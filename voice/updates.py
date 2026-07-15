@@ -21,7 +21,7 @@ from version import APP_VERSION
 
 # Укажите сюда URL, отдающий JSON с полем "tag_name" или "version",
 # например GitHub: https://api.github.com/repos/<owner>/<repo>/releases/latest
-UPDATE_ENDPOINT = ""
+UPDATE_ENDPOINT = "https://api.github.com/repos/Luna-corex/RinaAssistant/releases/latest"
 
 
 def _parse_version(s):
@@ -50,7 +50,7 @@ class UpdateChecker(QObject):
             self.result.emit(
                 False,
                 tr("Источник обновлений не настроен. Укажите URL релизов ") +
-                tr("в ui/voice/updates.py, чтобы включить проверку."))
+                tr("в voice/updates.py, чтобы включить проверку."))
             return
         try:
             req = urllib.request.Request(
