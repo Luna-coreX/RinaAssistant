@@ -5,7 +5,7 @@ BUILD = "2026.07"
 
 LINKS = {
     "site": "https://neurosync-foundry-portal.pages.dev/",
-    "source": "https://github.com/",
-    "docs": "https://github.com/",
-    "issues": "https://github.com/",
+    "source": "https://github.com/Luna-coreX/RinaAssistant",
+    "docs": "",
+    "issues": "https://github.com/Luna-coreX/RinaAssistant/issues",
 }
