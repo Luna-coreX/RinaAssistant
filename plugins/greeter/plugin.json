@@ -1,0 +1,9 @@
+{
+  "id": "greeter",
+  "name": "Приветствие",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Отвечает на приветствия. Скажите «привет» — и Рина ответит.",
+  "icon": "👋",
+  "entry": "GreeterPlugin"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "clock",
+  "name": "Часы",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Сообщает текущее время и дату по запросу («сколько времени», «какая дата»).",
+  "icon": "🕐",
+  "entry": "ClockPlugin"
+}

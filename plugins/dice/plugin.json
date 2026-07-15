@@ -1,0 +1,9 @@
+{
+  "id": "dice",
+  "name": "Кубик",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Бросает игральный кубик или монетку по команде («брось кубик», «подбрось монету»).",
+  "icon": "🎲",
+  "entry": "DicePlugin"
+}

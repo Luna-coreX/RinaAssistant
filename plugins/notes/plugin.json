@@ -1,0 +1,10 @@
+{
+  "id": "notes",
+  "name": "Заметки",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Быстрые заметки: своя вкладка, настройки и команда «запиши…».",
+  "icon": "📝",
+  "entry": "NotesPlugin",
+  "api_version": 2
+}
