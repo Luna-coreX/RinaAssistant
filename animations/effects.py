@@ -12,8 +12,14 @@ from PySide6.QtCore import (
     QPoint,
     QParallelAnimationGroup,
     QAbstractAnimation,
+    QObject,
+    Property,
 )
 from PySide6.QtWidgets import QWidget, QGraphicsOpacityEffect
+
+
+# Единая «фирменная» кривая — мягкий, но энергичный выход (модно/футуристично).
+EASE = QEasingCurve.OutExpo
 
 
 def _opacity_effect(widget: QWidget) -> QGraphicsOpacityEffect:
@@ -35,7 +41,7 @@ def fade_in(widget: QWidget, duration: int = 350,
     anim.setDuration(duration)
     anim.setStartValue(start)
     anim.setEndValue(end)
-    anim.setEasingCurve(QEasingCurve.OutCubic)
+    anim.setEasingCurve(EASE)
     anim.start(QAbstractAnimation.DeleteWhenStopped)
 
     widget._fade_anim = anim  # держим ссылку, иначе GC убьёт анимацию
@@ -101,13 +107,13 @@ def page_transition(widget: QWidget, duration: int = 280, offset: int = 26):
     fade.setDuration(duration)
     fade.setStartValue(0.0)
     fade.setEndValue(1.0)
-    fade.setEasingCurve(QEasingCurve.OutCubic)
+    fade.setEasingCurve(EASE)
 
     move = QPropertyAnimation(widget, b"pos", widget)
     move.setDuration(duration)
     move.setStartValue(start_pos)
     move.setEndValue(end_pos)
-    move.setEasingCurve(QEasingCurve.OutCubic)
+    move.setEasingCurve(EASE)
 
     group = QParallelAnimationGroup(widget)
     group.addAnimation(fade)
@@ -116,3 +122,44 @@ def page_transition(widget: QWidget, duration: int = 280, offset: int = 26):
 
     widget._page_anim = group
     return group
+
+
+class PulseValue(QObject):
+    """
+    Источник плавно пульсирующего значения 0→1→0 (loop).
+
+    Используется для «дыхания» индикаторов/свечения. Виджет подписывается
+    на сигнал :attr:`tick` и перерисовывается. Значение доступно как
+    свойство ``value`` (для отладки/цепочек).
+    """
+
+    def __init__(self, duration: int = 1600, parent=None):
+        super().__init__(parent)
+        self._value = 0.0
+        self._anim = QPropertyAnimation(self, b"value", self)
+        self._anim.setDuration(duration)
+        self._anim.setStartValue(0.0)
+        self._anim.setKeyValueAt(0.5, 1.0)
+        self._anim.setEndValue(0.0)
+        self._anim.setEasingCurve(QEasingCurve.InOutSine)
+        self._anim.setLoopCount(-1)
+
+    def get_value(self):
+        return self._value
+
+    def set_value(self, v):
+        self._value = v
+        for cb in getattr(self, "_subs", []):
+            cb()
+
+    value = Property(float, get_value, set_value)
+
+    def subscribe(self, callback):
+        self._subs = getattr(self, "_subs", [])
+        self._subs.append(callback)
+
+    def start(self):
+        self._anim.start()
+
+    def stop(self):
+        self._anim.stop()

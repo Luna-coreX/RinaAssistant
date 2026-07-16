@@ -89,7 +89,7 @@ class RinaPage(QWidget):
 
         status = QLabel("● Online")
         status.setStyleSheet(f"""
-            background: {Color.GREEN}22; color: {Color.GREEN};
+            background: {Color.alpha(Color.GREEN, '22')}; color: {Color.GREEN};
             border-radius: 10px; padding: 4px 12px;
             font-size: 12px; font-weight: 600;
         """)

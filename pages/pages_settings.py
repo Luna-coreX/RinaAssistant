@@ -502,14 +502,14 @@ class SettingsPage(QWidget):
             QPushButton {{
                 background: transparent;
                 color: {Color.RED};
-                border: 1px solid {Color.RED}55;
+                border: 1px solid {Color.alpha(Color.RED, '55')};
                 border-radius: {Radius.SM}px;
                 padding: 6px 18px;
                 font-size: 13px;
                 font-weight: 600;
             }}
             QPushButton:hover {{
-                background: {Color.RED}22;
+                background: {Color.alpha(Color.RED, '22')};
                 border: 1px solid {Color.RED};
             }}
         """)

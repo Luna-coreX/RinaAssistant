@@ -4,13 +4,16 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import (
-    QFont, QColor, QPainter, QPainterPath, QBrush, QShortcut, QKeySequence,
+    QFont, QColor, QPainter, QPainterPath, QBrush, QPen, QShortcut,
+    QKeySequence, QLinearGradient,
 )
 
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius, PAGE_ICONS, theme_manager
+from core.assets import app_icon, logo_pixmap
 from components.titlebar import TitleBar
 from components.nav_button import NavButton
+from components.status_dot import StatusDot
 from pages.pages import build_page
 from animations.effects import fade_window_in, page_transition
 from core.settings_store import settings
@@ -32,6 +35,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Rina Assistant")
+        self.setWindowIcon(app_icon())
         self.resize(1120, 720)
         self.setMinimumSize(940, 620)
 
@@ -276,7 +280,19 @@ class MainWindow(QMainWindow):
         rect = self.rect().adjusted(0, 0, -1, -1)
         path.addRoundedRect(rect, Radius.LG, Radius.LG)
         painter.fillPath(path, QBrush(QColor(Color.BASE)))
-        painter.setPen(QColor(Color.SURFACE_0))
+
+        # неоновая окантовка окна: акцент→розовый→синий по диагонали
+        edge = QLinearGradient(rect.left(), rect.top(),
+                               rect.right(), rect.bottom())
+        c1 = QColor(Color.ACCENT);  c1.setAlphaF(0.55)
+        c2 = QColor(Color.ACCENT2); c2.setAlphaF(0.30)
+        c3 = QColor(Color.ACCENT3); c3.setAlphaF(0.55)
+        edge.setColorAt(0.0, c1)
+        edge.setColorAt(0.5, c2)
+        edge.setColorAt(1.0, c3)
+        pen = QPen(QBrush(edge), 1.4)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
         painter.drawPath(path)
         painter.end()
 
@@ -320,15 +336,32 @@ class MainWindow(QMainWindow):
         self.sidebar.setFixedWidth(238)
 
         layout = QVBoxLayout(self.sidebar)
-        layout.setContentsMargins(16, 14, 16, 18)
+        layout.setContentsMargins(16, 16, 16, 18)
         layout.setSpacing(4)
 
-        self.logo = QLabel("🌸  Rina")
-        self.logo.setFont(QFont(FONT_FAMILY, 18, QFont.Bold))
-        self.logo_sub = QLabel("Assistant")
-        layout.addWidget(self.logo)
-        layout.addWidget(self.logo_sub)
-        layout.addSpacing(22)
+        # ---- брендовый блок: эмблема + градиентный вордмарк ----
+        from components.gradient_text import GradientText
+        brand = QHBoxLayout()
+        brand.setContentsMargins(4, 0, 0, 0)
+        brand.setSpacing(12)
+
+        self.logo_img = QLabel()
+        self.logo_img.setPixmap(logo_pixmap(40))
+        self.logo_img.setFixedSize(40, 40)
+        self.logo_img.setAlignment(Qt.AlignCenter)
+        brand.addWidget(self.logo_img)
+
+        wordmark = QVBoxLayout()
+        wordmark.setSpacing(0)
+        self.logo = GradientText("RINA", size=19, letter_spacing=2.0)
+        self.logo_sub = QLabel("ASSISTANT")
+        wordmark.addWidget(self.logo)
+        wordmark.addWidget(self.logo_sub)
+        brand.addLayout(wordmark)
+        brand.addStretch()
+
+        layout.addLayout(brand)
+        layout.addSpacing(24)
 
         # контейнер для кнопок навигации (пересобирается)
         self._nav_layout = QVBoxLayout()
@@ -339,8 +372,9 @@ class MainWindow(QMainWindow):
 
         self.status_frame = QFrame()
         sl = QHBoxLayout(self.status_frame)
-        sl.setContentsMargins(14, 10, 14, 10)
-        self.status_dot = QLabel("●")
+        sl.setContentsMargins(12, 8, 14, 8)
+        sl.setSpacing(6)
+        self.status_dot = StatusDot("GREEN", diameter=9)
         self.status_txt = QLabel("Rina Online")
         sl.addWidget(self.status_dot)
         sl.addWidget(self.status_txt)
@@ -397,16 +431,23 @@ class MainWindow(QMainWindow):
                 background: {Color.MANTLE};
                 border-top-left-radius: {Radius.LG}px;
                 border-bottom-left-radius: {Radius.LG}px;
+                border-right: 1px solid {Color.SURFACE_0};
             }}
         """)
-        self.logo.setStyleSheet(f"color: {Color.TEXT}; padding: 6px 8px;")
+        self.logo.update()
         self.logo_sub.setStyleSheet(
-            f"color: {Color.OVERLAY}; font-size: 11px; padding-left: 8px;")
-        self.status_frame.setStyleSheet(
-            f"background: {Color.CRUST}; border-radius: {Radius.MD}px;")
-        self.status_dot.setStyleSheet(f"color: {Color.GREEN}; font-size: 12px;")
+            f"color: {Color.OVERLAY}; font-size: 10px; font-weight: 700; "
+            f"letter-spacing: 3px;")
+        self.status_frame.setStyleSheet(f"""
+            QFrame {{
+                background: {Color.CRUST};
+                border: 1px solid {Color.SURFACE_0};
+                border-radius: {Radius.MD}px;
+            }}
+        """)
         self.status_txt.setStyleSheet(
-            f"color: {Color.SUBTEXT}; font-size: 12px; font-weight: 600;")
+            f"color: {Color.SUBTEXT}; font-size: 12px; font-weight: 600; "
+            f"background: transparent; border: none;")
 
     def _build_content(self):
         self.content_wrap = QFrame()
@@ -617,6 +658,7 @@ def run():
 
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
+    app.setWindowIcon(app_icon())
     app.setQuitOnLastWindowClosed(False)  # чтобы жить в трее
 
     # первый запуск — показать онбординг
