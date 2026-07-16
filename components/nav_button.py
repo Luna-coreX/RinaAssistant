@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QPushButton
-from PySide6.QtCore import Qt, Property, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QColor, QPainter, QFont
+from PySide6.QtCore import Qt, Property, QPropertyAnimation, QEasingCurve, QRectF
+from PySide6.QtGui import QColor, QPainter, QFont, QLinearGradient
 
 from core.theme import Color, FONT_FAMILY, Radius
 
@@ -69,7 +69,7 @@ class NavButton(QPushButton):
         anim.setDuration(dur)
         anim.setStartValue(start)
         anim.setEndValue(end)
-        anim.setEasingCurve(QEasingCurve.OutCubic)
+        anim.setEasingCurve(QEasingCurve.OutExpo)
         anim.start()
         self._active_anim = anim
 
@@ -78,29 +78,50 @@ class NavButton(QPushButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
 
-        rect = self.rect().adjusted(2, 3, -2, -3)
+        rect = QRectF(self.rect().adjusted(2, 3, -2, -3))
 
         # фон
         if self._bg_alpha > 0:
             if self.isChecked():
-                base = QColor(Color.ACCENT)
-                base.setAlphaF(0.16 * self._bg_alpha + 0.0)
-                bg = QColor(Color.ACCENT)
-                bg.setAlphaF(0.15 * self._bg_alpha)
+                # неоновая градиентная заливка активной вкладки
+                grad = QLinearGradient(rect.left(), 0, rect.right(), 0)
+                c1 = QColor(Color.ACCENT);  c1.setAlphaF(0.22 * self._bg_alpha)
+                c2 = QColor(Color.ACCENT2); c2.setAlphaF(0.12 * self._bg_alpha)
+                grad.setColorAt(0.0, c1)
+                grad.setColorAt(1.0, c2)
+                p.setBrush(grad)
+                p.setPen(Qt.NoPen)
+                p.drawRoundedRect(rect, Radius.SM, Radius.SM)
+                # тонкая акцентная окантовка
+                border = QColor(Color.ACCENT)
+                border.setAlphaF(0.35 * self._bg_alpha)
+                p.setBrush(Qt.NoBrush)
+                p.setPen(border)
+                p.drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5),
+                                  Radius.SM, Radius.SM)
             else:
                 bg = QColor(Color.SURFACE_0)
                 bg.setAlphaF(self._bg_alpha)
-            p.setBrush(bg)
-            p.setPen(Qt.NoPen)
-            p.drawRoundedRect(rect, Radius.SM, Radius.SM)
+                p.setBrush(bg)
+                p.setPen(Qt.NoPen)
+                p.drawRoundedRect(rect, Radius.SM, Radius.SM)
 
-        # индикатор слева
+        # индикатор слева со свечением
         if self._indicator > 0:
-            h = rect.height() * 0.55 * self._indicator
+            h = rect.height() * 0.6 * self._indicator
             y = rect.center().y() - h / 2
-            p.setBrush(QColor(Color.ACCENT))
+            # мягкое свечение под индикатором
+            glow = QColor(Color.ACCENT)
+            glow.setAlphaF(0.30 * self._indicator)
+            p.setBrush(glow)
             p.setPen(Qt.NoPen)
-            p.drawRoundedRect(rect.left(), int(y), 4, int(h), 2, 2)
+            p.drawRoundedRect(QRectF(rect.left() - 1, y - 3, 8, h + 6), 5, 5)
+            # сам индикатор — вертикальный градиент акцент→розовый
+            ind = QLinearGradient(0, y, 0, y + h)
+            ind.setColorAt(0.0, QColor(Color.ACCENT))
+            ind.setColorAt(1.0, QColor(Color.ACCENT2))
+            p.setBrush(ind)
+            p.drawRoundedRect(QRectF(rect.left(), y, 4, h), 2, 2)
 
         # текст
         color = QColor(Color.TEXT if self.isChecked() else Color.SUBTEXT)
@@ -108,6 +129,6 @@ class NavButton(QPushButton):
         f = self.font()
         f.setBold(self.isChecked())
         p.setFont(f)
-        text_rect = rect.adjusted(14, 0, 0, 0)
+        text_rect = self.rect().adjusted(16, 0, 0, 0)
         p.drawText(text_rect, Qt.AlignVCenter | Qt.AlignLeft, self.text())
         p.end()

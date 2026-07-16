@@ -106,6 +106,16 @@ DEFAULT_THEME = "Catppuccin Mocha"
 DEFAULT_ACCENT = "Mauve"
 
 
+def _mix(c1: str, c2: str, t: float) -> str:
+    """Линейная интерполяция двух hex-цветов (#rrggbb). t=0 -> c1, t=1 -> c2."""
+    c1 = c1.lstrip("#")
+    c2 = c2.lstrip("#")
+    r = round(int(c1[0:2], 16) + (int(c2[0:2], 16) - int(c1[0:2], 16)) * t)
+    g = round(int(c1[2:4], 16) + (int(c2[2:4], 16) - int(c1[2:4], 16)) * t)
+    b = round(int(c1[4:6], 16) + (int(c2[4:6], 16) - int(c1[4:6], 16)) * t)
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
 class _Color:
     """Держатель текущих цветов; атрибуты меняются при смене темы."""
     BASE = MANTLE = CRUST = ""
@@ -113,6 +123,8 @@ class _Color:
     TEXT = SUBTEXT = OVERLAY = ""
     GREEN = RED = PEACH = YELLOW = PINK = BLUE = TEAL = MAUVE = ""
     ACCENT = ""
+    # Вторичный/третичный акценты для неоновых градиентов (фиолетовый→розовый→синий)
+    ACCENT2 = ACCENT3 = ""
 
     def apply(self, theme_name, accent_name):
         pal = PALETTES.get(theme_name, PALETTES[DEFAULT_THEME])
@@ -123,6 +135,45 @@ class _Color:
             setattr(self, key, pal[key])
         accents = pal["accents"]
         self.ACCENT = accents.get(accent_name, next(iter(accents.values())))
+        # Пара для градиента: тянемся к розовому и синему из палитры,
+        # получая фирменную неоновую растяжку в духе логотипа Rina.
+        self.ACCENT2 = pal["PINK"]
+        self.ACCENT3 = pal["BLUE"]
+
+    # ---------- помощники для футуристичных градиентов ----------
+    def gradient(self, x1=0, y1=0, x2=1, y2=1, tri=False):
+        """QSS-градиент акцент→розовый (→синий). Для фонов кнопок/полос."""
+        if tri:
+            return (
+                f"qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, "
+                f"stop:0 {self.ACCENT3}, stop:0.5 {self.ACCENT}, "
+                f"stop:1 {self.ACCENT2})"
+            )
+        return (
+            f"qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, "
+            f"stop:0 {self.ACCENT}, stop:1 {self.ACCENT2})"
+        )
+
+    def glow(self, alpha=0.35):
+        """Акцентный цвет с прозрачностью (rgba-строка) для свечения/подсветки."""
+        c = self.ACCENT.lstrip("#")
+        r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
+        return f"rgba({r}, {g}, {b}, {alpha})"
+
+    @staticmethod
+    def alpha(hex_color, aa):
+        """
+        Корректная прозрачность для Qt-стилей: возвращает #AARRGGBB.
+
+        Внимание: конкатенация «{Color.X}22» даёт #RRGGBBAA, но Qt читает
+        8-значный hex как #AARRGGBB — цвет получается неверным. Этот helper
+        ставит альфу в начало, как ждёт Qt.
+        `aa` — строка из 2 hex-символов ('22') или int 0..255.
+        """
+        h = hex_color.lstrip("#")
+        if isinstance(aa, int):
+            aa = f"{max(0, min(255, aa)):02x}"
+        return f"#{aa}{h}"
 
 
 Color = _Color()

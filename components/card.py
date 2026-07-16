@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import QFrame, QVBoxLayout
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen
-from PySide6.QtCore import Qt
+from PySide6.QtGui import (
+    QColor, QPainter, QPainterPath, QBrush, QPen, QLinearGradient,
+)
+from PySide6.QtCore import Qt, QRectF
 from core.theme import Color, Radius
 
 
@@ -55,13 +57,30 @@ class Card(QFrame):
             shadow_rect = rect.adjusted(-i, -i + 3, i, i + 3)
             p.drawRoundedRect(shadow_rect, self._radius + i, self._radius + i)
 
-        # тело карточки
+        # тело карточки — лёгкий вертикальный градиент (стеклянный эффект)
+        body = QLinearGradient(rect.left(), rect.top(),
+                               rect.left(), rect.bottom())
+        top = QColor(Color.SURFACE_0)
+        top_c = QColor(Color.CRUST)
+        # чуть подсветить верх для объёма
+        body.setColorAt(0.0, QColor(
+            min(255, top_c.red() + 6),
+            min(255, top_c.green() + 6),
+            min(255, top_c.blue() + 8)))
+        body.setColorAt(1.0, top_c)
         path = QPainterPath()
         path.addRoundedRect(rect, self._radius, self._radius)
-        p.fillPath(path, QBrush(QColor(Color.CRUST)))
+        p.fillPath(path, QBrush(body))
 
-        # тонкая рамка
-        p.setPen(QPen(QColor(Color.SURFACE_0), 1))
+        # тонкая градиентная рамка: сверху акцентный отблеск, ниже — нейтраль
+        border = QLinearGradient(rect.left(), rect.top(),
+                                 rect.right(), rect.bottom())
+        hi = QColor(Color.ACCENT); hi.setAlphaF(0.28)
+        lo = QColor(Color.SURFACE_0)
+        border.setColorAt(0.0, hi)
+        border.setColorAt(0.35, lo)
+        border.setColorAt(1.0, lo)
+        p.setPen(QPen(QBrush(border), 1))
         p.setBrush(Qt.NoBrush)
         p.drawPath(path)
         p.end()

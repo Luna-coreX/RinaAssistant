@@ -5,8 +5,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-from i18n import t as tr
-from theme import Color, FONT_FAMILY, Radius
+from core.i18n import t as tr
+from core.theme import Color, FONT_FAMILY, Radius
 from components.controls import styled_combo, styled_lineedit
 from components.sequence_editor import SequenceEditor
 from voice.user_commands import (

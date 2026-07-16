@@ -11,29 +11,29 @@ from PySide6.QtCore import Qt, QObject, Signal
 
 from core.i18n import t as tr
 from core.theme import Color, theme_manager
+from core.assets import app_icon
 
 
 def make_tray_icon() -> QIcon:
-    """Рисуем простую иконку: скруглённый квадрат + буква R."""
+    """Иконка трея — фирменная эмблема Rina (assets/icon.ico)."""
+    icon = app_icon()
+    if not icon.isNull():
+        return icon
+
+    # запасной вариант, если ассет недоступен: скруглённый квадрат + R
     size = 64
     pix = QPixmap(size, size)
     pix.fill(Qt.transparent)
-
     p = QPainter(pix)
     p.setRenderHint(QPainter.Antialiasing)
-
-    # фон
     p.setBrush(QBrush(QColor(Color.ACCENT)))
     p.setPen(Qt.NoPen)
     p.drawRoundedRect(4, 4, size - 8, size - 8, 16, 16)
-
-    # буква R
     p.setPen(QColor("#ffffff"))
     f = QFont("Segoe UI", 30, QFont.Bold)
     p.setFont(f)
     p.drawText(pix.rect(), Qt.AlignCenter, "R")
     p.end()
-
     return QIcon(pix)
 
 

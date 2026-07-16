@@ -12,8 +12,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt
 
-from i18n import t as tr
-from theme import Color, FONT_FAMILY, Radius
+from core.i18n import t as tr
+from core.theme import Color, FONT_FAMILY, Radius
 from components.controls import styled_combo, styled_lineedit
 from voice.user_commands import SYSTEM_ACTIONS, make_command
 
@@ -89,10 +89,10 @@ class StepRow(QWidget):
         self.del_btn.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {Color.RED};
-                border: 1px solid {Color.RED}55; border-radius: {Radius.SM}px;
+                border: 1px solid {Color.alpha(Color.RED, '55')}; border-radius: {Radius.SM}px;
                 font-size: 13px;
             }}
-            QPushButton:hover {{ background: {Color.RED}22; }}
+            QPushButton:hover {{ background: {Color.alpha(Color.RED, '22')}; }}
         """)
         self.del_btn.clicked.connect(lambda: self._on_delete(self))
         row.addWidget(self.del_btn)

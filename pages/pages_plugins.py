@@ -171,7 +171,7 @@ class PluginsPage(QWidget):
             err.setWordWrap(True)
             err.setStyleSheet(f"""
                 color: {Color.RED}; font-size: 11px;
-                background: {Color.RED}18; border-radius: {Radius.SM}px;
+                background: {Color.alpha(Color.RED, '18')}; border-radius: {Radius.SM}px;
                 padding: 8px 10px;
             """)
             cl.addWidget(err)
@@ -200,7 +200,7 @@ class PluginsPage(QWidget):
         b = QLabel(text)
         b.setStyleSheet(f"""
             color: {color}; font-size: 10px; font-weight: 600;
-            background: {color}22; border-radius: 6px; padding: 1px 8px;
+            background: {Color.alpha(color, '22')}; border-radius: 6px; padding: 1px 8px;
         """)
         return b
 

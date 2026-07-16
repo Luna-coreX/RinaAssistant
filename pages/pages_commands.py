@@ -264,10 +264,10 @@ class CommandsPage(QWidget):
         b.setStyleSheet(f"""
             QPushButton {{
                 background: transparent; color: {color};
-                border: 1px solid {color}55; border-radius: 6px;
+                border: 1px solid {Color.alpha(color, '55')}; border-radius: 6px;
                 padding: 2px 12px; font-size: 12px; font-weight: 600;
             }}
-            QPushButton:hover {{ background: {color}22; border: 1px solid {color}; }}
+            QPushButton:hover {{ background: {Color.alpha(color, '22')}; border: 1px solid {color}; }}
         """)
         return b
 
@@ -283,14 +283,14 @@ class CommandsPage(QWidget):
         app_signals.run_command.emit(cid)
 
     def _open_builder_new(self):
-        from command_builder import CommandBuilderDialog
+        from dialogs.command_builder import CommandBuilderDialog
         dlg = CommandBuilderDialog(self)
         if dlg.exec():
             self.store.add(dlg.result())
             app_signals.commands_changed.emit()
 
     def _open_builder_edit(self, cmd):
-        from command_builder import CommandBuilderDialog
+        from dialogs.command_builder import CommandBuilderDialog
         dlg = CommandBuilderDialog(self, command=cmd)
         if dlg.exec():
             self.store.update(dlg.result())

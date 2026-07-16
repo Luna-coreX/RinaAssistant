@@ -48,17 +48,22 @@ class CommandBar(QWidget):
                 background: {Color.CRUST}; color: {Color.TEXT};
                 border: 1px solid {Color.SURFACE_0}; border-radius: {Radius.MD}px;
                 padding: 6px 16px; font-family: '{FONT_FAMILY}'; font-size: 13px;
+                selection-background-color: {Color.ACCENT};
             }}
+            QLineEdit:hover {{ border: 1px solid {Color.SURFACE_1}; }}
             QLineEdit:focus {{ border: 1px solid {Color.ACCENT}; }}
         """)
         self.send_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {Color.ACCENT}; color: #ffffff;
+                background: {Color.gradient(0, 0, 1, 0)}; color: #ffffff;
                 border: none; border-radius: {Radius.MD}px;
-                padding: 6px 22px; font-size: 13px; font-weight: 600;
+                padding: 6px 22px; font-size: 13px; font-weight: 700;
+                letter-spacing: 0.3px;
             }}
-            QPushButton:hover {{ background: {Color.MAUVE}; }}
-            QPushButton:pressed {{ background: {Color.SURFACE_2}; }}
+            QPushButton:hover {{
+                background: {Color.gradient(0, 0, 1, 0, tri=True)};
+            }}
+            QPushButton:pressed {{ background: {Color.ACCENT}; }}
         """)
 
     def _submit(self):

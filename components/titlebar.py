@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal
 
 from core.theme import Color, FONT_FAMILY
+from core.assets import logo_pixmap
 
 
 class TitleBar(QWidget):
@@ -36,8 +37,11 @@ class TitleBar(QWidget):
         layout.setSpacing(0)
 
         self.title = QLabel("Rina Assistant")
-        self.dot = QLabel("🌸")
-        self.dot.setStyleSheet("font-size: 14px; margin-right: 8px;")
+        self.dot = QLabel()
+        self.dot.setPixmap(logo_pixmap(22))
+        self.dot.setFixedSize(22, 22)
+        self.dot.setAlignment(Qt.AlignCenter)
+        self.dot.setStyleSheet("margin-right: 8px;")
 
         layout.addWidget(self.dot)
         layout.addWidget(self.title)
