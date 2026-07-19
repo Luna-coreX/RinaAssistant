@@ -11,11 +11,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
-from i18n import t as tr
-from theme import Color, FONT_FAMILY, Radius, theme_manager, PALETTES
+from core.i18n import t as tr
+from core.theme import Color, FONT_FAMILY, Radius, theme_manager, PALETTES
 from components.controls import styled_combo, styled_lineedit
 from components.toggle_switch import ToggleSwitch
-from settings_store import settings
+from core.settings_store import settings
 
 
 class OnboardingDialog(QDialog):
