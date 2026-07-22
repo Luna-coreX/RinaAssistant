@@ -102,10 +102,16 @@ class AboutPage(QWidget):
         title.setStyleSheet(f"color: {Color.SUBTEXT};")
         cl.addWidget(title)
 
-        cl.addWidget(self._link_button("🌐", tr("Веб-сайт"), LINKS["site"]))
-        cl.addWidget(self._link_button("💻", tr("Исходный код"), LINKS["source"]))
-        cl.addWidget(self._link_button("📖", tr("Документация"), LINKS["docs"]))
-        cl.addWidget(self._link_button("🐞", tr("Сообщить об ошибке"), LINKS["issues"]))
+        # показываем только те ссылки, у которых задан URL (пустые — пропускаем)
+        link_specs = [
+            ("🌐", tr("Веб-сайт"), LINKS.get("site")),
+            ("💻", tr("Исходный код"), LINKS.get("source")),
+            ("📖", tr("Документация"), LINKS.get("docs")),
+            ("🐞", tr("Сообщить об ошибке"), LINKS.get("issues")),
+        ]
+        for icon, text, url in link_specs:
+            if url:
+                cl.addWidget(self._link_button(icon, text, url))
         return card
 
     def _tech_card(self):

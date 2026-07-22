@@ -27,8 +27,8 @@ def _launch_command():
 
 
 def _project_root():
-    # ui/voice/autostart.py -> корень проекта на три уровня выше
-    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # voice/autostart.py -> корень проекта на два уровня выше
+    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # ---------------------------------------------------------------------------

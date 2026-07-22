@@ -221,7 +221,24 @@ class SettingsStore:
     def all(self) -> dict:
         return dict(self._data)
 
-    def reset(self):
+    def reset(self, groups=("settings",)):
+        """
+        Сбрасывает к значениям по умолчанию только указанные группы.
+
+        По умолчанию сбрасываются ТОЛЬКО пользовательские настройки
+        (группа "settings"): тема, поведение окна, голос, приватность и т.д.
+        Пользовательские команды, история и плагины сохраняются — их удаление
+        должно быть отдельным осознанным действием, а не побочным эффектом
+        «Сбросить настройки».
+        """
+        for grp in groups:
+            for k in GROUPS.get(grp, {}):
+                self._data[k] = DEFAULTS[k]
+            self._dirty.add(grp)
+        self.save()
+
+    def reset_all(self):
+        """Полный заводской сброс: обнуляет ВСЕ группы (команды, историю и т.д.)."""
         self._data = dict(DEFAULTS)
         self.save_all()
 

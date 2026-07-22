@@ -76,7 +76,7 @@ def _record_sounddevice(seconds=6, samplerate=16000):
     try:
         import sounddevice as sd
         import numpy as np
-        from settings_store import settings
+        from core.settings_store import settings
         device_id = settings.get("input_device", "default")
         kwargs = {}
         if device_id and device_id != "default":
@@ -189,7 +189,7 @@ class VoskEngine(STTEngine):
         return self._try_import() is not None and _sd_available()
 
     def _get_model(self):
-        from settings_store import settings
+        from core.settings_store import settings
         vosk = self._try_import()
         if vosk is None:
             return None
@@ -259,7 +259,7 @@ class WhisperEngine(STTEngine):
         return self._try_import() is not None and _sd_available()
 
     def _get_model(self):
-        from settings_store import settings
+        from core.settings_store import settings
         whisper = self._try_import()
         if whisper is None:
             return None

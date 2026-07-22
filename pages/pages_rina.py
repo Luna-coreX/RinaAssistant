@@ -186,15 +186,8 @@ class RinaPage(QWidget):
         cl.addWidget(SettingRow(
             "⚡", tr("Скорость речи"), tr("Темп произношения ответов"), spd_ctrl
         ))
-        cl.addWidget(Divider())
-
-        # 5. Язык
-        self.lang_combo = styled_combo(
-            ["Русский", "English", "Українська", "Español", "Deutsch"], 0)
-        cl.addWidget(SettingRow(
-            "🌐", tr("Язык"), tr("Язык интерфейса и распознавания речи"),
-            self.lang_combo
-        ))
+        # Язык распознавания речи теперь общий с языком интерфейса —
+        # настраивается один раз в «Настройки → Язык».
         return card
 
     # ---------- карточка «Поведение» ----------
@@ -253,7 +246,6 @@ class RinaPage(QWidget):
         self.wake_edit.setText(", ".join(str(w) for w in wake_list))
         self.volume_slider.setValue(int(settings.get("volume")))
         self.speed_slider.setValue(int(settings.get("speed")))
-        self._set_combo(self.lang_combo, settings.get("language"))
         self.voice_reply.setChecked(bool(settings.get("voice_reply")))
         self.always_listen.setChecked(bool(settings.get("always_listen")))
         # обновить подписи значений
@@ -301,7 +293,6 @@ class RinaPage(QWidget):
         self.wake_edit.textChanged.connect(self._save)
         self.volume_slider.valueChanged.connect(self._save)
         self.speed_slider.valueChanged.connect(self._save)
-        self.lang_combo.currentTextChanged.connect(self._save)
         self.voice_reply.toggled.connect(self._save)
         self.always_listen.toggled.connect(self._save)
         self.always_listen.toggled.connect(
@@ -328,7 +319,6 @@ class RinaPage(QWidget):
             "wake_words": self._wake_list(),
             "volume": self.volume_slider.value(),
             "speed": self.speed_slider.value(),
-            "language": self.lang_combo.currentText(),
             "voice_reply": self.voice_reply.isChecked(),
             "always_listen": self.always_listen.isChecked(),
         }
