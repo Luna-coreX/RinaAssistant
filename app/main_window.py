@@ -72,6 +72,9 @@ class MainWindow(QMainWindow):
         # голосовой слой
         self._setup_voice()
 
+        # автопроверка обновлений при старте (если включено в настройках)
+        self._maybe_check_updates()
+
     def _setup_voice(self):
         from plugins.manager import plugin_manager
         self.voice = VoiceService(plugin_manager=plugin_manager, parent=self)
@@ -265,6 +268,26 @@ class MainWindow(QMainWindow):
                 self.command_bar.input.setFocus()
         elif action_id == "floating_bar":
             self.toggle_floating_bar()
+
+    def _maybe_check_updates(self):
+        """
+        Фоновая проверка обновлений при запуске, если включена настройка.
+        Уведомляем через трей ТОЛЬКО когда доступна новая версия — чтобы
+        не спамить сообщением «у вас последняя версия» на каждом старте.
+        """
+        if not settings.get("check_updates", True):
+            return
+        try:
+            from voice.updates import UpdateChecker
+            self._startup_update_checker = UpdateChecker(self)
+            self._startup_update_checker.result.connect(self._on_startup_update)
+            self._startup_update_checker.check()
+        except Exception:
+            pass
+
+    def _on_startup_update(self, available, message):
+        if available and settings.get("notifications", True) and hasattr(self, "tray"):
+            self.tray.notify(tr("Доступно обновление"), message)
 
     def _sync_tray(self):
         if settings.get("minimize_to_tray"):

@@ -260,9 +260,10 @@ class VoiceService(QObject):
                 return
 
     def _lang_code(self):
+        # язык распознавания = язык интерфейса (единая настройка)
         lang_map = {"Русский": "ru", "English": "en", "Українська": "uk",
                     "Español": "es", "Deutsch": "de"}
-        return lang_map.get(settings.get("language", "Русский"), "ru")
+        return lang_map.get(settings.get("ui_language", "Русский"), "ru")
 
     def shutdown(self):
         self._stop_always.set()

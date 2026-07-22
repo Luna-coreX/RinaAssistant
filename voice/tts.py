@@ -183,7 +183,7 @@ class GttsEngine(TTSEngine):
 def _selected_output_device():
     """Индекс выбранного устройства вывода или None (по умолчанию)."""
     try:
-        from settings_store import settings
+        from core.settings_store import settings
         dev = settings.get("output_device", "default")
         if dev and dev != "default":
             return int(dev)
@@ -320,7 +320,7 @@ class PiperEngine(TTSEngine):
         return self._try_import() is not None
 
     def voices(self):
-        from settings_store import settings
+        from core.settings_store import settings
         model = settings.get("piper_model", "")
         if model:
             name = os.path.basename(model)
@@ -352,7 +352,7 @@ class PiperEngine(TTSEngine):
         PiperVoice = self._try_import()
         if PiperVoice is None:
             return
-        from settings_store import settings
+        from core.settings_store import settings
         model_path = settings.get("piper_model", "")
         if not model_path or not os.path.isfile(model_path):
             self._last_error = "Модель Piper не выбрана или файл не найден"

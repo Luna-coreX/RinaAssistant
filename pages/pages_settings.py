@@ -128,7 +128,7 @@ class SettingsPage(QWidget):
         from core.i18n import LANGUAGES
         self.language_combo = styled_combo(LANGUAGES, 0)
         cl.addWidget(SettingRow(
-            "🌍", tr("Язык интерфейса"), tr("Язык меню и подписей"),
+            "🌍", tr("Язык"), tr("Язык интерфейса и распознавания речи"),
             self.language_combo))
         return card
 
@@ -479,13 +479,6 @@ class SettingsPage(QWidget):
         cl.addWidget(SettingRow(
             "🕑", tr("Сохранять историю"), tr("Хранить историю запросов локально"),
             self.save_history))
-        cl.addWidget(Divider())
-
-        self.telemetry = ToggleSwitch()
-        cl.addWidget(SettingRow(
-            "📊", tr("Отправлять телеметрию"),
-            tr("Зарезервировано: сейчас ничего не отправляется"),
-            self.telemetry))
         return card
 
     # ---------- Сброс ----------
@@ -540,7 +533,6 @@ class SettingsPage(QWidget):
         self.sfx.setChecked(bool(settings.get("sound_effects")))
         self.updates.setChecked(bool(settings.get("check_updates")))
         self.save_history.setChecked(bool(settings.get("save_history")))
-        self.telemetry.setChecked(bool(settings.get("telemetry")))
 
         # аудио-устройства (по id)
         saved_in = settings.get("input_device", "default")
@@ -570,7 +562,6 @@ class SettingsPage(QWidget):
         self.sfx.toggled.connect(self._save)
         self.updates.toggled.connect(self._save)
         self.save_history.toggled.connect(self._save)
-        self.telemetry.toggled.connect(self._save)
         self.input_combo.currentIndexChanged.connect(self._save)
         self.output_combo.currentIndexChanged.connect(self._save)
 
@@ -587,7 +578,6 @@ class SettingsPage(QWidget):
             "sound_effects": self.sfx.isChecked(),
             "check_updates": self.updates.isChecked(),
             "save_history": self.save_history.isChecked(),
-            "telemetry": self.telemetry.isChecked(),
             "input_device": self._current_input_id(),
             "output_device": self._current_output_id(),
         }
