@@ -286,8 +286,28 @@ class MainWindow(QMainWindow):
             pass
 
     def _on_startup_update(self, available, message):
-        if available and settings.get("notifications", True) and hasattr(self, "tray"):
-            self.tray.notify(tr("Доступно обновление"), message)
+        if not available:
+            return
+
+        # Если окно на экране — показываем полноценное окно обновления.
+        # Уведомление трея для этого не годится: Qt молча его игнорирует,
+        # когда иконка трея скрыта (выключено «Сворачивать в трей»).
+        if self.isVisible() and not self.isMinimized():
+            try:
+                from dialogs.update_dialog import UpdateDialog
+                self._update_dialog = UpdateDialog(message, self)
+                self._update_dialog.show()
+                self._update_dialog.raise_()
+                return
+            except Exception:
+                pass
+
+        # окно скрыто/свёрнуто — пробуем трей, он в этом режиме виден
+        if settings.get("notifications", True) and hasattr(self, "tray"):
+            if self.tray.notify(tr("Доступно обновление"), message):
+                return
+        # трей недоступен — покажем окно при следующем разворачивании
+        self._pending_update_message = message
 
     def _sync_tray(self):
         if settings.get("minimize_to_tray"):
@@ -646,6 +666,12 @@ class MainWindow(QMainWindow):
         self.showNormal()
         self.raise_()
         self.activateWindow()
+        # если про обновление не удалось сообщить, пока окно было скрыто —
+        # показываем окно обновления сейчас
+        pending = getattr(self, "_pending_update_message", None)
+        if pending:
+            self._pending_update_message = None
+            self._on_startup_update(True, pending)
 
     def hideEvent(self, event):
         # окно свёрнуто в панель задач (не в трей) — тоже показать строку

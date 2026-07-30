@@ -105,9 +105,20 @@ class SystemTray(QObject):
         self._build_menu()
 
     def notify(self, title, message, msecs=4000):
-        if QSystemTrayIcon.supportsMessages():
-            self._tray.showMessage(
-                title, message, make_tray_icon(), msecs)
+        """
+        Показывает всплывающее уведомление у иконки трея.
+
+        Возвращает True, если уведомление действительно отправлено. Важно:
+        Qt молча игнорирует showMessage(), когда иконка трея скрыта (а она
+        скрыта, если выключено «Сворачивать в трей»), поэтому вызывающий код
+        должен уметь показать сообщение другим способом.
+        """
+        if not QSystemTrayIcon.supportsMessages():
+            return False
+        if not self._tray.isVisible():
+            return False
+        self._tray.showMessage(title, message, make_tray_icon(), msecs)
+        return True
 
     def show(self):
         self._tray.show()
