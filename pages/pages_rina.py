@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
@@ -186,9 +186,83 @@ class RinaPage(QWidget):
         cl.addWidget(SettingRow(
             "⚡", tr("Скорость речи"), tr("Темп произношения ответов"), spd_ctrl
         ))
+        cl.addWidget(Divider())
+
+        # Проверка голоса — прослушать выбранные движок/голос/громкость/скорость
+        cl.addWidget(self._voice_test_row())
+
         # Язык распознавания речи теперь общий с языком интерфейса —
         # настраивается один раз в «Настройки → Язык».
         return card
+
+    # ---------- проверка голоса ----------
+    def _voice_test_row(self):
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(0, 6, 0, 6)
+        h.setSpacing(12)
+
+        left = QVBoxLayout()
+        left.setSpacing(3)
+        tl = QLabel(tr("Проверка голоса"))
+        tl.setFont(QFont(FONT_FAMILY, 12, QFont.Bold))
+        tl.setStyleSheet(f"color: {Color.TEXT};")
+        left.addWidget(tl)
+        self.voice_test_status = QLabel(
+            tr("Рина произнесёт короткую фразу выбранным голосом"))
+        self.voice_test_status.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        self.voice_test_status.setWordWrap(True)
+        left.addWidget(self.voice_test_status)
+        h.addLayout(left, 1)
+
+        self.voice_test_btn = QPushButton(tr("🔊 Проверить"))
+        self.voice_test_btn.setCursor(Qt.PointingHandCursor)
+        self.voice_test_btn.setFixedHeight(36)
+        self.voice_test_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 4px 18px; font-size: 13px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+            QPushButton:disabled {{ color: {Color.OVERLAY}; }}
+        """)
+        self.voice_test_btn.clicked.connect(self._run_voice_test)
+        h.addWidget(self.voice_test_btn, 0, Qt.AlignVCenter)
+
+        from voice.voice_tester import VoiceTester
+        self._voice_tester = VoiceTester(self)
+        self._voice_tester.started.connect(self._on_voice_test_started)
+        self._voice_tester.finished.connect(self._on_voice_test_finished)
+        return row
+
+    def _run_voice_test(self):
+        engine_id = self._current_tts_id()
+        if engine_id == "silent":
+            self.voice_test_status.setText(
+                tr("Сначала выберите движок озвучки (TTS) выше"))
+            return
+        vidx = self.voice_combo.currentIndex()
+        voice_ids = getattr(self, "_voice_ids", [])
+        voice_id = voice_ids[vidx] if 0 <= vidx < len(voice_ids) else None
+        self._voice_tester.run_test(
+            engine_id, voice_id,
+            self.volume_slider.value(), self.speed_slider.value(),
+            tr("Привет! Меня зовут Рина. Это проверка голоса."))
+
+    def _on_voice_test_started(self):
+        self.voice_test_btn.setEnabled(False)
+        self.voice_test_btn.setText(tr("● Говорю…"))
+        self.voice_test_status.setText(tr("Воспроизведение…"))
+
+    def _on_voice_test_finished(self, err):
+        self.voice_test_btn.setEnabled(True)
+        self.voice_test_btn.setText(tr("🔊 Проверить"))
+        if err:
+            self.voice_test_status.setText(tr("Ошибка озвучки: ") + err)
+        else:
+            self.voice_test_status.setText(tr("Готово ✓"))
 
     # ---------- карточка «Поведение» ----------
     def _behavior_card(self):
