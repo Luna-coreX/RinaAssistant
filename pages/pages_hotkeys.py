@@ -21,6 +21,10 @@ class HotkeysPage(QWidget):
         super().__init__(parent)
         self._build()
 
+        # живой статус глобального хоткея (из кэша + подписка на обновления)
+        self._update_global_status(app_signals.last_hotkey_global)
+        app_signals.hotkey_status.connect(self._update_global_status)
+
     def _build(self):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -58,6 +62,11 @@ class HotkeysPage(QWidget):
         mc.addWidget(self._action_row(
             "🎤", tr("Активация ассистента"),
             tr("Разовое распознавание речи"), self.main_capture))
+
+        # живой индикатор: работает ли глобальный вызов (даже из трея)
+        self.global_status = QLabel("")
+        self.global_status.setWordWrap(True)
+        mc.addWidget(self.global_status)
         layout.addWidget(main_card)
 
         # дополнительные действия
@@ -82,8 +91,8 @@ class HotkeysPage(QWidget):
         layout.addWidget(actions_card)
 
         hint = QLabel(
-            tr("Кликните по полю и нажмите нужную комбинацию. Глобальные хоткеи ") +
-            tr("требуют пакет pynput; иначе работают, когда окно в фокусе."))
+            tr("Кликните по полю и нажмите нужную комбинацию. "
+               "Esc — отмена, пустое поле — снять назначение."))
         hint.setWordWrap(True)
         hint.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
         layout.addWidget(hint)
@@ -132,6 +141,19 @@ class HotkeysPage(QWidget):
         h.addLayout(box, 1)
         h.addWidget(capture, 0, Qt.AlignVCenter)
         return w
+
+    def _update_global_status(self, global_ok: bool):
+        if global_ok:
+            self.global_status.setText(
+                tr("✓ Глобальный вызов активен — работает даже из трея."))
+            self.global_status.setStyleSheet(
+                f"color: {Color.GREEN}; font-size: 11px; padding-left: 42px;")
+        else:
+            self.global_status.setText(
+                tr("Глобальный вызов недоступен (нужен пакет pynput: ") +
+                tr("pip install pynput). Комбинация сработает, когда окно в фокусе."))
+            self.global_status.setStyleSheet(
+                f"color: {Color.OVERLAY}; font-size: 11px; padding-left: 42px;")
 
     def _on_main_changed(self, seq):
         settings.set("hotkey", seq)

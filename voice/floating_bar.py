@@ -15,6 +15,7 @@ from PySide6.QtGui import QPainter, QColor, QGuiApplication
 
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius
+from core.assets import logo_pixmap
 
 
 class FloatingCommandBar(QWidget):
@@ -41,10 +42,11 @@ class FloatingCommandBar(QWidget):
         root.setContentsMargins(10, 6, 10, 6)
         root.setSpacing(8)
 
-        self.handle = QLabel("🌸")
-        self.handle.setStyleSheet("font-size: 18px;")
+        self.handle = QLabel()
+        self.handle.setPixmap(logo_pixmap(22))
         self.handle.setCursor(Qt.SizeAllCursor)
         self.handle.setFixedWidth(26)
+        self.handle.setAlignment(Qt.AlignCenter)
         root.addWidget(self.handle)
 
         self.input = QLineEdit()

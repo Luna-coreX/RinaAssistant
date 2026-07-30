@@ -29,10 +29,6 @@ class SettingsPage(QWidget):
         self._connect_signals()
         self._loading = False
 
-        # подсказка о глобальном хоткее из кэша + подписка на обновления
-        self._update_hotkey_hint(app_signals.last_hotkey_global)
-        app_signals.hotkey_status.connect(self._update_hotkey_hint)
-
     # ---------- построение ----------
     def _build(self):
         outer = QVBoxLayout(self)
@@ -380,17 +376,6 @@ class SettingsPage(QWidget):
             self.floating_bar))
         cl.addWidget(Divider())
 
-        self.hotkey_edit = styled_lineedit("Ctrl+Shift+R", "Ctrl+Shift+R")
-        cl.addWidget(SettingRow(
-            "⌨️", tr("Горячая клавиша"), tr("Комбинация для вызова ассистента"),
-            self.hotkey_edit))
-        self.hotkey_hint = QLabel("")
-        self.hotkey_hint.setWordWrap(True)
-        self.hotkey_hint.setStyleSheet(
-            f"color: {Color.OVERLAY}; font-size: 11px; padding-left: 42px;")
-        cl.addWidget(self.hotkey_hint)
-        cl.addWidget(Divider())
-
         self.notifications = ToggleSwitch()
         cl.addWidget(SettingRow(
             "🔔", tr("Уведомления"), tr("Показывать всплывающие уведомления"),
@@ -528,7 +513,6 @@ class SettingsPage(QWidget):
         self.tray.setChecked(bool(settings.get("minimize_to_tray")))
         self.start_min.setChecked(bool(settings.get("start_minimized")))
         self.floating_bar.setChecked(bool(settings.get("floating_command_bar")))
-        self.hotkey_edit.setText(str(settings.get("hotkey")))
         self.notifications.setChecked(bool(settings.get("notifications")))
         self.sfx.setChecked(bool(settings.get("sound_effects")))
         self.updates.setChecked(bool(settings.get("check_updates")))
@@ -557,7 +541,6 @@ class SettingsPage(QWidget):
         self.tray.toggled.connect(lambda _: app_signals.tray_pref_changed.emit())
         self.start_min.toggled.connect(self._save)
         self.floating_bar.toggled.connect(self._save)
-        self.hotkey_edit.textChanged.connect(self._on_hotkey_edited)
         self.notifications.toggled.connect(self._save)
         self.sfx.toggled.connect(self._save)
         self.updates.toggled.connect(self._save)
@@ -573,7 +556,6 @@ class SettingsPage(QWidget):
             "minimize_to_tray": self.tray.isChecked(),
             "start_minimized": self.start_min.isChecked(),
             "floating_command_bar": self.floating_bar.isChecked(),
-            "hotkey": self.hotkey_edit.text(),
             "notifications": self.notifications.isChecked(),
             "sound_effects": self.sfx.isChecked(),
             "check_updates": self.updates.isChecked(),
@@ -606,33 +588,6 @@ class SettingsPage(QWidget):
         from core.i18n import set_language
         set_language(name)
         app_signals.language_changed.emit()
-
-    def _on_hotkey_edited(self, *args):
-        if self._loading:
-            return
-        # сохраняем сразу, а перерегистрацию откладываем (debounce),
-        # чтобы не ловить незаконченные комбинации во время набора.
-        settings.set("hotkey", self.hotkey_edit.text())
-        settings.save()
-        self._flash_saved()
-        if not hasattr(self, "_hotkey_timer"):
-            self._hotkey_timer = QTimer(self)
-            self._hotkey_timer.setSingleShot(True)
-            self._hotkey_timer.timeout.connect(app_signals.hotkey_changed.emit)
-        self._hotkey_timer.start(600)
-
-    def _update_hotkey_hint(self, global_ok: bool):
-        if global_ok:
-            self.hotkey_hint.setText(
-                tr("✓ Глобальный вызов активен — работает даже из трея."))
-            self.hotkey_hint.setStyleSheet(
-                f"color: {Color.GREEN}; font-size: 11px; padding-left: 42px;")
-        else:
-            self.hotkey_hint.setText(
-                tr("Глобальный вызов недоступен (нужен пакет pynput: ") +
-                tr("pip install pynput). Комбинация сработает, когда окно в фокусе."))
-            self.hotkey_hint.setStyleSheet(
-                f"color: {Color.OVERLAY}; font-size: 11px; padding-left: 42px;")
 
     def _save(self, *args):
         if self._loading:

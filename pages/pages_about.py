@@ -7,6 +7,7 @@ from PySide6.QtCore import QUrl
 
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius
+from core.assets import logo_pixmap
 from components.card import Card
 from version import APP_VERSION, BUILD, LINKS
 
@@ -55,8 +56,8 @@ class AboutPage(QWidget):
         cl = card.layout()
         cl.setSpacing(6)
 
-        logo = QLabel("🌸")
-        logo.setStyleSheet("font-size: 56px;")
+        logo = QLabel()
+        logo.setPixmap(logo_pixmap(96))
         logo.setAlignment(Qt.AlignCenter)
         cl.addWidget(logo)
 

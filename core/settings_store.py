@@ -36,7 +36,6 @@ GROUPS = {
         "wake_words": ["Рина", "Rina"],
         "volume": 75,
         "speed": 100,
-        "language": "Русский",
         "voice_reply": True,
         "always_listen": False,
         "tts_engine": "silent",
@@ -60,7 +59,6 @@ GROUPS = {
         "hotkey": "Ctrl+Shift+R",
         "action_hotkeys": {},
         "save_history": True,
-        "telemetry": False,
         "first_run": True,
     },
     "commands": {
