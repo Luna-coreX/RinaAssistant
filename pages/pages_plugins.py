@@ -59,16 +59,13 @@ class PluginsPage(QWidget):
         box.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("🧩")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("Плагины"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
         row.addStretch()
 
-        refresh = QPushButton(tr("⟳ Обновить"))
+        refresh = QPushButton(tr("Обновить"))
         refresh.setCursor(Qt.PointingHandCursor)
         refresh.setFixedHeight(34)
         refresh.setStyleSheet(f"""
@@ -167,7 +164,7 @@ class PluginsPage(QWidget):
 
         # статус / ошибка
         if lp.error:
-            err = QLabel("⚠ " + lp.error.split("\n")[0])
+            err = QLabel(lp.error.split("\n")[0])
             err.setWordWrap(True)
             err.setStyleSheet(f"""
                 color: {Color.RED}; font-size: 11px;
@@ -178,7 +175,7 @@ class PluginsPage(QWidget):
         else:
             state_row = QHBoxLayout()
             state_row.setSpacing(8)
-            state = QLabel(tr("● Включён") if lp.enabled else tr("○ Выключен"))
+            state = QLabel(tr("Включён") if lp.enabled else tr("Выключен"))
             color = Color.GREEN if lp.enabled else Color.OVERLAY
             state.setStyleSheet(f"color: {color}; font-size: 11px; font-weight: 600;")
             state_row.addWidget(state)

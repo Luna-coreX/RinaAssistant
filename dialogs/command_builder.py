@@ -46,7 +46,7 @@ class CommandBuilderDialog(QDialog):
         # --- тип команды ---
         layout.addWidget(self._label(tr("Тип команды")))
         self._type_ids = [t for t, _, _ in COMMAND_TYPES]
-        type_labels = [f"{icon}  {tr(label)}" for _, label, icon in COMMAND_TYPES]
+        type_labels = [tr(label) for _, label, icon in COMMAND_TYPES]
         self.type_combo = styled_combo(type_labels, 0)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
         layout.addWidget(self.type_combo)

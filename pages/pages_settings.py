@@ -61,6 +61,7 @@ class SettingsPage(QWidget):
         layout.addWidget(self._audio_card())
         layout.addWidget(self._models_card())
         layout.addWidget(self._behavior_card())
+        layout.addWidget(self._search_card())
         layout.addWidget(self._privacy_card())
         layout.addWidget(self._reset_row())
         layout.addStretch()
@@ -73,12 +74,9 @@ class SettingsPage(QWidget):
         box.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("⚙️")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("Настройки"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
         row.addStretch()
 
@@ -103,28 +101,28 @@ class SettingsPage(QWidget):
     def _appearance_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🎨  Внешний вид")))
+        cl.addWidget(self._section_title(tr("Внешний вид")))
         cl.addSpacing(2)
 
         self.theme_combo = styled_combo(
             ["Catppuccin Mocha", "Catppuccin Macchiato",
              "Tokyo Night", "Nord", "Dracula"], 0)
         cl.addWidget(SettingRow(
-            "🌙", tr("Тема оформления"), tr("Цветовая схема приложения"),
+            tr("Тема оформления"), tr("Цветовая схема приложения"),
             self.theme_combo))
         cl.addWidget(Divider())
 
         self.accent_combo = styled_combo(
             ["Mauve", "Pink", "Blue", "Green", "Peach", "Teal"], 0)
         cl.addWidget(SettingRow(
-            "✨", tr("Акцентный цвет"), tr("Основной цвет кнопок и выделений"),
+            tr("Акцентный цвет"), tr("Основной цвет кнопок и выделений"),
             self.accent_combo))
         cl.addWidget(Divider())
 
         from core.i18n import LANGUAGES
         self.language_combo = styled_combo(LANGUAGES, 0)
         cl.addWidget(SettingRow(
-            "🌍", tr("Язык"), tr("Язык интерфейса и распознавания речи"),
+            tr("Язык"), tr("Язык интерфейса и распознавания речи"),
             self.language_combo))
         return card
 
@@ -134,7 +132,7 @@ class SettingsPage(QWidget):
 
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🎧  Аудио")))
+        cl.addWidget(self._section_title(tr("Аудио")))
         cl.addSpacing(2)
 
         # устройство ввода (микрофон)
@@ -145,7 +143,7 @@ class SettingsPage(QWidget):
             in_labels.append(tr(label))
         self.input_combo = styled_combo(in_labels, 0)
         cl.addWidget(SettingRow(
-            "🎤", tr("Микрофон"), tr("Устройство ввода для распознавания речи"),
+            tr("Микрофон"), tr("Устройство ввода для распознавания речи"),
             self.input_combo))
         cl.addWidget(Divider())
 
@@ -157,7 +155,7 @@ class SettingsPage(QWidget):
             out_labels.append(tr(label))
         self.output_combo = styled_combo(out_labels, 0)
         cl.addWidget(SettingRow(
-            "🔈", tr("Динамик"), tr("Устройство вывода для озвучки"),
+            tr("Динамик"), tr("Устройство вывода для озвучки"),
             self.output_combo))
         cl.addWidget(Divider())
 
@@ -181,7 +179,7 @@ class SettingsPage(QWidget):
         left.addWidget(self.level_meter)
         test_layout.addLayout(left, 1)
 
-        self.mic_test_btn = QPushButton(tr("🎙 Проверить"))
+        self.mic_test_btn = QPushButton(tr("Проверить"))
         self.mic_test_btn.setCursor(Qt.PointingHandCursor)
         self.mic_test_btn.setFixedHeight(36)
         self.mic_test_btn.setStyleSheet(f"""
@@ -214,7 +212,7 @@ class SettingsPage(QWidget):
     def _models_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🧩  Модели голоса")))
+        cl.addWidget(self._section_title(tr("Модели голоса")))
         cl.addSpacing(2)
 
         # Whisper — размер модели
@@ -227,19 +225,19 @@ class SettingsPage(QWidget):
         self.whisper_combo.currentTextChanged.connect(
             lambda t: (settings.set("whisper_model", t), settings.save()))
         cl.addWidget(SettingRow(
-            "🌐", tr("Модель Whisper"), tr("Размер (больше = точнее и медленнее)"),
+            tr("Модель Whisper"), tr("Размер (больше = точнее и медленнее)"),
             self.whisper_combo))
         cl.addWidget(Divider())
 
         # Vosk — папка модели
         self.vosk_path = self._path_row(
-            cl, "📂", tr("Модель Vosk"), tr("Папка со скачанной моделью Vosk"),
+            cl, tr("Модель Vosk"), tr("Папка со скачанной моделью Vosk"),
             settings.get("vosk_model", ""), key="vosk_model", is_dir=True)
         cl.addWidget(Divider())
 
         # Piper — файл .onnx
         self.piper_path = self._path_row(
-            cl, "🗣️", tr("Модель Piper"), tr("Файл .onnx голоса Piper"),
+            cl, tr("Модель Piper"), tr("Файл .onnx голоса Piper"),
             settings.get("piper_model", ""), key="piper_model", is_dir=False)
 
         hint = QLabel(
@@ -250,16 +248,11 @@ class SettingsPage(QWidget):
         cl.addWidget(hint)
         return card
 
-    def _path_row(self, parent_layout, icon, title, desc, value, key, is_dir):
+    def _path_row(self, parent_layout, title, desc, value, key, is_dir):
         row = QWidget()
         h = QHBoxLayout(row)
-        h.setContentsMargins(0, 6, 0, 6)
+        h.setContentsMargins(2, 6, 2, 6)
         h.setSpacing(10)
-
-        ic = QLabel(icon)
-        ic.setStyleSheet("font-size: 18px;")
-        ic.setFixedWidth(26)
-        h.addWidget(ic, 0, Qt.AlignTop)
 
         box = QVBoxLayout()
         box.setSpacing(2)
@@ -312,21 +305,21 @@ class SettingsPage(QWidget):
 
     def _on_mic_test_started(self):
         self.mic_test_btn.setEnabled(False)
-        self.mic_test_btn.setText(tr("● Запись…"))
+        self.mic_test_btn.setText(tr("Запись…"))
         self.mic_status.setText(tr("Говорите… идёт запись 2 секунды"))
 
     def _on_mic_test_finished(self, result):
         self.mic_test_btn.setEnabled(True)
-        self.mic_test_btn.setText(tr("🎙 Проверить"))
+        self.mic_test_btn.setText(tr("Проверить"))
         if result.ok:
             self.level_meter.animate_to(result.level)
             if result.level < 0.03:
                 self.mic_status.setText(
                     tr("Почти тишина — проверьте, что микрофон не отключён."))
             elif result.level < 0.5:
-                self.mic_status.setText(tr("Микрофон работает, уровень нормальный. ✓"))
+                self.mic_status.setText(tr("Микрофон работает, уровень нормальный."))
             else:
-                self.mic_status.setText(tr("Микрофон работает, громкий сигнал. ✓"))
+                self.mic_status.setText(tr("Микрофон работает, громкий сигнал."))
             QTimer.singleShot(2500, self.level_meter.reset)
         else:
             self.mic_status.setText(result.error or tr("Не удалось проверить микрофон."))
@@ -348,49 +341,49 @@ class SettingsPage(QWidget):
     def _behavior_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🖥  Поведение приложения")))
+        cl.addWidget(self._section_title(tr("Поведение приложения")))
         cl.addSpacing(2)
 
         self.autostart = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "🚀", tr("Запуск с системой"), tr("Открывать Рину при старте ОС"),
+            tr("Запуск с системой"), tr("Открывать Рину при старте ОС"),
             self.autostart))
         cl.addWidget(Divider())
 
         self.tray = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "📥", tr("Сворачивать в трей"), tr("Прятать окно вместо закрытия"),
+            tr("Сворачивать в трей"), tr("Прятать окно вместо закрытия"),
             self.tray))
         cl.addWidget(Divider())
 
         self.start_min = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "🔽", tr("Запускать свёрнутым"), tr("Стартовать сразу в трее"),
+            tr("Запускать свёрнутым"), tr("Стартовать сразу в трее"),
             self.start_min))
         cl.addWidget(Divider())
 
         self.floating_bar = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "💬", tr("Плавающая строка команд"),
+            tr("Плавающая строка команд"),
             tr("Показывать строку ввода поверх окон, когда Рина свёрнута"),
             self.floating_bar))
         cl.addWidget(Divider())
 
         self.notifications = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "🔔", tr("Уведомления"), tr("Показывать всплывающие уведомления"),
+            tr("Уведомления"), tr("Показывать всплывающие уведомления"),
             self.notifications))
         cl.addWidget(Divider())
 
         self.sfx = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "🎵", tr("Звуковые эффекты"), tr("Звук активации и ответов"),
+            tr("Звуковые эффекты"), tr("Звук активации и ответов"),
             self.sfx))
         cl.addWidget(Divider())
 
         self.updates = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "⬆️", tr("Проверять обновления"), tr("Автопроверка новых версий"),
+            tr("Проверять обновления"), tr("Автопроверка новых версий"),
             self.updates))
 
         # кнопка ручной проверки + статус
@@ -453,16 +446,51 @@ class SettingsPage(QWidget):
         self.update_status.setStyleSheet(f"color: {color}; font-size: 11px;")
         self.update_status.setText(message)
 
+    # ---------- Поиск ----------
+    def _search_card(self):
+        from voice import websearch
+
+        card = Card()
+        cl = card.layout()
+        cl.addWidget(self._section_title(tr("Поиск в интернете")))
+        cl.addSpacing(2)
+
+        self._engine_ids = []
+        labels = []
+        for eid, label in websearch.engine_choices():
+            self._engine_ids.append(eid)
+            labels.append(label)
+        self.engine_combo = styled_combo(labels, 0)
+        cl.addWidget(SettingRow(
+            tr("Поисковая система"),
+            tr("Куда уходят запросы вида «найди рецепт борща»"),
+            self.engine_combo))
+        cl.addWidget(Divider())
+
+        self.search_fallback = ToggleSwitch()
+        cl.addWidget(SettingRow(
+            tr("Искать нераспознанное"),
+            tr("Если команда не найдена — открыть поиск в браузере. "
+               "В режиме «всегда слушать» не срабатывает."),
+            self.search_fallback))
+        return card
+
+    def _current_engine_id(self):
+        idx = self.engine_combo.currentIndex()
+        if 0 <= idx < len(self._engine_ids):
+            return self._engine_ids[idx]
+        return "google"
+
     # ---------- Приватность ----------
     def _privacy_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🔒  Приватность")))
+        cl.addWidget(self._section_title(tr("Приватность")))
         cl.addSpacing(2)
 
         self.save_history = ToggleSwitch()
         cl.addWidget(SettingRow(
-            "🕑", tr("Сохранять историю"), tr("Хранить историю запросов локально"),
+            tr("Сохранять историю"), tr("Хранить историю запросов локально"),
             self.save_history))
         return card
 
@@ -517,6 +545,10 @@ class SettingsPage(QWidget):
         self.sfx.setChecked(bool(settings.get("sound_effects")))
         self.updates.setChecked(bool(settings.get("check_updates")))
         self.save_history.setChecked(bool(settings.get("save_history")))
+        self.search_fallback.setChecked(bool(settings.get("web_search_fallback")))
+        saved_engine = settings.get("search_engine", "google")
+        if saved_engine in getattr(self, "_engine_ids", []):
+            self.engine_combo.setCurrentIndex(self._engine_ids.index(saved_engine))
 
         # аудио-устройства (по id)
         saved_in = settings.get("input_device", "default")
@@ -545,6 +577,8 @@ class SettingsPage(QWidget):
         self.sfx.toggled.connect(self._save)
         self.updates.toggled.connect(self._save)
         self.save_history.toggled.connect(self._save)
+        self.search_fallback.toggled.connect(self._save)
+        self.engine_combo.currentIndexChanged.connect(self._save)
         self.input_combo.currentIndexChanged.connect(self._save)
         self.output_combo.currentIndexChanged.connect(self._save)
 
@@ -560,6 +594,8 @@ class SettingsPage(QWidget):
             "sound_effects": self.sfx.isChecked(),
             "check_updates": self.updates.isChecked(),
             "save_history": self.save_history.isChecked(),
+            "web_search_fallback": self.search_fallback.isChecked(),
+            "search_engine": self._current_engine_id(),
             "input_device": self._current_input_id(),
             "output_device": self._current_output_id(),
         }
@@ -597,7 +633,7 @@ class SettingsPage(QWidget):
         self._flash_saved()
 
     def _flash_saved(self):
-        self.saved_label.setText(tr("✓ Сохранено"))
+        self.saved_label.setText(tr("Сохранено"))
         if not hasattr(self, "_save_timer"):
             self._save_timer = QTimer(self)
             self._save_timer.setSingleShot(True)

@@ -246,8 +246,21 @@ class VoiceService(QObject):
         response = handle_builtin_command(command)
         if response:
             self.say(response)
-        else:
-            self.say(tr("Извини, я не поняла команду."), sound="error")
+            return
+
+        # 4) запасной вариант — поиск в интернете.
+        # В режиме «всегда слушать» НЕ ищем: туда попадает случайная речь и
+        # шум, и открывать браузер по ним нельзя. Только явная активация.
+        if (settings.get("web_search_fallback", True)
+                and source != "always"):
+            from voice import websearch
+            found = websearch.fallback_search(
+                command, settings.get("search_engine", websearch.DEFAULT_ENGINE))
+            if found:
+                self.say(found)
+                return
+
+        self.say(tr("Извини, я не поняла команду."), sound="error")
 
     def run_command_by_id(self, command_id):
         """Выполнить конкретную пользовательскую команду (кнопка «Выполнить»)."""

@@ -106,20 +106,18 @@ def styled_lineedit(placeholder="", text=""):
 
 class SettingRow(QWidget):
     """
-    Строка настройки: слева иконка + заголовок + подпись,
-    справа — контрол (тумблер / слайдер / комбо / поле).
+    Строка настройки: слева заголовок + подпись, справа — контрол
+    (тумблер / слайдер / комбо / поле).
+
+    Без иконки: эмодзи в каждой строке ничего не сообщали и превращали
+    список настроек в пёстрый шум. Ориентироваться помогают заголовки секций.
     """
 
-    def __init__(self, icon, title, subtitle, control, parent=None):
+    def __init__(self, title, subtitle, control, parent=None):
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 8, 0, 8)
+        layout.setContentsMargins(2, 8, 2, 8)
         layout.setSpacing(14)
-
-        ic = QLabel(icon)
-        ic.setStyleSheet("font-size: 20px;")
-        ic.setFixedWidth(28)
-        layout.addWidget(ic, 0, Qt.AlignTop)
 
         text_box = QVBoxLayout()
         text_box.setSpacing(2)

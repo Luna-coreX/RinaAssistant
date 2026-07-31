@@ -12,9 +12,7 @@ from components.toggle_switch import ToggleSwitch
 from core.settings_store import settings
 from core.app_signals import app_signals
 from voice.commands import known_commands
-from voice.user_commands import (
-    UserCommandStore, type_label, type_icon
-)
+from voice.user_commands import UserCommandStore, type_label
 
 
 class CommandsPage(QWidget):
@@ -68,16 +66,13 @@ class CommandsPage(QWidget):
         box.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("⚡")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("Команды"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
         row.addStretch()
 
-        add = QPushButton(tr("＋ Новая команда"))
+        add = QPushButton(tr("Новая команда"))
         add.setCursor(Qt.PointingHandCursor)
         add.setFixedHeight(36)
         add.setStyleSheet(f"""
@@ -99,7 +94,7 @@ class CommandsPage(QWidget):
 
     def _search_bar(self):
         bar = QLineEdit()
-        bar.setPlaceholderText(tr("🔍  Поиск команды…"))
+        bar.setPlaceholderText(tr("Поиск команды…"))
         bar.setFixedHeight(38)
         bar.setStyleSheet(f"""
             QLineEdit {{
@@ -205,11 +200,6 @@ class CommandsPage(QWidget):
 
         top = QHBoxLayout()
         top.setSpacing(12)
-        icon = QLabel(type_icon(cmd.get("type")))
-        icon.setStyleSheet("font-size: 24px;")
-        icon.setFixedWidth(34)
-        top.addWidget(icon, 0, Qt.AlignTop)
-
         info = QVBoxLayout()
         info.setSpacing(3)
         triggers = cmd.get("triggers", [])
@@ -245,11 +235,11 @@ class CommandsPage(QWidget):
         # кнопки действий
         actions = QHBoxLayout()
         actions.addStretch()
-        run = self._mini_btn(tr("▶ Выполнить"), Color.GREEN)
+        run = self._mini_btn(tr("Выполнить"), Color.GREEN)
         run.clicked.connect(lambda: self._run_cmd(cmd["id"]))
-        edit = self._mini_btn(tr("✎ Изменить"), Color.BLUE)
+        edit = self._mini_btn(tr("Изменить"), Color.BLUE)
         edit.clicked.connect(lambda: self._open_builder_edit(cmd))
-        delete = self._mini_btn(tr("🗑 Удалить"), Color.RED)
+        delete = self._mini_btn(tr("Удалить"), Color.RED)
         delete.clicked.connect(lambda: self._delete_cmd(cmd["id"]))
         actions.addWidget(run)
         actions.addWidget(edit)

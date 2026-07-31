@@ -19,6 +19,7 @@ from PySide6.QtGui import QPainter, QColor, QGuiApplication
 
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius
+from core.assets import logo_pixmap
 
 
 # ---------------------------------------------------------------------------
@@ -133,8 +134,9 @@ class Toast(QWidget):
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(12)
 
-        self.icon = QLabel("🌸")
-        self.icon.setStyleSheet("font-size: 22px;")
+        self.icon = QLabel()
+        self.icon.setPixmap(logo_pixmap(22))
+        self.icon.setFixedSize(22, 22)
         layout.addWidget(self.icon, 0, Qt.AlignTop)
 
         self.text = QLabel("")

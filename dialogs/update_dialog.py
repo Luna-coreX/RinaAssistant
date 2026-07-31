@@ -85,13 +85,11 @@ class UpdateDialog(QDialog):
         download.setFixedHeight(38)
         download.setStyleSheet(f"""
             QPushButton {{
-                background: {Color.gradient(0, 0, 1, 0)}; color: #ffffff;
+                background: {Color.ACCENT}; color: #ffffff;
                 border: none; border-radius: {Radius.SM}px;
-                padding: 4px 24px; font-size: 13px; font-weight: 700;
+                padding: 4px 24px; font-size: 13px; font-weight: 600;
             }}
-            QPushButton:hover {{
-                background: {Color.gradient(0, 0, 1, 0, tri=True)};
-            }}
+            QPushButton:hover {{ background: {Color.alpha(Color.ACCENT, 'dd')}; }}
         """)
         download.clicked.connect(self._open_releases)
 

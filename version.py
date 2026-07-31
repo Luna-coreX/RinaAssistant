@@ -1,7 +1,7 @@
 """Версия приложения и ссылки (без зависимостей от Qt)."""
 
-APP_VERSION = "1.1.4"
-BUILD = "2026.07"
+APP_VERSION = "1.2.0"
+BUILD = "2026.08"
 
 LINKS = {
     "site": "https://neurosync-foundry-portal.pages.dev/",

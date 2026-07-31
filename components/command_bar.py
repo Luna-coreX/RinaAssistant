@@ -55,15 +55,12 @@ class CommandBar(QWidget):
         """)
         self.send_btn.setStyleSheet(f"""
             QPushButton {{
-                background: {Color.gradient(0, 0, 1, 0)}; color: #ffffff;
+                background: {Color.ACCENT}; color: #ffffff;
                 border: none; border-radius: {Radius.MD}px;
-                padding: 6px 22px; font-size: 13px; font-weight: 700;
-                letter-spacing: 0.3px;
+                padding: 6px 22px; font-size: 13px; font-weight: 600;
             }}
-            QPushButton:hover {{
-                background: {Color.gradient(0, 0, 1, 0, tri=True)};
-            }}
-            QPushButton:pressed {{ background: {Color.ACCENT}; }}
+            QPushButton:hover {{ background: {Color.alpha(Color.ACCENT, 'dd')}; }}
+            QPushButton:pressed {{ background: {Color.SURFACE_2}; }}
         """)
 
     def _submit(self):

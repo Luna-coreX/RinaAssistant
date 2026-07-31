@@ -72,12 +72,9 @@ class RinaPage(QWidget):
 
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("🌸")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("Рина"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
         row.addStretch()
 
@@ -87,12 +84,9 @@ class RinaPage(QWidget):
         """)
         row.addWidget(self.saved_label)
 
-        status = QLabel("● Online")
-        status.setStyleSheet(f"""
-            background: {Color.alpha(Color.GREEN, '22')}; color: {Color.GREEN};
-            border-radius: 10px; padding: 4px 12px;
-            font-size: 12px; font-weight: 600;
-        """)
+        status = QLabel(tr("Online"))
+        status.setStyleSheet(
+            f"color: {Color.GREEN}; font-size: 12px; font-weight: 600;")
         row.addWidget(status)
 
         sub = QLabel(tr("Настройте голос и поведение вашего ассистента"))
@@ -112,7 +106,7 @@ class RinaPage(QWidget):
     def _voice_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🎙  Голос и речь")))
+        cl.addWidget(self._section_title(tr("Голос и речь")))
         cl.addSpacing(2)
 
         # 0. Выбор TTS-движка (самой системы синтеза)
@@ -123,7 +117,7 @@ class RinaPage(QWidget):
             tts_labels.append(label + ("" if avail else tr("  (не установлен)")))
         self.tts_combo = styled_combo(tts_labels, 0)
         cl.addWidget(SettingRow(
-            "🧠", tr("Система синтеза (TTS)"),
+            tr("Система синтеза (TTS)"),
             tr("Движок озвучки. «Без озвучки» показывает только текст."),
             self.tts_combo
         ))
@@ -137,7 +131,7 @@ class RinaPage(QWidget):
             stt_labels.append(label + ("" if avail else tr("  (недоступен)")))
         self.stt_combo = styled_combo(stt_labels, 0)
         cl.addWidget(SettingRow(
-            "👂", tr("Распознавание речи (STT)"),
+            tr("Распознавание речи (STT)"),
             tr("Движок микрофона. «Выключено» — ассистент не слушает."),
             self.stt_combo
         ))
@@ -146,7 +140,7 @@ class RinaPage(QWidget):
         # 1. Выбор голоса (зависит от выбранного движка)
         self.voice_combo = styled_combo([tr("Системный голос")], 0)
         cl.addWidget(SettingRow(
-            "🗣️", tr("Голос"), tr("Конкретный голос выбранного движка"),
+            tr("Голос"), tr("Конкретный голос выбранного движка"),
             self.voice_combo
         ))
         cl.addWidget(Divider())
@@ -154,7 +148,7 @@ class RinaPage(QWidget):
         # 2. Как обращаться к Рине (имя активации)
         self.wake_edit = styled_lineedit(tr("Рина, Рену, Рино"), tr("Рина"))
         cl.addWidget(SettingRow(
-            "💬", tr("Слова активации"),
+            tr("Слова активации"),
             tr("Варианты через запятую (распознавание бывает неточным)"),
             self.wake_edit
         ))
@@ -170,7 +164,7 @@ class RinaPage(QWidget):
             lambda v: self.volume_val.setText(f"{v}%"))
         vol_ctrl = self._slider_with_value(self.volume_slider, self.volume_val)
         cl.addWidget(SettingRow(
-            "🔊", tr("Громкость"), tr("Уровень громкости голоса Рины"), vol_ctrl
+            tr("Громкость"), tr("Уровень громкости голоса Рины"), vol_ctrl
         ))
         cl.addWidget(Divider())
 
@@ -184,7 +178,7 @@ class RinaPage(QWidget):
             lambda v: self.speed_val.setText(f"{v/100:.1f}x"))
         spd_ctrl = self._slider_with_value(self.speed_slider, self.speed_val)
         cl.addWidget(SettingRow(
-            "⚡", tr("Скорость речи"), tr("Темп произношения ответов"), spd_ctrl
+            tr("Скорость речи"), tr("Темп произношения ответов"), spd_ctrl
         ))
         cl.addWidget(Divider())
 
@@ -216,7 +210,7 @@ class RinaPage(QWidget):
         left.addWidget(self.voice_test_status)
         h.addLayout(left, 1)
 
-        self.voice_test_btn = QPushButton(tr("🔊 Проверить"))
+        self.voice_test_btn = QPushButton(tr("Проверить"))
         self.voice_test_btn.setCursor(Qt.PointingHandCursor)
         self.voice_test_btn.setFixedHeight(36)
         self.voice_test_btn.setStyleSheet(f"""
@@ -253,28 +247,28 @@ class RinaPage(QWidget):
 
     def _on_voice_test_started(self):
         self.voice_test_btn.setEnabled(False)
-        self.voice_test_btn.setText(tr("● Говорю…"))
+        self.voice_test_btn.setText(tr("Говорю…"))
         self.voice_test_status.setText(tr("Воспроизведение…"))
 
     def _on_voice_test_finished(self, err):
         self.voice_test_btn.setEnabled(True)
-        self.voice_test_btn.setText(tr("🔊 Проверить"))
+        self.voice_test_btn.setText(tr("Проверить"))
         if err:
             self.voice_test_status.setText(tr("Ошибка озвучки: ") + err)
         else:
-            self.voice_test_status.setText(tr("Готово ✓"))
+            self.voice_test_status.setText(tr("Готово"))
 
     # ---------- карточка «Поведение» ----------
     def _behavior_card(self):
         card = Card()
         cl = card.layout()
-        cl.addWidget(self._section_title(tr("🧠  Поведение")))
+        cl.addWidget(self._section_title(tr("Поведение")))
         cl.addSpacing(2)
 
         # 6. Отвечать голосом / молчать
         self.voice_reply = ToggleSwitch(checked=True)
         cl.addWidget(SettingRow(
-            "🔈", tr("Отвечать голосом"),
+            tr("Отвечать голосом"),
             tr("Если выключено — Рина отвечает только текстом"),
             self.voice_reply
         ))
@@ -283,7 +277,7 @@ class RinaPage(QWidget):
         # 7. Всегда слушать
         self.always_listen = ToggleSwitch(checked=False)
         cl.addWidget(SettingRow(
-            "👂", tr("Всегда слушать"),
+            tr("Всегда слушать"),
             tr("Активация по слову без нажатия горячей клавиши"),
             self.always_listen
         ))
@@ -406,7 +400,7 @@ class RinaPage(QWidget):
         self._flash_saved()
 
     def _flash_saved(self):
-        self.saved_label.setText(tr("✓ Сохранено"))
+        self.saved_label.setText(tr("Сохранено"))
         # спрятать через 1.5 с
         from PySide6.QtCore import QTimer
         if not hasattr(self, "_save_timer"):

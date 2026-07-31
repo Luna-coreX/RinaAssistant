@@ -13,6 +13,7 @@ from PySide6.QtGui import QFont
 
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius, theme_manager, PALETTES
+from core.assets import logo_pixmap
 from components.controls import styled_combo, styled_lineedit
 from components.toggle_switch import ToggleSwitch
 from core.settings_store import settings
@@ -47,8 +48,8 @@ class OnboardingDialog(QDialog):
         layout.setSpacing(16)
 
         # приветствие
-        logo = QLabel("🌸")
-        logo.setStyleSheet("font-size: 48px;")
+        logo = QLabel()
+        logo.setPixmap(logo_pixmap(56))
         logo.setAlignment(Qt.AlignCenter)
         layout.addWidget(logo)
 
@@ -116,7 +117,7 @@ class OnboardingDialog(QDialog):
         btns.addWidget(skip)
         btns.addStretch()
 
-        start = QPushButton(tr("Начать  →"))
+        start = QPushButton(tr("Начать"))
         start.setCursor(Qt.PointingHandCursor)
         start.setFixedHeight(40)
         start.setStyleSheet(f"""
