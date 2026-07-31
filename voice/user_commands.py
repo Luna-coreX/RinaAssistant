@@ -131,19 +131,29 @@ class UserCommandStore:
 # Сопоставление и выполнение
 # ---------------------------------------------------------------------------
 def matches(command, text):
-    """Подходит ли команда под распознанный текст."""
+    """
+    Подходит ли команда под распознанный текст.
+
+    Сравнение нечёткое: распознавание речи путает окончания и буквы
+    («зопусти дискорт»), а точное вхождение подстроки такие варианты теряет.
+    Режим «Точное совпадение» тоже допускает погрешность распознавания,
+    но требует совпадения фразы целиком, а не её вхождения.
+    """
     if not command.get("enabled", True):
         return False
-    low = text.lower().strip()
+
+    from voice.textmatch import similar, contains_phrase
+
+    exact_mode = command.get("match") == "exact"
     for trig in command.get("triggers", []):
-        t = str(trig).lower().strip()
-        if not t:
+        trigger = str(trig).strip()
+        if not trigger:
             continue
-        if command.get("match") == "exact":
-            if low == t:
+        if exact_mode:
+            if similar(text, trigger):
                 return True
-        else:  # contains
-            if t in low:
+        else:
+            if contains_phrase(text, trigger):
                 return True
     return False
 

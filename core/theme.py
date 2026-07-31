@@ -25,10 +25,10 @@ PAGE_ICONS = {
 
 
 class Radius:
-    SM = 8
-    MD = 12
-    LG = 18
-    XL = 24
+    SM = 6
+    MD = 8
+    LG = 12
+    XL = 16
 
 
 class Spacing:
@@ -122,9 +122,10 @@ class _Color:
     SURFACE_0 = SURFACE_1 = SURFACE_2 = ""
     TEXT = SUBTEXT = OVERLAY = ""
     GREEN = RED = PEACH = YELLOW = PINK = BLUE = TEAL = MAUVE = ""
+    # Один акцент на весь интерфейс: подсветка активного, кнопки действия,
+    # фокус. Никаких вторичных «неоновых» оттенков — иерархия строится
+    # размером и воздухом, а не цветом.
     ACCENT = ""
-    # Вторичный/третичный акценты для неоновых градиентов (фиолетовый→розовый→синий)
-    ACCENT2 = ACCENT3 = ""
 
     def apply(self, theme_name, accent_name):
         pal = PALETTES.get(theme_name, PALETTES[DEFAULT_THEME])
@@ -135,30 +136,6 @@ class _Color:
             setattr(self, key, pal[key])
         accents = pal["accents"]
         self.ACCENT = accents.get(accent_name, next(iter(accents.values())))
-        # Пара для градиента: тянемся к розовому и синему из палитры,
-        # получая фирменную неоновую растяжку в духе логотипа Rina.
-        self.ACCENT2 = pal["PINK"]
-        self.ACCENT3 = pal["BLUE"]
-
-    # ---------- помощники для футуристичных градиентов ----------
-    def gradient(self, x1=0, y1=0, x2=1, y2=1, tri=False):
-        """QSS-градиент акцент→розовый (→синий). Для фонов кнопок/полос."""
-        if tri:
-            return (
-                f"qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, "
-                f"stop:0 {self.ACCENT3}, stop:0.5 {self.ACCENT}, "
-                f"stop:1 {self.ACCENT2})"
-            )
-        return (
-            f"qlineargradient(x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, "
-            f"stop:0 {self.ACCENT}, stop:1 {self.ACCENT2})"
-        )
-
-    def glow(self, alpha=0.35):
-        """Акцентный цвет с прозрачностью (rgba-строка) для свечения/подсветки."""
-        c = self.ACCENT.lstrip("#")
-        r, g, b = int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16)
-        return f"rgba({r}, {g}, {b}, {alpha})"
 
     @staticmethod
     def alpha(hex_color, aa):

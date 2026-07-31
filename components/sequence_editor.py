@@ -53,7 +53,7 @@ class StepRow(QWidget):
 
         # тип шага
         self.type_combo = styled_combo(
-            [f"{icon} {tr(label)}" for _, label, icon in STEP_TYPES], 0)
+            [tr(label) for _, label, icon in STEP_TYPES], 0)
         self.type_combo.setFixedWidth(150)
         self.type_combo.currentIndexChanged.connect(self._sync_fields)
         row.addWidget(self.type_combo)
@@ -173,7 +173,7 @@ class SequenceEditor(QWidget):
         self._rows_holder.setSpacing(2)
         self._layout.addLayout(self._rows_holder)
 
-        add = QPushButton(tr("＋ Добавить шаг"))
+        add = QPushButton(tr("Добавить шаг"))
         add.setCursor(Qt.PointingHandCursor)
         add.setFixedHeight(34)
         add.setStyleSheet(f"""

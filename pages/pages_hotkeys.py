@@ -60,7 +60,7 @@ class HotkeysPage(QWidget):
         self.main_capture = KeyCaptureEdit(settings.get("hotkey", "Ctrl+Shift+R"))
         self.main_capture.captured.connect(self._on_main_changed)
         mc.addWidget(self._action_row(
-            "🎤", tr("Активация ассистента"),
+            tr("Активация ассистента"),
             tr("Разовое распознавание речи"), self.main_capture))
 
         # живой индикатор: работает ли глобальный вызов (даже из трея)
@@ -80,12 +80,12 @@ class HotkeysPage(QWidget):
         saved = settings.get("action_hotkeys", {}) or {}
         self._captures = {}
         items = list(HOTKEY_ACTIONS.items())
-        for i, (action_id, (label, desc, icon)) in enumerate(items):
+        for i, (action_id, (label, desc, _icon)) in enumerate(items):
             cap = KeyCaptureEdit(saved.get(action_id, ""))
             cap.captured.connect(
                 lambda seq, aid=action_id: self._on_action_changed(aid, seq))
             self._captures[action_id] = cap
-            ac.addWidget(self._action_row(icon, label, desc, cap))
+            ac.addWidget(self._action_row(label, desc, cap))
             if i < len(items) - 1:
                 ac.addWidget(Divider())
         layout.addWidget(actions_card)
@@ -106,12 +106,9 @@ class HotkeysPage(QWidget):
         box.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("⌨️")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("Горячие клавиши"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
         row.addStretch()
         sub = QLabel(tr("Быстрый доступ к действиям ассистента"))
@@ -120,15 +117,11 @@ class HotkeysPage(QWidget):
         box.addWidget(sub)
         return box
 
-    def _action_row(self, icon, title, desc, capture):
+    def _action_row(self, title, desc, capture):
         w = QWidget()
         h = QHBoxLayout(w)
-        h.setContentsMargins(0, 8, 0, 8)
+        h.setContentsMargins(2, 8, 2, 8)
         h.setSpacing(14)
-        ic = QLabel(icon)
-        ic.setStyleSheet("font-size: 20px;")
-        ic.setFixedWidth(28)
-        h.addWidget(ic)
         box = QVBoxLayout()
         box.setSpacing(2)
         t = QLabel(title)
@@ -145,7 +138,7 @@ class HotkeysPage(QWidget):
     def _update_global_status(self, global_ok: bool):
         if global_ok:
             self.global_status.setText(
-                tr("✓ Глобальный вызов активен — работает даже из трея."))
+                tr("Глобальный вызов активен — работает даже из трея."))
             self.global_status.setStyleSheet(
                 f"color: {Color.GREEN}; font-size: 11px; padding-left: 42px;")
         else:

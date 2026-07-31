@@ -324,17 +324,8 @@ class MainWindow(QMainWindow):
         path.addRoundedRect(rect, Radius.LG, Radius.LG)
         painter.fillPath(path, QBrush(QColor(Color.BASE)))
 
-        # неоновая окантовка окна: акцент→розовый→синий по диагонали
-        edge = QLinearGradient(rect.left(), rect.top(),
-                               rect.right(), rect.bottom())
-        c1 = QColor(Color.ACCENT);  c1.setAlphaF(0.55)
-        c2 = QColor(Color.ACCENT2); c2.setAlphaF(0.30)
-        c3 = QColor(Color.ACCENT3); c3.setAlphaF(0.55)
-        edge.setColorAt(0.0, c1)
-        edge.setColorAt(0.5, c2)
-        edge.setColorAt(1.0, c3)
-        pen = QPen(QBrush(edge), 1.4)
-        painter.setPen(pen)
+        # тонкая нейтральная окантовка — отделяет окно от фона рабочего стола
+        painter.setPen(QPen(QColor(Color.SURFACE_1), 1))
         painter.setBrush(Qt.NoBrush)
         painter.drawPath(path)
         painter.end()
@@ -382,8 +373,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(16, 16, 16, 18)
         layout.setSpacing(4)
 
-        # ---- брендовый блок: эмблема + градиентный вордмарк ----
-        from components.gradient_text import GradientText
+        # ---- брендовый блок: эмблема + вордмарк ----
         brand = QHBoxLayout()
         brand.setContentsMargins(4, 0, 0, 0)
         brand.setSpacing(12)
@@ -396,8 +386,9 @@ class MainWindow(QMainWindow):
 
         wordmark = QVBoxLayout()
         wordmark.setSpacing(0)
-        self.logo = GradientText("RINA", size=19, letter_spacing=2.0)
-        self.logo_sub = QLabel("ASSISTANT")
+        self.logo = QLabel("Rina")
+        self.logo.setFont(QFont(FONT_FAMILY, 17, QFont.Bold))
+        self.logo_sub = QLabel("Assistant")
         wordmark.addWidget(self.logo)
         wordmark.addWidget(self.logo_sub)
         brand.addLayout(wordmark)
@@ -477,10 +468,8 @@ class MainWindow(QMainWindow):
                 border-right: 1px solid {Color.SURFACE_0};
             }}
         """)
-        self.logo.update()
-        self.logo_sub.setStyleSheet(
-            f"color: {Color.OVERLAY}; font-size: 10px; font-weight: 700; "
-            f"letter-spacing: 3px;")
+        self.logo.setStyleSheet(f"color: {Color.TEXT};")
+        self.logo_sub.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
         self.status_frame.setStyleSheet(f"""
             QFrame {{
                 background: {Color.CRUST};

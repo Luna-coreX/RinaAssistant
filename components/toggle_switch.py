@@ -2,7 +2,7 @@ from PySide6.QtWidgets import QAbstractButton
 from PySide6.QtCore import (
     Qt, Property, QPropertyAnimation, QEasingCurve, QSize, QRectF,
 )
-from PySide6.QtGui import QPainter, QColor, QLinearGradient
+from PySide6.QtGui import QPainter, QColor
 
 from core.theme import Color
 
@@ -47,25 +47,15 @@ class ToggleSwitch(QAbstractButton):
         p.setRenderHint(QPainter.Antialiasing)
         t = max(0.0, min(1.0, self._offset))  # клампим (OutBack выходит за [0,1])
 
-        # трек: выкл — нейтраль, вкл — неоновый градиент акцент→розовый
+        # трек: плавный переход нейтраль → акцент
         p.setPen(Qt.NoPen)
         off_color = QColor(Color.SURFACE_1)
-        if t <= 0.001:
-            p.setBrush(off_color)
-        else:
-            grad = QLinearGradient(0, 0, self.width(), 0)
-            a = QColor(Color.ACCENT)
-            b = QColor(Color.ACCENT2)
-            # подмешиваем нейтраль на промежуточных значениях
-            def blend(c):
-                return QColor(
-                    int(off_color.red() + (c.red() - off_color.red()) * t),
-                    int(off_color.green() + (c.green() - off_color.green()) * t),
-                    int(off_color.blue() + (c.blue() - off_color.blue()) * t),
-                )
-            grad.setColorAt(0.0, blend(a))
-            grad.setColorAt(1.0, blend(b))
-            p.setBrush(grad)
+        on_color = QColor(Color.ACCENT)
+        p.setBrush(QColor(
+            int(off_color.red() + (on_color.red() - off_color.red()) * t),
+            int(off_color.green() + (on_color.green() - off_color.green()) * t),
+            int(off_color.blue() + (on_color.blue() - off_color.blue()) * t),
+        ))
         p.drawRoundedRect(self.rect(), 13, 13)
 
         # бегунок

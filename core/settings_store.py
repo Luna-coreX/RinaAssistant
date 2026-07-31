@@ -59,6 +59,8 @@ GROUPS = {
         "hotkey": "Ctrl+Shift+R",
         "action_hotkeys": {},
         "save_history": True,
+        "search_engine": "google",
+        "web_search_fallback": True,
         "first_run": True,
     },
     "commands": {

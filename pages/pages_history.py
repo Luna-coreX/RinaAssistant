@@ -62,10 +62,7 @@ class _Avatar(QWidget):
         r = QRectF(0, 0, AVATAR, AVATAR)
 
         if self._is_user:
-            grad = QLinearGradient(0, 0, AVATAR, AVATAR)
-            grad.setColorAt(0.0, QColor(Color.ACCENT))
-            grad.setColorAt(1.0, QColor(Color.ACCENT2))
-            p.setBrush(grad)
+            p.setBrush(QColor(Color.ACCENT))
             p.setPen(Qt.NoPen)
             p.drawEllipse(r)
             # силуэт человека
@@ -118,13 +115,9 @@ class _Bubble(QFrame):
         path = _rounded_path(rect, tl, tr_, br, bl)
 
         if self._is_user:
-            grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
-            c1 = QColor(Color.ACCENT);  c1.setAlphaF(0.22)
-            c2 = QColor(Color.ACCENT2); c2.setAlphaF(0.13)
-            grad.setColorAt(0.0, c1)
-            grad.setColorAt(1.0, c2)
-            p.fillPath(path, grad)
-            border = QColor(Color.ACCENT); border.setAlphaF(0.45)
+            fill = QColor(Color.ACCENT); fill.setAlphaF(0.16)
+            p.fillPath(path, fill)
+            border = QColor(Color.ACCENT); border.setAlphaF(0.38)
         else:
             p.fillPath(path, QColor(Color.CRUST))
             border = QColor(Color.SURFACE_0)
@@ -187,26 +180,18 @@ class HistoryPage(QWidget):
         box.setSpacing(4)
         row = QHBoxLayout()
         row.setSpacing(12)
-        ic = QLabel("🕑")
-        ic.setStyleSheet("font-size: 30px;")
         t = QLabel(tr("История"))
         t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
         t.setStyleSheet(f"color: {Color.TEXT};")
-        row.addWidget(ic)
         row.addWidget(t)
 
         self.count_chip = QLabel("")
-        self.count_chip.setStyleSheet(f"""
-            color: {Color.SUBTEXT};
-            background: {Color.alpha(Color.ACCENT, '1e')};
-            border: 1px solid {Color.alpha(Color.ACCENT, '3a')};
-            border-radius: 10px; padding: 3px 12px;
-            font-size: 11px; font-weight: 700;
-        """)
-        row.addWidget(self.count_chip)
+        self.count_chip.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 12px; padding-left: 4px;")
+        row.addWidget(self.count_chip, 0, Qt.AlignBottom)
         row.addStretch()
 
-        self.clear_btn = QPushButton(tr("🗑  Очистить"))
+        self.clear_btn = QPushButton(tr("Очистить"))
         self.clear_btn.setCursor(Qt.PointingHandCursor)
         self.clear_btn.setFixedHeight(34)
         self.clear_btn.setStyleSheet(f"""
@@ -252,14 +237,12 @@ class HistoryPage(QWidget):
 
         if not settings.get("save_history", True):
             self._list_holder.addWidget(self._empty_state(
-                "🔕",
                 tr("Сохранение истории выключено"),
                 tr("Включите «Сохранять историю» в настройках, чтобы вести журнал.")))
             self._animate_list()
             return
         if not entries:
             self._list_holder.addWidget(self._empty_state(
-                "🕑",
                 tr("История пуста"),
                 tr("Здесь появятся ваши команды и ответы Рины.")))
             self._animate_list()
@@ -284,15 +267,10 @@ class HistoryPage(QWidget):
         h.setContentsMargins(0, 8, 0, 2)
         h.setSpacing(12)
         h.addWidget(self._hline(), 1)
-        pill = QLabel(day)
-        pill.setStyleSheet(f"""
-            color: {Color.SUBTEXT};
-            background: {Color.CRUST};
-            border: 1px solid {Color.SURFACE_0};
-            border-radius: 10px; padding: 3px 14px;
-            font-size: 11px; font-weight: 700;
-        """)
-        h.addWidget(pill)
+        label = QLabel(day)
+        label.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px; font-weight: 600;")
+        h.addWidget(label)
         h.addWidget(self._hline(), 1)
         return w
 
@@ -303,13 +281,10 @@ class HistoryPage(QWidget):
         return line
 
     # ---------- пустое состояние ----------
-    def _empty_state(self, glyph, title, desc):
+    def _empty_state(self, title, desc):
         card = Card()
         cl = card.layout()
         cl.setSpacing(8)
-        icon = QLabel(glyph)
-        icon.setAlignment(Qt.AlignCenter)
-        icon.setStyleSheet("font-size: 42px;")
         t = QLabel(title)
         t.setAlignment(Qt.AlignCenter)
         t.setFont(QFont(FONT_FAMILY, 15, QFont.Bold))
@@ -319,7 +294,6 @@ class HistoryPage(QWidget):
         d.setWordWrap(True)
         d.setStyleSheet(f"color: {Color.SUBTEXT}; font-size: 13px;")
         cl.addSpacing(6)
-        cl.addWidget(icon)
         cl.addWidget(t)
         cl.addWidget(d)
         cl.addSpacing(6)

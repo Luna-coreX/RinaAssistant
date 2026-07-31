@@ -78,13 +78,28 @@ def handle_builtin_command(text):
     Разбирает текст и выполняет встроенную команду.
     Возвращает строку-ответ (для озвучки/toast) или None, если не распознано.
     """
-    low = text.lower()
+    from voice.textmatch import normalize, contains_phrase
+    from voice import calculator, websearch
+    from core.settings_store import settings
+
+    low = normalize(text)
+
+    # --- арифметика: «посчитай 15*12», «20% от 3000» ---
+    calculated = calculator.try_calculate(text)
+    if calculated:
+        return calculated
+
+    # --- явный веб-поиск: «найди рецепт борща» ---
+    found = websearch.try_search(
+        text, settings.get("search_engine", websearch.DEFAULT_ENGINE))
+    if found:
+        return found
 
     # --- запуск приложений ---
     launch_words = ("запусти", "открой", "включи", "запустить", "открыть", "open", "launch")
-    if any(w in low for w in launch_words):
+    if any(contains_phrase(low, w) for w in launch_words):
         for key, app in APPS.items():
-            if any(name in low for name in app["names"]):
+            if any(contains_phrase(low, name) for name in app["names"]):
                 ok = _launch(key)
                 if ok:
                     return tr("Хорошо, запускаю {app}.", app=tr(app['label']))
@@ -103,7 +118,7 @@ def handle_builtin_command(text):
 
     if ("что ты умеешь" in low or "твои возможности" in low
             or "what can you do" in low or "your capabilities" in low):
-        return tr("Я могу запускать приложения, отвечать на вопросы и "
+        return tr("Я могу запускать приложения, считать, искать в интернете и "
                   "выполнять команды плагинов. Попробуй сказать: запусти браузер.")
 
     return None
@@ -115,6 +130,8 @@ def known_commands():
     for key, app in APPS.items():
         cmds.append((tr("Запусти {app}", app=tr(app['label'])),
                      tr("Открывает {app}", app=tr(app['label']))))
+    cmds.append((tr("Посчитай 15 * 12"), tr("Считает выражение, проценты и доли")))
+    cmds.append((tr("Найди рецепт борща"), tr("Ищет запрос в интернете")))
     cmds.append((tr("Как тебя зовут"), tr("Ассистент представляется")))
     cmds.append((tr("Что ты умеешь"), tr("Список возможностей")))
     return cmds

@@ -80,8 +80,8 @@ class AboutPage(QWidget):
 
         return card
 
-    def _link_button(self, icon, text, url):
-        btn = QPushButton(f"  {icon}   {text}")
+    def _link_button(self, text, url):
+        btn = QPushButton(text)
         btn.setCursor(Qt.PointingHandCursor)
         btn.setFixedHeight(42)
         btn.setStyleSheet(f"""
@@ -105,14 +105,14 @@ class AboutPage(QWidget):
 
         # показываем только те ссылки, у которых задан URL (пустые — пропускаем)
         link_specs = [
-            ("🌐", tr("Веб-сайт"), LINKS.get("site")),
-            ("💻", tr("Исходный код"), LINKS.get("source")),
-            ("📖", tr("Документация"), LINKS.get("docs")),
-            ("🐞", tr("Сообщить об ошибке"), LINKS.get("issues")),
+            (tr("Веб-сайт"), LINKS.get("site")),
+            (tr("Исходный код"), LINKS.get("source")),
+            (tr("Документация"), LINKS.get("docs")),
+            (tr("Сообщить об ошибке"), LINKS.get("issues")),
         ]
-        for icon, text, url in link_specs:
+        for text, url in link_specs:
             if url:
-                cl.addWidget(self._link_button(icon, text, url))
+                cl.addWidget(self._link_button(text, url))
         return card
 
     def _tech_card(self):

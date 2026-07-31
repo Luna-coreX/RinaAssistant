@@ -15,12 +15,9 @@ def _header(title, subtitle, icon):
 
     row = QHBoxLayout()
     row.setSpacing(12)
-    ic = QLabel(icon)
-    ic.setStyleSheet("font-size: 30px;")
     t = QLabel(title)
     t.setFont(QFont(FONT_FAMILY, 24, QFont.Bold))
     t.setStyleSheet(f"color: {Color.TEXT};")
-    row.addWidget(ic)
     row.addWidget(t)
     row.addStretch()
 
