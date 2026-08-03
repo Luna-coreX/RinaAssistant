@@ -1,9 +1,15 @@
 from plugins.api import Plugin
 from plugins.settings_spec import Toggle, Text, Choice, Slider
+from plugins.page_spec import Title, Note, Items, Button, Divider
 
 
 class NotesPlugin(Plugin):
-    """Демонстрация расширенного API: вкладка + настройки + команда."""
+    """
+    Демонстрация расширенного API: вкладка + настройки + команда.
+
+    Вкладка описана декларативно (API v2) — плагин не импортирует Qt,
+    поэтому его не придётся переписывать при смене оболочки приложения.
+    """
 
     page_title = "Заметки"
     page_icon = "📝"
@@ -16,9 +22,10 @@ class NotesPlugin(Plugin):
         low = text.lower()
         if low.startswith("запиши") or "заметка" in low:
             note = text.split(" ", 1)[1] if " " in text else ""
-            notes = self.ctx.get_setting("items", []) or []
-            notes.append(note)
-            self.ctx.set_setting("items", notes)
+            if note:
+                notes = self.ctx.get_setting("items", []) or []
+                notes.append(note)
+                self.ctx.set_setting("items", notes[-self._limit():])
             self.respond(f"Записала: {note}" if note else "Что записать?")
             return True
         return False
@@ -34,20 +41,38 @@ class NotesPlugin(Plugin):
             Text("prefix", "Префикс заметки", default="•"),
         ]
 
-    # --- своя вкладка ---
-    def create_page(self):
-        from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
-        from PySide6.QtGui import QFont
-        w = QWidget()
-        v = QVBoxLayout(w)
-        v.setSpacing(8)
-        title = QLabel("Мои заметки")
-        title.setFont(QFont("Segoe UI", 14))
-        v.addWidget(title)
-        notes = self.ctx.get_setting("items", []) or []
+    # --- своя вкладка (API v2: описание, а не виджеты) ---
+    def page(self):
+        notes = self._visible_notes()
         prefix = self.setting("prefix", "•")
-        if not notes:
-            v.addWidget(QLabel("Пока пусто. Скажите: «запиши купить молоко»."))
-        for n in notes[-20:]:
-            v.addWidget(QLabel(f"{prefix} {n}"))
-        return w
+
+        elements = [Title("Мои заметки")]
+        if notes:
+            elements.append(Note(f"Всего записей: {len(notes)}"))
+            elements.append(Items(f"{prefix} {n}" for n in notes))
+            elements.append(Divider())
+            elements.append(Button("Очистить список", action="clear",
+                                   variant="danger"))
+        else:
+            elements.append(
+                Note("Пока пусто. Скажите: «запиши купить молоко»."))
+        return elements
+
+    def on_action(self, action, value=None):
+        if action == "clear":
+            self.ctx.set_setting("items", [])
+            self.log("Список заметок очищен")
+
+    # --- вспомогательное ---
+    def _limit(self):
+        try:
+            return max(1, int(self.setting("limit", 20)))
+        except (TypeError, ValueError):
+            return 20
+
+    def _visible_notes(self):
+        notes = list(self.ctx.get_setting("items", []) or [])
+        notes = notes[-self._limit():]
+        if self.setting("sort", "новые сверху") == "новые сверху":
+            notes.reverse()
+        return notes

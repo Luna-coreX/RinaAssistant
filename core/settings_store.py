@@ -26,6 +26,13 @@ import tempfile
 
 APP_NAME = "RinaAssistant"
 
+# Версия схемы конфига. Растёт, когда меняется ФОРМА данных (а не набор
+# настроек): добавление нового ключа с дефолтом миграции не требует.
+#   0 — конфиги до 2.0 (версия не записывалась)
+#   1 — язык распознавания объединён с языком интерфейса (ui_language)
+#   2 — app_aliases хранит словарь {path, kind, name}, а не строку пути
+CONFIG_VERSION = 2
+
 
 # Значения по умолчанию, сгруппированные по файлам.
 GROUPS = {
@@ -61,6 +68,9 @@ GROUPS = {
         "save_history": True,
         "search_engine": "google",
         "web_search_fallback": True,
+        "program_folders": [],
+        "app_aliases": {},
+        "config_version": 0,
         "first_run": True,
     },
     "commands": {
@@ -102,6 +112,11 @@ def _config_dir() -> str:
     return path
 
 
+def config_dir() -> str:
+    """Папка с данными приложения (настройки, кэши). Создаётся при обращении."""
+    return _config_dir()
+
+
 class SettingsStore:
     def __init__(self):
         self._dir = _config_dir()
@@ -129,10 +144,102 @@ class SettingsStore:
         for group in GROUPS:
             self._load_group(group)
 
+        # обновление формы данных до текущей версии схемы
+        migrated = self._migrate_schema() or migrated
+
         if migrated:
             self.save_all()
         self._loaded = True
         return self._data
+
+    # ---------- миграция схемы ----------
+    def _raw_group(self, group):
+        """Сырое содержимое файла группы (включая ключи, которых уже нет)."""
+        try:
+            with open(self._group_path(group), "r", encoding="utf-8") as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def _backup_config(self, from_version):
+        """
+        Копия конфигов перед первой миграцией.
+
+        Пользовательские команды и история накапливаются годами — если
+        миграция окажется неудачной, должно остаться к чему вернуться.
+        """
+        backup_dir = os.path.join(self._dir, f"backup-v{from_version}")
+        if os.path.isdir(backup_dir):
+            return          # копия уже есть, второй раз не перезаписываем
+        try:
+            os.makedirs(backup_dir, exist_ok=True)
+            for group in GROUPS:
+                src = self._group_path(group)
+                if os.path.isfile(src):
+                    with open(src, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    with open(os.path.join(backup_dir, f"{group}.json"),
+                              "w", encoding="utf-8") as f:
+                        f.write(content)
+        except OSError:
+            pass            # не смогли сделать копию — миграцию всё равно проводим
+
+    def _migrate_schema(self):
+        """Приводит данные к текущей CONFIG_VERSION. True, если что-то меняли."""
+        stored = self._data.get("config_version", 0)
+        try:
+            stored = int(stored)
+        except (TypeError, ValueError):
+            stored = 0
+        if stored >= CONFIG_VERSION:
+            return False
+
+        # конфиг существует (а не создаётся с нуля) — бэкапим перед правками
+        if os.path.isfile(self._group_path("settings")):
+            self._backup_config(stored)
+
+        if stored < 1:
+            self._migrate_to_v1()
+        if stored < 2:
+            self._migrate_to_v2()
+
+        self._data["config_version"] = CONFIG_VERSION
+        return True
+
+    def _migrate_to_v1(self):
+        """
+        Язык распознавания речи объединён с языком интерфейса.
+
+        Раньше «Язык» на вкладке Рины (ключ language) управлял только
+        распознаванием. Если пользователь его менял, а язык интерфейса не
+        трогал — переносим его выбор, чтобы распознавание не «переехало»
+        молча на другой язык.
+        """
+        old = self._raw_group("settings")
+        legacy_lang = str(old.get("language", "")).strip()
+        if not legacy_lang:
+            return
+        from core.i18n import LANGUAGES
+        if (legacy_lang in LANGUAGES
+                and self._data.get("ui_language") == DEFAULTS["ui_language"]):
+            self._data["ui_language"] = legacy_lang
+
+    def _migrate_to_v2(self):
+        """app_aliases: строка с путём -> словарь {path, kind, name}."""
+        aliases = self._data.get("app_aliases") or {}
+        if not isinstance(aliases, dict):
+            self._data["app_aliases"] = {}
+            return
+        upgraded = {}
+        for key, value in aliases.items():
+            if isinstance(value, str):
+                name = os.path.splitext(os.path.basename(value))[0]
+                upgraded[key] = {"path": value, "kind": "file", "name": name}
+            elif isinstance(value, dict) and value.get("path"):
+                upgraded[key] = value
+            # прочее (битые записи) отбрасываем
+        self._data["app_aliases"] = upgraded
 
     def _load_group(self, group):
         path = self._group_path(group)

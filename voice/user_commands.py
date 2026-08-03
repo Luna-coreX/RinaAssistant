@@ -37,13 +37,48 @@ COMMAND_TYPES = [
     ("sequence", "Последовательность", "🔗"),
 ]
 
+# Действия над окном самой Рины выполняет главное окно (host),
+# действия с префиксом sys_ — voice/system_control (громкость, медиа, ПК).
 SYSTEM_ACTIONS = [
-    ("minimize", "Свернуть окно"),
-    ("show",     "Показать окно"),
-    ("quit",     "Выйти из приложения"),
-    ("mute",     "Отключить озвучку"),
-    ("unmute",   "Включить озвучку"),
+    ("minimize",             "Свернуть окно Рины"),
+    ("show",                 "Показать окно Рины"),
+    ("quit",                 "Выйти из Рины"),
+    ("mute",                 "Отключить озвучку"),
+    ("unmute",               "Включить озвучку"),
+    ("sys_volume_up",        "Прибавить громкость"),
+    ("sys_volume_down",      "Убавить громкость"),
+    ("sys_volume_mute",      "Переключить звук системы"),
+    ("sys_media_play_pause", "Пауза / продолжить"),
+    ("sys_media_next",       "Следующий трек"),
+    ("sys_media_prev",       "Предыдущий трек"),
+    ("sys_screenshot",       "Сделать скриншот"),
+    ("sys_lock",             "Заблокировать компьютер"),
+    ("sys_sleep",            "Спящий режим"),
+    ("sys_restart",          "Перезагрузить компьютер"),
+    ("sys_shutdown",         "Выключить компьютер"),
 ]
+
+# Действия, которые нельзя выполнять без подтверждения: ошибка распознавания
+# или случайно совпавшая фраза не должна выключать компьютер.
+DESTRUCTIVE_ACTIONS = {"sys_shutdown", "sys_restart", "sys_sleep", "quit"}
+
+
+def action_label(action_id):
+    for aid, label in SYSTEM_ACTIONS:
+        if aid == action_id:
+            return label
+    return action_id
+
+
+def command_needs_confirm(command):
+    """Есть ли в команде (или её шагах) необратимое действие."""
+    if command.get("type") == "system":
+        return command.get("target") in DESTRUCTIVE_ACTIONS
+    if command.get("type") == "sequence":
+        return any(step.get("type") == "system"
+                   and step.get("target") in DESTRUCTIVE_ACTIONS
+                   for step in command.get("steps", []))
+    return False
 
 
 def new_command_id():
@@ -51,7 +86,8 @@ def new_command_id():
 
 
 def make_command(cmd_type="app", triggers=None, target="", response="",
-                 match="contains", enabled=True, steps=None):
+                 match="contains", enabled=True, steps=None,
+                 target_kind="file"):
     return {
         "id": new_command_id(),
         "enabled": bool(enabled),
@@ -59,6 +95,8 @@ def make_command(cmd_type="app", triggers=None, target="", response="",
         "triggers": triggers or [],
         "match": match,
         "target": target,
+        # чем является target: файл/путь или идентификатор приложения Магазина
+        "target_kind": target_kind,
         "response": response,
         "steps": steps or [],
     }
@@ -188,7 +226,12 @@ def execute(command, host=None):
     response = command.get("response", "")
 
     ok = True
-    if ctype == "app" or ctype == "folder":
+    if ctype == "app" and command.get("target_kind") == "uwp":
+        # приложение Магазина: запускается по идентификатору, а не по пути
+        from voice import app_index
+        ok = app_index.launch(
+            app_index.AppEntry(target, target, "uwp", "learned"))
+    elif ctype == "app" or ctype == "folder":
         ok = _open_path(target)
     elif ctype == "website":
         url = target
@@ -205,6 +248,16 @@ def execute(command, host=None):
             response = target
     elif ctype == "system":
         ok = _run_system_action(target, host)
+    elif ctype == "pause":
+        # пауза между шагами: дать программе время запуститься.
+        # Ограничиваем сверху, чтобы опечатка не подвесила выполнение надолго.
+        import time
+        try:
+            seconds = max(0.0, min(float(str(target).replace(",", ".")), 60.0))
+        except (TypeError, ValueError):
+            seconds = 1.0
+        time.sleep(seconds)
+        ok = True
     elif ctype == "sequence":
         ok = True
         for step in command.get("steps", []):
@@ -220,8 +273,13 @@ def execute(command, host=None):
 
 
 def _run_system_action(action, host):
-    if host is None:
-        return False
+    # действия с компьютером (громкость, медиа, блокировка) — им host не нужен
+    if str(action).startswith("sys_"):
+        from voice import system_control
+        return system_control.run(action[4:]) is not None
+
+    # действия над окном Рины трогают виджеты, а команда может выполняться
+    # в фоновом потоке (распознавание речи) — уводим их в GUI-поток сигналом
     mapping = {
         "minimize": "action_minimize",
         "show": "action_show",
@@ -229,10 +287,18 @@ def _run_system_action(action, host):
         "mute": "action_mute",
         "unmute": "action_unmute",
     }
-    method = mapping.get(action)
-    if method and hasattr(host, method):
+    if action not in mapping:
+        return False
+    try:
+        from core.app_signals import app_signals
+        app_signals.window_action.emit(action)
+        return True
+    except Exception:
+        pass
+    # запасной путь, если сигнальная шина недоступна
+    if host is not None and hasattr(host, mapping[action]):
         try:
-            getattr(host, method)()
+            getattr(host, mapping[action])()
             return True
         except Exception:
             return False
@@ -240,22 +306,24 @@ def _run_system_action(action, host):
 
 
 def _default_response(command, ok):
+    from core.i18n import t as tr
+
     ctype = command.get("type")
     if not ok:
-        return "Не получилось выполнить команду."
+        return tr("Не получилось выполнить команду.")
     if ctype == "app":
-        return "Запускаю программу."
+        return tr("Запускаю программу.")
     if ctype == "folder":
-        return "Открываю папку."
+        return tr("Открываю папку.")
     if ctype == "website":
-        return "Открываю сайт."
+        return tr("Открываю сайт.")
     if ctype == "speak":
         return command.get("target", "")
     if ctype == "system":
-        return "Готово."
+        return tr("Готово.")
     if ctype == "sequence":
-        return "Выполняю последовательность."
-    return "Готово."
+        return tr("Выполняю последовательность.")
+    return tr("Готово.")
 
 
 def dispatch_user_command(text, store: UserCommandStore, host=None):

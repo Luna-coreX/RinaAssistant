@@ -15,18 +15,20 @@ from PySide6.QtCore import Qt
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius
 from components.controls import styled_combo, styled_lineedit
+from components.app_picker import AppPickerEdit
 from voice.user_commands import SYSTEM_ACTIONS, make_command
 
 
 # типы, доступные внутри последовательности (без вложенных последовательностей)
 STEP_TYPES = [
-    ("app",     "Программа",         "🖥️"),
-    ("folder",  "Папка",             "📁"),
-    ("website", "Сайт",              "🌐"),
-    ("speak",   "Озвучить",          "🔊"),
-    ("system",  "Системное действие","⚙️"),
+    ("app",     "Программа"),
+    ("folder",  "Папка"),
+    ("website", "Сайт"),
+    ("speak",   "Озвучить"),
+    ("system",  "Действие"),
+    ("pause",   "Пауза"),
 ]
-_STEP_IDS = [t for t, _, _ in STEP_TYPES]
+_STEP_IDS = [t for t, _ in STEP_TYPES]
 
 
 class StepRow(QWidget):
@@ -53,12 +55,16 @@ class StepRow(QWidget):
 
         # тип шага
         self.type_combo = styled_combo(
-            [tr(label) for _, label, icon in STEP_TYPES], 0)
-        self.type_combo.setFixedWidth(150)
+            [tr(label) for _, label in STEP_TYPES], 0)
+        self.type_combo.setFixedWidth(140)
         self.type_combo.currentIndexChanged.connect(self._sync_fields)
         row.addWidget(self.type_combo)
 
-        # цель: поле ввода (путь/url/текст)
+        # выбор программы из найденных (для шага «Программа»)
+        self.app_picker = AppPickerEdit()
+        row.addWidget(self.app_picker, 1)
+
+        # цель: поле ввода (путь/url/текст/секунды)
         self.target_edit = styled_lineedit("")
         row.addWidget(self.target_edit, 1)
 
@@ -104,19 +110,21 @@ class StepRow(QWidget):
     def _sync_fields(self, *args):
         t = self._current_type()
         is_system = (t == "system")
-        is_pathlike = t in ("app", "folder")
+        is_app = (t == "app")
 
         self.system_combo.setVisible(is_system)
-        self.target_edit.setVisible(not is_system)
-        self.browse_btn.setVisible(is_pathlike)
+        self.app_picker.setVisible(is_app)
+        self.target_edit.setVisible(not is_system and not is_app)
+        # «Обзор…» живёт внутри выбора программы, для папки — отдельная кнопка
+        self.browse_btn.setVisible(t == "folder")
 
         placeholders = {
-            "app": "Путь к программе или имя",
-            "folder": "Путь к папке",
+            "folder": tr("Путь к папке"),
             "website": "example.com",
-            "speak": "Текст для озвучивания",
+            "speak": tr("Текст для озвучивания"),
+            "pause": tr("Секунд, например 2"),
         }
-        if not is_system:
+        if not is_system and not is_app:
             self.target_edit.setPlaceholderText(placeholders.get(t, ""))
 
     def _browse(self):
@@ -136,20 +144,30 @@ class StepRow(QWidget):
             actions = [a for a, _ in SYSTEM_ACTIONS]
             if step.get("target") in actions:
                 self.system_combo.setCurrentIndex(actions.index(step["target"]))
+        elif t == "app":
+            self.app_picker.set_target(step.get("target", ""),
+                                       step.get("target_kind", "file"))
         else:
             self.target_edit.setText(step.get("target", ""))
 
     def to_step(self):
         """Возвращает под-команду или None, если шаг пустой/некорректный."""
         t = self._current_type()
+        target_kind = "file"
         if t == "system":
             target = SYSTEM_ACTIONS[self.system_combo.currentIndex()][0]
+        elif t == "app":
+            target = self.app_picker.target().strip()
+            target_kind = self.app_picker.target_kind()
+            if not target:
+                return None
         else:
             target = self.target_edit.text().strip()
             if not target:
                 return None
         # у шагов нет фраз активации — они выполняются в составе последовательности
-        return make_command(cmd_type=t, triggers=["_step"], target=target)
+        return make_command(cmd_type=t, triggers=["_step"], target=target,
+                            target_kind=target_kind)
 
 
 class SequenceEditor(QWidget):

@@ -85,7 +85,9 @@ class HotkeysPage(QWidget):
             cap.captured.connect(
                 lambda seq, aid=action_id: self._on_action_changed(aid, seq))
             self._captures[action_id] = cap
-            ac.addWidget(self._action_row(label, desc, cap))
+            # подписи действий лежат в voice/hotkey_actions.py как обычные
+            # строки — переводим их здесь, при показе
+            ac.addWidget(self._action_row(tr(label), tr(desc), cap))
             if i < len(items) - 1:
                 ac.addWidget(Divider())
         layout.addWidget(actions_card)

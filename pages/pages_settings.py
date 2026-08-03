@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton,
     QFileDialog
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 
 from core.i18n import t as tr
@@ -20,6 +20,10 @@ from voice.mic_tester import MicTester
 
 class SettingsPage(QWidget):
     """Настройки приложения (тема, поведение окна, приватность и т.д.)."""
+
+    # скан программ идёт в фоновом потоке — результат возвращаем сигналом,
+    # трогать виджеты из чужого потока нельзя
+    index_refreshed = Signal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -60,6 +64,7 @@ class SettingsPage(QWidget):
         layout.addWidget(self._appearance_card())
         layout.addWidget(self._audio_card())
         layout.addWidget(self._models_card())
+        layout.addWidget(self._programs_card())
         layout.addWidget(self._behavior_card())
         layout.addWidget(self._search_card())
         layout.addWidget(self._privacy_card())
@@ -322,7 +327,9 @@ class SettingsPage(QWidget):
                 self.mic_status.setText(tr("Микрофон работает, громкий сигнал."))
             QTimer.singleShot(2500, self.level_meter.reset)
         else:
-            self.mic_status.setText(result.error or tr("Не удалось проверить микрофон."))
+            self.mic_status.setText(
+                tr(result.error) if result.error
+                else tr("Не удалось проверить микрофон."))
             self.level_meter.reset()
 
     def _current_input_id(self):
@@ -445,6 +452,192 @@ class SettingsPage(QWidget):
         color = Color.GREEN if available else Color.OVERLAY
         self.update_status.setStyleSheet(f"color: {color}; font-size: 11px;")
         self.update_status.setText(message)
+
+    # ---------- Программы ----------
+    def _programs_card(self):
+        """
+        Папки с portable-программами: у них нет ярлыка в «Пуске» и записи
+        в реестре, поэтому найти их можно только там, где укажет пользователь.
+        """
+        card = Card()
+        cl = card.layout()
+        cl.addWidget(self._section_title(tr("Программы")))
+
+        hint = QLabel(tr(
+            "Рина сама находит установленные программы. Если что-то лежит "
+            "просто папкой (portable-версии, игры, SDK) — добавьте её сюда."))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(hint)
+
+        self._folders_box = QVBoxLayout()
+        self._folders_box.setSpacing(4)
+        cl.addLayout(self._folders_box)
+
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        add_btn = QPushButton(tr("Добавить папку…"))
+        add_btn.setCursor(Qt.PointingHandCursor)
+        add_btn.setFixedHeight(34)
+        add_btn.setStyleSheet(self._small_button_qss())
+        add_btn.clicked.connect(self._add_program_folder)
+        row.addWidget(add_btn)
+
+        self.reindex_btn = QPushButton(tr("Обновить список"))
+        self.reindex_btn.setCursor(Qt.PointingHandCursor)
+        self.reindex_btn.setFixedHeight(34)
+        self.reindex_btn.setStyleSheet(self._small_button_qss())
+        self.reindex_btn.clicked.connect(self._refresh_index)
+        row.addWidget(self.reindex_btn)
+        row.addStretch()
+        cl.addLayout(row)
+
+        self.index_status = QLabel("")
+        self.index_status.setWordWrap(True)
+        self.index_status.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(self.index_status)
+
+        # программы, которые пользователь показал вручную («запомни путь»)
+        self._learned_row = QWidget()
+        lr = QHBoxLayout(self._learned_row)
+        lr.setContentsMargins(0, 4, 0, 0)
+        lr.setSpacing(8)
+        self.learned_label = QLabel("")
+        self.learned_label.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        lr.addWidget(self.learned_label, 1)
+        self.forget_btn = QPushButton(tr("Забыть все"))
+        self.forget_btn.setCursor(Qt.PointingHandCursor)
+        self.forget_btn.setFixedHeight(28)
+        self.forget_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: transparent; color: {Color.RED};
+                border: 1px solid {Color.alpha(Color.RED, '55')};
+                border-radius: {Radius.SM}px;
+                padding: 2px 12px; font-size: 11px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.alpha(Color.RED, '22')}; }}
+        """)
+        self.forget_btn.clicked.connect(self._forget_learned)
+        lr.addWidget(self.forget_btn, 0, Qt.AlignVCenter)
+        cl.addWidget(self._learned_row)
+        self._update_learned_row()
+
+        self.index_refreshed.connect(self._on_index_refreshed)
+        self._rebuild_folder_rows()
+        self._show_index_count()
+        return card
+
+    def _small_button_qss(self):
+        return f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 4px 16px; font-size: 12px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+            QPushButton:disabled {{ color: {Color.OVERLAY}; }}
+        """
+
+    def _rebuild_folder_rows(self):
+        while self._folders_box.count():
+            item = self._folders_box.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        folders = list(settings.get("program_folders", []) or [])
+        if not folders:
+            empty = QLabel(tr("Папки не добавлены"))
+            empty.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+            self._folders_box.addWidget(empty)
+            return
+
+        for path in folders:
+            row = QWidget()
+            h = QHBoxLayout(row)
+            h.setContentsMargins(0, 2, 0, 2)
+            h.setSpacing(8)
+            label = QLabel(path)
+            label.setStyleSheet(f"color: {Color.TEXT}; font-size: 12px;")
+            label.setWordWrap(True)
+            h.addWidget(label, 1)
+            remove = QPushButton(tr("Убрать"))
+            remove.setCursor(Qt.PointingHandCursor)
+            remove.setFixedHeight(28)
+            remove.setStyleSheet(f"""
+                QPushButton {{
+                    background: transparent; color: {Color.RED};
+                    border: 1px solid {Color.alpha(Color.RED, '55')};
+                    border-radius: {Radius.SM}px;
+                    padding: 2px 12px; font-size: 11px; font-weight: 600;
+                }}
+                QPushButton:hover {{ background: {Color.alpha(Color.RED, '22')}; }}
+            """)
+            remove.clicked.connect(
+                lambda _checked=False, p=path: self._remove_program_folder(p))
+            h.addWidget(remove, 0, Qt.AlignVCenter)
+            self._folders_box.addWidget(row)
+
+    def _add_program_folder(self):
+        path = QFileDialog.getExistingDirectory(
+            self, tr("Папка с программами"))
+        if not path:
+            return
+        folders = list(settings.get("program_folders", []) or [])
+        if path in folders:
+            return
+        folders.append(path)
+        settings.set("program_folders", folders)
+        settings.save()
+        self._rebuild_folder_rows()
+        self._flash_saved()
+        self._refresh_index()
+
+    def _remove_program_folder(self, path):
+        folders = [p for p in (settings.get("program_folders", []) or [])
+                   if p != path]
+        settings.set("program_folders", folders)
+        settings.save()
+        self._rebuild_folder_rows()
+        self._flash_saved()
+        self._refresh_index()
+
+    def _refresh_index(self):
+        """Пересканировать список программ (в фоне — скан занимает секунды)."""
+        from voice import app_index
+        self.reindex_btn.setEnabled(False)
+        self.index_status.setText(tr("Ищу программы…"))
+        app_index.refresh_async(
+            lambda entries: self.index_refreshed.emit(len(entries)))
+
+    def _on_index_refreshed(self, count):
+        self.reindex_btn.setEnabled(True)
+        self.index_status.setText(
+            tr("Найдено программ: {count}", count=count))
+
+    def _update_learned_row(self):
+        learned = settings.get("app_aliases", {}) or {}
+        if learned:
+            self.learned_label.setText(
+                tr("Показано вручную: {count}", count=len(learned)))
+            self._learned_row.show()
+        else:
+            self._learned_row.hide()
+
+    def _forget_learned(self):
+        settings.set("app_aliases", {})
+        settings.save()
+        self._update_learned_row()
+        self._flash_saved()
+
+    def _show_index_count(self):
+        from voice import app_index
+        cached, _ts = app_index.load_cache()
+        if cached:
+            self.index_status.setText(
+                tr("Найдено программ: {count}", count=len(cached)))
 
     # ---------- Поиск ----------
     def _search_card(self):

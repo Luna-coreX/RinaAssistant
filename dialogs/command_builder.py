@@ -8,10 +8,12 @@ from PySide6.QtGui import QFont
 from core.i18n import t as tr
 from core.theme import Color, FONT_FAMILY, Radius
 from components.controls import styled_combo, styled_lineedit
+from components.app_picker import AppPickerEdit
 from components.sequence_editor import SequenceEditor
 from voice.user_commands import (
     COMMAND_TYPES, SYSTEM_ACTIONS, make_command
 )
+from voice.textmatch import normalize as normalize_phrase
 
 
 class CommandBuilderDialog(QDialog):
@@ -52,9 +54,14 @@ class CommandBuilderDialog(QDialog):
         layout.addWidget(self.type_combo)
 
         # --- динамическое поле цели ---
-        self.target_label = self._label(tr("Путь к программе"))
+        self.target_label = self._label(tr("Программа"))
         layout.addWidget(self.target_label)
 
+        # выбор программы из найденных (для типа «Программа»)
+        self.app_picker = AppPickerEdit()
+        layout.addWidget(self.app_picker)
+
+        # обычное поле пути/ссылки (папка, сайт)
         target_row = QHBoxLayout()
         target_row.setSpacing(8)
         self.target_edit = styled_lineedit("")
@@ -72,6 +79,7 @@ class CommandBuilderDialog(QDialog):
         """)
         self.browse_btn.clicked.connect(self._browse)
         target_row.addWidget(self.browse_btn)
+        self._target_row = target_row
         layout.addLayout(target_row)
 
         # системное действие (свой комбо, скрывается для других типов)
@@ -172,14 +180,16 @@ class CommandBuilderDialog(QDialog):
         self.target_label.hide()
         self.target_edit.hide()
         self.browse_btn.hide()
+        self.app_picker.hide()
         self.system_combo.hide()
         self.speak_edit.hide()
         self.sequence_editor.hide()
 
         if t == "app":
-            self.target_label.setText(tr("Путь к программе или её имя"))
-            self.target_label.show(); self.target_edit.show(); self.browse_btn.show()
-            self.target_edit.setPlaceholderText(tr("C:\\...\\Discord.exe  или  discord"))
+            # Рина уже знает установленные программы — выбираем из них,
+            # а не просим путь к .exe
+            self.target_label.setText(tr("Программа"))
+            self.target_label.show(); self.app_picker.show()
         elif t == "folder":
             self.target_label.setText(tr("Путь к папке"))
             self.target_label.show(); self.target_edit.show(); self.browse_btn.show()
@@ -231,6 +241,9 @@ class CommandBuilderDialog(QDialog):
         elif t == "sequence":
             self.sequence_editor.load_steps(cmd.get("steps", []))
             self._seq_initialized = True
+        elif t == "app":
+            self.app_picker.set_target(cmd.get("target", ""),
+                                       cmd.get("target_kind", "file"))
         else:
             self.target_edit.setText(cmd.get("target", ""))
 
@@ -243,7 +256,13 @@ class CommandBuilderDialog(QDialog):
             return self._error(tr("Добавьте хотя бы одну фразу активации."))
 
         steps = []
-        if t == "speak":
+        target_kind = "file"
+        if t == "app":
+            target = self.app_picker.target().strip()
+            target_kind = self.app_picker.target_kind()
+            if not target:
+                return self._error(tr("Выберите программу."))
+        elif t == "speak":
             target = self.speak_edit.toPlainText().strip()
             if not target:
                 return self._error(tr("Введите текст для озвучивания."))
@@ -259,18 +278,55 @@ class CommandBuilderDialog(QDialog):
             if not target:
                 return self._error(tr("Укажите путь или ссылку."))
 
+        conflict = self._find_conflict(triggers)
+        if conflict:
+            phrase, other = conflict
+            if normalize_phrase(other) == normalize_phrase(phrase):
+                return self._error(tr(
+                    "Фраза «{phrase}» уже используется другой командой — "
+                    "сработает она. Измените фразу.", phrase=phrase))
+            return self._error(tr(
+                "Фраза «{phrase}» уже занята командой «{other}» — она "
+                "сработает первой. Измените фразу.",
+                phrase=phrase, other=other))
+
         match = "exact" if self.match_combo.currentIndex() == 1 else "contains"
         response = self.response_edit.text().strip()
 
         cmd = make_command(
             cmd_type=t, triggers=triggers, target=target,
             response=response, match=match, enabled=True, steps=steps,
+            target_kind=target_kind,
         )
         if self._editing and self._command:
             cmd["id"] = self._command["id"]
             cmd["enabled"] = self._command.get("enabled", True)
         self._result = cmd
         self.accept()
+
+    def _find_conflict(self, triggers):
+        """
+        Ищет фразу, уже занятую другой командой.
+
+        Команды перебираются по порядку, срабатывает первая подходящая —
+        поэтому дубликат означал бы, что новая команда просто не запустится.
+        Возвращает (фраза, имя чужой команды) или None.
+        """
+        from core.settings_store import settings
+        from voice.user_commands import UserCommandStore
+        from voice.textmatch import normalize
+
+        my_id = self._command.get("id") if self._editing and self._command else None
+        mine = {normalize(t) for t in triggers}
+
+        for cmd in UserCommandStore(settings).all():
+            if cmd.get("id") == my_id:
+                continue
+            for other in cmd.get("triggers", []):
+                if normalize(other) in mine:
+                    label = (cmd.get("triggers") or [tr("(без фразы)")])[0]
+                    return other, label
+        return None
 
     def _error(self, msg):
         self.error_label.setText(msg)
