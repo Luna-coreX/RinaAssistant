@@ -18,12 +18,20 @@ from voice.user_commands import UserCommandStore, type_label
 class CommandsPage(QWidget):
     """Список встроенных и пользовательских команд + конструктор."""
 
+    # индекс программ пересобирается в фоне — результат возвращаем сигналом
+    index_refreshed = Signal(int)
+
+    # сколько найденных программ показывать без фильтра: их больше тысячи,
+    # список целиком бесполезен и тормозит отрисовку
+    PROGRAMS_PREVIEW = 24
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.store = UserCommandStore(settings)
         self._filter = ""
         self._build()
         app_signals.commands_changed.connect(self._reload)
+        self.index_refreshed.connect(self._on_index_refreshed)
 
     def _build(self):
         outer = QVBoxLayout(self)
@@ -139,6 +147,12 @@ class CommandsPage(QWidget):
         elif not self._filter:
             self._list_holder.addWidget(self._empty_hint())
 
+        # --- программы, показанные вручную ---
+        learned = self._learned_card()
+        if learned is not None:
+            self._list_holder.addWidget(self._section(tr("Запомненные программы")))
+            self._list_holder.addWidget(learned)
+
         # --- встроенные ---
         builtin = [(name, desc) for name, desc in known_commands()
                    if self._match_filter(name, desc)]
@@ -152,6 +166,138 @@ class CommandsPage(QWidget):
                     from components.controls import Divider
                     cl.addWidget(Divider())
             self._list_holder.addWidget(card)
+
+        # --- найденные программы ---
+        self._list_holder.addWidget(self._programs_card())
+
+    # ---------- запомненные программы ----------
+    def _learned_card(self):
+        """
+        Программы, которые пользователь показал сам («укажи путь») или выбрал
+        в уточняющем вопросе. Управлять ими логично здесь, рядом с командами,
+        а не только скопом в настройках.
+        """
+        from components.controls import Divider
+
+        aliases = settings.get("app_aliases", {}) or {}
+        rows = []
+        for phrase, data in sorted(aliases.items()):
+            if isinstance(data, str):       # старый формат
+                data = {"path": data, "name": ""}
+            name = data.get("name") or data.get("path", "")
+            if self._match_filter(phrase, name):
+                rows.append((phrase, name))
+        if not rows:
+            return None
+
+        card = Card()
+        cl = card.layout()
+        note = QLabel(tr("Рина запомнила, что вы имеете в виду под этими словами."))
+        note.setWordWrap(True)
+        note.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(note)
+
+        for i, (phrase, name) in enumerate(rows):
+            row = QWidget()
+            h = QHBoxLayout(row)
+            h.setContentsMargins(0, 6, 0, 6)
+            h.setSpacing(12)
+
+            box = QVBoxLayout()
+            box.setSpacing(2)
+            title = QLabel(f"«{phrase}»")
+            title.setStyleSheet(
+                f"color: {Color.TEXT}; font-size: 13px; font-weight: 600;")
+            sub = QLabel(name)
+            sub.setWordWrap(True)
+            sub.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+            box.addWidget(title)
+            box.addWidget(sub)
+            h.addLayout(box, 1)
+
+            forget = self._mini_btn(tr("Забыть"), Color.RED)
+            forget.clicked.connect(
+                lambda _checked=False, p=phrase: self._forget_alias(p))
+            h.addWidget(forget, 0, Qt.AlignVCenter)
+
+            cl.addWidget(row)
+            if i < len(rows) - 1:
+                cl.addWidget(Divider())
+        return card
+
+    def _forget_alias(self, phrase):
+        from voice import app_launcher
+        app_launcher.forget(phrase)
+        self._reload()
+
+    # ---------- найденные программы ----------
+    def _programs_card(self):
+        """
+        Что Рина нашла на компьютере и может запускать голосом.
+        Список большой, поэтому без фильтра показываем только начало.
+        """
+        from voice import app_index
+
+        card = Card()
+        cl = card.layout()
+
+        head = QHBoxLayout()
+        head.setSpacing(10)
+        title = QLabel(tr("Найденные программы"))
+        title.setFont(QFont(FONT_FAMILY, 13, QFont.Bold))
+        title.setStyleSheet(f"color: {Color.SUBTEXT};")
+        head.addWidget(title)
+        head.addStretch()
+
+        self.reindex_btn = QPushButton(tr("Обновить список"))
+        self.reindex_btn.setCursor(Qt.PointingHandCursor)
+        self.reindex_btn.setFixedHeight(30)
+        self.reindex_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 2px 14px; font-size: 12px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+            QPushButton:disabled {{ color: {Color.OVERLAY}; }}
+        """)
+        self.reindex_btn.clicked.connect(self._refresh_index)
+        head.addWidget(self.reindex_btn)
+        cl.addLayout(head)
+
+        entries = app_index.get_index()
+        if self._filter:
+            shown = app_index.find(self._filter, limit=30, entries=entries)
+            note = (tr("Совпадений: {count}", count=len(shown)) if shown
+                    else tr("Ничего не найдено по запросу"))
+        else:
+            shown = entries[:self.PROGRAMS_PREVIEW]
+            note = tr("Всего найдено: {count}. Скажите «запусти» и название — "
+                      "искать в списке не нужно.", count=len(entries))
+
+        self.programs_note = QLabel(note)
+        self.programs_note.setWordWrap(True)
+        self.programs_note.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(self.programs_note)
+
+        if shown:
+            grid = QLabel(",   ".join(e.name for e in shown))
+            grid.setWordWrap(True)
+            grid.setStyleSheet(f"color: {Color.TEXT}; font-size: 12px;")
+            cl.addWidget(grid)
+        return card
+
+    def _refresh_index(self):
+        from voice import app_index
+        self.reindex_btn.setEnabled(False)
+        self.reindex_btn.setText(tr("Ищу…"))
+        app_index.refresh_async(
+            lambda entries: self.index_refreshed.emit(len(entries)))
+
+    def _on_index_refreshed(self, _count):
+        # список пересобираем целиком — заодно обновится и счётчик
+        self._reload()
 
     def _section(self, title):
         lbl = QLabel(title)

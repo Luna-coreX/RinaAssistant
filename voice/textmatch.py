@@ -27,6 +27,27 @@ def normalize(text):
     return re.sub(r"\s+", " ", low).strip()
 
 
+# Кириллица -> латиница. Нужна, потому что распознавание речи всегда выдаёт
+# русские буквы («телеграм»), а названия программ почти всегда латиницей.
+_TRANSLIT = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ж": "zh",
+    "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n",
+    "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u", "ф": "f",
+    "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch", "ъ": "",
+    "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
+
+def translit(text):
+    """«телеграм» -> «telegram». Латиница остаётся как есть."""
+    norm = normalize(text)
+    return "".join(_TRANSLIT.get(ch, ch) for ch in norm)
+
+
+def has_cyrillic(text):
+    return any("а" <= ch <= "я" or ch == "ё" for ch in str(text).lower())
+
+
 def similar(a, b, threshold=THRESHOLD):
     """Похожи ли две строки (после нормализации)."""
     a, b = normalize(a), normalize(b)

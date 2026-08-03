@@ -52,19 +52,18 @@ class PluginSettingsPanel(Card):
 
     def _build_field(self, field):
         kind = field.kind
-        icon = field.icon or "•"
 
         if kind == "toggle":
             w = ToggleSwitch(checked=bool(self._get(field.key, field.default)))
             w.toggled.connect(lambda on, k=field.key: self._set(k, bool(on)))
             self._widgets[field.key] = w
-            return SettingRow(icon, field.label, field.description, w)
+            return SettingRow(field.label, field.description, w)
 
         if kind == "text":
             w = styled_lineedit("", str(self._get(field.key, field.default)))
             w.textChanged.connect(lambda t, k=field.key: self._set(k, t))
             self._widgets[field.key] = w
-            return SettingRow(icon, field.label, field.description, w)
+            return SettingRow(field.label, field.description, w)
 
         if kind == "choice":
             opts = field.options or []
@@ -74,7 +73,7 @@ class PluginSettingsPanel(Card):
                 w.setCurrentIndex(opts.index(cur))
             w.currentTextChanged.connect(lambda t, k=field.key: self._set(k, t))
             self._widgets[field.key] = w
-            return SettingRow(icon, field.label, field.description, w)
+            return SettingRow(field.label, field.description, w)
 
         if kind == "slider":
             container = QWidget()
@@ -92,6 +91,6 @@ class PluginSettingsPanel(Card):
             h.addWidget(s)
             h.addWidget(val)
             self._widgets[field.key] = s
-            return SettingRow(icon, field.label, field.description, container)
+            return SettingRow(field.label, field.description, container)
 
         return None

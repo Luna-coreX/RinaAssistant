@@ -112,12 +112,63 @@ class MainWindow(QMainWindow):
         # выполнение пользовательской команды по кнопке «Выполнить»
         app_signals.run_command.connect(self.voice.run_command_by_id)
 
+        # программу не нашли — предложить указать файл и запомнить его
+        app_signals.app_not_found.connect(self._on_app_not_found)
+
+        # действия над окном приходят сигналом из потока распознавания
+        app_signals.window_action.connect(self._on_window_action)
+
         # плагины: вкладки, окна, уведомления, голос
         plugin_manager.pages_changed.connect(self.on_plugin_pages_changed)
         plugin_manager.window_requested.connect(self._open_plugin_window)
         plugin_manager.notify_requested.connect(self._plugin_notify)
         plugin_manager.response.connect(self._on_plugin_response)
         self._plugin_windows = []
+
+    def _on_window_action(self, action):
+        """Выполняет действие над окном уже в GUI-потоке."""
+        handler = {
+            "minimize": self.action_minimize,
+            "show": self.action_show,
+            "quit": self.action_quit,
+            "mute": self.action_mute,
+            "unmute": self.action_unmute,
+        }.get(action)
+        if handler:
+            handler()
+
+    def _on_app_not_found(self, query):
+        """
+        Рина не нашла программу — предлагаем показать файл.
+
+        Спрашиваем только когда окно на экране: выдёргивать диалог поверх
+        чужой полноэкранной работы из-за неудачной голосовой команды нельзя.
+        """
+        if not self.isVisible() or self.isMinimized():
+            return
+        try:
+            from dialogs.teach_app_dialog import TeachAppDialog
+            from voice import app_launcher, app_index
+        except Exception:
+            return
+
+        dlg = TeachAppDialog(query, self)
+        self._teach_dialog = dlg   # держим ссылку, иначе окно закроется сборщиком
+
+        def on_accepted():
+            path = dlg.chosen_path()
+            if not path:
+                return
+            app_launcher.remember(query, path)
+            entry = app_launcher.alias_entry(query)
+            if entry is not None and app_index.launch(entry):
+                self.voice.say(tr("Запомнила. Запускаю {app}.", app=entry.name))
+            else:
+                self.voice.say(tr("Запомнила «{name}».", name=query))
+
+        dlg.accepted.connect(on_accepted)
+        dlg.show()
+        dlg.raise_()
 
     def _on_plugin_response(self, pid, text):
         # плагин что-то ответил -> тот же путь, что и у ассистента (toast + голос)

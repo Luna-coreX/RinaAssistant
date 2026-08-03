@@ -16,6 +16,7 @@
 """
 
 import threading
+import time
 
 from PySide6.QtCore import QObject, Signal
 
@@ -48,6 +49,8 @@ class VoiceService(QObject):
         self._history = HistoryStore(settings)
         self._host = None  # объект для системных действий (ставит окно)
         self._speaking = threading.Event()  # Рина сейчас озвучивает ответ
+        # незакрытый уточняющий вопрос: {"kind", "options", "ts"}
+        self._pending = None
 
     def set_host(self, host):
         """host предоставляет action_minimize/show/quit/mute/unmute для команд."""
@@ -130,7 +133,9 @@ class VoiceService(QObject):
             # активировал ассистента нажатием клавиши
             self.process_command(result.text, require_wake=False, source="voice")
         elif result.error:
-            self.error.emit(result.error)
+            # движки распознавания отдают текст ошибки по-русски — переводим
+            # здесь, на границе с интерфейсом, а не в каждом движке
+            self.error.emit(tr(result.error))
 
     # ---------- режим «всегда слушать» ----------
     def set_always_listen(self, on):
@@ -204,6 +209,97 @@ class VoiceService(QObject):
 
         return strip_wake(text, wake_words)  # None если активации нет
 
+    # ---------- уточняющие вопросы ----------
+    PENDING_TTL = 60      # через минуту вопрос считается неактуальным
+
+    def _resolve_pending(self, command):
+        """
+        Пытается понять фразу как ответ на заданный ранее вопрос.
+        True — фраза обработана как ответ, дальше по конвейеру не идём.
+        """
+        pending = self._pending
+        if not pending:
+            return False
+        if time.time() - pending.get("ts", 0) > self.PENDING_TTL:
+            self._pending = None
+            return False
+        if pending.get("kind") in ("confirm_action", "confirm_command"):
+            return self._resolve_confirm(command, pending)
+        if pending.get("kind") != "choose_app":
+            return False
+
+        from voice import app_index, app_launcher
+        entry, cancelled = app_launcher.choose(command, pending["options"])
+
+        if cancelled:
+            self._pending = None
+            self.say(tr("Хорошо, отменяю."))
+            return True
+        if entry is None:
+            # не похоже на ответ — считаем это новой командой
+            return False
+
+        query = pending.get("query")
+        self._pending = None
+        if app_index.launch(entry):
+            # запоминаем выбор: в следующий раз «обс» сразу запустит то же самое
+            if query:
+                app_launcher.remember(query, entry.launch, entry.kind, entry.name)
+            self.say(tr("Запускаю {app}.", app=entry.name))
+        else:
+            self.say(tr("Не получилось запустить {app}.", app=entry.name),
+                     sound="error")
+        return True
+
+    # согласие/отказ на опасное действие. Требуем явного «да» — молчаливое
+    # непонимание не должно выключать компьютер.
+    YES_WORDS = ("да", "давай", "подтверждаю", "точно", "выключай",
+                 "перезагружай", "усыпляй", "ага", "yes", "confirm")
+    NO_WORDS = ("нет", "отмена", "отмени", "не надо", "стоп", "no", "cancel")
+
+    def _run_user_command(self, user_cmd):
+        """
+        Выполняет пользовательскую команду.
+
+        Последовательности уходят в фоновый поток: между шагами может стоять
+        пауза, а блокировать поток интерфейса (команда из строки ввода)
+        нельзя — окно бы «зависало» на всё время выполнения.
+        """
+        from voice.user_commands import execute
+
+        self._cmd_store.bump_stat(user_cmd.get("id"))
+        if user_cmd.get("type") == "sequence":
+            def worker():
+                _ok, resp = execute(user_cmd, self._host)
+                self.say(resp)
+            threading.Thread(target=worker, daemon=True).start()
+            return
+        _ok, resp = execute(user_cmd, self._host)
+        self.say(resp)
+
+    def _resolve_confirm(self, command, pending):
+        from voice import system_control
+        from voice.textmatch import normalize
+
+        low = normalize(command)
+        words = low.split()
+
+        if any(w in words for w in self.NO_WORDS):
+            self._pending = None
+            self.say(tr("Хорошо, отменяю."))
+            return True
+        if any(w in words for w in self.YES_WORDS):
+            self._pending = None
+            # подтверждали либо одиночное действие, либо команду целиком
+            if pending.get("command") is not None:
+                self._run_user_command(pending["command"])
+            else:
+                self.say(system_control.run(pending.get("action")))
+            return True
+        # ответ не похож ни на согласие, ни на отказ — на всякий случай
+        # считаем это новой командой, действие не выполняем
+        return False
+
     # ---------- обработка команды ----------
     def process_command(self, text, require_wake=False, source="typed"):
         if not text:
@@ -227,6 +323,13 @@ class VoiceService(QObject):
         self._history.add("user", command, source=source)
         self._emit_history_changed()
 
+        # 0) ответ на заданный ранее уточняющий вопрос («второй», «obs studio»)
+        if self._resolve_pending(command):
+            return
+        # фраза оказалась новой командой, а не ответом — старый вопрос снимаем,
+        # иначе следующее «второй» ответило бы на давно неактуальный вопрос
+        self._pending = None
+
         # 1) плагины
         if self._plugins is not None:
             try:
@@ -236,13 +339,62 @@ class VoiceService(QObject):
                 pass
         # 2) пользовательские команды (из конструктора)
         try:
-            resp = dispatch_user_command(command, self._cmd_store, self._host)
-            if resp is not None:
-                self.say(resp)
+            from voice.user_commands import matches, command_needs_confirm
+            for user_cmd in self._cmd_store.all():
+                if not matches(user_cmd, command):
+                    continue
+                if command_needs_confirm(user_cmd):
+                    # в команде есть выключение/перезагрузка/сон — переспрашиваем
+                    self._pending = {
+                        "kind": "confirm_command",
+                        "command": user_cmd,
+                        "ts": time.time(),
+                    }
+                    self.say(tr("Команда «{name}» выключит или перезагрузит "
+                                "компьютер. Точно выполнить?",
+                                name=(user_cmd.get("triggers") or ["?"])[0]))
+                else:
+                    self._run_user_command(user_cmd)
                 return
         except Exception:
             pass
-        # 3) встроенные команды
+        # 3) управление системой и медиа (громче, пауза, скриншот, выключение)
+        from voice import system_control
+        action_id, needs_confirm = system_control.match_action(command)
+        if action_id:
+            if needs_confirm:
+                # выключение/перезагрузка/сон по одной распознанной фразе —
+                # слишком дорогая ошибка, обязательно переспрашиваем
+                self._pending = {
+                    "kind": "confirm_action",
+                    "action": action_id,
+                    "ts": time.time(),
+                }
+                self.say(system_control.confirm_question(action_id))
+            else:
+                self.say(system_control.run(action_id))
+            return
+
+        # 4) запуск программ по индексу установленного ПО
+        from voice import app_launcher
+        outcome = app_launcher.resolve(command)
+        if outcome is not None:
+            if outcome.status == "ambiguous":
+                self._pending = {
+                    "kind": "choose_app",
+                    "options": outcome.options,
+                    "query": outcome.query,
+                    "ts": time.time(),
+                }
+            self.say(outcome.message,
+                     sound="error" if outcome.status == "not_found" else "response")
+            # программу не нашли — предлагаем показать файл, чтобы запомнить
+            if outcome.status == "not_found" and outcome.query:
+                from core.app_signals import app_signals
+                app_signals.app_not_found.emit(outcome.query)
+            return
+
+        # 4) встроенные команды
         response = handle_builtin_command(command)
         if response:
             self.say(response)

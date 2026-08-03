@@ -247,16 +247,48 @@ class PluginManager(QObject):
         return result
 
     def _has_page(self, lp):
-        # у плагина есть вкладка, если create_page переопределён и вернёт виджет.
-        # Проверяем «дёшево»: переопределён ли метод относительно базового.
+        # вкладка есть, если переопределён page() (API v2) или create_page() (v1).
+        # Проверяем «дёшево»: отличается ли метод от базового.
         cls = type(lp.instance)
-        return cls.create_page is not Plugin.create_page
+        return (cls.page is not Plugin.page
+                or cls.create_page is not Plugin.create_page)
+
+    def get_plugin_page_spec(self, plugin_id):
+        """Декларативное описание вкладки (список элементов) или []."""
+        lp = self.plugins.get(plugin_id)
+        if not lp or lp.instance is None:
+            return []
+        try:
+            return lp.instance.page() or []
+        except Exception:
+            self.log(plugin_id,
+                     tr("Ошибка page:\n") + traceback.format_exc(limit=2))
+            return []
+
+    def dispatch_action(self, plugin_id, action, value=None):
+        """Нажата кнопка на вкладке плагина."""
+        lp = self.plugins.get(plugin_id)
+        if not lp or lp.instance is None:
+            return
+        self._safe_call(lp, "on_action", action, value)
 
     def build_plugin_page(self, plugin_id):
         """Создать виджет вкладки плагина (или None)."""
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
             return None
+
+        # API v2: плагин описывает страницу, рисуем её сами
+        if type(lp.instance).page is not Plugin.page:
+            try:
+                from plugins.page_view import PluginPageView
+                return PluginPageView(plugin_id, self)
+            except Exception:
+                self.log(plugin_id,
+                         tr("Ошибка page:\n") + traceback.format_exc(limit=2))
+                return None
+
+        # API v1: устаревший путь с готовым QWidget
         try:
             return lp.instance.create_page()
         except Exception:
