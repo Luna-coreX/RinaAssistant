@@ -9,7 +9,7 @@ A modular desktop assistant for automation, voice interaction and personal workf
 </h3>
 
 <p align="center">
-  <b>Version: 2.0.0 Stable</b>
+  <b>Version: 2.5.0 Stable</b>
 </p>
 
 ---
