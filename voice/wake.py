@@ -13,8 +13,23 @@
 import difflib
 
 
-# порог схожести для нечёткого совпадения (0..1). 0.8 — «рену»≈«рина».
+# Порог схожести для нечёткого совпадения (0..1).
+# 0.8 ловит «рины»/«рино» (0.75 — не проходит) и «ирина» (0.89 — проходит);
+# сильно искажённое «рену» (0.5) требует опустить порог примерно до 0.5.
+# Значение по умолчанию; фактическое берётся из настроек (wake_sensitivity),
+# потому что удачный порог зависит от микрофона и движка распознавания.
 FUZZY_THRESHOLD = 0.8
+
+
+def threshold():
+    """Порог из настроек с защитой от бессмысленных значений."""
+    try:
+        from core.settings_store import settings
+        value = float(settings.get("wake_sensitivity", FUZZY_THRESHOLD))
+    except Exception:
+        return FUZZY_THRESHOLD
+    # ниже 0.5 совпадать будет что угодно, выше 0.98 — почти ничего
+    return max(0.5, min(0.98, value))
 
 
 def get_wake_words(settings) -> list:
@@ -72,7 +87,7 @@ def _similar(a, b):
         return True
     # короткие слова сравниваем строже, чтобы не ловить лишнее
     ratio = difflib.SequenceMatcher(None, a, b).ratio()
-    return ratio >= FUZZY_THRESHOLD
+    return ratio >= threshold()
 
 
 def strip_wake(text, wake_words):

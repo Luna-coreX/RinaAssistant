@@ -25,7 +25,7 @@ from voice.overlays import ListeningOverlay, Toast, MicWidget
 
 
 PAGES = [
-    "Рина", "Команды", "Горячие клавиши", "История",
+    "Рина", "Команды", "Напоминания", "Горячие клавиши", "История",
     "Настройки", "О программе", "Плагины",
 ]
 
@@ -71,6 +71,9 @@ class MainWindow(QMainWindow):
 
         # голосовой слой
         self._setup_voice()
+
+        # таймеры и напоминания
+        self._setup_reminders()
 
         # автопроверка обновлений при старте (если включено в настройках)
         self._maybe_check_updates()
@@ -319,6 +322,28 @@ class MainWindow(QMainWindow):
                 self.command_bar.input.setFocus()
         elif action_id == "floating_bar":
             self.toggle_floating_bar()
+
+    def _setup_reminders(self):
+        """Планировщик таймеров: живёт в GUI-потоке, проверяет раз в секунду."""
+        from voice.reminders import Scheduler
+        self.scheduler = Scheduler(settings, self)
+        self.scheduler.fired.connect(self._on_reminder_fired)
+        self.scheduler.start()
+
+    def _on_reminder_fired(self, item):
+        """Сработало напоминание: сказать вслух, показать и уведомить."""
+        from voice import reminders as rem
+        titles = {"timer": tr("Таймер"), "reminder": tr("Напоминание"),
+                  "alarm": tr("Будильник")}
+        title = titles.get(item.get("kind"), tr("Напоминание"))
+        text = item.get("text") or tr("Время вышло.")
+
+        # голос и toast — тем же путём, что и обычные ответы ассистента
+        if hasattr(self, "voice"):
+            self.voice.say(f"{title}. {text}" if item.get("text") else text)
+        if settings.get("notifications", True) and hasattr(self, "tray"):
+            self.tray.notify(title, text)
+        app_signals.reminders_changed.emit()
 
     def _maybe_check_updates(self):
         """

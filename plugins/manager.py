@@ -7,6 +7,7 @@
 """
 
 import os
+import re
 import sys
 import json
 import importlib.util
@@ -26,6 +27,77 @@ def plugins_dir() -> str:
     path = os.path.join(here, "plugins")
     os.makedirs(path, exist_ok=True)
     return path
+
+
+class PluginInstallError(Exception):
+    """Папка или архив не похожи на плагин."""
+
+
+def install_plugin(source_path):
+    """
+    Устанавливает плагин из папки или .zip в каталог plugins/.
+
+    Проверяем содержимое до копирования: манифест и main.py обязательны,
+    иначе в каталоге плагинов появится мусор, который каждый запуск будет
+    показываться как сбойный плагин.
+    Возвращает id установленного плагина.
+    """
+    import shutil
+    import zipfile
+    import tempfile
+
+    source_path = str(source_path or "").strip()
+    if not source_path or not os.path.exists(source_path):
+        raise PluginInstallError(tr("Файл или папка не найдены"))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        if os.path.isdir(source_path):
+            staged = source_path
+        elif source_path.lower().endswith(".zip"):
+            try:
+                with zipfile.ZipFile(source_path) as archive:
+                    archive.extractall(tmp)
+            except (zipfile.BadZipFile, OSError) as e:
+                raise PluginInstallError(tr("Не удалось распаковать архив: ") + str(e))
+            staged = _find_plugin_root(tmp)
+        else:
+            raise PluginInstallError(tr("Нужна папка плагина или .zip"))
+
+        if staged is None or not os.path.isfile(os.path.join(staged, "plugin.json")):
+            raise PluginInstallError(tr("В плагине нет файла plugin.json"))
+        if not os.path.isfile(os.path.join(staged, "main.py")):
+            raise PluginInstallError(tr("В плагине нет файла main.py"))
+
+        try:
+            with open(os.path.join(staged, "plugin.json"), "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+        except (OSError, ValueError) as e:
+            raise PluginInstallError(tr("Битый plugin.json: ") + str(e))
+
+        plugin_id = str(manifest.get("id") or manifest.get("name") or "").strip()
+        plugin_id = re.sub(r"[^\w.-]+", "_", plugin_id)
+        if not plugin_id:
+            raise PluginInstallError(tr("В plugin.json не указан id"))
+
+        target = os.path.join(plugins_dir(), plugin_id)
+        if os.path.abspath(staged) == os.path.abspath(target):
+            raise PluginInstallError(tr("Этот плагин уже установлен"))
+        if os.path.isdir(target):
+            shutil.rmtree(target, ignore_errors=True)   # обновление поверх
+        shutil.copytree(staged, target)
+    return plugin_id
+
+
+def _find_plugin_root(base):
+    """Ищет папку с plugin.json — архив часто содержит одну вложенную папку."""
+    if os.path.isfile(os.path.join(base, "plugin.json")):
+        return base
+    for name in sorted(os.listdir(base)):
+        candidate = os.path.join(base, name)
+        if os.path.isdir(candidate) and \
+                os.path.isfile(os.path.join(candidate, "plugin.json")):
+            return candidate
+    return None
 
 
 class LoadedPlugin:

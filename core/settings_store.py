@@ -70,6 +70,8 @@ GROUPS = {
         "web_search_fallback": True,
         "program_folders": [],
         "app_aliases": {},
+        "wake_sensitivity": 0.8,
+        "listen_seconds": 8,
         "config_version": 0,
         "first_run": True,
     },
@@ -83,6 +85,9 @@ GROUPS = {
     },
     "history": {
         "history": [],
+    },
+    "reminders": {
+        "reminders": [],
     },
 }
 

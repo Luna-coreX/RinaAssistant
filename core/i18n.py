@@ -460,11 +460,104 @@ _EN = {
     'Пустая запись': 'Empty recording',
     'Модель Piper не выбрана или файл не найден': 'No Piper model selected, or the file is missing',
     'Показать/скрыть строку поверх окон': 'Show/hide the bar on top of other windows',
+    'Напоминания': 'Reminders',
+    'Напоминание': 'Reminder',
+    'Таймер': 'Timer',
+    'Будильник': 'Alarm',
+    'Время вышло.': 'Time’s up.',
+    'Новое напоминание': 'New reminder',
+    'О чём напомнить (необязательно)': 'What to remind about (optional)',
+    'Поставить': 'Set',
+    'Отменить все': 'Cancel all',
+    'Отменить': 'Cancel',
+    'активных: {count}': 'active: {count}',
+    'Ничего не запланировано': 'Nothing scheduled',
+    'Ничего не запланировано.': 'Nothing is scheduled.',
+    'Таймеры и напоминания появятся здесь.': 'Timers and reminders will appear here.',
+    'Скажите «поставь таймер на 10 минут» или «напомни в 15:00 позвонить врачу»': 'Say “set a timer for 10 minutes” or “remind me at 15:00 to call the doctor”',
+    'Укажите, через сколько напомнить.': 'Say how soon to remind you.',
+    'минут': 'minutes',
+    'секунд': 'seconds',
+    'часов': 'hours',
+    '{when} · осталось {left}': '{when} · {left} left',
+    '{h} ч {m} мин': '{h} h {m} min',
+    '{m} мин {s} с': '{m} min {s} s',
+    '{s} с': '{s} s',
+    'Засекла {left}.': 'Timer set for {left}.',
+    'Напомню через {left}: {text}.': 'I’ll remind you in {left}: {text}.',
+    'Напомню в {time}: {text}.': 'I’ll remind you at {time}: {text}.',
+    'Разбужу в {time}.': 'I’ll wake you at {time}.',
+    'Запланировано: ': 'Scheduled: ',
+    'Нечего отменять.': 'Nothing to cancel.',
+    'Отменила: {count}.': 'Cancelled: {count}.',
+    'Экспорт': 'Export',
+    'Импорт': 'Import',
+    'Сохранить команды': 'Save commands',
+    'Выберите файл команд': 'Choose a commands file',
+    'Файлы Рины (*.json)': 'Rina files (*.json)',
+    'Нечего экспортировать': 'Nothing to export',
+    'Не удалось сохранить: ': 'Couldn’t save: ',
+    'Экспортировано команд: {count}': 'Commands exported: {count}',
+    'Добавлено: {added}, пропущено дубликатов: {skipped}': 'Added: {added}, duplicates skipped: {skipped}',
+    'Сохранить историю': 'Save history',
+    'Текст (*.txt);;Файлы Рины (*.json)': 'Text (*.txt);;Rina files (*.json)',
+    'Поиск по истории…': 'Search history…',
+    'Ничего не найдено': 'Nothing found',
+    'По запросу «{query}» записей нет.': 'No entries match “{query}”.',
+    'Это не файл команд': 'This is not a commands file',
+    'Файл не похож на экспорт Рины': 'This file doesn’t look like a Rina export',
+    'В файле нет списка команд': 'The file contains no command list',
+    'Файл сделан более новой версией Рины — обновите приложение': 'The file was made by a newer version of Rina — please update',
+    'Установить из папки': 'Install from folder',
+    'Установить из архива': 'Install from archive',
+    'Архив плагина': 'Plugin archive',
+    'Архивы (*.zip)': 'Archives (*.zip)',
+    'Папка плагина': 'Plugin folder',
+    'Установлен плагин «{name}». Включите его ниже.': 'Plugin “{name}” installed. Enable it below.',
+    'Не удалось установить: ': 'Couldn’t install: ',
+    'Файл или папка не найдены': 'File or folder not found',
+    'Нужна папка плагина или .zip': 'A plugin folder or .zip is required',
+    'Не удалось распаковать архив: ': 'Couldn’t unpack the archive: ',
+    'В плагине нет файла plugin.json': 'The plugin has no plugin.json',
+    'В плагине нет файла main.py': 'The plugin has no main.py',
+    'Битый plugin.json: ': 'Broken plugin.json: ',
+    'В plugin.json не указан id': 'plugin.json has no id',
+    'Этот плагин уже установлен': 'This plugin is already installed',
+    'Чувствительность активации': 'Wake word sensitivity',
+    'Насколько похоже должно звучать слово активации. Ниже — срабатывает чаще, но и на лишнее.': 'How closely the wake word must match. Lower reacts more often — including to things you didn’t mean.',
+    'Длительность записи': 'Recording length',
+    'Сколько секунд Рина слушает после нажатия горячей клавиши': 'How many seconds Rina listens after the hotkey',
+    '{n} с': '{n} s',
+    'Проверить модели': 'Check models',
+    'Модели не выбраны — проверять нечего.': 'No models selected — nothing to check.',
+    'Модель Vosk на месте': 'Vosk model is in place',
+    'Модель Piper на месте': 'Piper model is in place',
+    'Папка модели не выбрана': 'No model folder selected',
+    'Папки не существует': 'The folder does not exist',
+    'Не похоже на модель Vosk (нет папок am/conf)': 'This doesn’t look like a Vosk model (no am/conf folders)',
+    'Похоже, модель лежит внутри: {name}': 'The model seems to be inside: {name}',
+    'Файл модели не выбран': 'No model file selected',
+    'Файла не существует': 'The file does not exist',
+    'Нужен файл .onnx': 'An .onnx file is required',
+    'Рядом нет файла настроек .onnx.json': 'The .onnx.json config file is missing next to it',
+    'Переведено примерно {percent}% интерфейса — остальное показывается по-русски.': 'About {percent}% of the interface is translated — the rest is shown in Russian.',
 }
 
 
+from core.i18n_langs import UK as _UK, ES as _ES, DE as _DE
+
+# Словари по языкам. Русский — язык исходных строк, ему словарь не нужен.
+# Английский переведён полностью, остальные — основной интерфейс; всё
+# непереведённое честно показывается по-русски (см. core/i18n_langs.py).
+_TRANSLATIONS = {
+    "English": _EN,
+    "Українська": _UK,
+    "Español": _ES,
+    "Deutsch": _DE,
+}
+
 # Список поддерживаемых языков для выпадающего списка.
-LANGUAGES = ["Русский", "English"]
+LANGUAGES = ["Русский"] + list(_TRANSLATIONS.keys())
 
 _current = {"lang": "Русский"}
 
@@ -478,15 +571,33 @@ def get_language():
     return _current["lang"]
 
 
-def t(text, **kwargs):
+def coverage(lang=None):
+    """
+    Доля переведённых строк (0..1) — чтобы честно понимать состояние языка.
+    Для русского всегда 1.0: это язык оригинала.
+    """
+    lang = lang or _current["lang"]
+    if lang == "Русский":
+        return 1.0
+    table = _TRANSLATIONS.get(lang)
+    if not table or not _EN:
+        return 0.0
+    # за 100% берём объём английского словаря — он полный
+    return min(1.0, len(table) / len(_EN))
+
+
+def t(_text, **kwargs):
     """Перевести строку на текущий язык (или вернуть как есть).
 
     Поддерживает подстановку: t("Автор: {name}", name="...").
+
+    Первый параметр назван с подчёркиванием намеренно: иначе строка с
+    плейсхолдером {text} — t("Напомню: {text}", text=...) — конфликтует
+    с самим аргументом функции.
     """
-    if _current["lang"] == "English":
-        result = _EN.get(text, text)
-    else:
-        result = text
+    text = _text
+    table = _TRANSLATIONS.get(_current["lang"])
+    result = table.get(text, text) if table else text
     if kwargs:
         try:
             result = result.format(**kwargs)

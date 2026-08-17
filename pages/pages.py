@@ -58,6 +58,10 @@ def build_page(name: str) -> QWidget:
         from .pages_history import build_history_page
         return build_history_page()
 
+    if name == "Напоминания":
+        from .pages_reminders import build_reminders_page
+        return build_reminders_page()
+
     # запасная страница для неизвестного имени (все штатные вкладки — выше)
     page = QWidget()
     layout = QVBoxLayout(page)

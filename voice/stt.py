@@ -13,6 +13,57 @@ Speech-to-Text слой с выбором движка и работой с ми
 import threading
 
 
+def check_vosk_model(path):
+    """
+    Проверяет, похожа ли папка на модель Vosk.
+
+    Ошибиться папкой легко (часто указывают на архив или на уровень выше),
+    и без проверки это выясняется только в момент, когда пользователь
+    что-то сказал, — а ответом будет невнятная ошибка распознавания.
+    Возвращает (ok, сообщение).
+    """
+    import os
+
+    from core.i18n import t as tr
+
+    if not path:
+        return False, tr("Папка модели не выбрана")
+    if not os.path.isdir(path):
+        return False, tr("Папки не существует")
+
+    names = set(os.listdir(path))
+    # у любой модели Vosk есть акустическая часть и конфиг
+    required = ("am", "conf")
+    missing = [n for n in required if n not in names]
+    if missing:
+        # частый случай: указали папку на уровень выше настоящей модели
+        nested = [n for n in names
+                  if os.path.isdir(os.path.join(path, n))
+                  and {"am", "conf"} <= set(os.listdir(os.path.join(path, n)))]
+        if nested:
+            return False, tr("Похоже, модель лежит внутри: {name}",
+                             name=nested[0])
+        return False, tr("Не похоже на модель Vosk (нет папок am/conf)")
+    return True, tr("Модель Vosk на месте")
+
+
+def check_piper_model(path):
+    """Проверяет файл голоса Piper (.onnx + конфиг рядом)."""
+    import os
+
+    from core.i18n import t as tr
+
+    if not path:
+        return False, tr("Файл модели не выбран")
+    if not os.path.isfile(path):
+        return False, tr("Файла не существует")
+    if not path.lower().endswith(".onnx"):
+        return False, tr("Нужен файл .onnx")
+    if not os.path.isfile(path + ".json"):
+        return False, tr("Рядом нет файла настроек .onnx.json")
+    return True, tr("Модель Piper на месте")
+
+
 class STTResult:
     def __init__(self, text="", ok=False, error=None):
         self.text = text

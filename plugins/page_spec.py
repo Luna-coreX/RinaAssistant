@@ -89,6 +89,39 @@ def Divider():
     return Element(kind="divider")
 
 
+def Input(action, placeholder="", value="", button=""):
+    """
+    Поле ввода. При нажатии Enter (или кнопки рядом) приложение вызовет
+    plugin.on_action(action, введённый_текст).
+    """
+    return Element(kind="input", action=str(action), text=str(placeholder),
+                   value=str(value), variant=str(button or ""))
+
+
+def Table(rows, headers=None):
+    """
+    Простая таблица: список строк, каждая — список ячеек.
+    Заголовки необязательны.
+    """
+    return Element(kind="table",
+                   items=[[str(c) for c in row] for row in (rows or [])],
+                   value=[str(h) for h in headers] if headers else None)
+
+
+def Progress(value, text=""):
+    """Полоса прогресса: value от 0.0 до 1.0."""
+    try:
+        ratio = max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        ratio = 0.0
+    return Element(kind="progress", value=ratio, text=str(text))
+
+
+def Badge(text, variant="normal"):
+    """Небольшая метка состояния: normal | good | warn | danger."""
+    return Element(kind="badge", text=str(text), variant=variant)
+
+
 def page_to_dict(elements):
     """Вся страница как список словарей (для передачи наружу)."""
     return [e.to_dict() for e in (elements or []) if isinstance(e, Element)]

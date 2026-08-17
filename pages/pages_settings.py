@@ -10,7 +10,7 @@ from core.theme import Color, FONT_FAMILY, Radius, theme_manager
 from components.card import Card
 from components.toggle_switch import ToggleSwitch
 from components.controls import (
-    styled_combo, styled_lineedit, SettingRow, Divider
+    styled_combo, styled_lineedit, styled_slider, SettingRow, Divider
 )
 from core.settings_store import settings
 from core.app_signals import app_signals
@@ -129,7 +129,28 @@ class SettingsPage(QWidget):
         cl.addWidget(SettingRow(
             tr("Язык"), tr("Язык интерфейса и распознавания речи"),
             self.language_combo))
+
+        # честно показываем, насколько язык переведён: у части языков
+        # переведён только основной интерфейс, остальное остаётся русским
+        self.lang_coverage = QLabel("")
+        self.lang_coverage.setWordWrap(True)
+        self.lang_coverage.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(self.lang_coverage)
+        self._update_lang_coverage()
         return card
+
+    def _update_lang_coverage(self):
+        from core.i18n import coverage
+
+        lang = self.language_combo.currentText()
+        ratio = coverage(lang)
+        if ratio >= 0.99:
+            self.lang_coverage.setText("")
+            return
+        self.lang_coverage.setText(tr(
+            "Переведено примерно {percent}% интерфейса — остальное показывается "
+            "по-русски.", percent=int(ratio * 100)))
 
     # ---------- Аудио ----------
     def _audio_card(self):
@@ -234,6 +255,50 @@ class SettingsPage(QWidget):
             self.whisper_combo))
         cl.addWidget(Divider())
 
+        # чувствительность слова активации
+        self.wake_slider = styled_slider(50, 98,
+                                         int(float(settings.get("wake_sensitivity", 0.8)) * 100))
+        self.wake_value = QLabel("")
+        self.wake_value.setFixedWidth(46)
+        self.wake_value.setStyleSheet(
+            f"color: {Color.ACCENT}; font-weight: 600; font-size: 12px;")
+        wake_box = QWidget()
+        wb = QHBoxLayout(wake_box)
+        wb.setContentsMargins(0, 0, 0, 0)
+        wb.setSpacing(10)
+        self.wake_slider.setFixedWidth(200)
+        wb.addWidget(self.wake_slider)
+        wb.addWidget(self.wake_value)
+        self.wake_slider.valueChanged.connect(self._on_wake_sensitivity)
+        self._update_wake_value(self.wake_slider.value())
+        cl.addWidget(SettingRow(
+            tr("Чувствительность активации"),
+            tr("Насколько похоже должно звучать слово активации. "
+               "Ниже — срабатывает чаще, но и на лишнее."),
+            wake_box))
+        cl.addWidget(Divider())
+
+        # длительность разового прослушивания
+        self.listen_slider = styled_slider(3, 20, int(settings.get("listen_seconds", 8)))
+        self.listen_value = QLabel("")
+        self.listen_value.setFixedWidth(46)
+        self.listen_value.setStyleSheet(
+            f"color: {Color.ACCENT}; font-weight: 600; font-size: 12px;")
+        listen_box = QWidget()
+        lb = QHBoxLayout(listen_box)
+        lb.setContentsMargins(0, 0, 0, 0)
+        lb.setSpacing(10)
+        self.listen_slider.setFixedWidth(200)
+        lb.addWidget(self.listen_slider)
+        lb.addWidget(self.listen_value)
+        self.listen_slider.valueChanged.connect(self._on_listen_seconds)
+        self._update_listen_value(self.listen_slider.value())
+        cl.addWidget(SettingRow(
+            tr("Длительность записи"),
+            tr("Сколько секунд Рина слушает после нажатия горячей клавиши"),
+            listen_box))
+        cl.addWidget(Divider())
+
         # Vosk — папка модели
         self.vosk_path = self._path_row(
             cl, tr("Модель Vosk"), tr("Папка со скачанной моделью Vosk"),
@@ -245,6 +310,25 @@ class SettingsPage(QWidget):
             cl, tr("Модель Piper"), tr("Файл .onnx голоса Piper"),
             settings.get("piper_model", ""), key="piper_model", is_dir=False)
 
+        # проверка выбранных моделей — иначе неверный путь всплывает
+        # только в момент, когда пользователь что-то сказал
+        check_row = QWidget()
+        cr = QHBoxLayout(check_row)
+        cr.setContentsMargins(2, 4, 2, 0)
+        cr.setSpacing(10)
+        check_btn = QPushButton(tr("Проверить модели"))
+        check_btn.setCursor(Qt.PointingHandCursor)
+        check_btn.setFixedHeight(32)
+        check_btn.setStyleSheet(self._small_button_qss())
+        check_btn.clicked.connect(self._check_models)
+        cr.addWidget(check_btn, 0, Qt.AlignVCenter)
+        self.models_status = QLabel("")
+        self.models_status.setWordWrap(True)
+        self.models_status.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        cr.addWidget(self.models_status, 1)
+        cl.addWidget(check_row)
+
         hint = QLabel(
             tr("Vosk: alphacephei.com/vosk/models · Whisper скачивается сам при ") +
             tr("первом запуске · Piper: файлы .onnx с huggingface."))
@@ -252,6 +336,48 @@ class SettingsPage(QWidget):
         hint.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
         cl.addWidget(hint)
         return card
+
+    # ---------- голос: настройки и проверки ----------
+    def _update_wake_value(self, value):
+        self.wake_value.setText(f"{value / 100:.2f}")
+
+    def _on_wake_sensitivity(self, value):
+        self._update_wake_value(value)
+        if self._loading:
+            return
+        settings.set("wake_sensitivity", value / 100)
+        settings.save()
+        self._flash_saved()
+
+    def _update_listen_value(self, value):
+        self.listen_value.setText(tr("{n} с", n=value))
+
+    def _on_listen_seconds(self, value):
+        self._update_listen_value(value)
+        if self._loading:
+            return
+        settings.set("listen_seconds", int(value))
+        settings.save()
+        self._flash_saved()
+
+    def _check_models(self):
+        from voice import stt
+
+        lines = []
+        vosk_ok, vosk_msg = stt.check_vosk_model(settings.get("vosk_model", ""))
+        piper_ok, piper_msg = stt.check_piper_model(settings.get("piper_model", ""))
+        # сообщаем только про выбранные модели: ругаться на невыбранные незачем
+        if settings.get("vosk_model"):
+            lines.append(("✓ " if vosk_ok else "✕ ") + vosk_msg)
+        if settings.get("piper_model"):
+            lines.append(("✓ " if piper_ok else "✕ ") + piper_msg)
+        if not lines:
+            lines.append(tr("Модели не выбраны — проверять нечего."))
+
+        all_ok = all(line.startswith("✓") for line in lines)
+        self.models_status.setStyleSheet(
+            f"color: {Color.GREEN if all_ok else Color.RED}; font-size: 11px;")
+        self.models_status.setText("   ".join(lines))
 
     def _path_row(self, parent_layout, title, desc, value, key, is_dir):
         row = QWidget()
@@ -810,6 +936,7 @@ class SettingsPage(QWidget):
         theme_manager.set_accent(name)
 
     def _on_language_changed(self, name):
+        self._update_lang_coverage()
         if self._loading:
             return
         settings.set("ui_language", name)
