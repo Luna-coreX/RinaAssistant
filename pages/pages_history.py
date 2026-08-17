@@ -160,6 +160,7 @@ class HistoryPage(QWidget):
         layout.setSpacing(16)
 
         layout.addLayout(self._header())
+        layout.addWidget(self._search_bar())
 
         # обёртка списка — её и анимируем при обновлении
         self._list_wrap = QWidget()
@@ -191,6 +192,20 @@ class HistoryPage(QWidget):
         row.addWidget(self.count_chip, 0, Qt.AlignBottom)
         row.addStretch()
 
+        self.export_btn = QPushButton(tr("Экспорт"))
+        self.export_btn.setCursor(Qt.PointingHandCursor)
+        self.export_btn.setFixedHeight(34)
+        self.export_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 4px 16px; font-size: 12px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+        """)
+        self.export_btn.clicked.connect(self._export_history)
+        row.addWidget(self.export_btn)
+
         self.clear_btn = QPushButton(tr("Очистить"))
         self.clear_btn.setCursor(Qt.PointingHandCursor)
         self.clear_btn.setFixedHeight(34)
@@ -216,6 +231,59 @@ class HistoryPage(QWidget):
         box.addWidget(sub)
         return box
 
+    # ---------- поиск ----------
+    def _search_bar(self):
+        from PySide6.QtWidgets import QLineEdit
+
+        bar = QLineEdit()
+        bar.setPlaceholderText(tr("Поиск по истории…"))
+        bar.setFixedHeight(38)
+        bar.setStyleSheet(f"""
+            QLineEdit {{
+                background: {Color.CRUST}; color: {Color.TEXT};
+                border: 1px solid {Color.SURFACE_0};
+                border-radius: {Radius.SM}px;
+                padding: 4px 14px; font-size: 13px;
+            }}
+            QLineEdit:focus {{ border: 1px solid {Color.ACCENT}; }}
+        """)
+        bar.textChanged.connect(self._on_search)
+        self.search_bar = bar
+        return bar
+
+    def _on_search(self, text):
+        self._filter = (text or "").strip().lower()
+        self._reload()
+
+    def _visible_entries(self):
+        """Записи с учётом строки поиска."""
+        entries = self.store.all()
+        query = getattr(self, "_filter", "")
+        if not query:
+            return entries
+        return [e for e in entries if query in str(e.get("text", "")).lower()]
+
+    # ---------- экспорт ----------
+    def _export_history(self):
+        from PySide6.QtWidgets import QFileDialog
+        from core import data_transfer
+
+        entries = self.store.all()
+        if not entries:
+            return
+        path, selected = QFileDialog.getSaveFileName(
+            self, tr("Сохранить историю"), "rina-history.txt",
+            tr("Текст (*.txt);;Файлы Рины (*.json)"))
+        if not path:
+            return
+        try:
+            if path.lower().endswith(".json") or "json" in (selected or "").lower():
+                data_transfer.export_history_json(path, entries)
+            else:
+                data_transfer.export_history_text(path, entries)
+        except OSError:
+            pass
+
     def _clear_list(self):
         while self._list_holder.count():
             item = self._list_holder.takeAt(0)
@@ -225,12 +293,12 @@ class HistoryPage(QWidget):
 
     def _reload(self):
         self._clear_list()
-        entries = self.store.all()
+        entries = self._visible_entries()
+        query = getattr(self, "_filter", "")
 
         # счётчик в шапке
         if entries and settings.get("save_history", True):
-            n = len(entries)
-            self.count_chip.setText(self._plural(n))
+            self.count_chip.setText(self._plural(len(entries)))
             self.count_chip.show()
         else:
             self.count_chip.hide()
@@ -242,9 +310,14 @@ class HistoryPage(QWidget):
             self._animate_list()
             return
         if not entries:
-            self._list_holder.addWidget(self._empty_state(
-                tr("История пуста"),
-                tr("Здесь появятся ваши команды и ответы Рины.")))
+            if query:
+                self._list_holder.addWidget(self._empty_state(
+                    tr("Ничего не найдено"),
+                    tr("По запросу «{query}» записей нет.", query=query)))
+            else:
+                self._list_holder.addWidget(self._empty_state(
+                    tr("История пуста"),
+                    tr("Здесь появятся ваши команды и ответы Рины.")))
             self._animate_list()
             return
 

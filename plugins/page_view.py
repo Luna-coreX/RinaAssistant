@@ -9,7 +9,9 @@
 описывает своё текущее состояние, а не следит за синхронизацией виджетов.
 """
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QFrame
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QFrame
+)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 
@@ -107,6 +109,34 @@ class PluginPageView(QWidget):
             btn.clicked.connect(lambda _checked=False, a=action: self._on_action(a))
             return btn
 
+        if kind == "input":
+            return self._render_input(element)
+
+        if kind == "table":
+            return self._render_table(element)
+
+        if kind == "progress":
+            return self._render_progress(element)
+
+        if kind == "badge":
+            colors = {"good": Color.GREEN, "warn": Color.PEACH,
+                      "danger": Color.RED, "normal": Color.SUBTEXT}
+            color = colors.get(element.variant, Color.SUBTEXT)
+            lbl = QLabel(element.text)
+            lbl.setStyleSheet(f"""
+                color: {color};
+                background: {Color.alpha(color, '1e')};
+                border-radius: {Radius.SM}px;
+                padding: 3px 10px; font-size: 11px; font-weight: 600;
+            """)
+            lbl.setAlignment(Qt.AlignLeft)
+            row = QWidget()
+            lay = QHBoxLayout(row)
+            lay.setContentsMargins(0, 0, 0, 0)
+            lay.addWidget(lbl)
+            lay.addStretch()
+            return row
+
         if kind == "divider":
             line = QFrame()
             line.setFixedHeight(1)
@@ -115,7 +145,104 @@ class PluginPageView(QWidget):
 
         return None
 
+    def _render_input(self, element):
+        from components.controls import styled_lineedit
+
+        box = QWidget()
+        lay = QHBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(8)
+
+        edit = styled_lineedit(element.text, str(element.value or ""))
+        action = element.action
+
+        def submit():
+            text = edit.text().strip()
+            if text:
+                self._on_action(action, text)
+
+        edit.returnPressed.connect(submit)
+        lay.addWidget(edit, 1)
+
+        if element.variant:          # подпись кнопки, если плагин её задал
+            btn = QPushButton(element.variant)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setFixedHeight(38)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {Color.ACCENT}; color: #ffffff;
+                    border: none; border-radius: {Radius.SM}px;
+                    padding: 4px 18px; font-size: 12px; font-weight: 600;
+                }}
+                QPushButton:hover {{ background: {Color.alpha(Color.ACCENT, 'dd')}; }}
+            """)
+            btn.clicked.connect(submit)
+            lay.addWidget(btn)
+        return box
+
+    def _render_table(self, element):
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(2)
+
+        headers = element.value if isinstance(element.value, list) else None
+        if headers:
+            lay.addWidget(self._table_row(headers, header=True))
+        for row in element.items or []:
+            lay.addWidget(self._table_row(row))
+        return box
+
+    def _table_row(self, cells, header=False):
+        row = QWidget()
+        lay = QHBoxLayout(row)
+        lay.setContentsMargins(10, 5, 10, 5)
+        lay.setSpacing(12)
+        for cell in cells:
+            lbl = QLabel(str(cell))
+            lbl.setWordWrap(True)
+            if header:
+                lbl.setStyleSheet(
+                    f"color: {Color.SUBTEXT}; font-size: 11px; font-weight: 700;")
+            else:
+                lbl.setStyleSheet(f"color: {Color.TEXT}; font-size: 12px;")
+            lay.addWidget(lbl, 1)
+        if not header:
+            row.setStyleSheet(
+                f"background: {Color.SURFACE_0}; border-radius: {Radius.SM}px;")
+        return row
+
+    def _render_progress(self, element):
+        from PySide6.QtWidgets import QProgressBar
+
+        box = QWidget()
+        lay = QVBoxLayout(box)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(4)
+
+        if element.text:
+            caption = QLabel(element.text)
+            caption.setStyleSheet(f"color: {Color.SUBTEXT}; font-size: 12px;")
+            lay.addWidget(caption)
+
+        bar = QProgressBar()
+        bar.setRange(0, 100)
+        bar.setValue(int(float(element.value or 0) * 100))
+        bar.setTextVisible(False)
+        bar.setFixedHeight(8)
+        bar.setStyleSheet(f"""
+            QProgressBar {{
+                background: {Color.SURFACE_0};
+                border: none; border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background: {Color.ACCENT}; border-radius: 4px;
+            }}
+        """)
+        lay.addWidget(bar)
+        return box
+
     # ---------- действия ----------
-    def _on_action(self, action):
-        self._manager.dispatch_action(self._plugin_id, action)
+    def _on_action(self, action, value=None):
+        self._manager.dispatch_action(self._plugin_id, action, value)
         self.rebuild()      # состояние могло измениться — показываем актуальное

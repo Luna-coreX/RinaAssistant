@@ -121,7 +121,7 @@ class VoiceService(QObject):
             # и увеличенный лимит фразы
             result = engine.listen_once(
                 language=self._lang_code(),
-                timeout=8,
+                timeout=self._listen_seconds(),
             )
         finally:
             self.listening_stopped.emit()
@@ -257,6 +257,45 @@ class VoiceService(QObject):
                  "перезагружай", "усыпляй", "ага", "yes", "confirm")
     NO_WORDS = ("нет", "отмена", "отмени", "не надо", "стоп", "no", "cancel")
 
+    # ---------- таймеры и напоминания ----------
+    def _handle_reminder(self, command):
+        """Возвращает текст ответа, если фраза про время, иначе None."""
+        from voice import reminders
+
+        parsed = reminders.parse(command)
+        if parsed is None:
+            return None
+
+        store = reminders.ReminderStore(settings)
+
+        if parsed.action == "list":
+            items = sorted(store.active(), key=lambda r: r.get("fire_at", 0))
+            if not items:
+                return tr("Ничего не запланировано.")
+            return tr("Запланировано: ") + "; ".join(
+                reminders.describe(i) for i in items[:5])
+
+        if parsed.action == "cancel":
+            removed = store.clear_active()
+            if not removed:
+                return tr("Нечего отменять.")
+            return tr("Отменила: {count}.", count=removed)
+
+        fire_at = parsed.at if parsed.at else time.time() + (parsed.delay or 0)
+        store.add(parsed.kind, fire_at, parsed.text)
+
+        if parsed.delay:
+            left = reminders.humanize_left(parsed.delay)
+            if parsed.text:
+                return tr("Напомню через {left}: {text}.",
+                          left=left, text=parsed.text)
+            return tr("Засекла {left}.", left=left)
+
+        when = reminders.when_text(fire_at)
+        if parsed.text:
+            return tr("Напомню в {time}: {text}.", time=when, text=parsed.text)
+        return tr("Разбужу в {time}.", time=when)
+
     def _run_user_command(self, user_cmd):
         """
         Выполняет пользовательскую команду.
@@ -358,7 +397,13 @@ class VoiceService(QObject):
                 return
         except Exception:
             pass
-        # 3) управление системой и медиа (громче, пауза, скриншот, выключение)
+        # 3) таймеры, будильники и напоминания
+        reminder_reply = self._handle_reminder(command)
+        if reminder_reply is not None:
+            self.say(reminder_reply)
+            return
+
+        # 4) управление системой и медиа (громче, пауза, скриншот, выключение)
         from voice import system_control
         action_id, needs_confirm = system_control.match_action(command)
         if action_id:
@@ -423,6 +468,14 @@ class VoiceService(QObject):
                 ok, resp = execute(cmd, self._host)
                 self.say(resp)
                 return
+
+    def _listen_seconds(self):
+        """Сколько слушать микрофон за раз (настройка, с разумными границами)."""
+        try:
+            value = int(settings.get("listen_seconds", 8))
+        except (TypeError, ValueError):
+            return 8
+        return max(3, min(20, value))
 
     def _lang_code(self):
         # язык распознавания = язык интерфейса (единая настройка)

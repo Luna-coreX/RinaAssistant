@@ -65,26 +65,81 @@ class PluginsPage(QWidget):
         row.addWidget(t)
         row.addStretch()
 
-        refresh = QPushButton(tr("Обновить"))
-        refresh.setCursor(Qt.PointingHandCursor)
-        refresh.setFixedHeight(34)
-        refresh.setStyleSheet(f"""
+        flat = f"""
             QPushButton {{
                 background: {Color.SURFACE_0}; color: {Color.TEXT};
                 border: none; border-radius: {Radius.SM}px;
                 padding: 4px 16px; font-size: 12px; font-weight: 600;
             }}
             QPushButton:hover {{ background: {Color.SURFACE_1}; }}
-        """)
+        """
+
+        install_folder = QPushButton(tr("Установить из папки"))
+        install_folder.setCursor(Qt.PointingHandCursor)
+        install_folder.setFixedHeight(34)
+        install_folder.setStyleSheet(flat)
+        install_folder.clicked.connect(lambda: self._install(from_zip=False))
+        row.addWidget(install_folder)
+
+        install_zip = QPushButton(tr("Установить из архива"))
+        install_zip.setCursor(Qt.PointingHandCursor)
+        install_zip.setFixedHeight(34)
+        install_zip.setStyleSheet(flat)
+        install_zip.clicked.connect(lambda: self._install(from_zip=True))
+        row.addWidget(install_zip)
+
+        refresh = QPushButton(tr("Обновить"))
+        refresh.setCursor(Qt.PointingHandCursor)
+        refresh.setFixedHeight(34)
+        refresh.setStyleSheet(flat)
         refresh.clicked.connect(plugin_manager.discover)
         row.addWidget(refresh)
+
+        self.install_status = QLabel("")
+        self.install_status.setWordWrap(True)
+        self.install_status.setStyleSheet(
+            f"color: {Color.GREEN}; font-size: 12px; font-weight: 600;")
 
         sub = QLabel(tr("Папка плагинов: {p}", p=plugins_dir()))
         sub.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 12px;")
         sub.setWordWrap(True)
         box.addLayout(row)
+        box.addWidget(self.install_status)
         box.addWidget(sub)
         return box
+
+    # ---------- установка ----------
+    def _install(self, from_zip):
+        from PySide6.QtWidgets import QFileDialog
+        from plugins.manager import install_plugin, PluginInstallError
+
+        if from_zip:
+            path, _ = QFileDialog.getOpenFileName(
+                self, tr("Архив плагина"), "", tr("Архивы (*.zip)"))
+        else:
+            path = QFileDialog.getExistingDirectory(self, tr("Папка плагина"))
+        if not path:
+            return
+
+        try:
+            plugin_id = install_plugin(path)
+        except PluginInstallError as e:
+            self._show_install_status(str(e), ok=False)
+            return
+        except Exception as e:      # неожиданное — тоже показываем, а не молчим
+            self._show_install_status(tr("Не удалось установить: ") + str(e),
+                                      ok=False)
+            return
+
+        plugin_manager.discover()
+        self._show_install_status(
+            tr("Установлен плагин «{name}». Включите его ниже.", name=plugin_id))
+
+    def _show_install_status(self, text, ok=True):
+        self.install_status.setStyleSheet(
+            f"color: {Color.GREEN if ok else Color.RED}; "
+            f"font-size: 12px; font-weight: 600;")
+        self.install_status.setText(text)
 
     def _clear_list(self):
         while self._list_holder.count():

@@ -1,8 +1,8 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QScrollArea, QPushButton,
-    QLineEdit
+    QLineEdit, QFileDialog
 )
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtGui import QFont
 
 from core.i18n import t as tr
@@ -80,6 +80,12 @@ class CommandsPage(QWidget):
         row.addWidget(t)
         row.addStretch()
 
+        # перенос команд между компьютерами
+        self.export_btn = self._flat_button(tr("Экспорт"), self._export_commands)
+        row.addWidget(self.export_btn)
+        self.import_btn = self._flat_button(tr("Импорт"), self._import_commands)
+        row.addWidget(self.import_btn)
+
         add = QPushButton(tr("Новая команда"))
         add.setCursor(Qt.PointingHandCursor)
         add.setFixedHeight(36)
@@ -89,16 +95,95 @@ class CommandsPage(QWidget):
                 border: none; border-radius: {Radius.SM}px;
                 padding: 4px 18px; font-size: 13px; font-weight: 600;
             }}
-            QPushButton:hover {{ background: {Color.MAUVE}; }}
+            QPushButton:hover {{ background: {Color.alpha(Color.ACCENT, 'dd')}; }}
         """)
         add.clicked.connect(self._open_builder_new)
         row.addWidget(add)
 
+        sub_row = QHBoxLayout()
+        sub_row.setSpacing(10)
         sub = QLabel(tr("Голосовые и текстовые команды ассистента"))
         sub.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 13px;")
+        sub_row.addWidget(sub)
+        self.transfer_status = QLabel("")
+        self.transfer_status.setStyleSheet(
+            f"color: {Color.GREEN}; font-size: 12px; font-weight: 600;")
+        sub_row.addWidget(self.transfer_status)
+        sub_row.addStretch()
+
         box.addLayout(row)
-        box.addWidget(sub)
+        box.addLayout(sub_row)
         return box
+
+    def _flat_button(self, text, handler):
+        btn = QPushButton(text)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setFixedHeight(36)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 4px 16px; font-size: 13px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+        """)
+        btn.clicked.connect(handler)
+        return btn
+
+    # ---------- перенос команд ----------
+    def _flash_transfer(self, text, ok=True):
+        self.transfer_status.setStyleSheet(
+            f"color: {Color.GREEN if ok else Color.RED}; "
+            f"font-size: 12px; font-weight: 600;")
+        self.transfer_status.setText(text)
+        if not hasattr(self, "_transfer_timer"):
+            self._transfer_timer = QTimer(self)
+            self._transfer_timer.setSingleShot(True)
+            self._transfer_timer.timeout.connect(
+                lambda: self.transfer_status.setText(""))
+        self._transfer_timer.start(4000)
+
+    def _export_commands(self):
+        from core import data_transfer
+        commands = self.store.all()
+        if not commands:
+            self._flash_transfer(tr("Нечего экспортировать"), ok=False)
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, tr("Сохранить команды"), "rina-commands.json",
+            tr("Файлы Рины (*.json)"))
+        if not path:
+            return
+        try:
+            count = data_transfer.export_commands(
+                path, commands, settings.get("command_stats", {}))
+        except OSError as e:
+            self._flash_transfer(tr("Не удалось сохранить: ") + str(e), ok=False)
+            return
+        self._flash_transfer(tr("Экспортировано команд: {count}", count=count))
+
+    def _import_commands(self):
+        from core import data_transfer
+        from voice.user_commands import new_command_id
+
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("Выберите файл команд"), "", tr("Файлы Рины (*.json)"))
+        if not path:
+            return
+        try:
+            incoming = data_transfer.read_commands(path)
+        except data_transfer.TransferError as e:
+            self._flash_transfer(str(e), ok=False)
+            return
+
+        merged, added, skipped = data_transfer.merge_commands(
+            self.store.all(), incoming, new_command_id)
+        if added:
+            self.store.save_all(merged)
+            app_signals.commands_changed.emit()
+        self._flash_transfer(
+            tr("Добавлено: {added}, пропущено дубликатов: {skipped}",
+               added=added, skipped=skipped), ok=bool(added))
 
     def _search_bar(self):
         bar = QLineEdit()
