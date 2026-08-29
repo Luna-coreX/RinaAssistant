@@ -77,8 +77,7 @@ def build():
         "--add-data",
         f"pages;pages",
 
-        "--add-data",
-        f"ui;ui",
+
 
         "--add-data",
         f"voice;voice",
