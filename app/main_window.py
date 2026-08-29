@@ -101,7 +101,12 @@ class MainWindow(QMainWindow):
         self.voice.listening_started.connect(self.listening_overlay.show_overlay)
         self.voice.listening_stopped.connect(self.listening_overlay.hide_overlay)
         self.voice.always_capturing.connect(self.mic_widget.set_active)
+        # ядро может само выключить режим (например, не выбран движок STT).
+        # Без этого мик-виджет продолжал висеть, а клик по нему снова включал
+        # режим — снять его было невозможно.
+        self.voice.always_listen_changed.connect(self._on_always_listen_changed)
         self.voice.responded.connect(self._on_assistant_response)
+        self.voice.thinking.connect(self._on_thinking)
         self.voice.recognized.connect(self._on_recognized)
         self.voice.error.connect(self._on_voice_error)
 
@@ -130,6 +135,15 @@ class MainWindow(QMainWindow):
 
     def _on_window_action(self, action):
         """Выполняет действие над окном уже в GUI-потоке."""
+        if action == "screenshot":
+            # снимок экрана — вызов Qt, из фонового потока он не работает
+            from voice import system_control
+            path = system_control.grab_screen()
+            self.voice.say(
+                tr("Сохранила скриншот в {path}.",
+                   path=__import__("os").path.basename(path)) if path
+                else tr("Не удалось сделать скриншот."))
+            return
         handler = {
             "minimize": self.action_minimize,
             "show": self.action_show,
@@ -196,6 +210,15 @@ class MainWindow(QMainWindow):
         if settings.get("notifications", True) and hasattr(self, "tray"):
             self.tray.notify(title, message)
 
+    def _on_thinking(self, active):
+        """
+        Модель обдумывает ответ — это может занять секунды.
+        Показываем подсказку без озвучки: проговаривать «думаю» вслух
+        перед каждым ответом было бы утомительно.
+        """
+        if active:
+            self.toast.show_toast(tr("Думаю…"), duration=15000)
+
     def _on_assistant_response(self, text):
         # ответ ассистента: toast + (озвучка идёт в сервисе)
         self.toast.show_toast(text)
@@ -216,6 +239,16 @@ class MainWindow(QMainWindow):
         settings.set("always_listen", new_state)
         settings.save()
         self._set_always_listen(new_state)
+
+    def _on_always_listen_changed(self, on):
+        """Ядро сообщило фактическое состояние режима — приводим UI в согласие."""
+        if on:
+            self.mic_widget.show_widget()
+        else:
+            self.mic_widget.hide()
+        if bool(settings.get("always_listen")) != bool(on):
+            settings.set("always_listen", bool(on))
+            settings.save()
 
     def _set_always_listen(self, on):
         self.voice.set_always_listen(on)
@@ -324,11 +357,11 @@ class MainWindow(QMainWindow):
             self.toggle_floating_bar()
 
     def _setup_reminders(self):
-        """Планировщик таймеров: живёт в GUI-потоке, проверяет раз в секунду."""
-        from voice.reminders import Scheduler
-        self.scheduler = Scheduler(settings, self)
-        self.scheduler.fired.connect(self._on_reminder_fired)
-        self.scheduler.start()
+        """
+        Планировщик живёт в ядре и работает в фоне; сюда срабатывания
+        приходят сигналом — уже в потоке интерфейса.
+        """
+        self.voice.reminder_fired.connect(self._on_reminder_fired)
 
     def _on_reminder_fired(self, item):
         """Сработало напоминание: сказать вслух, показать и уведомить."""

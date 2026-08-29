@@ -257,7 +257,9 @@ class HistoryPage(QWidget):
 
     def _visible_entries(self):
         """Записи с учётом строки поиска."""
-        entries = self.store.all()
+        # файл истории мог быть повреждён или отредактирован руками:
+        # одна битая запись не должна ломать всю вкладку
+        entries = [e for e in self.store.all() if isinstance(e, dict)]
         query = getattr(self, "_filter", "")
         if not query:
             return entries
@@ -402,9 +404,18 @@ class HistoryPage(QWidget):
         bl.addWidget(top)
 
         msg = QLabel(text)
+        # текст приходит из распознавания, от плагина или от языковой модели.
+        # QLabel по умолчанию разбирает HTML: тег <img src="file://host/...">
+        # заставил бы Windows пойти в SMB-шару и отдать учётные данные.
+        msg.setTextFormat(Qt.PlainText)
         msg.setWordWrap(True)
-        msg.setStyleSheet(
-            f"color: {Color.TEXT}; font-size: 13px; background: transparent;")
+        # размер задаём шрифтом, а не стилем: ширину переноса считаем сами,
+        # а метрики стиля к этому моменту ещё не применены
+        msg_font = msg.font()
+        msg_font.setPixelSize(13)
+        msg.setFont(msg_font)
+        msg.setStyleSheet(f"color: {Color.TEXT}; background: transparent;")
+        self._fit_wrapped(msg, text)
         bl.addWidget(msg)
 
         tm = QLabel(clock)
@@ -422,6 +433,24 @@ class HistoryPage(QWidget):
             h.addWidget(bubble)
             h.addStretch()
         return row
+
+    def _fit_wrapped(self, label, text):
+        """
+        Задаёт метке ширину переноса и высоту под неё.
+
+        Пузырь берёт ширину из sizeHint, а у метки с переносом sizeHint
+        считается до того, как ширина известна, — из-за этого длинные реплики
+        обрезались на первой строке. Считаем ширину сами: по длине текста, но
+        не шире пузыря, и просим у метки высоту именно для этой ширины.
+        """
+        from PySide6.QtGui import QFontMetrics
+
+        padding = 28                    # горизонтальные отступы внутри пузыря
+        max_width = BUBBLE_MAX - padding
+        natural = QFontMetrics(label.font()).horizontalAdvance(text)
+        width = max(60, min(natural, max_width))
+        label.setFixedWidth(width)
+        label.setMinimumHeight(label.heightForWidth(width))
 
     # ---------- вспомогательное ----------
     def _source_label(self, source):

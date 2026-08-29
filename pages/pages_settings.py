@@ -24,6 +24,8 @@ class SettingsPage(QWidget):
     # скан программ идёт в фоновом потоке — результат возвращаем сигналом,
     # трогать виджеты из чужого потока нельзя
     index_refreshed = Signal(int)
+    # проверка Ollama идёт в фоне: (доступна, сообщение, список моделей)
+    llm_checked = Signal(bool, str, list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -66,6 +68,7 @@ class SettingsPage(QWidget):
         layout.addWidget(self._models_card())
         layout.addWidget(self._programs_card())
         layout.addWidget(self._behavior_card())
+        layout.addWidget(self._llm_card())
         layout.addWidget(self._search_card())
         layout.addWidget(self._privacy_card())
         layout.addWidget(self._reset_row())
@@ -765,6 +768,131 @@ class SettingsPage(QWidget):
             self.index_status.setText(
                 tr("Найдено программ: {count}", count=len(cached)))
 
+    # ---------- Локальная модель ----------
+    def _llm_card(self):
+        """
+        Ответы на свободные вопросы локальной моделью.
+
+        Возможность выключена по умолчанию и требует установленного Ollama,
+        поэтому карточка честно показывает состояние сервера, а не делает вид,
+        что всё работает.
+        """
+        from core import llm
+
+        card = Card()
+        cl = card.layout()
+        cl.addWidget(self._section_title(tr("Ответы моделью (ИИ)")))
+
+        hint = QLabel(tr(
+            "Если фразу не разобрала ни одна команда, на неё может ответить "
+            "локальная модель через Ollama. Запросы уходят только на указанный "
+            "адрес — наружу ничего не отправляется."))
+        hint.setWordWrap(True)
+        hint.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+        cl.addWidget(hint)
+
+        self.llm_enabled = ToggleSwitch()
+        cl.addWidget(SettingRow(
+            tr("Отвечать моделью"),
+            tr("Вместо «Извини, я не поняла» — ответ языковой модели"),
+            self.llm_enabled))
+        cl.addWidget(Divider())
+
+        self.llm_url = styled_lineedit(llm.DEFAULT_URL,
+                                       str(settings.get("llm_url", llm.DEFAULT_URL)))
+        cl.addWidget(SettingRow(
+            tr("Адрес Ollama"), tr("По умолчанию сервер работает на этом компьютере"),
+            self.llm_url))
+
+        # обещание «наружу ничего не уходит» верно только для локального адреса
+        self.llm_remote_warning = QLabel("")
+        self.llm_remote_warning.setWordWrap(True)
+        self.llm_remote_warning.setStyleSheet(
+            f"color: {Color.PEACH}; font-size: 11px;")
+        cl.addWidget(self.llm_remote_warning)
+        self.llm_url.textChanged.connect(self._update_llm_warning)
+        self._update_llm_warning()
+        cl.addWidget(Divider())
+
+        self.llm_model = styled_combo([tr("не выбрано")], 0)
+        cl.addWidget(SettingRow(
+            tr("Модель"), tr("Какая модель отвечает на вопросы"),
+            self.llm_model))
+
+        status_row = QWidget()
+        sr = QHBoxLayout(status_row)
+        sr.setContentsMargins(2, 4, 2, 0)
+        sr.setSpacing(10)
+        self.llm_check_btn = QPushButton(tr("Проверить связь"))
+        self.llm_check_btn.setCursor(Qt.PointingHandCursor)
+        self.llm_check_btn.setFixedHeight(32)
+        self.llm_check_btn.setStyleSheet(self._small_button_qss())
+        self.llm_check_btn.clicked.connect(self._check_llm)
+        sr.addWidget(self.llm_check_btn, 0, Qt.AlignVCenter)
+        self.llm_status = QLabel("")
+        self.llm_status.setWordWrap(True)
+        self.llm_status.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
+        sr.addWidget(self.llm_status, 1)
+        cl.addWidget(status_row)
+        cl.addWidget(Divider())
+
+        self.llm_persona = styled_lineedit(llm.DEFAULT_PERSONA[:60] + "…",
+                                           str(settings.get("llm_persona", "")))
+        cl.addWidget(SettingRow(
+            tr("Характер"),
+            tr("Как модель должна себя вести. Пусто — вариант по умолчанию."),
+            self.llm_persona))
+        return card
+
+    def _update_llm_warning(self, *args):
+        from core import llm
+
+        url = self.llm_url.text().strip()
+        if url and not llm.is_local_url(url):
+            self.llm_remote_warning.setText(tr(
+                "Адрес не локальный: вопросы и часть переписки будут "
+                "отправляться на этот сервер."))
+        else:
+            self.llm_remote_warning.setText("")
+
+    def _fill_llm_models(self, found):
+        """Заполняет список моделей, сохраняя выбранную."""
+        chosen = str(settings.get("llm_model", "") or "")
+        self.llm_model.blockSignals(True)
+        self.llm_model.clear()
+        if found:
+            self.llm_model.addItems(found)
+            if chosen in found:
+                self.llm_model.setCurrentIndex(found.index(chosen))
+        else:
+            self.llm_model.addItem(tr("не выбрано"))
+        self.llm_model.blockSignals(False)
+
+    def _check_llm(self):
+        """
+        Проверка связи с Ollama — в фоне: сервер может не отвечать,
+        и ждать его в потоке интерфейса нельзя.
+        """
+        from core import llm
+        import threading
+
+        self.llm_check_btn.setEnabled(False)
+        self.llm_status.setText(tr("Проверяю…"))
+
+        def worker():
+            found = llm.models(force=True)
+            ok, message = llm.status()
+            self.llm_checked.emit(ok, message, found)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_llm_checked(self, ok, message, found):
+        self.llm_check_btn.setEnabled(True)
+        self.llm_status.setStyleSheet(
+            f"color: {Color.GREEN if ok else Color.RED}; font-size: 11px;")
+        self.llm_status.setText(message)
+        self._fill_llm_models(list(found))
+
     # ---------- Поиск ----------
     def _search_card(self):
         from voice import websearch
@@ -793,6 +921,11 @@ class SettingsPage(QWidget):
                "В режиме «всегда слушать» не срабатывает."),
             self.search_fallback))
         return card
+
+    def _current_llm_model(self):
+        text = self.llm_model.currentText().strip()
+        # «не выбрано» — это заглушка пустого списка, а не имя модели
+        return "" if text == tr("не выбрано") else text
 
     def _current_engine_id(self):
         idx = self.engine_combo.currentIndex()
@@ -865,6 +998,10 @@ class SettingsPage(QWidget):
         self.updates.setChecked(bool(settings.get("check_updates")))
         self.save_history.setChecked(bool(settings.get("save_history")))
         self.search_fallback.setChecked(bool(settings.get("web_search_fallback")))
+        self.llm_enabled.setChecked(bool(settings.get("llm_enabled")))
+        # модели подтягиваем из кэша: лезть в сеть при открытии настроек не надо
+        from core import llm as _llm
+        self._fill_llm_models(_llm.models())
         saved_engine = settings.get("search_engine", "google")
         if saved_engine in getattr(self, "_engine_ids", []):
             self.engine_combo.setCurrentIndex(self._engine_ids.index(saved_engine))
@@ -898,6 +1035,11 @@ class SettingsPage(QWidget):
         self.save_history.toggled.connect(self._save)
         self.search_fallback.toggled.connect(self._save)
         self.engine_combo.currentIndexChanged.connect(self._save)
+        self.llm_enabled.toggled.connect(self._save)
+        self.llm_url.textChanged.connect(self._save)
+        self.llm_persona.textChanged.connect(self._save)
+        self.llm_model.currentTextChanged.connect(self._save)
+        self.llm_checked.connect(self._on_llm_checked)
         self.input_combo.currentIndexChanged.connect(self._save)
         self.output_combo.currentIndexChanged.connect(self._save)
 
@@ -915,6 +1057,10 @@ class SettingsPage(QWidget):
             "save_history": self.save_history.isChecked(),
             "web_search_fallback": self.search_fallback.isChecked(),
             "search_engine": self._current_engine_id(),
+            "llm_enabled": self.llm_enabled.isChecked(),
+            "llm_url": self.llm_url.text().strip(),
+            "llm_persona": self.llm_persona.text().strip(),
+            "llm_model": self._current_llm_model(),
             "input_device": self._current_input_id(),
             "output_device": self._current_output_id(),
         }

@@ -5,15 +5,15 @@
 позвонить маме», «разбуди в 7:30» и хранит запланированное между запусками —
 напоминание должно пережить перезапуск приложения, иначе ему нельзя доверять.
 
-Планировщик (Scheduler) живёт в GUI-потоке на QTimer: проверять раз в секунду
-дешевле и надёжнее, чем держать поток на каждое напоминание.
+Здесь только разбор фраз и хранилище. Срок наступления проверяет ядро
+(RinaEngine.start_reminders) раз в секунду в фоновом потоке: один общий опрос
+дешевле и надёжнее, чем поток на каждое напоминание.
 """
 
+import math
 import re
 import time
 import uuid
-
-from PySide6.QtCore import QObject, QTimer, Signal
 
 from core.i18n import t as tr
 from voice.textmatch import normalize
@@ -41,6 +41,9 @@ NUM_WORDS = {
     "девятнадцать": 19, "двадцать": 20, "тридцать": 30, "сорок": 40,
     "пятьдесят": 50, "шестьдесят": 60, "девяносто": 90,
 }
+
+# Больше года вперёд — почти наверняка ошибка распознавания
+MAX_DELAY_SECONDS = 365 * 24 * 3600
 
 UNIT_SECONDS = {
     "секунда": 1, "секунды": 1, "секунд": 1, "секунду": 1, "сек": 1,
@@ -83,7 +86,13 @@ def _duration_seconds(text):
         if amount is None:
             # «через час», «на минуту» — числительное опущено
             amount = 1
-    return int(amount * UNIT_SECONDS[unit])
+
+    seconds = amount * UNIT_SECONDS[unit]
+    # очень длинное число даёт inf, а int(inf) — исключение. Заодно отсекаем
+    # бессмысленные сроки: «через 99999999 минут» — это не напоминание.
+    if not math.isfinite(seconds) or seconds <= 0:
+        return None
+    return int(min(seconds, MAX_DELAY_SECONDS))
 
 
 def _absolute_time(text):
@@ -178,7 +187,24 @@ class ReminderStore:
         self._settings = settings
 
     def all(self):
-        return list(self._settings.get("reminders", []) or [])
+        """Запланированное, приведённое к ожидаемому виду (см. HistoryStore.all)."""
+        clean = []
+        for item in (self._settings.get("reminders", []) or []):
+            if not isinstance(item, dict) or not item.get("id"):
+                continue
+            try:
+                fire_at = float(item.get("fire_at", 0) or 0)
+            except (TypeError, ValueError):
+                continue        # без внятного времени напоминание бессмысленно
+            clean.append({
+                "id": str(item["id"]),
+                "kind": str(item.get("kind", "reminder")),
+                "text": str(item.get("text", "")),
+                "fire_at": fire_at,
+                "created_at": item.get("created_at", 0),
+                "done": bool(item.get("done")),
+            })
+        return clean
 
     def active(self):
         return [r for r in self.all() if not r.get("done")]
@@ -187,7 +213,14 @@ class ReminderStore:
         self._settings.set("reminders", items)
         self._settings.save()
 
+    MAX_FUTURE = 10 * 365 * 24 * 3600      # дальше десяти лет — заведомо ошибка
+
     def add(self, kind, fire_at, text=""):
+        try:
+            fire_at = float(fire_at)
+        except (TypeError, ValueError):
+            fire_at = time.time()
+        fire_at = min(fire_at, time.time() + self.MAX_FUTURE)
         item = {
             "id": "rem_" + uuid.uuid4().hex[:6],
             "kind": kind,
@@ -221,32 +254,8 @@ class ReminderStore:
         return [r for r in self.active() if r.get("fire_at", 0) <= now]
 
 
-# ---------------------------------------------------------------------------
-# Планировщик
-# ---------------------------------------------------------------------------
-class Scheduler(QObject):
-    """Раз в секунду проверяет, не пора ли что-то напомнить."""
-
-    fired = Signal(dict)          # сработавшее напоминание
-
-    def __init__(self, settings, parent=None):
-        super().__init__(parent)
-        self.store = ReminderStore(settings)
-        self._timer = QTimer(self)
-        self._timer.setInterval(1000)
-        self._timer.timeout.connect(self._tick)
-
-    def start(self):
-        self._timer.start()
-
-    def stop(self):
-        self._timer.stop()
-
-    def _tick(self):
-        for item in self.store.due():
-            self.store.mark_done(item["id"])
-            self.fired.emit(item)
-
+# Планировщик живёт в ядре (core/engine.py): здесь только разбор фраз,
+# хранилище и формулировки — модуль не зависит от интерфейса.
 
 # ---------------------------------------------------------------------------
 # Формулировки
@@ -265,7 +274,12 @@ def humanize_left(seconds):
 
 def when_text(fire_at):
     """Время срабатывания в читаемом виде."""
-    stamp = time.localtime(fire_at)
+    try:
+        stamp = time.localtime(fire_at)
+    except (OSError, OverflowError, ValueError):
+        # дата вне разумного диапазона: строку показать всё равно надо,
+        # иначе одна такая запись рушила бы всю вкладку и её нельзя было снять
+        return "—"
     today = time.localtime()
     clock = time.strftime("%H:%M", stamp)
     if (stamp.tm_year, stamp.tm_mon, stamp.tm_mday) == \

@@ -1,259 +1,181 @@
 # Rina Assistant
 
 <p align="center">
-  <img src="assets/logo.png" alt="Rina Assistant Logo" width="180">
+  <img src="assets/logo.png" alt="Rina Assistant" width="180">
 </p>
 
 <h3 align="center">
-A modular desktop assistant for automation, voice interaction and personal workflows.
+A desktop voice assistant for Windows — launches your apps, keeps your timers, and answers when asked.
 </h3>
 
 <p align="center">
-  <b>Version: 2.5.0 Stable</b>
+  <b>Version 3.0.0</b> · Windows · Python 3.10+ · MIT
 </p>
 
 ---
 
-## ✨ About
+## About
 
-**Rina Assistant** is a customizable desktop assistant designed to simplify everyday workflows through voice commands, automation and extensible plugin support.
+**Rina Assistant** listens, understands what you asked for, and does it: opens the program you named even if you named it in the wrong alphabet, sets a timer, changes the volume, does the arithmetic, searches the web, or — if you enable it — answers the question with a language model running on your own machine.
 
-The project focuses on creating a flexible assistant that can interact with your system, launch applications, manage workflows and provide voice-based interaction.
+Everything runs locally by default. No account, no cloud service, no telemetry.
 
 Rina Assistant is developed as part of the **NeuroSync Foundry** ecosystem.
 
 ---
 
-# 🚀 Features
+## Screenshots
 
-## 🎙️ Voice Interaction
-
-Rina Assistant supports multiple Text-to-Speech and Speech-to-Text engines.
-
-### Text-to-Speech (TTS)
-
-Supported engines:
-
-* **pyttsx3** — offline system voice synthesis
-* **Edge Neural TTS** — high-quality neural voices
-* **gTTS** — Google Text-to-Speech
-* **Piper TTS** — local neural voice synthesis
-
-### Speech-to-Text (STT)
-
-Supported engines:
-
-* **Google Speech Recognition**
-* **Vosk**
-* **Whisper**
-* **PocketSphinx** *(currently unavailable)*
+| | |
+|---|---|
+| <img src="docs/01-main.png" width="420"> | <img src="docs/02-commands.png" width="420"> |
+| **Main** — dialogue, microphone, quick actions | **Commands** — your own phrases and sequences |
+| <img src="docs/03-reminders.png" width="420"> | <img src="docs/04-history.png" width="420"> |
+| **Reminders** — timers, alarms, reminders | **History** — everything said, grouped by day |
+| <img src="docs/05-settings-ai.png" width="420"> | <img src="docs/06-plugins.png" width="420"> |
+| **Settings** — voice, recognition, local model | **Plugins** — install, enable, configure |
 
 ---
 
-# ⚙️ Automation
+## What it does
 
-Rina can help automate your workflow through customizable commands.
+### Launching applications
 
-Supported actions:
+Rina indexes what is actually installed on the machine — Start Menu shortcuts, the registry, Store (UWP) apps, and any portable folders you point her at. You do not register programs by hand.
 
-* Launch applications
-* Open folders
-* Open websites
-* Execute custom commands
-* Control Rina Assistant settings
-* Create command sequences
+- **Type it however you speak it.** "Открой телеграм" finds *Telegram*; Cyrillic input is transliterated and matched fuzzily, so near-misses and mishearings still land.
+- **Ambiguity is asked about, not guessed.** Several matches produce a question, and your answer is remembered as an alias for next time.
+- **Portable programs** without an installer can be added by path.
 
-Example:
+### Voice
 
-> "Launch workspace"
+Speech synthesis and recognition are pluggable — pick what suits the machine.
 
-Possible sequence:
+**Text to speech:** silent (text only), `pyttsx3` (offline, system voices), Edge Neural TTS (online, best quality), gTTS (online), Piper (offline neural, needs an `.onnx` model).
+
+**Speech to text:** disabled, Google, Vosk (offline), Whisper (offline), PocketSphinx.
+
+Wake-word activation tolerates imperfect recognition, and always-listen mode is available.
+
+### Commands and sequences
+
+Six kinds of user commands — launch an app, open a folder, open a website, say something, run a system action, or run a **sequence** that chains several steps with pauses. Commands can be exported and imported between machines; anything imported arrives **disabled**, so nothing runs before you have looked at it.
+
+### Reminders
+
+Timers, alarms and reminders in plain language — "поставь таймер на 10 минут", "напомни через полчаса позвонить маме", "разбуди в 7:30". They survive restarts and fire from a background scheduler.
+
+### System control
+
+Eleven actions: volume up/down/mute, media next/previous/play-pause, lock, screenshot, sleep, restart, shutdown. Destructive ones always ask first — a single misheard phrase can never power off the machine.
+
+### Answers
+
+- **Arithmetic** is evaluated from a parsed expression tree, never with `eval`.
+- **Unrecognised phrases** fall back to a web search.
+- **Optional local model.** With Ollama installed, anything unparsed can be answered by a model on your own computer. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local.
+
+### Plugins
+
+Plugins add commands, settings and their own page. Pages are **declarative** — a plugin describes its interface as data (`title`, `text`, `note`, `items`, `button`, `input`, `table`, `progress`, `badge`, `divider`) and never touches the UI toolkit. Install from a folder or a `.zip`; four plugins ship with the app (clock, dice, greeter, notes).
+
+See [`plugins/README.md`](plugins/README.md) for the plugin API.
+
+### Interface
+
+Five themes (Catppuccin Mocha, Catppuccin Macchiato, Tokyo Night, Nord, Dracula), five interface languages (Русский, English, Українська, Español, Deutsch), a floating command bar, tray integration, autostart, a global hotkey, a first-run wizard, and a full history with export to JSON or plain text.
+
+---
+
+## Architecture
+
+Version 3.0.0 separated the thinking from the window.
 
 ```
-Open Discord
-↓
-Launch Visual Studio
-↓
-Open YouTube Lo-Fi stream
-↓
-Open project folder
+core/engine.py      the whole pipeline — no Qt imports at all
+core/events.py      event bus: the core announces, it never touches a widget
+core/protocol.py    every event and payload declared in one place, versioned
+voice/service.py    a thin Qt adapter that turns core events into signals
 ```
 
----
+The command pipeline runs in order: pending question → plugins → user commands → reminders → system control → application launcher → built-ins → language model → web search.
 
-# 🧩 Plugin System
-
-Rina Assistant includes an extensible plugin architecture.
-
-Plugins can add:
-
-* New application features
-* Additional pages
-* Custom windows
-* Settings panels
-* New functionality
-
-The plugin system allows extending Rina without modifying the core application.
+Because the core imports no Qt, it can be driven and tested headless, and a background thread can no longer call into the interface by accident. This is deliberate groundwork: version 4.0.0 moves the shell to C# and the core becomes a separate process speaking a protocol.
 
 ---
 
-# 🎨 Interface
-
-Features:
-
-* Modern desktop UI
-* Custom themes
-* Toast notifications
-* Animated interface elements
-* System tray integration
-* Initial setup wizard
-* Customizable settings
-
----
-
-# ⌨️ Hotkeys
-
-Rina supports keyboard shortcuts for interacting with the application.
-
-Currently available:
-
-* Program control actions
-* Quick access to assistant functions
-
-More hotkey functionality will be expanded in future versions.
-
----
-
-# 📦 Project Structure
+## Project structure
 
 ```
 RinaAssistant/
 │
-├── animations/     # UI animations and effects
-├── app/            # Application core and window management
-├── assets/         # Images, icons and resources
-├── components/     # Reusable UI components
-├── core/           # Core logic and services
-├── dialogs/        # Application dialogs
-├── pages/          # Application pages
-├── plugins/        # Plugin system and extensions
-├── ui/             # UI configuration and helpers
+├── animations/   UI animations and effects
+├── app/          application shell and main window
+├── assets/       icons, logo, emblem
+├── components/   reusable UI components
+├── core/         headless core: engine, events, protocol, settings, i18n, theme, LLM
+├── dialogs/      dialogs (first run, update, plugin install)
+├── docs/         screenshots
+├── pages/        application pages
+├── plugins/      plugin system and bundled plugins
+├── voice/        speech, recognition, app index, reminders, system control
 │
-└── main.py         # Application entry point
+└── main.py       entry point
 ```
 
 ---
 
-# 📸 Screenshots
+## Installation
 
-> Screenshots will be added soon.
-
-<!-- Add screenshots here -->
-
-Example:
-
-```
-docs/
- ├── main_window.png
- ├── settings.png
- ├── plugins.png
- └── voice_control.png
-```
-
----
-
-# 🎬 Demo Video
-
-> Demo video coming soon.
-
-<!-- Example:
-
-[![Rina Assistant Demo](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://youtu.be/VIDEO_ID)
-
--->
-
----
-
-# 🛠️ Installation
-
-## Windows
-
-An installer package will be available after the first repository release.
-
-Currently, manual installation requires:
-
-* Python 3.x
-* Required dependencies
-
-Install dependencies:
+Requires **Windows** and **Python 3.10+**.
 
 ```bash
+git clone https://github.com/Luna-coreX/RinaAssistant.git
+cd RinaAssistant
 pip install -r requirements.txt
-```
-
-Run:
-
-```bash
 python main.py
 ```
 
----
+Only `PySide6` is strictly required. Voice engines are optional and listed in `requirements.txt` — install the ones you intend to use. Some (Vosk, Piper) need a model file downloaded separately.
 
-# 📋 Requirements
+### Optional: local AI answers
 
-* Windows OS
-* Python 3.x
-* Installed dependencies from `requirements.txt`
+Install [Ollama](https://ollama.com), pull a model, then enable it in **Settings → AI**:
 
-Some voice engines may require additional models or external configuration.
+```bash
+ollama pull llama3.1:8b
+```
 
----
-
-# 🗺️ Roadmap
-
-Future improvements:
-
-* More voice engines
-* Improved automation system
-* Extended plugin API
-* More integrations
-* Additional customization options
-* Further UI improvements
+Rina talks to `http://localhost:11434` by default and checks the connection from the settings page.
 
 ---
 
-# 🤝 Contributing
+## Roadmap
 
-Contributions, suggestions and bug reports are welcome.
+**4.0.0 — Separation and redesign.** The core becomes a standalone Python service; the shell and system layer are rewritten in C# (WPF) with a protocol between them. Because the shell is new code regardless, the interface is redesigned rather than ported. No new user-facing capabilities.
 
-If you found a problem or have an idea:
-
-1. Open an Issue
-2. Describe the problem or suggestion
-3. Provide additional information if needed
+**5.0.0 — Platform.** End-to-end streaming (speech starts while the answer is still being generated, and can be interrupted), persistent memory, mature tool registry with granular permissions.
 
 ---
 
-# 📄 License
+## Contributing
 
-This project is licensed under the **MIT License**.
-
-See the `LICENSE` file for more information.
+Issues and pull requests are welcome. When reporting a bug, include the version, what you said or typed, and what happened instead.
 
 ---
 
-# 🌐 Links
+## License
 
-**NeuroSync Foundry**
-
-Coming soon.
-
-**Repository**
-
-https://github.com/
+MIT — see [`LICENSE`](LICENSE).
 
 ---
+
+## Links
+
+- **NeuroSync Foundry** — https://neurosync-foundry-portal.pages.dev/
+- **Repository** — https://github.com/Luna-coreX/RinaAssistant
+- **Issues** — https://github.com/Luna-coreX/RinaAssistant/issues
 
 <p align="center">
-  Made with ❤️ and Python
+  Made with Python
 </p>

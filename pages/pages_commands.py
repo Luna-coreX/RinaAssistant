@@ -182,7 +182,7 @@ class CommandsPage(QWidget):
             self.store.save_all(merged)
             app_signals.commands_changed.emit()
         self._flash_transfer(
-            tr("Добавлено: {added}, пропущено дубликатов: {skipped}",
+            tr("Добавлено: {added} (выключены), пропущено дубликатов: {skipped}",
                added=added, skipped=skipped), ok=bool(added))
 
     def _search_bar(self):
@@ -350,7 +350,12 @@ class CommandsPage(QWidget):
         head.addWidget(self.reindex_btn)
         cl.addLayout(head)
 
-        entries = app_index.get_index()
+        entries = app_index.cached_index()
+        if not entries and not getattr(self, "_index_requested", False):
+            # первый запуск: кэша ещё нет. Сканируем в фоне и перерисуемся,
+            # когда индекс будет готов — окно при этом остаётся отзывчивым.
+            self._index_requested = True
+            self._refresh_index()
         if self._filter:
             shown = app_index.find(self._filter, limit=30, entries=entries)
             note = (tr("Совпадений: {count}", count=len(shown)) if shown

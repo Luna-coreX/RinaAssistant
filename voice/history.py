@@ -22,7 +22,28 @@ class HistoryStore:
         return bool(self._settings.get("save_history", True))
 
     def all(self):
-        return list(self._settings.get("history", []) or [])
+        """
+        Записи журнала, приведённые к ожидаемому виду.
+
+        Файл истории могли отредактировать руками или повредить при сбое;
+        одна испорченная запись не должна ломать всю вкладку, поэтому мусор
+        отбрасывается здесь, а не в каждом месте показа.
+        """
+        clean = []
+        for entry in (self._settings.get("history", []) or []):
+            if not isinstance(entry, dict):
+                continue
+            try:
+                stamp = float(entry.get("ts", 0) or 0)
+            except (TypeError, ValueError):
+                stamp = 0.0
+            clean.append({
+                "ts": stamp,
+                "kind": str(entry.get("kind", "user")),
+                "text": str(entry.get("text", "")),
+                "source": str(entry.get("source", "")),
+            })
+        return clean
 
     def add(self, kind, text, source=""):
         if not self.enabled():

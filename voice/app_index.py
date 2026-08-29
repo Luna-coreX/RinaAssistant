@@ -140,6 +140,18 @@ def _is_junk(name):
     return any(word in low for word in SKIP_WORDS)
 
 
+def _powershell():
+    """Полный путь к PowerShell: по короткому имени Windows ищет и в текущей папке."""
+    from voice.system_control import system_exe
+    return system_exe("powershell.exe", os.path.join("System32",
+                                                     "WindowsPowerShell", "v1.0"))
+
+
+def _explorer():
+    from voice.system_control import system_exe
+    return system_exe("explorer.exe", "")
+
+
 def _no_window():
     """Флаги, чтобы не мигало консольное окно при вызове PowerShell."""
     if sys.platform.startswith("win"):
@@ -275,7 +287,7 @@ def scan_uwp():
         # Windows) — русские имена («Блокнот», «Диспетчер задач») в UTF-8 читаются
         # как мусор. Просим сам PowerShell выдавать UTF-8.
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+            [_powershell(), "-NoProfile", "-NonInteractive", "-Command",
              "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
              "Get-StartApps | ConvertTo-Json -Compress"],
             capture_output=True, timeout=25, **_no_window())
@@ -414,15 +426,34 @@ def get_index(refresh=False):
         return _INDEX
 
 
+def cached_index():
+    """
+    Индекс без сканирования: только память или готовый кэш.
+
+    get_index() при пустом кэше запускает полный обход (секунды, плюс запуск
+    PowerShell) и держит блокировку — вызывать его из потока интерфейса нельзя,
+    окно замирает. Страницы берут отсюда, а обновление просят в фоне.
+    """
+    if _INDEX is not None:
+        return _INDEX
+    cached, _ts = load_cache()
+    return cached
+
+
 def refresh_async(callback=None):
     """Пересканировать в фоне (скан занимает секунды — в GUI-потоке нельзя)."""
     def worker():
-        entries = get_index(refresh=True)
-        if callback:
-            try:
-                callback(entries)
-            except Exception:
-                pass
+        entries = []
+        try:
+            entries = get_index(refresh=True)
+        finally:
+            # колбэк обязан сработать всегда: на нём разблокируется кнопка,
+            # иначе она осталась бы серой с надписью «Ищу…» навсегда
+            if callback:
+                try:
+                    callback(entries)
+                except Exception:
+                    pass
     threading.Thread(target=worker, daemon=True).start()
 
 
@@ -538,7 +569,7 @@ def launch(entry):
     try:
         if entry.kind == "uwp":
             subprocess.Popen(
-                ["explorer.exe", "shell:AppsFolder\\" + entry.launch],
+                [_explorer(), "shell:AppsFolder\\" + entry.launch],
                 **_no_window())
             return True
         if sys.platform.startswith("win"):

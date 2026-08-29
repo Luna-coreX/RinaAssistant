@@ -276,7 +276,11 @@ def _run_system_action(action, host):
     # действия с компьютером (громкость, медиа, блокировка) — им host не нужен
     if str(action).startswith("sys_"):
         from voice import system_control
-        return system_control.run(action[4:]) is not None
+        from core.i18n import t as tr
+        message = system_control.run(action[4:])
+        # run() возвращает текст и при неудаче — сравниваем именно с ним,
+        # иначе шаг последовательности отчитывался бы «Готово» после сбоя
+        return bool(message) and message != tr("Не получилось выполнить действие.")
 
     # действия над окном Рины трогают виджеты, а команда может выполняться
     # в фоновом потоке (распознавание речи) — уводим их в GUI-поток сигналом
@@ -290,8 +294,9 @@ def _run_system_action(action, host):
     if action not in mapping:
         return False
     try:
-        from core.app_signals import app_signals
-        app_signals.window_action.emit(action)
+        from core.events import bus
+        from core.protocol import Events
+        bus.emit(Events.WINDOW_ACTION, action=action)
         return True
     except Exception:
         pass
@@ -324,16 +329,3 @@ def _default_response(command, ok):
     if ctype == "sequence":
         return tr("Выполняю последовательность.")
     return tr("Готово.")
-
-
-def dispatch_user_command(text, store: UserCommandStore, host=None):
-    """
-    Ищет подходящую пользовательскую команду и выполняет её.
-    Возвращает текст ответа или None, если ничего не совпало.
-    """
-    for command in store.all():
-        if matches(command, text):
-            store.bump_stat(command.get("id"))
-            ok, response = execute(command, host)
-            return response
-    return None

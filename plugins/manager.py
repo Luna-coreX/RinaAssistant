@@ -33,6 +33,20 @@ class PluginInstallError(Exception):
     """Папка или архив не похожи на плагин."""
 
 
+# Имя плагина становится именем папки, поэтому допускаем только простое имя:
+# буквы, цифры, «_», «-», точка внутри. Ни разделителей пути, ни «.»/«..».
+_PLUGIN_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
+
+
+def _safe_plugin_id(raw):
+    """Проверенное имя плагина или PluginInstallError."""
+    plugin_id = re.sub(r"[^\w.-]+", "_", str(raw or "").strip())
+    if (not plugin_id or plugin_id in (".", "..")
+            or not _PLUGIN_ID_RE.match(plugin_id)):
+        raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
+    return plugin_id
+
+
 def install_plugin(source_path):
     """
     Устанавливает плагин из папки или .zip в каталог plugins/.
@@ -74,18 +88,39 @@ def install_plugin(source_path):
         except (OSError, ValueError) as e:
             raise PluginInstallError(tr("Битый plugin.json: ") + str(e))
 
-        plugin_id = str(manifest.get("id") or manifest.get("name") or "").strip()
-        plugin_id = re.sub(r"[^\w.-]+", "_", plugin_id)
-        if not plugin_id:
-            raise PluginInstallError(tr("В plugin.json не указан id"))
+        plugin_id = _safe_plugin_id(manifest.get("id") or manifest.get("name"))
 
-        target = os.path.join(plugins_dir(), plugin_id)
-        if os.path.abspath(staged) == os.path.abspath(target):
+        base = os.path.abspath(plugins_dir())
+        target = os.path.abspath(os.path.join(base, plugin_id))
+        # Имя берётся из чужого файла, поэтому проверяем результат, а не только
+        # исходную строку: путь обязан остаться прямо внутри каталога плагинов.
+        if os.path.dirname(target) != base or target == base:
+            raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
+        if os.path.abspath(staged) == target:
             raise PluginInstallError(tr("Этот плагин уже установлен"))
-        if os.path.isdir(target):
-            shutil.rmtree(target, ignore_errors=True)   # обновление поверх
+        replaced = os.path.isdir(target)
+        if replaced:
+            # обновление поверх: удаляем только то, что само является плагином
+            if not os.path.isfile(os.path.join(target, "plugin.json")):
+                raise PluginInstallError(tr("В папке назначения не плагин"))
+            shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(staged, target)
-    return plugin_id
+
+    if replaced:
+        # Под этим id уже был плагин, и он мог быть включён. Код нового плагина
+        # выполняется при включении, поэтому не наследуем чужое «включено»:
+        # иначе подсунутый архив с чужим id запускался бы сам, без ведома
+        # пользователя. Пусть включит осознанно.
+        _disable_saved(plugin_id)
+    return plugin_id, replaced
+
+
+def _disable_saved(plugin_id):
+    """Убирает плагин из списка включённых в настройках."""
+    enabled = [p for p in (settings.get("enabled_plugins", []) or [])
+               if p != plugin_id]
+    settings.set("enabled_plugins", enabled)
+    settings.save()
 
 
 def _find_plugin_root(base):
@@ -139,8 +174,10 @@ class PluginManager(QObject):
                 with open(manifest_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 manifest = PluginManifest.from_dict(data, path=folder)
-                if not manifest.id:
-                    manifest.id = name
+                # Имя папки — единственный надёжный идентификатор: id внутри
+                # plugin.json пишет автор плагина, и совпадение с чужим id
+                # отдало бы ему настройки и место соседа в списке.
+                manifest.id = name
             except Exception as e:
                 # битый манифест — показываем как сбойный плагин
                 manifest = PluginManifest(id=name, name=name, path=folder)
