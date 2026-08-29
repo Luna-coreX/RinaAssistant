@@ -42,23 +42,29 @@ class PluginPageView(QWidget):
             if widget is not None:
                 self._layout.addWidget(widget)
 
+    @staticmethod
+    def _plain(label):
+        """Плагин задаёт текст сам — рисуем его как текст, а не как разметку."""
+        label.setTextFormat(Qt.PlainText)
+        return label
+
     def _render(self, element):
         kind = getattr(element, "kind", "")
 
         if kind == "title":
-            lbl = QLabel(element.text)
+            lbl = self._plain(QLabel(element.text))
             lbl.setFont(QFont(FONT_FAMILY, 14, QFont.Bold))
             lbl.setStyleSheet(f"color: {Color.TEXT};")
             return lbl
 
         if kind == "text":
-            lbl = QLabel(element.text)
+            lbl = self._plain(QLabel(element.text))
             lbl.setWordWrap(True)
             lbl.setStyleSheet(f"color: {Color.TEXT}; font-size: 13px;")
             return lbl
 
         if kind == "note":
-            lbl = QLabel(element.text)
+            lbl = self._plain(QLabel(element.text))
             lbl.setWordWrap(True)
             lbl.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
             return lbl
@@ -69,7 +75,7 @@ class PluginPageView(QWidget):
             lay.setContentsMargins(0, 0, 0, 0)
             lay.setSpacing(4)
             for text in element.items or []:
-                row = QLabel(text)
+                row = self._plain(QLabel(text))
                 row.setWordWrap(True)
                 row.setStyleSheet(f"""
                     color: {Color.TEXT}; font-size: 12px;
@@ -122,7 +128,7 @@ class PluginPageView(QWidget):
             colors = {"good": Color.GREEN, "warn": Color.PEACH,
                       "danger": Color.RED, "normal": Color.SUBTEXT}
             color = colors.get(element.variant, Color.SUBTEXT)
-            lbl = QLabel(element.text)
+            lbl = self._plain(QLabel(element.text))
             lbl.setStyleSheet(f"""
                 color: {color};
                 background: {Color.alpha(color, '1e')};
@@ -199,7 +205,7 @@ class PluginPageView(QWidget):
         lay.setContentsMargins(10, 5, 10, 5)
         lay.setSpacing(12)
         for cell in cells:
-            lbl = QLabel(str(cell))
+            lbl = self._plain(QLabel(str(cell)))
             lbl.setWordWrap(True)
             if header:
                 lbl.setStyleSheet(
@@ -221,7 +227,7 @@ class PluginPageView(QWidget):
         lay.setSpacing(4)
 
         if element.text:
-            caption = QLabel(element.text)
+            caption = self._plain(QLabel(element.text))
             caption.setStyleSheet(f"color: {Color.SUBTEXT}; font-size: 12px;")
             lay.addWidget(caption)
 

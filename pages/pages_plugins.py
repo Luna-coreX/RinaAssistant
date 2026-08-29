@@ -122,7 +122,7 @@ class PluginsPage(QWidget):
             return
 
         try:
-            plugin_id = install_plugin(path)
+            plugin_id, replaced = install_plugin(path)
         except PluginInstallError as e:
             self._show_install_status(str(e), ok=False)
             return
@@ -132,8 +132,13 @@ class PluginsPage(QWidget):
             return
 
         plugin_manager.discover()
-        self._show_install_status(
-            tr("Установлен плагин «{name}». Включите его ниже.", name=plugin_id))
+        if replaced:
+            self._show_install_status(tr(
+                "Плагин «{name}» заменён новой версией и выключен — "
+                "включите его сами, если доверяете источнику.", name=plugin_id))
+        else:
+            self._show_install_status(
+                tr("Установлен плагин «{name}». Включите его ниже.", name=plugin_id))
 
     def _show_install_status(self, text, ok=True):
         self.install_status.setStyleSheet(
@@ -187,6 +192,7 @@ class PluginsPage(QWidget):
         name_row = QHBoxLayout()
         name_row.setSpacing(8)
         name = QLabel(lp.manifest.name)
+        name.setTextFormat(Qt.PlainText)   # имя берётся из чужого plugin.json
         name.setFont(QFont(FONT_FAMILY, 14, QFont.Bold))
         name.setStyleSheet(f"color: {Color.TEXT};")
         name_row.addWidget(name)
@@ -200,10 +206,12 @@ class PluginsPage(QWidget):
         info.addLayout(name_row)
 
         author = QLabel(tr("Автор: {a}", a=lp.manifest.author))
+        author.setTextFormat(Qt.PlainText)
         author.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
         info.addWidget(author)
 
         desc = QLabel(lp.manifest.description or tr("Без описания"))
+        desc.setTextFormat(Qt.PlainText)
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color: {Color.SUBTEXT}; font-size: 12px;")
         info.addWidget(desc)
@@ -220,6 +228,7 @@ class PluginsPage(QWidget):
         # статус / ошибка
         if lp.error:
             err = QLabel(lp.error.split("\n")[0])
+            err.setTextFormat(Qt.PlainText)
             err.setWordWrap(True)
             err.setStyleSheet(f"""
                 color: {Color.RED}; font-size: 11px;

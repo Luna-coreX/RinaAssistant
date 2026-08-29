@@ -68,14 +68,70 @@ def read_commands(path):
     else:
         if data.get("kind") != KIND_COMMANDS:
             raise TransferError("Это не файл команд")
-        if int(data.get("format", 0)) > FORMAT_VERSION:
+        try:
+            file_format = int(data.get("format", 0))
+        except (TypeError, ValueError):
+            raise TransferError("Не удалось прочитать версию формата файла")
+        if file_format > FORMAT_VERSION:
             raise TransferError(
                 "Файл сделан более новой версией Рины — обновите приложение")
         commands = (data.get("payload") or {}).get("commands", [])
 
     if not isinstance(commands, list):
         raise TransferError("В файле нет списка команд")
-    return [c for c in commands if isinstance(c, dict) and c.get("triggers")]
+    if len(commands) > MAX_COMMANDS:
+        raise TransferError(
+            f"Слишком много команд в файле (больше {MAX_COMMANDS})")
+    return [_sanitize_command(c) for c in commands
+            if isinstance(c, dict) and c.get("triggers")]
+
+
+# Файл команд мог быть написан кем угодно, а команда — это запуск программы.
+# Поэтому импортированное приводится к безопасному виду и приходит выключенным:
+# пользователь включает вручную, увидев, что именно он добавил.
+MAX_COMMANDS = 500
+MAX_TRIGGERS = 20
+MAX_TRIGGER_LEN = 200
+MIN_TRIGGER_LEN = 2
+
+
+def _sanitize_command(raw):
+    """Оставляет только известные поля и приводит их к ожидаемым типам."""
+    from voice.user_commands import COMMAND_TYPES, SYSTEM_ACTIONS
+
+    known_types = {t for t, _label, *_ in COMMAND_TYPES} | {"pause"}
+    cmd_type = str(raw.get("type", "app"))
+    if cmd_type not in known_types:
+        cmd_type = "speak"          # неизвестный тип ничего не запускает
+
+    triggers = []
+    for trigger in (raw.get("triggers") or [])[:MAX_TRIGGERS]:
+        trigger = str(trigger).strip()[:MAX_TRIGGER_LEN]
+        # слишком короткая фраза срабатывала бы почти на любую реплику
+        if len(trigger) >= MIN_TRIGGER_LEN:
+            triggers.append(trigger)
+
+    target = str(raw.get("target", ""))[:1000]
+    if cmd_type == "system":
+        actions = {a for a, _ in SYSTEM_ACTIONS}
+        if target not in actions:
+            cmd_type, target = "speak", ""
+
+    steps = raw.get("steps") or []
+    steps = [_sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
+
+    return {
+        "id": str(raw.get("id", "")),
+        # импортированное всегда выключено: включение — осознанный шаг
+        "enabled": False,
+        "type": cmd_type,
+        "triggers": triggers,
+        "match": "exact" if raw.get("match") == "exact" else "contains",
+        "target": target,
+        "target_kind": "uwp" if raw.get("target_kind") == "uwp" else "file",
+        "response": str(raw.get("response", ""))[:500],
+        "steps": steps,
+    }
 
 
 def merge_commands(existing, incoming, new_id):

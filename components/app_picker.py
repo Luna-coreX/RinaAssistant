@@ -59,7 +59,7 @@ class AppPickerEdit(QWidget):
     def _setup_completer(self):
         try:
             from voice import app_index
-            entries = app_index.get_index()
+            entries = app_index.cached_index()
         except Exception:
             entries = []
 

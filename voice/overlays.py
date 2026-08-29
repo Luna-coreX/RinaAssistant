@@ -140,6 +140,8 @@ class Toast(QWidget):
         layout.addWidget(self.icon, 0, Qt.AlignTop)
 
         self.text = QLabel("")
+        # в toast попадают ответы модели и плагинов — только как обычный текст
+        self.text.setTextFormat(Qt.PlainText)
         self.text.setWordWrap(True)
         self.text.setStyleSheet(
             f"color: {Color.TEXT}; font-family: '{FONT_FAMILY}'; font-size: 13px;")

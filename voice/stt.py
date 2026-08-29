@@ -10,7 +10,7 @@ Speech-to-Text слой с выбором движка и работой с ми
 поэтому запускается из фонового потока (voice/service.py).
 """
 
-import threading
+import os
 
 
 def check_vosk_model(path):

@@ -22,6 +22,7 @@ import os
 import sys
 import json
 import tempfile
+import threading
 
 
 APP_NAME = "RinaAssistant"
@@ -72,6 +73,13 @@ GROUPS = {
         "app_aliases": {},
         "wake_sensitivity": 0.8,
         "listen_seconds": 8,
+        # локальная языковая модель (Ollama). Выключена по умолчанию:
+        # это тяжёлая возможность, которая требует установленного сервера.
+        "llm_enabled": False,
+        "llm_url": "http://localhost:11434",
+        "llm_model": "",
+        "llm_persona": "",
+        "llm_timeout": 30,
         "config_version": 0,
         "first_run": True,
     },
@@ -124,6 +132,8 @@ def config_dir() -> str:
 
 class SettingsStore:
     def __init__(self):
+        # к настройкам обращаются из нескольких потоков (см. save)
+        self._lock = threading.RLock()
         self._dir = _config_dir()
         self._data = dict(DEFAULTS)
         self._dirty = set()      # какие группы изменились (для точечной записи)
@@ -304,27 +314,34 @@ class SettingsStore:
 
     def save(self):
         """Сохраняет только изменённые группы (или все, если неизвестно)."""
-        groups = self._dirty or set(GROUPS.keys())
-        ok = True
-        for g in groups:
-            ok = self._save_group(g) and ok
-        self._dirty.clear()
-        return ok
+        # Настройки пишут несколько потоков сразу: команда из окна, ответ из
+        # потока распознавания, сработавшее напоминание. Раньше save() шёл
+        # прямо по self._dirty, и добавление ключа в другом потоке роняло
+        # перебор («Set changed size during iteration»).
+        with self._lock:
+            groups = set(self._dirty) if self._dirty else set(GROUPS.keys())
+            self._dirty.clear()
+            ok = True
+            for g in groups:
+                ok = self._save_group(g) and ok
+            return ok
 
     def save_all(self):
-        for g in GROUPS:
-            self._save_group(g)
-        self._dirty.clear()
+        with self._lock:
+            for g in GROUPS:
+                self._save_group(g)
+            self._dirty.clear()
 
     # ---------- доступ ----------
     def get(self, key, default=None):
         return self._data.get(key, DEFAULTS.get(key, default))
 
     def set(self, key, value):
-        self._data[key] = value
-        grp = _KEY_TO_GROUP.get(key)
-        if grp:
-            self._dirty.add(grp)
+        with self._lock:
+            self._data[key] = value
+            grp = _KEY_TO_GROUP.get(key)
+            if grp:
+                self._dirty.add(grp)
 
     def update(self, mapping: dict):
         for k, v in mapping.items():

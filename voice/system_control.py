@@ -39,6 +39,18 @@ def _windows():
     return sys.platform.startswith("win")
 
 
+def system_exe(name, subdir="System32"):
+    """
+    Абсолютный путь к системной программе.
+
+    По короткому имени Windows ищет программу в том числе в текущей папке,
+    поэтому подложенный туда файл выполнился бы вместо системного.
+    """
+    root = os.environ.get("SystemRoot") or r"C:\Windows"
+    full = os.path.join(root, subdir, name)
+    return full if os.path.isfile(full) else name
+
+
 def _tap_key(vk_code, times=1):
     """Эмулирует нажатие клавиши (нажать/отпустить)."""
     if not _windows():
@@ -94,7 +106,7 @@ def sleep_pc():
         return False
     try:
         subprocess.Popen(
-            ["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"],
+            [system_exe("rundll32.exe"), "powrprof.dll,SetSuspendState", "0,1,0"],
             creationflags=0x08000000)
         return True
     except Exception:
@@ -105,7 +117,7 @@ def shutdown_pc():
     if not _windows():
         return False
     try:
-        subprocess.Popen(["shutdown", "/s", "/t", "0"],
+        subprocess.Popen([system_exe("shutdown.exe"), "/s", "/t", "0"],
                          creationflags=0x08000000)
         return True
     except Exception:
@@ -116,15 +128,18 @@ def restart_pc():
     if not _windows():
         return False
     try:
-        subprocess.Popen(["shutdown", "/r", "/t", "0"],
+        subprocess.Popen([system_exe("shutdown.exe"), "/r", "/t", "0"],
                          creationflags=0x08000000)
         return True
     except Exception:
         return False
 
 
-def screenshot():
-    """Снимок всех экранов в «Изображения». Возвращает путь или None."""
+def grab_screen():
+    """
+    Снимок экрана. ВЫЗЫВАТЬ ТОЛЬКО ИЗ ПОТОКА ИНТЕРФЕЙСА: захват экрана —
+    операция Qt, из фонового потока она даёт пустую картинку или падает.
+    """
     try:
         from PySide6.QtWidgets import QApplication
         from PySide6.QtCore import QDateTime
@@ -235,11 +250,11 @@ def match_action(text):
 def run(action_id):
     """Выполняет действие, возвращает текст ответа."""
     if action_id == "screenshot":
-        path = screenshot()
-        if path:
-            return tr("Сохранила скриншот в {path}.",
-                      path=os.path.basename(path))
-        return tr("Не удалось сделать скриншот.")
+        # сам снимок делает оболочка в своём потоке (см. MainWindow)
+        from core.events import bus
+        from core.protocol import Events
+        bus.emit(Events.WINDOW_ACTION, action="screenshot")
+        return tr("Делаю скриншот.")
 
     runner = RUNNERS.get(action_id)
     if runner is None:
