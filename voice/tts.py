@@ -12,13 +12,23 @@ Text-to-Speech слой с выбором движка.
 
 Синтез блокирующий, поэтому вызывается из фонового потока (см. voice/service.py),
 а не напрямую из GUI.
+
+Воспроизведение проходит через единственную очередь (_Playback): ответы
+звучат по одному и в порядке поступления. Каждый синтез пишет в собственный
+временный файл, который удаляется после проигрывания.
 """
 
 import os
-import sys
+import queue
 import subprocess
+import sys
 import tempfile
 import threading
+
+from core.logging_setup import get_logger
+
+
+log = get_logger("tts")
 
 
 class TTSEngine:
@@ -170,11 +180,11 @@ class GttsEngine(TTSEngine):
             return
         lang = voice if voice in dict(self.LANG_VOICES) else "ru"
         try:
-            tmp = os.path.join(tempfile.gettempdir(), "rina_gtts.mp3")
+            tmp = new_temp_file(".mp3", "rina_gtts_")
             gTTS(text=text, lang=lang, slow=(rate < 80)).save(tmp)
             # единый путь воспроизведения: sounddevice+soundfile,
             # с учётом выбранного устройства вывода
-            _play_audio_file(tmp)
+            _play_audio_file(tmp, delete_after=True)
         except Exception:
             pass
 
@@ -192,8 +202,84 @@ def _selected_output_device():
     return None
 
 
-def _play_audio_file(path):
-    """Кроссплатформенное воспроизведение аудиофайла (mp3/wav)."""
+def new_temp_file(suffix, prefix="rina_tts_"):
+    """
+    Отдельный файл под каждый синтез.
+
+    Раньше имена были постоянными («rina_gtts.mp3»), и два ответа подряд
+    затирали файл друг друга: первый обрывался на середине, второй мог
+    прочитать наполовину записанные данные.
+    """
+    fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix)
+    os.close(fd)            # писать будет синтезатор, ему нужен путь
+    return path
+
+
+class _Playback:
+    """
+    Единственный воркер воспроизведения.
+
+    Ответы Рины должны звучать по очереди и целиком. Без очереди два
+    синтеза, начавшиеся почти одновременно, играли одновременно: слышно
+    было обоих и ни одного.
+    """
+
+    def __init__(self):
+        self._queue = queue.Queue()
+        self._worker = None
+        self._lock = threading.Lock()
+
+    def _ensure_worker(self):
+        with self._lock:
+            if self._worker is None or not self._worker.is_alive():
+                self._worker = threading.Thread(
+                    target=self._run, name="tts-playback", daemon=True)
+                self._worker.start()
+
+    def _run(self):
+        while True:
+            job = self._queue.get()
+            path, delete_after, done, result = job
+            try:
+                result.append(_play_now(path))
+            except Exception:
+                # сбой одного файла не должен уносить воркер: следующий
+                # ответ обязан прозвучать
+                log.exception("Ошибка воспроизведения")
+                result.append(False)
+            finally:
+                if delete_after:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+                done.set()
+
+    def play(self, path, delete_after=False, wait=True):
+        """Ставит файл в очередь. При wait=True ждёт окончания."""
+        self._ensure_worker()
+        done = threading.Event()
+        result = []
+        self._queue.put((path, delete_after, done, result))
+        if not wait:
+            return True
+        done.wait()
+        return bool(result and result[0])
+
+    def pending(self):
+        return self._queue.qsize()
+
+
+_playback = _Playback()
+
+
+def _play_audio_file(path, delete_after=False):
+    """Поставить файл в очередь воспроизведения и дождаться его."""
+    return _playback.play(path, delete_after=delete_after, wait=True)
+
+
+def _play_now(path):
+    """Собственно воспроизведение. Вызывается только воркером очереди."""
     device = _selected_output_device()
 
     # если выбрано конкретное устройство вывода — играем через sounddevice,
@@ -286,7 +372,7 @@ class EdgeTTSEngine(TTSEngine):
         vol_str = f"{'+' if vol_pct >= 0 else ''}{vol_pct}%"
         try:
             import asyncio
-            tmp = os.path.join(tempfile.gettempdir(), "rina_edge.mp3")
+            tmp = new_temp_file(".mp3", "rina_edge_")
 
             async def _gen():
                 communicate = edge_tts.Communicate(
@@ -294,7 +380,7 @@ class EdgeTTSEngine(TTSEngine):
                 await communicate.save(tmp)
 
             asyncio.run(_gen())
-            _play_audio_file(tmp)
+            _play_audio_file(tmp, delete_after=True)
         except Exception:
             pass
 
@@ -358,7 +444,7 @@ class PiperEngine(TTSEngine):
             self._last_error = "Модель Piper не выбрана или файл не найден"
             return
         import wave
-        tmp = os.path.join(tempfile.gettempdir(), "rina_piper.wav")
+        tmp = new_temp_file(".wav", "rina_piper_")
         try:
             voice_model = self._load_voice(PiperVoice, model_path)
             with wave.open(tmp, "wb") as wav:
@@ -368,7 +454,7 @@ class PiperEngine(TTSEngine):
                 else:
                     # старый API: synthesize(text, wav_file)
                     voice_model.synthesize(text, wav)
-            _play_audio_file(tmp)
+            _play_audio_file(tmp, delete_after=True)
         except Exception as e:
             # не глушим молча — сохраняем причину, чтобы показать в UI/логах
             self._last_error = f"Ошибка Piper: {e}"

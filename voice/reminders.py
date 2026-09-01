@@ -72,22 +72,26 @@ def _duration_seconds(text):
     if re.search(r"\bполтора часа\b", text):
         return 5400
 
-    # число (цифрами или словом) + единица
+    # Число (цифрами или словом) + единица. Складываем ВСЕ пары, а не
+    # только первую: «1 час 30 минут» — это полтора часа, и раньше
+    # пользователь узнавал об ошибке через час.
     pattern = r"(\d+(?:[.,]\d+)?|[а-яё]+)\s*(" + "|".join(UNIT_SECONDS) + r")\b"
-    match = re.search(pattern, text)
-    if not match:
+    seconds = 0.0
+    found = False
+    for match in re.finditer(pattern, text):
+        raw, unit = match.group(1), match.group(2)
+        try:
+            amount = float(raw.replace(",", "."))
+        except ValueError:
+            amount = NUM_WORDS.get(raw)
+            if amount is None:
+                # «через час», «на минуту» — числительное опущено
+                amount = 1
+        seconds += amount * UNIT_SECONDS[unit]
+        found = True
+
+    if not found:
         return None
-
-    raw, unit = match.group(1), match.group(2)
-    try:
-        amount = float(raw.replace(",", "."))
-    except ValueError:
-        amount = NUM_WORDS.get(raw)
-        if amount is None:
-            # «через час», «на минуту» — числительное опущено
-            amount = 1
-
-    seconds = amount * UNIT_SECONDS[unit]
     # очень длинное число даёт inf, а int(inf) — исключение. Заодно отсекаем
     # бессмысленные сроки: «через 99999999 минут» — это не напоминание.
     if not math.isfinite(seconds) or seconds <= 0:
@@ -229,24 +233,31 @@ class ReminderStore:
             "created_at": time.time(),
             "done": False,
         }
-        items = self.all()
-        items.append(item)
-        self.save_all(items)
+        # чтение и запись — одной операцией: планировщик в фоновом потоке
+        # помечает сработавшее ровно тогда же, когда пользователь добавляет
+        # новое, и без блокировки одно затирает другое
+        with self._settings.transaction():
+            items = self.all()
+            items.append(item)
+            self.save_all(items)
         return item
 
     def mark_done(self, item_id):
-        items = self.all()
-        for item in items:
-            if item.get("id") == item_id:
-                item["done"] = True
-        self.save_all(items)
+        with self._settings.transaction():
+            items = self.all()
+            for item in items:
+                if item.get("id") == item_id:
+                    item["done"] = True
+            self.save_all(items)
 
     def remove(self, item_id):
-        self.save_all([r for r in self.all() if r.get("id") != item_id])
+        with self._settings.transaction():
+            self.save_all([r for r in self.all() if r.get("id") != item_id])
 
     def clear_active(self):
-        removed = len(self.active())
-        self.save_all([r for r in self.all() if r.get("done")])
+        with self._settings.transaction():
+            removed = len(self.active())
+            self.save_all([r for r in self.all() if r.get("done")])
         return removed
 
     def due(self, now=None):

@@ -6,6 +6,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QFont
 
 from core.i18n import t as tr
+from core.logging_setup import get_logger
 from core.theme import Color, FONT_FAMILY, Radius, theme_manager
 from components.card import Card
 from components.toggle_switch import ToggleSwitch
@@ -16,6 +17,9 @@ from core.settings_store import settings
 from core.app_signals import app_signals
 from voice import audio_devices
 from voice.mic_tester import MicTester
+
+
+log = get_logger("settings")
 
 
 class SettingsPage(QWidget):
@@ -71,6 +75,7 @@ class SettingsPage(QWidget):
         layout.addWidget(self._llm_card())
         layout.addWidget(self._search_card())
         layout.addWidget(self._privacy_card())
+        layout.addWidget(self._diagnostics_card())
         layout.addWidget(self._reset_row())
         layout.addStretch()
 
@@ -880,8 +885,15 @@ class SettingsPage(QWidget):
         self.llm_status.setText(tr("Проверяю…"))
 
         def worker():
-            found = llm.models(force=True)
-            ok, message = llm.status()
+            # сигнал должен уйти при любом исходе: иначе кнопка останется
+            # серой, а строка состояния — навсегда в «Проверяю…»
+            try:
+                found = llm.models(force=True)
+                ok, message = llm.status()
+            except Exception as e:
+                log.exception("Сбой проверки связи с моделью")
+                found, ok = [], False
+                message = tr("Ошибка проверки: ") + str(e)
             self.llm_checked.emit(ok, message, found)
 
         threading.Thread(target=worker, daemon=True).start()
@@ -946,6 +958,67 @@ class SettingsPage(QWidget):
             self.save_history))
         return card
 
+    # ---------- Диагностика ----------
+    def _diagnostics_card(self):
+        """
+        Журнал приложения. Нужен, чтобы разбирать сбои по записям, а не по
+        воспоминаниям: фоновый поток умирает молча, и без журнала снаружи
+        видно только, что действие не произошло.
+        """
+        from core import logging_setup
+
+        card = Card()
+        cl = card.layout()
+        cl.addWidget(self._section_title(tr("Диагностика")))
+        cl.addSpacing(2)
+
+        self.log_level = styled_combo(list(logging_setup.LEVELS), 1)
+        cl.addWidget(SettingRow(
+            tr("Подробность журнала"),
+            tr("ERROR — только сбои, DEBUG — всё подряд"),
+            self.log_level))
+        cl.addWidget(Divider())
+
+        self.log_texts = ToggleSwitch()
+        cl.addWidget(SettingRow(
+            tr("Записывать тексты реплик"),
+            tr("По умолчанию в журнал попадает только длина фразы. "
+               "Включайте, только когда собираетесь приложить журнал "
+               "к сообщению об ошибке."),
+            self.log_texts))
+
+        log_row = QWidget()
+        lr = QHBoxLayout(log_row)
+        lr.setContentsMargins(42, 2, 0, 4)
+        lr.setSpacing(10)
+        self.log_path_label = QLabel(logging_setup.log_path())
+        self.log_path_label.setWordWrap(True)
+        self.log_path_label.setTextFormat(Qt.PlainText)
+        self.log_path_label.setStyleSheet(
+            f"color: {Color.OVERLAY}; font-size: 11px;")
+        lr.addWidget(self.log_path_label, 1)
+        self.open_logs_btn = QPushButton(tr("Открыть папку"))
+        self.open_logs_btn.setCursor(Qt.PointingHandCursor)
+        self.open_logs_btn.setFixedHeight(32)
+        self.open_logs_btn.setStyleSheet(f"""
+            QPushButton {{
+                background: {Color.SURFACE_0}; color: {Color.TEXT};
+                border: none; border-radius: {Radius.SM}px;
+                padding: 2px 14px; font-size: 12px; font-weight: 600;
+            }}
+            QPushButton:hover {{ background: {Color.SURFACE_1}; }}
+        """)
+        self.open_logs_btn.clicked.connect(self._open_logs)
+        lr.addWidget(self.open_logs_btn, 0, Qt.AlignVCenter)
+        cl.addWidget(log_row)
+        return card
+
+    def _open_logs(self):
+        from core import logging_setup
+        from voice.user_commands import _open_path
+
+        _open_path(logging_setup.logs_dir())
+
     # ---------- Сброс ----------
     def _reset_row(self):
         row = QWidget()
@@ -997,6 +1070,11 @@ class SettingsPage(QWidget):
         self.sfx.setChecked(bool(settings.get("sound_effects")))
         self.updates.setChecked(bool(settings.get("check_updates")))
         self.save_history.setChecked(bool(settings.get("save_history")))
+        from core import logging_setup as _log
+        saved_level = str(settings.get("log_level", _log.DEFAULT_LEVEL)).upper()
+        if saved_level in _log.LEVELS:
+            self.log_level.setCurrentIndex(_log.LEVELS.index(saved_level))
+        self.log_texts.setChecked(bool(settings.get("log_texts")))
         self.search_fallback.setChecked(bool(settings.get("web_search_fallback")))
         self.llm_enabled.setChecked(bool(settings.get("llm_enabled")))
         # модели подтягиваем из кэша: лезть в сеть при открытии настроек не надо
@@ -1033,6 +1111,8 @@ class SettingsPage(QWidget):
         self.sfx.toggled.connect(self._save)
         self.updates.toggled.connect(self._save)
         self.save_history.toggled.connect(self._save)
+        self.log_level.currentTextChanged.connect(self._on_log_changed)
+        self.log_texts.toggled.connect(self._on_log_changed)
         self.search_fallback.toggled.connect(self._save)
         self.engine_combo.currentIndexChanged.connect(self._save)
         self.llm_enabled.toggled.connect(self._save)
@@ -1055,6 +1135,8 @@ class SettingsPage(QWidget):
             "sound_effects": self.sfx.isChecked(),
             "check_updates": self.updates.isChecked(),
             "save_history": self.save_history.isChecked(),
+            "log_level": self.log_level.currentText(),
+            "log_texts": self.log_texts.isChecked(),
             "web_search_fallback": self.search_fallback.isChecked(),
             "search_engine": self._current_engine_id(),
             "llm_enabled": self.llm_enabled.isChecked(),
@@ -1097,6 +1179,14 @@ class SettingsPage(QWidget):
         settings.update(self.get_settings())
         settings.save()
         self._flash_saved()
+
+    def _on_log_changed(self, *args):
+        """Уровень журнала применяется сразу: ждать перезапуска незачем."""
+        if self._loading:
+            return
+        self._save()
+        from core import logging_setup
+        logging_setup.apply_settings()
 
     def _flash_saved(self):
         self.saved_label.setText(tr("Сохранено"))

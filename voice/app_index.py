@@ -26,6 +26,10 @@ import threading
 import time
 
 from voice.textmatch import normalize, similar, translit, has_cyrillic
+from core.logging_setup import get_logger
+
+
+log = get_logger("apps")
 
 
 # Разговорные названия -> как программа называется в системе.
@@ -564,14 +568,40 @@ def find(query, limit=5, entries=None):
     return [entry for _s, _l, entry in scored[:limit]]
 
 
+def _uwp_known(app_id):
+    """
+    Есть ли такой AppUserModelID среди найденных приложений Магазина.
+
+    Проверить иначе нельзя: explorer.exe завершается сразу и о судьбе
+    `shell:AppsFolder\\<id>` ничего не сообщает, а ждать его нельзя —
+    если проводник ещё не запущен, он становится оболочкой и не завершается
+    вовсе. Поэтому сверяемся с индексом до запуска.
+    """
+    index = cached_index()
+    if not index:
+        return True         # индекса нет — судить не о чем, пробуем запустить
+    return any(e.kind == "uwp" and e.launch == app_id for e in index)
+
+
 def launch(entry):
     """Запускает приложение. True при успехе."""
     try:
         if entry.kind == "uwp":
+            if not _uwp_known(entry.launch):
+                log.warning("Приложение Магазина не найдено: %s", entry.launch)
+                return False
             subprocess.Popen(
                 [_explorer(), "shell:AppsFolder\\" + entry.launch],
                 **_no_window())
             return True
+
+        # Индекс живёт сутки, и программу за это время могли удалить.
+        # Молча отдать системе несуществующий путь — значит показать
+        # пользователю системную ошибку вместо внятного ответа.
+        if os.path.isabs(entry.launch) and not os.path.exists(entry.launch):
+            log.warning("Путь не существует: %s", entry.launch)
+            return False
+
         if sys.platform.startswith("win"):
             os.startfile(entry.launch)      # noqa: S606 — штатный запуск в ОС
         elif sys.platform == "darwin":
@@ -580,4 +610,5 @@ def launch(entry):
             subprocess.Popen([entry.launch])
         return True
     except Exception:
+        log.exception("Не удалось запустить %s", entry.name)
         return False

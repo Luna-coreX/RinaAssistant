@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 from core.i18n import t as tr
+from core.logging_setup import security_log
 
 
 # --- виртуальные коды мультимедийных клавиш Windows ---
@@ -259,6 +260,9 @@ def run(action_id):
     runner = RUNNERS.get(action_id)
     if runner is None:
         return None
+    if action_id in CONFIRM_QUESTIONS:
+        # питание и сон — ровно то, ради чего существует подтверждение
+        security_log().warning("Выполняется системное действие: %s", action_id)
     if runner():
         return tr(DONE_MESSAGES.get(action_id, "Готово."))
     return tr("Не получилось выполнить действие.")

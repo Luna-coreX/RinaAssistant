@@ -82,8 +82,14 @@ def read_commands(path):
     if len(commands) > MAX_COMMANDS:
         raise TransferError(
             f"Слишком много команд в файле (больше {MAX_COMMANDS})")
-    return [_sanitize_command(c) for c in commands
-            if isinstance(c, dict) and c.get("triggers")]
+    clean = [_sanitize_command(c) for c in commands
+             if isinstance(c, dict) and c.get("triggers")]
+    from core.logging_setup import security_log
+    security_log().info(
+        "Импорт команд из %s: в файле %d, принято %d, отброшено %d, "
+        "все выключены", path, len(commands), len(clean),
+        len(commands) - len(clean))
+    return clean
 
 
 # Файл команд мог быть написан кем угодно, а команда — это запуск программы.

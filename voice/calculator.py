@@ -100,16 +100,19 @@ def _strip_triggers(low):
     return low
 
 
+_PERCENT_RE = re.compile(
+    r"(-?\d+(?:[.,]\d+)?)\s*(?:%|процент(?:а|ов)?|percent)\s*(?:от|of)\s*"
+    r"(-?\d+(?:[.,]\d+)?)")
+
+
 def _percent_of(expr):
-    """«20 процентов от 3000» / «20% от 3000» -> 20/100*3000."""
-    m = re.search(
-        r"(-?\d+(?:[.,]\d+)?)\s*(?:%|процент(?:а|ов)?|percent)\s*(?:от|of)\s*"
-        r"(-?\d+(?:[.,]\d+)?)", expr)
+    """«20 процентов от 3000» / «20% от 3000» -> (значение, совпадение)."""
+    m = _PERCENT_RE.search(expr)
     if not m:
-        return None
+        return None, None
     part = float(m.group(1).replace(",", "."))
     whole = float(m.group(2).replace(",", "."))
-    return part / 100.0 * whole
+    return part / 100.0 * whole, m
 
 
 # Глагольные конструкции: связка между операндами зависит от глагола.
@@ -166,10 +169,17 @@ def try_calculate(text):
     low = text.lower().strip()
     has_trigger = any(low.startswith(t) for t in TRIGGERS)
 
-    # процент от числа — считаем до общего разбора
-    percent = _percent_of(low)
+    # Процент от числа — до общего разбора, но по тем же правилам допуска:
+    # либо фразу явно адресовали счёту, либо она и есть только это выражение.
+    # Иначе обычная реплика «скинули 20 процентов от 3000, беру» перехватывалась
+    # арифметикой вместо ответа по существу.
+    percent, match = _percent_of(low)
     if percent is not None:
-        return tr("Получается {result}.", result=_format_number(percent))
+        rest = low[:match.start()] + " " + low[match.end():]
+        rest = re.sub(r"[^\w]+", " ", rest).strip()
+        if has_trigger or not rest:
+            return tr("Получается {result}.",
+                      result=_format_number(percent))
 
     expr = _to_expression(text)
     if not expr:

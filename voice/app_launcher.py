@@ -164,7 +164,8 @@ def resolve(text):
                 "launched", tr("Запускаю {app}.", app=learned.name))
         return LaunchOutcome(
             "not_found",
-            tr("Не получилось запустить {app}.", app=learned.name),
+            tr("Не получилось запустить {app} — программу удалили "
+               "или перенесли.", app=learned.name),
             query=target)
 
     candidates = app_index.find(target, limit=5)
@@ -195,7 +196,8 @@ def resolve(text):
                 "launched", tr("Запускаю {app}.", app=entry.name))
         return LaunchOutcome(
             "not_found",
-            tr("Не получилось запустить {app}.", app=entry.name))
+            tr("Не получилось запустить {app} — программу удалили "
+               "или перенесли.", app=entry.name))
 
     names = ", ".join(e.name for e in candidates[:3])
     return LaunchOutcome(

@@ -7,7 +7,12 @@ import threading
 
 from PySide6.QtCore import QObject, Signal
 
+from core.i18n import t as tr
+from core.logging_setup import get_logger
 from voice import audio_devices
+
+
+log = get_logger("mic")
 
 
 class MicTester(QObject):
@@ -31,6 +36,16 @@ class MicTester(QObject):
                          daemon=True).start()
 
     def _worker(self, device_id, seconds):
-        result = audio_devices.test_microphone(device_id, seconds=seconds)
-        self._busy = False
-        self.finished.emit(result)
+        # Без finally исключение в test_microphone оставляло _busy=True
+        # навсегда: сигнал finished не приходил, и кнопка «Проверить»
+        # оставалась серой до перезапуска приложения.
+        result = None
+        try:
+            result = audio_devices.test_microphone(device_id, seconds=seconds)
+        except Exception as e:
+            log.exception("Сбой проверки микрофона")
+            result = audio_devices.MicTestResult(
+                error=tr("Не удалось проверить микрофон: ") + str(e))
+        finally:
+            self._busy = False
+            self.finished.emit(result)

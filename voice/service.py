@@ -89,7 +89,10 @@ class VoiceService(QObject):
         self.engine.listen_once()
 
     def process_command(self, text, require_wake=False, source="typed"):
-        self.engine.handle_command(text, require_wake=require_wake, source=source)
+        # в фоне: вызывают из потока интерфейса, а конвейер может уйти
+        # в сеть или к языковой модели на несколько секунд
+        self.engine.handle_command_async(
+            text, require_wake=require_wake, source=source)
 
     def set_always_listen(self, on):
         self.engine.set_always_listen(on)

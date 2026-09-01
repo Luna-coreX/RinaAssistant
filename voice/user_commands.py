@@ -131,35 +131,40 @@ class UserCommandStore:
         self._settings.save()
 
     def add(self, command):
-        cmds = self.all()
-        cmds.append(command)
-        self.save_all(cmds)
+        with self._settings.transaction():
+            cmds = self.all()
+            cmds.append(command)
+            self.save_all(cmds)
 
     def update(self, command):
-        cmds = self.all()
-        for i, c in enumerate(cmds):
-            if c.get("id") == command.get("id"):
-                cmds[i] = command
-                break
-        self.save_all(cmds)
+        with self._settings.transaction():
+            cmds = self.all()
+            for i, c in enumerate(cmds):
+                if c.get("id") == command.get("id"):
+                    cmds[i] = command
+                    break
+            self.save_all(cmds)
 
     def remove(self, command_id):
-        cmds = [c for c in self.all() if c.get("id") != command_id]
-        self.save_all(cmds)
+        with self._settings.transaction():
+            cmds = [c for c in self.all() if c.get("id") != command_id]
+            self.save_all(cmds)
 
     def set_enabled(self, command_id, enabled):
-        cmds = self.all()
-        for c in cmds:
-            if c.get("id") == command_id:
-                c["enabled"] = bool(enabled)
-        self.save_all(cmds)
+        with self._settings.transaction():
+            cmds = self.all()
+            for c in cmds:
+                if c.get("id") == command_id:
+                    c["enabled"] = bool(enabled)
+            self.save_all(cmds)
 
     # статистика запусков
     def bump_stat(self, command_id):
-        stats = dict(self._settings.get("command_stats", {}) or {})
-        stats[command_id] = stats.get(command_id, 0) + 1
-        self._settings.set("command_stats", stats)
-        self._settings.save()
+        with self._settings.transaction():
+            stats = dict(self._settings.get("command_stats", {}) or {})
+            stats[command_id] = stats.get(command_id, 0) + 1
+            self._settings.set("command_stats", stats)
+            self._settings.save()
 
     def stat(self, command_id):
         return (self._settings.get("command_stats", {}) or {}).get(command_id, 0)
@@ -196,9 +201,28 @@ def matches(command, text):
     return False
 
 
+def missing_path(target) -> bool:
+    """
+    Цель выглядит путём, но такого пути нет.
+
+    Команда живёт дольше программы: путь мог остаться от удалённого или
+    перемещённого приложения. Короткое имя («discord») путём не считаем —
+    его разрешает сама ОС по реестру App Paths, и это допустимый способ
+    задать команду.
+    """
+    target = str(target or "")
+    if not target:
+        return False
+    looks_like_path = (os.path.isabs(target) or os.sep in target
+                       or "/" in target)
+    return looks_like_path and not os.path.exists(target)
+
+
 def _open_path(path):
     """Открыть файл/папку/приложение штатно для ОС."""
     if not path:
+        return False
+    if missing_path(path):
         return False
     try:
         if sys.platform.startswith("win"):
@@ -221,6 +245,8 @@ def execute(command, host=None):
     Выполняет команду. host — объект с методами для системных действий
     (minimize/show/quit/mute/unmute) и say(text). Возвращает (ok, response_text).
     """
+    from core.i18n import t as tr
+
     ctype = command.get("type")
     target = command.get("target", "")
     response = command.get("response", "")
@@ -232,7 +258,14 @@ def execute(command, host=None):
         ok = app_index.launch(
             app_index.AppEntry(target, target, "uwp", "learned"))
     elif ctype == "app" or ctype == "folder":
-        ok = _open_path(target)
+        if missing_path(target):
+            # называем причину: «не получилось» не подсказывает, что делать
+            ok = False
+            response = response or tr(
+                "Не нашла «{target}» — программу удалили или перенесли.",
+                target=os.path.basename(str(target).rstrip("\\/")) or target)
+        else:
+            ok = _open_path(target)
     elif ctype == "website":
         url = target
         if url and not url.startswith(("http://", "https://")):
