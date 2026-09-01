@@ -11,6 +11,7 @@ localhost). Модель работает на компьютере пользо
 Зависимостей не добавляет: Ollama отвечает по HTTP, и хватает urllib.
 """
 
+import http.client
 import json
 import time
 import urllib.error
@@ -85,6 +86,11 @@ def _request(path, payload=None, timeout=8):
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
+    if not is_local_url(url):
+        # переписка уходит с этого компьютера — это событие безопасности
+        from core.logging_setup import security_log
+        security_log().warning("Запрос к модели по нелокальному адресу: %s",
+                               base_url())
     req = urllib.request.Request(url, data=data, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
@@ -93,7 +99,10 @@ def _request(path, payload=None, timeout=8):
             return json.loads(raw.decode("utf-8", errors="replace"))
     except urllib.error.URLError as e:
         raise LLMError(tr("Ollama не отвечает: ") + str(getattr(e, "reason", e)))
-    except (ValueError, OSError) as e:
+    except (ValueError, OSError, http.client.HTTPException) as e:
+        # HTTPException (обрыв ответа, битый chunked, слишком длинная строка
+        # заголовка) не наследуется от OSError и раньше пролетал наружу:
+        # кнопка «Проверить связь» оставалась в состоянии проверки навсегда
         raise LLMError(tr("Ошибка обращения к модели: ") + str(e))
 
 

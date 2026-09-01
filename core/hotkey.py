@@ -15,6 +15,9 @@
 всё равно доступна через QShortcut, который вешает главное окно отдельно.
 """
 
+import threading
+import time
+
 from PySide6.QtCore import QObject, Signal
 
 try:
@@ -75,11 +78,28 @@ class HotkeyManager(QObject):
     activated = Signal()            # основной хоткей «слушать»
     action_activated = Signal(str)  # доп. действие по id
 
+    # Удержание комбинации даёт автоповтор клавиш, и pynput честно сообщает
+    # о каждом повторе. Без подавления одно нажатие запускало команду
+    # несколько раз подряд.
+    DEBOUNCE_SECONDS = 0.3
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._listener = None
         self._current = None
         self._action_map = {}       # action_id -> sequence
+        self._last_fire = {}        # что и когда срабатывало в последний раз
+        self._fire_lock = threading.Lock()
+
+    def _too_soon(self, key) -> bool:
+        """Срабатывание слишком близко к предыдущему для той же комбинации."""
+        now = time.monotonic()
+        with self._fire_lock:
+            last = self._last_fire.get(key, 0.0)
+            if now - last < self.DEBOUNCE_SECONDS:
+                return True
+            self._last_fire[key] = now
+            return False
 
     @property
     def available(self) -> bool:
@@ -93,6 +113,8 @@ class HotkeyManager(QObject):
         """
         self.unregister()
         self._action_map = dict(actions or {})
+        with self._fire_lock:
+            self._last_fire.clear()
 
         if not PYNPUT_AVAILABLE:
             return False
@@ -127,11 +149,15 @@ class HotkeyManager(QObject):
 
     def _make_action_cb(self, action_id):
         def cb():
+            if self._too_soon(action_id):
+                return
             self.action_activated.emit(action_id)
         return cb
 
     def _on_triggered(self):
         # вызывается из потока pynput -> просто эмитим сигнал (thread-safe)
+        if self._too_soon("__main__"):
+            return
         self.activated.emit()
 
     def unregister(self):

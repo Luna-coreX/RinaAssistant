@@ -51,18 +51,21 @@ class HistoryStore:
         text = str(text).strip()
         if not text:
             return
-        entries = self.all()
-        entries.append({
-            "ts": time.time(),
-            "kind": kind,
-            "text": text,
-            "source": source,
-        })
-        # обрезаем до последних MAX_ENTRIES
-        if len(entries) > MAX_ENTRIES:
-            entries = entries[-MAX_ENTRIES:]
-        self._settings.set("history", entries)
-        self._settings.save()
+        # чтение, изменение и запись — одной неделимой операцией: иначе
+        # одновременный ответ и напоминание затирают записи друг друга
+        with self._settings.transaction():
+            entries = self.all()
+            entries.append({
+                "ts": time.time(),
+                "kind": kind,
+                "text": text,
+                "source": source,
+            })
+            # обрезаем до последних MAX_ENTRIES
+            if len(entries) > MAX_ENTRIES:
+                entries = entries[-MAX_ENTRIES:]
+            self._settings.set("history", entries)
+            self._settings.save()
 
     def clear(self):
         self._settings.set("history", [])

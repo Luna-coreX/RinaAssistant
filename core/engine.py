@@ -13,11 +13,13 @@
 в фоновые потоки: ядро не должно зависеть от того, кто его вызвал.
 """
 
+import queue
 import threading
 import time
 
 from core.events import bus
 from core.i18n import t as tr
+from core.logging_setup import get_logger, safe, security_log
 from core.protocol import Events
 from core.settings_store import settings
 from voice import stt as stt_mod
@@ -25,6 +27,9 @@ from voice import tts as tts_mod
 from voice.commands import handle_builtin_command
 from voice.history import HistoryStore
 from voice.user_commands import UserCommandStore
+
+
+log = get_logger("engine")
 
 
 class RinaEngine:
@@ -49,12 +54,25 @@ class RinaEngine:
         self._cmd_store = UserCommandStore(settings)
         self._history = HistoryStore(settings)
         self._host = None                    # действия над окном (см. set_host)
-        self._speaking = threading.Event()   # Рина сейчас говорит
+        # «Рина сейчас говорит». Считаем говорящих, а не держим один флаг:
+        # при перекрывающихся ответах первый закончивший сбрасывал флаг,
+        # микрофон открывался под ещё звучащую речь, и Рина слышала себя.
+        self._speaking = threading.Event()
+        self._speak_lock = threading.Lock()
+        self._speak_count = 0
         self._pending = None                 # незакрытый уточняющий вопрос
 
         # планировщик напоминаний: обычный поток, а не таймер интерфейса
         self._stop_reminders = threading.Event()
         self._reminder_thread = None
+
+        # Очередь команд. Конвейер запускает программы, ходит в сеть и ждёт
+        # ответа модели — в потоке интерфейса это секунды замороженного окна.
+        # Очередь одна на все источники: конвейер держит общее состояние
+        # (незакрытый уточняющий вопрос), и параллельная обработка его портит.
+        self._commands = queue.Queue()
+        self._command_worker = None
+        self._command_lock = threading.Lock()
 
     # ------------------------------------------------------------------
     # события
@@ -88,7 +106,7 @@ class RinaEngine:
         if not settings.get("voice_reply", True):
             return  # режим «молчать» — только текст, без голоса
         engine = tts_mod.get_engine(settings.get("tts_engine", "silent"))
-        self._speaking.set()
+        self._begin_speaking()
         try:
             engine.speak(
                 text,
@@ -101,7 +119,18 @@ class RinaEngine:
         finally:
             # пауза после речи, чтобы «хвост» не попал обратно в микрофон
             time.sleep(0.4)
-            self._speaking.clear()
+            self._end_speaking()
+
+    def _begin_speaking(self):
+        with self._speak_lock:
+            self._speak_count += 1
+            self._speaking.set()
+
+    def _end_speaking(self):
+        with self._speak_lock:
+            self._speak_count = max(0, self._speak_count - 1)
+            if self._speak_count == 0:
+                self._speaking.clear()
 
     def _wait_while_speaking(self):
         while self._speaking.is_set() and not self._stop_always.is_set():
@@ -122,20 +151,32 @@ class RinaEngine:
 
         sounds.play_activation(settings)
         self._emit(Events.LISTENING_STARTED)
+        result = None
         try:
             engine = stt_mod.get_engine(settings.get("stt_engine", "disabled"))
             result = engine.listen_once(
                 language=self.lang_code(),
                 timeout=self.listen_seconds(),
             )
+        except Exception as e:
+            # Раньше здесь был только finally: индикатор гас, исключение
+            # уносило поток, и пользователь видел, что «ничего не произошло»,
+            # без единой подсказки почему.
+            log.exception("Сбой распознавания")
+            self.say(tr("Не получилось распознать речь: ") + str(e),
+                     sound="error")
+            return
         finally:
             self._emit(Events.LISTENING_STOPPED)
             self._busy = False
 
+        if result is None:
+            return
         if result.ok and result.text:
             self._emit(Events.RECOGNIZED, text=result.text)
             # по хоткею слово активации не нужно: пользователь уже позвал явно
-            self.handle_command(result.text, require_wake=False, source="voice")
+            self.handle_command_async(result.text, require_wake=False,
+                                      source="voice")
         elif result.error:
             # движки отдают текст ошибки по-русски — переводим на границе
             self._emit(Events.ERROR, text=tr(result.error))
@@ -189,8 +230,8 @@ class RinaEngine:
             if result.ok and result.text:
                 # здесь слово активации обязательно: иначе ассистент реагировал
                 # бы на любой разговор в комнате
-                self.handle_command(result.text, require_wake=True,
-                                    source="always")
+                self.handle_command_async(result.text, require_wake=True,
+                                          source="always", wait=True)
                 self._wait_while_speaking()
 
     # ------------------------------------------------------------------
@@ -284,6 +325,9 @@ class RinaEngine:
         words = normalize(command).split()
 
         if any(w in words for w in self.NO_WORDS):
+            security_log().info(
+                "Опасное действие отменено пользователем: %s",
+                pending.get("action") or "пользовательская команда")
             self._pending = None
             self.say(tr("Хорошо, отменяю."))
             return True
@@ -358,11 +402,66 @@ class RinaEngine:
         self.say(resp)
 
     def run_command_by_id(self, command_id):
-        """Выполнить команду по её id (кнопка «Выполнить» в списке)."""
+        """
+        Выполнить команду по её id (кнопка «Выполнить» в списке).
+
+        Тоже в фоне: последовательность с паузами выполняется секундами,
+        а нажимают кнопку из потока интерфейса.
+        """
         for cmd in self._cmd_store.all():
             if cmd.get("id") == command_id:
-                self._run_user_command(cmd)
+                self._ensure_command_worker()
+                threading.Thread(
+                    target=self._run_user_command, args=(cmd,),
+                    name="rina-run-command", daemon=True).start()
                 return
+
+    # ------------------------------------------------------------------
+    # очередь команд
+    # ------------------------------------------------------------------
+    def _ensure_command_worker(self):
+        with self._command_lock:
+            worker = self._command_worker
+            if worker is None or not worker.is_alive():
+                self._command_worker = threading.Thread(
+                    target=self._command_loop, name="rina-commands",
+                    daemon=True)
+                self._command_worker.start()
+
+    def _command_loop(self):
+        while True:
+            text, require_wake, source, done = self._commands.get()
+            try:
+                self.handle_command(text, require_wake=require_wake,
+                                    source=source)
+            except Exception as e:
+                # без этого исключение уносило бы воркер, и все следующие
+                # команды остались бы в очереди навсегда
+                log.exception("Сбой обработки команды")
+                try:
+                    self.say(tr("Не получилось выполнить команду: ") + str(e),
+                             sound="error")
+                except Exception:
+                    pass
+            finally:
+                done.set()
+
+    def handle_command_async(self, text, require_wake=False, source="typed",
+                             wait=False):
+        """
+        Поставить команду в очередь обработки.
+
+        Оболочка вызывает это вместо handle_command: конвейер работает в
+        своём потоке, окно остаётся живым, а порядок команд сохраняется.
+        wait=True нужен режиму «всегда слушать»: он не должен слушать
+        дальше, пока предыдущая фраза не отработала.
+        """
+        self._ensure_command_worker()
+        done = threading.Event()
+        self._commands.put((text, require_wake, source, done))
+        if wait:
+            done.wait()
+        return done
 
     # ------------------------------------------------------------------
     # конвейер команд
@@ -383,6 +482,7 @@ class RinaEngine:
                 self.say(tr("Да? Слушаю."))
             return
 
+        log.info("Команда (%s): %s", source, safe(command))
         self._history.add("user", command, source=source)
         self._emit(Events.HISTORY_CHANGED)
 
@@ -397,9 +497,12 @@ class RinaEngine:
         if self._plugins is not None:
             try:
                 if self._plugins.dispatch_command(command):
+                    log.debug("Команду обработал плагин")
                     return
             except Exception:
-                pass
+                # плагин — чужой код; его сбой не должен рвать конвейер,
+                # но и пропадать бесследно тоже не должен
+                log.exception("Сбой плагина при разборе команды")
 
         # 2) пользовательские команды
         try:
@@ -421,7 +524,7 @@ class RinaEngine:
                     self._run_user_command(user_cmd)
                 return
         except Exception:
-            pass
+            log.exception("Сбой при разборе пользовательских команд")
 
         # 3) таймеры, будильники и напоминания
         reminder_reply = self._handle_reminder(command)

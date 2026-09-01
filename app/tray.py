@@ -47,13 +47,31 @@ class SystemTray(QObject):
         self._tray.setIcon(make_tray_icon())
         self._tray.setToolTip("Rina Assistant")
 
+        self._menu = None
         self._build_menu()
         self._tray.activated.connect(self._on_activated)
 
-        # обновлять иконку при смене темы (меняется акцент)
+        # обновлять иконку и меню при смене темы (меняется акцент и палитра)
         theme_manager.changed.connect(self._refresh_icon)
+        theme_manager.changed.connect(self._build_menu)
+
+        # и при смене языка: иначе меню трея остаётся на прежнем языке
+        from core.app_signals import app_signals
+        app_signals.language_changed.connect(self._build_menu)
 
     def _build_menu(self):
+        # Старое меню и его действия — дети этого объекта. Без явной уборки
+        # каждая пересборка добавляла бы новый набор QAction поверх прежних,
+        # и меню росло бы с каждой сменой темы или языка.
+        previous = getattr(self, "_menu", None)
+        if previous is not None:
+            self._tray.setContextMenu(None)
+            for action in previous.actions():
+                action.setParent(None)
+                action.deleteLater()
+            previous.deleteLater()
+            self._menu = None
+
         menu = QMenu()
         menu.setStyleSheet(f"""
             QMenu {{

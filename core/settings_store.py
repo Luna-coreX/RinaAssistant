@@ -18,6 +18,8 @@
 монолитный settings.json автоматически мигрирует в новые файлы.
 """
 
+import contextlib
+import copy
 import os
 import sys
 import json
@@ -80,6 +82,10 @@ GROUPS = {
         "llm_model": "",
         "llm_persona": "",
         "llm_timeout": 30,
+        # журналирование. Тексты реплик — содержимое разговора, поэтому
+        # пишутся только при явном согласии и только на уровне DEBUG.
+        "log_level": "INFO",
+        "log_texts": False,
         "config_version": 0,
         "first_run": True,
     },
@@ -100,6 +106,11 @@ GROUPS = {
 }
 
 # Плоский словарь всех дефолтов (для обратной совместимости API).
+#
+# ВАЖНО: половина значений здесь — изменяемые (списки и словари), и они
+# общие с GROUPS. Копировать их можно только глубоко: поверхностная копия
+# отдавала бы приложению тот же самый объект, и первая же настройка плагина
+# меняла бы «значение по умолчанию». Для этого есть defaults_for().
 DEFAULTS = {}
 for _grp in GROUPS.values():
     DEFAULTS.update(_grp)
@@ -109,6 +120,17 @@ _KEY_TO_GROUP = {}
 for _name, _grp in GROUPS.items():
     for _k in _grp:
         _KEY_TO_GROUP[_k] = _name
+
+
+def default_value(key):
+    """Заводское значение ключа — всегда отдельный объект."""
+    return copy.deepcopy(DEFAULTS[key])
+
+
+def defaults_for(group=None):
+    """Заводские значения группы (или все) — всегда отдельные объекты."""
+    source = GROUPS[group] if group is not None else DEFAULTS
+    return copy.deepcopy(source)
 
 
 def _config_dir() -> str:
@@ -135,9 +157,26 @@ class SettingsStore:
         # к настройкам обращаются из нескольких потоков (см. save)
         self._lock = threading.RLock()
         self._dir = _config_dir()
-        self._data = dict(DEFAULTS)
+        self._data = defaults_for()
         self._dirty = set()      # какие группы изменились (для точечной записи)
         self._loaded = False
+
+    # ---------- атомарные изменения ----------
+    @contextlib.contextmanager
+    def transaction(self):
+        """
+        Блокировка на всю последовательность «прочитать — изменить — записать».
+
+        set() и save() по отдельности потокобезопасны, а такая
+        последовательность — нет: два потока читают одно состояние, и второй
+        затирает изменения первого. Так пропадали записи истории, когда ответ
+        Рины и сработавшее напоминание писались одновременно.
+
+        Блокировка та же самая (RLock), поэтому вложенные set()/save()
+        внутри блока работают как обычно.
+        """
+        with self._lock:
+            yield self
 
     # ---------- пути файлов ----------
     def _group_path(self, group):
@@ -150,7 +189,7 @@ class SettingsStore:
 
     # ---------- загрузка ----------
     def load(self):
-        self._data = dict(DEFAULTS)
+        self._data = defaults_for()
 
         # миграция: если новые файлы ещё не созданы, а старый монолит есть —
         # раскидать его по группам и сохранить.
@@ -309,7 +348,12 @@ class SettingsStore:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
             os.replace(tmp, path)
             return True
-        except OSError:
+        except OSError as e:
+            # молчаливая потеря настроек — худший из отказов: пользователь
+            # думает, что сохранил, а после перезапуска всё вернулось
+            from core.logging_setup import get_logger
+            get_logger("settings").error(
+                "Не удалось записать группу «%s» в %s: %s", group, path, e)
             return False
 
     def save(self):
@@ -362,13 +406,13 @@ class SettingsStore:
         """
         for grp in groups:
             for k in GROUPS.get(grp, {}):
-                self._data[k] = DEFAULTS[k]
+                self._data[k] = default_value(k)
             self._dirty.add(grp)
         self.save()
 
     def reset_all(self):
         """Полный заводской сброс: обнуляет ВСЕ группы (команды, историю и т.д.)."""
-        self._data = dict(DEFAULTS)
+        self._data = defaults_for()
         self.save_all()
 
 

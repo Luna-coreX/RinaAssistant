@@ -90,6 +90,24 @@ _EN = {
     'Показывать строку ввода поверх окон при сворачивании': 'Show an input bar over windows when minimized',
     'Приватность': 'Privacy',
     'Сохранять историю': 'Save history',
+    'Не получилось выполнить команду: ': "Couldn't run the command: ",
+
+    # диагностика: сбои проверок и распознавания
+    'Не получилось распознать речь: ': "Couldn't recognise speech: ",
+    'Не удалось проверить микрофон: ': "Couldn't test the microphone: ",
+    'Ошибка проверки: ': 'Check failed: ',
+
+    # запуск: цель исчезла
+    'Не нашла «{target}» — программу удалили или перенесли.': "Couldn't find “{target}” — the program was removed or moved.",
+    'Не получилось запустить {app} — программу удалили или перенесли.': "Couldn't launch {app} — the program was removed or moved.",
+
+    # диагностика (журнал приложения)
+    'Диагностика': 'Diagnostics',
+    'Подробность журнала': 'Log detail',
+    'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — failures only, DEBUG — everything',
+    'Записывать тексты реплик': 'Log message texts',
+    'По умолчанию в журнал попадает только длина фразы. Включайте, только когда собираетесь приложить журнал к сообщению об ошибке.': 'By default only the length of a phrase is logged. Turn this on only when you are about to attach the log to a bug report.',
+    'Открыть папку': 'Open folder',
     'Вести журнал команд и ответов': 'Keep a log of commands and replies',
     'Отправлять телеметрию': 'Send telemetry',
     'Зарезервировано: сейчас ничего не отправляется': 'Reserved: nothing is sent for now',

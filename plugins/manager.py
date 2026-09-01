@@ -17,8 +17,12 @@ import traceback
 from PySide6.QtCore import QObject, Signal
 
 from core.i18n import t as tr
+from core.logging_setup import get_logger, security_log
 from plugins.api import Plugin, PluginManifest, PluginContext, API_VERSION
 from core.settings_store import settings
+
+
+log = get_logger("plugins")
 
 
 def plugins_dir() -> str:
@@ -43,6 +47,7 @@ def _safe_plugin_id(raw):
     plugin_id = re.sub(r"[^\w.-]+", "_", str(raw or "").strip())
     if (not plugin_id or plugin_id in (".", "..")
             or not _PLUGIN_ID_RE.match(plugin_id)):
+        security_log().warning("Отклонено имя плагина из plugin.json: %r", raw)
         raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
     return plugin_id
 
@@ -95,6 +100,8 @@ def install_plugin(source_path):
         # Имя берётся из чужого файла, поэтому проверяем результат, а не только
         # исходную строку: путь обязан остаться прямо внутри каталога плагинов.
         if os.path.dirname(target) != base or target == base:
+            security_log().warning(
+                "Путь установки плагина ведёт за пределы каталога: %s", target)
             raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
         if os.path.abspath(staged) == target:
             raise PluginInstallError(tr("Этот плагин уже установлен"))
@@ -112,6 +119,12 @@ def install_plugin(source_path):
         # иначе подсунутый архив с чужим id запускался бы сам, без ведома
         # пользователя. Пусть включит осознанно.
         _disable_saved(plugin_id)
+        security_log().warning(
+            "Плагин %s заменён установкой из %s и принудительно выключен",
+            plugin_id, source_path)
+    else:
+        security_log().info("Установлен плагин %s из %s",
+                            plugin_id, source_path)
     return plugin_id, replaced
 
 
@@ -194,6 +207,12 @@ class PluginManager(QObject):
                             f"Обновите приложение.")
             self.plugins[manifest.id] = lp
 
+        broken = [p.manifest.id for p in self.plugins.values() if p.error]
+        log.info("Найдено плагинов: %d, из них сбойных: %d",
+                 len(self.plugins), len(broken))
+        for pid in broken:
+            log.warning("Плагин «%s»: %s", pid, self.plugins[pid].error)
+
         # включаем те, что были включены ранее
         for pid in enabled_ids:
             if pid in self.plugins:
@@ -255,6 +274,7 @@ class PluginManager(QObject):
                 self.changed.emit()
                 return
         lp.enabled = True
+        log.info("Плагин включён: %s", plugin_id)
         self._safe_call(lp, "on_enable")
         if persist:
             self._persist_enabled()
@@ -267,6 +287,7 @@ class PluginManager(QObject):
             return
         self._safe_call(lp, "on_disable")
         lp.enabled = False
+        log.info("Плагин выключен: %s", plugin_id)
         if persist:
             self._persist_enabled()
         self.changed.emit()

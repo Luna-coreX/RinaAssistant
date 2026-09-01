@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
     QLabel, QStackedWidget, QFrame, QButtonGroup,
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import (
     QFont, QColor, QPainter, QPainterPath, QBrush, QPen, QShortcut,
     QKeySequence, QLinearGradient,
@@ -652,6 +652,11 @@ class MainWindow(QMainWindow):
         return scroll
 
     def _rebuild_content(self):
+        # вызывается отложенно — окно к этому моменту могли закрыть
+        try:
+            self.content.count()
+        except RuntimeError:
+            return
         current = getattr(self, "_current_index", 0)
         while self.content.count():
             w = self.content.widget(0)
@@ -701,6 +706,19 @@ class MainWindow(QMainWindow):
 
     # ---------- перекраска темы ----------
     def apply_theme(self):
+        # Пересборка страниц разрушает виджеты, а мы находимся внутри
+        # обработки сигнала темы — среди получателей которого есть и сами
+        # страницы. Разрушать их отсюда небезопасно, поэтому пересборку
+        # откладываем до следующего оборота цикла событий.
+        if getattr(self, "_theme_applying", False):
+            return
+        self._theme_applying = True
+        try:
+            self._apply_theme_now()
+        finally:
+            self._theme_applying = False
+
+    def _apply_theme_now(self):
         self._style_sidebar()
         self._style_content()
 
@@ -717,7 +735,7 @@ class MainWindow(QMainWindow):
             self.floating_bar.apply_theme()
             self.floating_bar.update()
 
-        self._rebuild_content()
+        QTimer.singleShot(0, self._rebuild_content)
         self.update()  # фон окна
 
     # ---------- поведение ----------
@@ -790,7 +808,16 @@ class MainWindow(QMainWindow):
 
 def run():
     import sys
+    from core import logging_setup
+    from version import APP_VERSION
+
+    # журнал поднимаем первым: всё, что упадёт дальше, должно быть записано,
+    # а не потеряно. Уровень пока по умолчанию — настроек ещё нет.
+    logging_setup.setup()
+
     settings.load()
+    logging_setup.apply_settings()
+    logging_setup.log_startup(APP_VERSION)
 
     # применяем язык интерфейса до построения UI
     from core.i18n import set_language
@@ -799,14 +826,16 @@ def run():
     # применяем сохранённую тему ДО построения UI
     theme_manager.apply(settings.get("theme"), settings.get("accent"))
 
-    # обнаруживаем и подключаем плагины (включённые ранее — загрузятся)
-    from plugins.manager import plugin_manager
-    plugin_manager.discover()
-
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setWindowIcon(app_icon())
     app.setQuitOnLastWindowClosed(False)  # чтобы жить в трее
+
+    # Плагины ищем ПОСЛЕ создания QApplication. discover() читает манифесты и
+    # загружает код включённых плагинов, а чужой код может тронуть Qt — до
+    # QApplication это падение на старте, которое не объяснить пользователю.
+    from plugins.manager import plugin_manager
+    plugin_manager.discover()
 
     # первый запуск — показать онбординг
     if settings.get("first_run", True):

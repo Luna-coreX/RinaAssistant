@@ -1,56 +1,96 @@
 """
 Встроенные команды ассистента (то, что не покрыто плагинами).
 
-Основной кейс — запуск приложений: «Рина, запусти Discord».
-Кроссплатформенный запуск: на Windows через `start`, на macOS через `open`,
-на Linux через сам исполняемый файл. Возвращаем текст ответа, который
-ассистент озвучит и покажет в toast.
+Запуск программ сюда почти не попадает: этим занимается voice/app_launcher
+по индексу установленного ПО. Каталог ниже остался запасным путём для
+систем, где индекс пуст.
+
+Запуск на Windows идёт по абсолютному пути и без оболочки. Раньше здесь
+было `Popen("discord", shell=True)`: порядок поиска Windows включает текущую
+рабочую папку, поэтому файл `discord.exe`, положенный рядом с приложением,
+выполнился бы вместо настоящей программы.
 """
 
-from core.i18n import t as tr
-import sys
+import os
 import shutil
 import subprocess
+import sys
+
+from core.i18n import t as tr
+from core.logging_setup import get_logger
+
+
+log = get_logger("commands")
 
 
 # Каталог известных приложений: ключевое слово -> команды под каждую ОС.
 APPS = {
     "discord": {
         "names": ["discord", "дискорд"],
-        "win": "discord",
+        "win": "discord.exe",
         "darwin": "Discord",
         "linux": "discord",
         "label": "Discord",
     },
     "browser": {
         "names": ["браузер", "browser", "хром", "chrome"],
-        "win": "start chrome",
+        "win": "chrome.exe",
+        "default_browser": True,
         "darwin": "Google Chrome",
         "linux": "google-chrome",
         "label": "браузер",
     },
     "notepad": {
         "names": ["блокнот", "notepad", "заметки"],
-        "win": "notepad",
+        "win": "notepad.exe",
         "darwin": "TextEdit",
         "linux": "gedit",
         "label": "блокнот",
     },
     "calculator": {
         "names": ["калькулятор", "calculator", "calc"],
-        "win": "calc",
+        "win": "calc.exe",
         "darwin": "Calculator",
         "linux": "gnome-calculator",
         "label": "калькулятор",
     },
     "explorer": {
         "names": ["проводник", "файлы", "explorer", "finder"],
-        "win": "explorer",
+        "win": "explorer.exe",
         "darwin": "Finder",
         "linux": "xdg-open .",
         "label": "проводник",
     },
 }
+
+
+def _windows_exe(name):
+    """
+    Абсолютный путь к исполняемому файлу или None.
+
+    Ищем сами, а не полагаемся на поиск Windows: его порядок включает
+    текущую рабочую папку, и подложенный туда файл выполнился бы вместо
+    настоящего. Системные каталоги проверяем первыми, PATH — последним.
+    """
+    root = os.environ.get("SystemRoot") or r"C:\Windows"
+    for folder in (os.path.join(root, "System32"), root):
+        candidate = os.path.join(folder, name)
+        if os.path.isfile(candidate):
+            return candidate
+    return shutil.which(name)
+
+
+def _launch_windows(app) -> bool:
+    path = _windows_exe(app["win"])
+    if path:
+        subprocess.Popen([path])
+        return True
+    if app.get("default_browser"):
+        # конкретного Chrome может не быть, а браузер по умолчанию есть
+        # всегда — открыть его честнее, чем ответить отказом
+        import webbrowser
+        return bool(webbrowser.open("about:blank"))
+    return False
 
 
 def _launch(app_key) -> bool:
@@ -59,17 +99,19 @@ def _launch(app_key) -> bool:
     platform = sys.platform
     try:
         if platform.startswith("win"):
-            subprocess.Popen(app["win"], shell=True)
-        elif platform == "darwin":
+            return _launch_windows(app)
+        if platform == "darwin":
             subprocess.Popen(["open", "-a", app["darwin"]])
-        else:  # linux и прочее
-            cmd = app["linux"]
-            exe = cmd.split()[0]
-            if shutil.which(exe) is None and exe != "xdg-open":
-                return False
-            subprocess.Popen(cmd.split())
+            return True
+        # linux и прочее
+        cmd = app["linux"]
+        exe = cmd.split()[0]
+        if shutil.which(exe) is None and exe != "xdg-open":
+            return False
+        subprocess.Popen(cmd.split())
         return True
     except Exception:
+        log.exception("Не удалось запустить %s", app.get("label", app_key))
         return False
 
 
