@@ -160,46 +160,6 @@ def _to_expression(text):
     return expr or None
 
 
-def classify(text):
-    """
-    Чистый разбор: («calc», {"result": ...}) либо («calc.zero_division», {})
-    либо None. Ничего не выполняет и ничего не пишет.
-
-    Отделено от try_calculate ради роутера (4.0-B02): тому нужно намерение
-    с аргументами, а не готовая фраза для озвучки.
-    """
-    if not text:
-        return None
-    low = text.lower().strip()
-    has_trigger = any(low.startswith(t) for t in TRIGGERS)
-
-    percent, match = _percent_of(low)
-    if percent is not None:
-        rest = low[:match.start()] + " " + low[match.end():]
-        rest = re.sub(r"[^\w]+", " ", rest).strip()
-        if has_trigger or not rest:
-            return "calc", {"result": _format_number(percent)}
-
-    expr = _to_expression(text)
-    if not expr:
-        return None
-    if not has_trigger and not re.fullmatch(r"[\d\s+\-*/%().]+", low):
-        return None
-    if not re.search(r"\d", expr) or not re.search(r"[+\-*/%]", expr):
-        return None
-
-    try:
-        result = _eval_node(ast.parse(expr, mode="eval"))
-    except ZeroDivisionError:
-        return "calc.zero_division", {}
-    except Exception:
-        return None
-
-    if isinstance(result, complex):
-        return None
-    return "calc", {"result": _format_number(result)}
-
-
 def try_calculate(text):
     """
     Возвращает текст ответа, если фраза — арифметика, иначе None.

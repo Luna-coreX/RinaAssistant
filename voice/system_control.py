@@ -227,17 +227,8 @@ CONFIRM_QUESTIONS = {
 def match_action(text):
     """
     Возвращает (action_id, needs_confirm) или (None, False).
-
-    Два прохода, и порядок между ними важнее длины фразы.
-
-    Сначала точное вхождение, от длинных фраз к коротким: «выключи звук» не
-    должно срабатывать как «выключи компьютер».
-
-    И только потом — неточное, для оговорок и ошибок распознавания. Раньше
-    проход был один, и «убавь громкость» делало ГРОМЧЕ: неточное сравнение
-    считает её похожей на «прибавь громкость» (0.875 при пороге 0.82), а та
-    длиннее и потому проверялась первой. Точное совпадение обязано побеждать
-    приблизительное, какой бы длины оно ни было.
+    Фразы проверяются от длинных к коротким: «выключи звук» не должно
+    срабатывать как «выключи компьютер».
     """
     from voice.textmatch import normalize, contains_phrase
 
@@ -252,32 +243,18 @@ def match_action(text):
     ranked.sort(reverse=True)
 
     for _length, phrase, action_id, confirm in ranked:
-        if normalize(phrase) in low:
-            return action_id, confirm
-
-    for _length, phrase, action_id, confirm in ranked:
         if contains_phrase(low, phrase):
             return action_id, confirm
     return None, False
 
 
-#: Действия, которые выполняет оболочка, а не ядро.
-#: Снимок экрана — операция интерфейса: из фонового потока она даёт пустую
-#: картинку или падает. Ядро только сообщает о намерении.
-WINDOW_ACTIONS = frozenset({"screenshot"})
-
-
 def run(action_id):
-    """
-    Выполняет действие, возвращает текст ответа.
-
-    Действия из WINDOW_ACTIONS здесь НЕ выполняются: их делает оболочка,
-    а сообщить ей об этом — дело исполнителя, у которого есть своя шина.
-    Раньше отсюда шло событие в модульный синглтон `core.events.bus`, и
-    из-за этого ядро нельзя было поднять дважды: событие уходило мимо
-    обоих (см. 4.0-B05).
-    """
-    if action_id in WINDOW_ACTIONS:
+    """Выполняет действие, возвращает текст ответа."""
+    if action_id == "screenshot":
+        # сам снимок делает оболочка в своём потоке (см. MainWindow)
+        from core.events import bus
+        from core.protocol import Events
+        bus.emit(Events.WINDOW_ACTION, action="screenshot")
         return tr("Делаю скриншот.")
 
     runner = RUNNERS.get(action_id)

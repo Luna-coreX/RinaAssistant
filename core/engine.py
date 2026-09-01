@@ -19,16 +19,9 @@ import time
 
 from core.events import bus
 from core.i18n import t as tr
-from core import router as router_mod
-from core import dialog as dialog_mod
-from core.dialog import Dialog, Question
-from core.executor import Executor
-from voice.wake import get_wake_words
-from voice.reminders import ReminderStore
 from core.logging_setup import get_logger, safe, security_log
 from core.protocol import Events
-from core.features import default_features
-from core.settings_api import default_settings
+from core.settings_store import settings
 from voice import stt as stt_mod
 from voice import tts as tts_mod
 from voice.commands import handle_builtin_command
@@ -45,26 +38,14 @@ class RinaEngine:
     # через минуту заданный вопрос считается неактуальным
     PENDING_TTL = 60
 
-    # Слова согласия и отказа живут в роутере: это часть разбора, и роутер
-    # обязан работать, не поднимая ядро. Здесь — псевдонимы, чтобы не менять
-    # обращения RinaEngine.YES_WORDS по коду и в тестах.
-    YES_WORDS = router_mod.YES_WORDS
-    NO_WORDS = router_mod.NO_WORDS
+    # согласие/отказ на опасное действие. Требуем явного «да» — молчаливое
+    # непонимание не должно выключать компьютер.
+    YES_WORDS = ("да", "давай", "подтверждаю", "точно", "выключай",
+                 "перезагружай", "усыпляй", "ага", "yes", "confirm")
+    NO_WORDS = ("нет", "отмена", "отмени", "не надо", "стоп", "no", "cancel")
 
-    def __init__(self, plugin_manager=None, event_bus=None, settings=None,
-                 features=None):
-        """
-        settings — любой объект по core.settings_api.SettingsProvider.
-        По умолчанию общее хранилище приложения; в тестах — MemorySettings,
-        чтобы не трогать файл пользователя.
-
-        features — по core.features.FeatureProvider. По умолчанию бесплатный
-        план, где доступно всё.
-        """
+    def __init__(self, plugin_manager=None, event_bus=None):
         self.bus = event_bus or bus
-        self._settings = settings if settings is not None else default_settings()
-        self._features = features if features is not None else default_features()
-        settings = self._settings          # локальное имя для кода ниже
         self._plugins = plugin_manager
         self._busy = False
         self._always_listen = False
@@ -79,22 +60,7 @@ class RinaEngine:
         self._speaking = threading.Event()
         self._speak_lock = threading.Lock()
         self._speak_count = 0
-        self._reminders = ReminderStore(settings)
-
-        # Разбор, память о заданном вопросе и исполнение разведены по
-        # отдельным объектам (4.0-B02, B03, B04). Ядро их связывает.
-        self._dialog = Dialog()
-        self._executor = Executor(
-            # Через лямбду, а не связанным методом: озвучку и шину ядро
-            # может подменить позже (тесты, оболочка), и исполнитель обязан
-            # следовать за текущей, а не за той, что была при сборке.
-            say=lambda text, sound="response": self.say(text, sound=sound),
-            emit=lambda name, **data: self._emit(name, **data),
-            settings=settings,
-            reminders_store=self._reminders,
-            command_store=self._cmd_store,
-            on_alias=self._remember_choice,
-        )
+        self._pending = None                 # незакрытый уточняющий вопрос
 
         # планировщик напоминаний: обычный поток, а не таймер интерфейса
         self._stop_reminders = threading.Event()
@@ -114,20 +80,9 @@ class RinaEngine:
     def _emit(self, name, **payload):
         self.bus.emit(name, **payload)
 
-    @property
-    def features(self):
-        """
-        Доступность возможностей. Спрашивать только здесь.
-
-        Оболочка показывает состояние, но не решает его: решение принимает
-        ядро, иначе его можно обойти со стороны интерфейса (4.0-B08).
-        """
-        return self._features
-
     def set_host(self, host):
         """host выполняет действия над окном (свернуть/показать/выйти)."""
         self._host = host
-        self._executor._host = host
 
     # ------------------------------------------------------------------
     # озвучка
@@ -137,9 +92,9 @@ class RinaEngine:
         from voice import sounds
 
         if sound == "response":
-            sounds.play_response(self._settings)
+            sounds.play_response(settings)
         elif sound == "error":
-            sounds.play_error(self._settings)
+            sounds.play_error(settings)
 
         self._history.add("assistant", text)
         self._emit(Events.HISTORY_CHANGED)
@@ -148,16 +103,16 @@ class RinaEngine:
                          daemon=True).start()
 
     def _speak_blocking(self, text):
-        if not self._settings.get("voice_reply", True):
+        if not settings.get("voice_reply", True):
             return  # режим «молчать» — только текст, без голоса
-        engine = tts_mod.get_engine(self._settings.get("tts_engine", "silent"))
+        engine = tts_mod.get_engine(settings.get("tts_engine", "silent"))
         self._begin_speaking()
         try:
             engine.speak(
                 text,
-                voice=self._settings.get("voice"),
-                volume=int(self._settings.get("volume", 75)),
-                rate=int(self._settings.get("speed", 100)),
+                voice=settings.get("voice"),
+                volume=int(settings.get("volume", 75)),
+                rate=int(settings.get("speed", 100)),
             )
         except Exception as e:
             self._emit(Events.ERROR, text=tr("Ошибка озвучки: ") + str(e))
@@ -194,11 +149,11 @@ class RinaEngine:
     def _listen_worker(self):
         from voice import sounds
 
-        sounds.play_activation(self._settings)
+        sounds.play_activation(settings)
         self._emit(Events.LISTENING_STARTED)
         result = None
         try:
-            engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
+            engine = stt_mod.get_engine(settings.get("stt_engine", "disabled"))
             result = engine.listen_once(
                 language=self.lang_code(),
                 timeout=self.listen_seconds(),
@@ -249,7 +204,7 @@ class RinaEngine:
 
     def _always_worker(self, stop_flag=None):
         stop_flag = stop_flag or self._stop_always
-        engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
+        engine = stt_mod.get_engine(settings.get("stt_engine", "disabled"))
         if engine.id == "disabled":
             self._emit(Events.ERROR, text=tr(
                 "Режим «всегда слушать» требует выбранного движка распознавания."))
@@ -292,7 +247,9 @@ class RinaEngine:
         self._reminder_thread.start()
 
     def _reminder_worker(self):
-        store = self._reminders
+        from voice.reminders import ReminderStore
+
+        store = ReminderStore(settings)
         while not self._stop_reminders.wait(1.0):
             try:
                 for item in store.due():
@@ -314,51 +271,135 @@ class RinaEngine:
 
         from voice.wake import get_wake_words, strip_wake
 
-        wake_words = get_wake_words(self._settings)
+        wake_words = get_wake_words(settings)
         if not wake_words:
             return text.strip()
         return strip_wake(text, wake_words)
 
     # ------------------------------------------------------------------
-    # уточняющие вопросы и исполнение
+    # уточняющие вопросы
     # ------------------------------------------------------------------
-    # Решает, что значит фраза, — роутер (core/router.py).
-    # Помнит незакрытый вопрос — диалог (core/dialog.py).
-    # Делает — исполнитель (core/executor.py).
-    # Ядру остаётся связать их и вести историю.
+    def _resolve_pending(self, command):
+        """True — фраза была ответом на вопрос, дальше по конвейеру не идём."""
+        pending = self._pending
+        if not pending:
+            return False
+        if time.time() - pending.get("ts", 0) > self.PENDING_TTL:
+            self._pending = None
+            return False
+        if pending.get("kind") in ("confirm_action", "confirm_command"):
+            return self._resolve_confirm(command, pending)
+        if pending.get("kind") != "choose_app":
+            return False
 
-    def _router_context(self, source, require_wake):
-        """Всё, что роутер должен знать о мире, — снимок на этот момент."""
         from voice import app_index, app_launcher
-        from core import llm
 
-        question = self._dialog.current()
-        return router_mod.RouterContext(
-            apps=app_index.cached_index() or [],
-            aliases=dict(self._settings.get("app_aliases", {}) or {}),
-            pending=question.to_dict() if question else None,
-            wake_words=tuple(get_wake_words(self._settings)),
-            require_wake=require_wake,
-            source=source,
-            reminders_active=len(self._reminders.active()),
-            llm_enabled=llm.is_enabled(),
-            web_fallback=bool(self._settings.get("web_search_fallback", True)),
-        )
+        options = pending.get("options") or []
+        if not options:                 # состояние повреждено — вопроса больше нет
+            self._pending = None
+            return False
+        entry, cancelled = app_launcher.choose(command, options)
+        if cancelled:
+            self._pending = None
+            self.say(tr("Хорошо, отменяю."))
+            return True
+        if entry is None:
+            return False       # не похоже на ответ — считаем новой командой
 
-    def _remember_choice(self, query, entry):
-        from voice import app_launcher
+        query = pending.get("query")
+        self._pending = None
+        if app_index.launch(entry):
+            # запоминаем выбор: в следующий раз запустится сразу
+            if query:
+                app_launcher.remember(query, entry.launch, entry.kind, entry.name)
+            self.say(tr("Запускаю {app}.", app=entry.name))
+        else:
+            self.say(tr("Не получилось запустить {app}.", app=entry.name),
+                     sound="error")
+        return True
 
-        app_launcher.remember(query, entry.launch, entry.kind, entry.name)
+    def _resolve_confirm(self, command, pending):
+        from voice import system_control
+        from voice.textmatch import normalize
 
-    def _ask(self, question):
-        """Задать вопрос и озвучить его."""
-        self._dialog.ask(question)
+        words = normalize(command).split()
 
+        if any(w in words for w in self.NO_WORDS):
+            security_log().info(
+                "Опасное действие отменено пользователем: %s",
+                pending.get("action") or "пользовательская команда")
+            self._pending = None
+            self.say(tr("Хорошо, отменяю."))
+            return True
+        if any(w in words for w in self.YES_WORDS):
+            self._pending = None
+            if pending.get("command") is not None:
+                self._run_user_command(pending["command"])
+            else:
+                self.say(system_control.run(pending.get("action")))
+            return True
+        # ответ невнятный — действие не выполняем, трактуем как новую команду
+        return False
+
+    # ------------------------------------------------------------------
+    # обработчики шагов конвейера
+    # ------------------------------------------------------------------
+    def _handle_reminder(self, command):
+        """Текст ответа, если фраза про время, иначе None."""
+        from voice import reminders
+
+        parsed = reminders.parse(command)
+        if parsed is None:
+            return None
+
+        store = reminders.ReminderStore(settings)
+
+        if parsed.action == "list":
+            items = sorted(store.active(), key=lambda r: r.get("fire_at", 0))
+            if not items:
+                return tr("Ничего не запланировано.")
+            return tr("Запланировано: ") + "; ".join(
+                reminders.describe(i) for i in items[:5])
+
+        if parsed.action == "cancel":
+            removed = store.clear_active()
+            if not removed:
+                return tr("Нечего отменять.")
+            return tr("Отменила: {count}.", count=removed)
+
+        fire_at = parsed.at if parsed.at else time.time() + (parsed.delay or 0)
+        store.add(parsed.kind, fire_at, parsed.text)
+
+        if parsed.delay:
+            left = reminders.humanize_left(parsed.delay)
+            if parsed.text:
+                return tr("Напомню через {left}: {text}.",
+                          left=left, text=parsed.text)
+            return tr("Засекла {left}.", left=left)
+
+        when = reminders.when_text(fire_at)
+        if parsed.text:
+            return tr("Напомню в {time}: {text}.", time=when, text=parsed.text)
+        return tr("Разбужу в {time}.", time=when)
 
     def _run_user_command(self, user_cmd):
-        """Выполнить пользовательскую команду — через исполнителя."""
-        return self._executor.run_user_command(user_cmd)
+        """
+        Выполняет пользовательскую команду.
 
+        Последовательности уходят в фоновый поток: между шагами бывает пауза,
+        а вызывающий поток (в том числе поток интерфейса) блокировать нельзя.
+        """
+        from voice.user_commands import execute
+
+        self._cmd_store.bump_stat(user_cmd.get("id"))
+        if user_cmd.get("type") == "sequence":
+            def worker():
+                _ok, resp = execute(user_cmd, self._host)
+                self.say(resp)
+            threading.Thread(target=worker, daemon=True).start()
+            return
+        _ok, resp = execute(user_cmd, self._host)
+        self.say(resp)
 
     def run_command_by_id(self, command_id):
         """
@@ -426,110 +467,121 @@ class RinaEngine:
     # конвейер команд
     # ------------------------------------------------------------------
     def handle_command(self, text, require_wake=False, source="typed"):
-        ctx = self._router_context(source, require_wake)
-        intent = router_mod.route(text, ctx)
-
-        # Индекс программ мог быть ещё не построен: в 3.1.0 его строила первая
-        # же команда запуска. Повторяем разбор ровно один раз и только когда
-        # индекс пуст — иначе первое «громче» ждало бы обхода диска.
-        if intent.name == "app.not_found" and not ctx.apps:
-            from voice import app_index
-
-            ctx.apps = app_index.get_index() or []
-            if ctx.apps:
-                intent = router_mod.route(text, ctx)
-
-        if intent.name == "silence":
+        if not text:
             return
 
-        if intent.name == "ask.wake":
-            self._history.add("user", "Рина", source=source)
-            self._emit(Events.HISTORY_CHANGED)
-            self._executor.execute(intent, source)
+        command = self._extract_command(text, require_wake)
+        if command is None:
+            return          # активации не было — молчим
+        if not command:
+            # активация прозвучала, но команды нет. В режиме «всегда слушать»
+            # не отвечаем: Рина услышала бы собственный ответ и зациклилась.
+            if source != "always":
+                self._history.add("user", "Рина", source=source)
+                self._emit(Events.HISTORY_CHANGED)
+                self.say(tr("Да? Слушаю."))
             return
 
-        command = intent.text
         log.info("Команда (%s): %s", source, safe(command))
         self._history.add("user", command, source=source)
         self._emit(Events.HISTORY_CHANGED)
 
-        # Фраза была ответом на заданный вопрос — роутер это уже понял.
-        if intent.stage == "pending":
-            self._dialog.answered()
-            if intent.name == "cancelled":
-                security_log().info(
-                    "Опасное действие отменено пользователем: %s",
-                    intent.arg("action") or "пользовательская команда")
-            self._executor.execute(intent, source)
+        # 0) ответ на ранее заданный вопрос
+        if self._resolve_pending(command):
             return
+        # это новая команда, а не ответ — старый вопрос снимаем, иначе
+        # следующее «второй» ответило бы на давно неактуальный вопрос
+        self._pending = None
 
-        # Не ответ — вопрос снимается. Так ведёт себя 3.1.0: любая
-        # нераспознанная реплика забывает заданный вопрос (инвентарь, §6).
-        self._dialog.dropped()
+        # 1) плагины
+        if self._plugins is not None:
+            try:
+                if self._plugins.dispatch_command(command):
+                    log.debug("Команду обработал плагин")
+                    return
+            except Exception:
+                # плагин — чужой код; его сбой не должен рвать конвейер,
+                # но и пропадать бесследно тоже не должен
+                log.exception("Сбой плагина при разборе команды")
 
-        # Плагины и пользовательские команды роутер пока не разбирает:
-        # плагин — чужой код, и «взял бы он фразу» узнаётся только запуском.
-        if self._dispatch_plugin(command):
-            return
-        if self._dispatch_user_command(command):
-            return
-
-        # Языковая модель — единственное, что ядро делает само: ответ идёт
-        # секундами, и ждать его в этом потоке нельзя.
-        if intent.name == "llm.answer":
-            self._ask_llm_async(command, source)
-            return
-
-        # Намерение, после которого ждём ответа, сначала становится вопросом.
-        # Какие именно — знает core/intent.py, а не набор условий здесь.
-        if intent.needs_answer:
-            self._dialog.ask(self._question_for(intent))
-
-        self._executor.execute(intent, source)
-
-    @staticmethod
-    def _question_for(intent):
-        """Намерение, ждущее ответа, -> заданный вопрос."""
-        if intent.name == "app.ambiguous":
-            return Question(kind=dialog_mod.CHOOSE_APP,
-                            options=tuple(intent.arg("options") or ()),
-                            query=intent.arg("query") or "")
-        if intent.name == "system.confirm":
-            return Question.confirm_action(intent.arg("action"))
-        return Question.confirm_command(intent.arg("command_id") or "")
-
-    def _dispatch_plugin(self, command):
-        if self._plugins is None:
-            return False
+        # 2) пользовательские команды
         try:
-            if self._plugins.dispatch_command(command):
-                log.debug("Команду обработал плагин")
-                return True
-        except Exception:
-            # плагин — чужой код; его сбой не должен рвать конвейер,
-            # но и пропадать бесследно тоже не должен
-            log.exception("Сбой плагина при разборе команды")
-        return False
+            from voice.user_commands import matches, command_needs_confirm
 
-    def _dispatch_user_command(self, command):
-        from voice.user_commands import matches, command_needs_confirm
-
-        try:
             for user_cmd in self._cmd_store.all():
                 if not matches(user_cmd, command):
                     continue
                 if command_needs_confirm(user_cmd):
-                    self._ask(Question.confirm_command(user_cmd.get("id")))
+                    self._pending = {
+                        "kind": "confirm_command",
+                        "command": user_cmd,
+                        "ts": time.time(),
+                    }
                     self.say(tr("Команда «{name}» выключит или перезагрузит "
                                 "компьютер. Точно выполнить?",
                                 name=(user_cmd.get("triggers") or ["?"])[0]))
                 else:
-                    self._executor.run_user_command(user_cmd)
-                return True
+                    self._run_user_command(user_cmd)
+                return
         except Exception:
             log.exception("Сбой при разборе пользовательских команд")
-        return False
 
+        # 3) таймеры, будильники и напоминания
+        reminder_reply = self._handle_reminder(command)
+        if reminder_reply is not None:
+            self.say(reminder_reply)
+            return
+
+        # 4) управление системой и медиа
+        from voice import system_control
+
+        action_id, needs_confirm = system_control.match_action(command)
+        if action_id:
+            if needs_confirm:
+                self._pending = {
+                    "kind": "confirm_action",
+                    "action": action_id,
+                    "ts": time.time(),
+                }
+                self.say(system_control.confirm_question(action_id))
+            else:
+                self.say(system_control.run(action_id))
+            return
+
+        # 5) запуск программ по индексу установленного ПО
+        from voice import app_launcher
+
+        outcome = app_launcher.resolve(command)
+        if outcome is not None:
+            if outcome.status == "ambiguous":
+                self._pending = {
+                    "kind": "choose_app",
+                    "options": outcome.options,
+                    "query": outcome.query,
+                    "ts": time.time(),
+                }
+            self.say(outcome.message,
+                     sound="error" if outcome.status == "not_found" else "response")
+            if outcome.status == "not_found" and outcome.query:
+                self._emit(Events.APP_NOT_FOUND, query=outcome.query)
+            return
+
+        # 6) встроенные команды (счёт, поиск, простые ответы)
+        response = handle_builtin_command(command)
+        if response:
+            self.say(response)
+            return
+
+        # 7) свободный вопрос — отвечает локальная модель (если включена).
+        # Ответ занимает секунды, поэтому уходит в фоновый поток: конвейер
+        # может выполняться и в потоке интерфейса (команда из строки ввода).
+        from core import llm
+
+        if llm.is_enabled():
+            self._ask_llm_async(command, source)
+            return
+
+        self._fallback_reply(command, source)
 
     def _ask_llm_async(self, command, source):
         """Спрашивает модель в фоне и отвечает, когда та ответит."""
@@ -560,11 +612,11 @@ class RinaEngine:
         В режиме «всегда слушать» не ищем: туда попадают шум и случайная
         речь, открывать по ним браузер нельзя.
         """
-        if self._settings.get("web_search_fallback", True) and source != "always":
+        if settings.get("web_search_fallback", True) and source != "always":
             from voice import websearch
 
             found = websearch.fallback_search(
-                command, self._settings.get("search_engine", websearch.DEFAULT_ENGINE))
+                command, settings.get("search_engine", websearch.DEFAULT_ENGINE))
             if found:
                 self.say(found)
                 return
@@ -576,7 +628,7 @@ class RinaEngine:
     # ------------------------------------------------------------------
     def listen_seconds(self):
         try:
-            value = int(self._settings.get("listen_seconds", 8))
+            value = int(settings.get("listen_seconds", 8))
         except (TypeError, ValueError):
             return 8
         return max(3, min(20, value))
@@ -585,7 +637,7 @@ class RinaEngine:
         """Язык распознавания = язык интерфейса (единая настройка)."""
         lang_map = {"Русский": "ru", "English": "en", "Українська": "uk",
                     "Español": "es", "Deutsch": "de"}
-        return lang_map.get(self._settings.get("ui_language", "Русский"), "ru")
+        return lang_map.get(settings.get("ui_language", "Русский"), "ru")
 
     def shutdown(self):
         self._stop_always.set()

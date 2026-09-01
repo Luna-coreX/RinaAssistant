@@ -240,7 +240,7 @@ def _open_path(path):
         return False
 
 
-def execute(command, host=None, emit=None):
+def execute(command, host=None):
     """
     Выполняет команду. host — объект с методами для системных действий
     (minimize/show/quit/mute/unmute) и say(text). Возвращает (ok, response_text).
@@ -280,7 +280,7 @@ def execute(command, host=None, emit=None):
         if not response:
             response = target
     elif ctype == "system":
-        ok = _run_system_action(target, host, emit)
+        ok = _run_system_action(target, host)
     elif ctype == "pause":
         # пауза между шагами: дать программе время запуститься.
         # Ограничиваем сверху, чтобы опечатка не подвесила выполнение надолго.
@@ -294,7 +294,7 @@ def execute(command, host=None, emit=None):
     elif ctype == "sequence":
         ok = True
         for step in command.get("steps", []):
-            step_ok, _ = execute(step, host, emit)
+            step_ok, _ = execute(step, host)
             ok = ok and step_ok
     else:
         ok = False
@@ -305,7 +305,7 @@ def execute(command, host=None, emit=None):
     return ok, response
 
 
-def _run_system_action(action, host, emit=None):
+def _run_system_action(action, host):
     # действия с компьютером (громкость, медиа, блокировка) — им host не нужен
     if str(action).startswith("sys_"):
         from voice import system_control
@@ -326,14 +326,14 @@ def _run_system_action(action, host, emit=None):
     }
     if action not in mapping:
         return False
-    # Событие идёт в переданную шину, а не в модульный синглтон: иначе
-    # действие уходит мимо того ядра, которое его затеяло (4.0-B05).
-    if emit is not None:
+    try:
+        from core.events import bus
         from core.protocol import Events
-
-        emit(Events.WINDOW_ACTION, action=action)
+        bus.emit(Events.WINDOW_ACTION, action=action)
         return True
-    # запасной путь, если шину не передали
+    except Exception:
+        pass
+    # запасной путь, если сигнальная шина недоступна
     if host is not None and hasattr(host, mapping[action]):
         try:
             getattr(host, mapping[action])()
