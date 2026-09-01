@@ -57,6 +57,10 @@ class Question:
     options: tuple = ()
     #: что искали, когда возник вопрос
     query: str = ""
+    #: выданное подтверждение для опасного действия (4.0-C05).
+    #: Хранится в вопросе, потому что согласие человека относится к
+    #: конкретному вызову, а не к тому, что вопрос когда-то задавали.
+    confirmation_id: str = ""
 
     def __post_init__(self):
         if self.kind not in KINDS:
@@ -76,7 +80,8 @@ class Question:
         return {"kind": self.kind, "asked_at": self.asked_at,
                 "action": self.action, "command_id": self.command_id,
                 "options": [dict(o) for o in self.options],
-                "query": self.query}
+                "query": self.query,
+                "confirmation_id": self.confirmation_id}
 
     @classmethod
     def from_dict(cls, data):
@@ -85,7 +90,8 @@ class Question:
                    action=str(data.get("action", "")),
                    command_id=str(data.get("command_id", "")),
                    options=tuple(data.get("options") or ()),
-                   query=str(data.get("query", "")))
+                   query=str(data.get("query", "")),
+                   confirmation_id=str(data.get("confirmation_id", "")))
 
     @classmethod
     def choose_app(cls, options, query=""):
@@ -94,12 +100,14 @@ class Question:
                    options=tuple(e.to_dict() for e in options))
 
     @classmethod
-    def confirm_action(cls, action):
-        return cls(kind=CONFIRM_ACTION, action=action)
+    def confirm_action(cls, action, confirmation_id=""):
+        return cls(kind=CONFIRM_ACTION, action=action,
+                   confirmation_id=confirmation_id)
 
     @classmethod
-    def confirm_command(cls, command_id):
-        return cls(kind=CONFIRM_COMMAND, command_id=command_id)
+    def confirm_command(cls, command_id, confirmation_id=""):
+        return cls(kind=CONFIRM_COMMAND, command_id=command_id,
+                   confirmation_id=confirmation_id)
 
 
 class Dialog:

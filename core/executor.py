@@ -1,25 +1,23 @@
 """
-Исполнитель: намерение -> действие -> результат.
+Исполнитель: намерение -> вызов инструмента -> результат.
 
-Задача плана 4.0-B04. Единственное место, где происходят побочные эффекты:
-запускаются программы, меняется громкость, пишутся напоминания, открывается
-браузер, спрашивается языковая модель.
+Задача плана 4.0-B04, переработан под 4.0-C03.
 
-Зачем сводить в одну точку. Пока побочные эффекты разбросаны по конвейеру,
-нельзя ни перечислить их, ни поставить перед ними проверку разрешений, ни
-показать предпросмотр опасного действия. Всё это — 4.0-C03, C04 и C05, и все
-они опираются на то, что путь исполнения ровно один.
+Раньше исполнитель сам делал побочные эффекты: звал `app_index.launch`,
+`system_control.run`, открывал браузер. Теперь он **ничего не делает сам** —
+он переводит намерение в вызов инструмента и отдаёт его `ToolRunner`, который
+проверяет аргументы, разрешения и подтверждение.
 
-Что исполнитель НЕ делает: не разбирает текст (это роутер) и не решает, задан
-ли вопрос (это core/dialog.py). Он получает готовое намерение.
+Разделение по одной причине: пока побочный эффект достижим из исполнителя
+напрямую, любые ворота перед ним держатся на дисциплине. Критерий C03 —
+«исполнитель не имеет ни одного пути исполнения в обход реестра» — проверяется
+механически (tools/test_registry_only.py), и проверять его можно только если
+путь ровно один.
 
-Зависимости приходят снаружи — хранилища, озвучка, шина событий. Поэтому
-исполнителя можно собрать в тесте с подставными хранилищами и проверить, что
-он сделал, не поднимая приложение.
+Что осталось исполнителю: знать, каким инструментом отвечает каждое намерение,
+и превратить результат в реплику. Реплики — здесь, потому что после 4.0-F08
+текст ответов Рины собирается в ядре, а не в оболочке.
 """
-
-import threading
-import time
 
 from core.i18n import t as tr
 from core.intent import Result
@@ -30,17 +28,16 @@ log = get_logger("executor")
 
 
 class Executor:
-    """Выполняет намерения. Всё, что меняет мир, происходит здесь."""
+    """Переводит намерения в вызовы инструментов."""
 
-    def __init__(self, *, say, emit, settings, reminders_store,
-                 command_store, host=None, on_alias=None):
+    def __init__(self, *, say, tools, emit=None):
         self._say = say
+        self._tools = tools          # ToolRunner
         self._emit = emit
-        self._settings = settings
-        self._reminders = reminders_store
-        self._commands = command_store
-        self._host = host
-        self._on_alias = on_alias          # запомнить выбор программы
+
+    @property
+    def tools(self):
+        return self._tools
 
     # ------------------------------------------------------------------
     def execute(self, intent, source="typed"):
@@ -52,25 +49,12 @@ class Executor:
         log.debug("Исполняю %s для %s", intent.name, safe(intent.text))
         return handler(intent, source)
 
-    # ---------- запуск программ ----------
+    # ---------- программы ----------
     def _do_app_launch(self, intent, source):
-        from voice import app_index
-
-        name = intent.arg("app")
-        entry = self._find_entry(name)
-        if entry is None:
-            return self._fail(tr("Не нашла программу «{name}».", name=name),
-                              "app.not_found")
-        if not app_index.launch(entry):
-            return self._fail(
-                tr("Не получилось запустить {app} — программу удалили "
-                   "или перенесли.", app=entry.name), "app.launch_failed")
-
-        # Выбор из нескольких запоминается: в следующий раз без вопроса.
-        query = intent.arg("query")
-        if query and self._on_alias:
-            self._on_alias(query, entry)
-        return self._ok(tr("Запускаю {app}.", app=entry.name))
+        return self._run("launch_app", {
+            "name": intent.arg("app"),
+            "query": intent.arg("query") or "",
+        }, source=source)
 
     def _do_app_ambiguous(self, intent, source):
         names = ", ".join(o.get("name", "") for o in
@@ -82,119 +66,101 @@ class Executor:
         from core.protocol import Events
 
         query = intent.arg("query")
-        result = self._fail(tr("Не нашла программу «{name}».", name=query),
-                            "app.not_found")
-        if query:
+        if query and self._emit:
             self._emit(Events.APP_NOT_FOUND, query=query)
-        return result
+        return self._fail(tr("Не нашла программу «{name}».", name=query),
+                          "app.not_found")
 
     def _do_app_launch_failed(self, intent, source):
         return self._fail(
             tr("Не получилось запустить {app} — программу удалили "
                "или перенесли.", app=intent.arg("app")), "app.launch_failed")
 
-    def _find_entry(self, name):
-        from voice import app_index
-
-        for entry in app_index.cached_index() or []:
-            if entry.name == name:
-                return entry
-        return None
-
-    # ---------- напоминания ----------
-    def _do_reminder_create(self, intent, source):
-        from voice import reminders
-
-        seconds = intent.arg("seconds")
-        at = intent.arg("at")
-        text = intent.arg("text") or ""
-        fire_at = at if at else time.time() + (seconds or 0)
-        self._reminders.add(intent.arg("kind"), fire_at, text)
-
-        if seconds:
-            left = reminders.humanize_left(seconds)
-            if text:
-                return self._ok(tr("Напомню через {left}: {text}.",
-                                   left=left, text=text))
-            return self._ok(tr("Засекла {left}.", left=left))
-
-        when = reminders.when_text(fire_at)
-        if text:
-            return self._ok(tr("Напомню в {time}: {text}.", time=when,
-                               text=text))
-        return self._ok(tr("Разбужу в {time}.", time=when))
-
-    def _do_reminder_list(self, intent, source):
-        from voice import reminders
-
-        items = sorted(self._reminders.active(),
-                       key=lambda r: r.get("fire_at", 0))
-        if not items:
-            return self._ok(tr("Ничего не запланировано."))
-        return self._ok(tr("Запланировано: ") + "; ".join(
-            reminders.describe(i) for i in items[:5]))
-
-    def _do_reminder_cancel(self, intent, source):
-        removed = self._reminders.clear_active()
-        if not removed:
-            return self._ok(tr("Нечего отменять."))
-        return self._ok(tr("Отменила: {count}.", count=removed))
-
     # ---------- система ----------
+    #: Действие 3.1.0 -> (инструмент, аргументы).
+    _SYSTEM = {
+        "volume_up": ("set_volume", {"action": "up"}),
+        "volume_down": ("set_volume", {"action": "down"}),
+        "volume_mute": ("set_volume", {"action": "mute"}),
+        "media_next": ("media_control", {"action": "next"}),
+        "media_prev": ("media_control", {"action": "previous"}),
+        "media_play_pause": ("media_control", {"action": "play_pause"}),
+        "lock": ("lock_screen", {}),
+        "screenshot": ("take_screenshot", {}),
+        "shutdown": ("power_action", {"action": "shutdown"}),
+        "restart": ("power_action", {"action": "restart"}),
+        "sleep": ("power_action", {"action": "sleep"}),
+    }
+
     def _do_system_action(self, intent, source):
-        from core.protocol import Events
+        mapping = self._SYSTEM.get(intent.arg("action"))
+        if mapping is None:
+            return Result.failure(error_code="internal")
+        name, args = mapping
+        return self._run(name, args,
+                         confirmation_id=intent.arg("confirmation_id"),
+                         source=source)
+
+    def _do_system_confirm(self, intent, source):
+        """
+        Задать вопрос об опасном действии.
+
+        Подтверждение выдаётся здесь же и возвращается в Result: ядро кладёт
+        его идентификатор в заданный вопрос и предъявит, когда человек
+        согласится. Так согласие оказывается привязано к конкретному вызову,
+        а не к самому факту, что вопрос когда-то задавали.
+        """
         from voice import system_control
 
         action = intent.arg("action")
-        # Снимок экрана делает оболочка: сообщаем ей через СВОЮ шину.
-        if action in system_control.WINDOW_ACTIONS:
-            self._emit(Events.WINDOW_ACTION, action=action)
-            return self._ok(system_control.run(action))
-
-        message = system_control.run(action)
-        if message is None:
+        mapping = self._SYSTEM.get(action)
+        if mapping is None:
             return Result.failure(error_code="internal")
-        failed = message == tr("Не получилось выполнить действие.")
-        return (self._fail(message, "internal") if failed
-                else self._ok(message))
 
-    def _do_system_confirm(self, intent, source):
-        from voice import system_control
+        name, args = mapping
+        question = system_control.confirm_question(action)
+        confirmation = self._tools.request_confirmation(
+            name, args, preview=question)
+        result = self._ok(question)
+        return result.with_data(confirmation_id=confirmation.id)
 
-        return self._ok(system_control.confirm_question(intent.arg("action")))
+    # ---------- напоминания ----------
+    def _do_reminder_create(self, intent, source):
+        args = {"kind": intent.arg("kind")}
+        for key in ("seconds", "at", "text"):
+            value = intent.arg(key)
+            if value:
+                args[key] = value
+        return self._run("create_reminder", args, source=source)
 
-    def _do_command_confirm(self, intent, source):
-        return self._ok(intent.arg("question") or tr("Точно выполнить?"))
+    def _do_reminder_list(self, intent, source):
+        return self._run("list_reminders", {}, source=source)
 
-    # ---------- пользовательские команды ----------
+    def _do_reminder_cancel(self, intent, source):
+        return self._run("cancel_reminder", {}, source=source)
+
+    # ---------- пользовательские команды и плагины ----------
     def _do_user_command(self, intent, source):
-        command_id = intent.arg("command_id")
-        for command in self._commands.all():
-            if command.get("id") == command_id:
-                return self.run_user_command(command)
-        return Result.failure(error_code="internal")
+        return self._run("run_user_command",
+                         {"command_id": intent.arg("command_id")},
+                         confirmation_id=intent.arg("confirmation_id"),
+                         source=source)
 
-    def run_user_command(self, command):
+    def dispatch_plugins(self, text, source="typed"):
+        """Отдать фразу плагинам. True — плагин её взял."""
+        result = self._tools.call("dispatch_plugin_command", {"text": text},
+                                  source=source)
+        return bool(result.value)
+
+    def run_user_command(self, command, source="shell"):
         """
-        Выполняет пользовательскую команду.
+        Выполнить команду по объекту — для кнопки «Выполнить» в списке.
 
-        Последовательности уходят в фоновый поток: между шагами бывает пауза,
-        а вызывающий поток блокировать нельзя.
+        Источник по умолчанию «shell»: нажали кнопку, а не сказали фразу.
+        В журнале вызовов это разные инициаторы, и различать их важно.
         """
-        from voice.user_commands import execute
-
-        self._commands.bump_stat(command.get("id"))
-        if command.get("type") == "sequence":
-            def worker():
-                _ok, response = execute(command, self._host,
-                                        self._emit)
-                self._say(response)
-            threading.Thread(target=worker, daemon=True).start()
-            return Result.success()
-
-        ok, response = execute(command, self._host, self._emit)
-        self._say(response, sound="response" if ok else "error")
-        return Result(ok=ok, response=response)
+        return self._run("run_user_command",
+                         {"command_id": command.get("id")}, source=source)
 
     # ---------- ответы ----------
     def _do_calc(self, intent, source):
@@ -213,15 +179,8 @@ class Executor:
         return self._ok(make())
 
     def _do_websearch(self, intent, source):
-        from voice import websearch
-
-        engine = self._settings.get("search_engine", websearch.DEFAULT_ENGINE)
-        query = intent.arg("query")
-        if websearch.open_search(query, engine):
-            return self._ok(tr("Ищу «{query}» в {engine}.", query=query,
-                               engine=websearch.engine_label(engine)))
-        return self._fail(tr("Не удалось открыть браузер для поиска."),
-                          "internal")
+        return self._run("web_search", {"query": intent.arg("query")},
+                         source=source)
 
     def _do_cancelled(self, intent, source):
         return self._ok(tr("Хорошо, отменяю."))
@@ -233,19 +192,40 @@ class Executor:
         return Result.success()
 
     # ---------- хвост ----------
+    def _do_llm_answer(self, intent, source):
+        result = self._tools.call(
+            "ask_model", {"question": intent.text}, source=source)
+        if result.ok:
+            return self._ok(result.message)
+        return Result.failure(error_code=result.error_code)
+
     def _do_fallback_search(self, intent, source):
         from voice import websearch
 
-        engine = self._settings.get("search_engine", websearch.DEFAULT_ENGINE)
-        found = websearch.fallback_search(intent.arg("query"), engine)
-        if found:
-            return self._ok(found)
-        return self._do_fallback_none(intent, source)
+        query = intent.arg("query") or intent.text
+        result = self._tools.call("web_search", {"query": query},
+                                  source=source)
+        if not result.ok:
+            return self._do_fallback_none(intent, source)
+        # Формулировка запасного поиска отличается от явного: человек не
+        # просил искать, и об этом честнее сказать.
+        return self._ok(tr("Не нашла такой команды — поищу «{query}» "
+                           "в интернете.", query=query))
 
     def _do_fallback_none(self, intent, source):
         return self._fail(tr("Извини, я не поняла команду."), "internal")
 
     # ---------- вспомогательное ----------
+    def _run(self, name, args, confirmation_id=None, *, source):
+        """Вызов инструмента и превращение результата в реплику."""
+        result = self._tools.call(name, args,
+                                  confirmation_id=confirmation_id,
+                                  source=source)
+        if result.ok:
+            return (self._ok(result.message) if result.message
+                    else Result.success())
+        return self._fail(result.message, result.error_code)
+
     def _ok(self, response):
         self._say(response)
         return Result.success(response)

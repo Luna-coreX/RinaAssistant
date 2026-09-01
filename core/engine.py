@@ -23,6 +23,7 @@ from core import router as router_mod
 from core import dialog as dialog_mod
 from core.dialog import Dialog, Question
 from core.executor import Executor
+from core.toolrunner import ToolContext, ToolRunner
 from voice.wake import get_wake_words
 from voice.reminders import ReminderStore
 from core.logging_setup import get_logger, safe, security_log
@@ -84,16 +85,30 @@ class RinaEngine:
         # Разбор, память о заданном вопросе и исполнение разведены по
         # отдельным объектам (4.0-B02, B03, B04). Ядро их связывает.
         self._dialog = Dialog()
+
+        # Всё, что меняет мир, проходит через реестр инструментов
+        # (4.0-C03). Исполнитель ниже ничего не делает сам — он переводит
+        # намерения в вызовы.
+        self._tools = ToolRunner(
+            ToolContext(
+                settings=settings,
+                reminders=self._reminders,
+                commands=self._cmd_store,
+                plugins=plugin_manager,
+                # Через лямбду, а не связанным методом: озвучку и шину ядро
+                # может подменить позже (тесты, оболочка), и инструменты
+                # обязаны следовать за текущей, а не за той, что была при
+                # сборке.
+                emit=lambda name, **data: self._emit(name, **data),
+                host=None,
+                on_alias=self._remember_choice,
+            ),
+            features=self._features,
+        )
         self._executor = Executor(
-            # Через лямбду, а не связанным методом: озвучку и шину ядро
-            # может подменить позже (тесты, оболочка), и исполнитель обязан
-            # следовать за текущей, а не за той, что была при сборке.
             say=lambda text, sound="response": self.say(text, sound=sound),
+            tools=self._tools,
             emit=lambda name, **data: self._emit(name, **data),
-            settings=settings,
-            reminders_store=self._reminders,
-            command_store=self._cmd_store,
-            on_alias=self._remember_choice,
         )
 
         # планировщик напоминаний: обычный поток, а не таймер интерфейса
@@ -127,6 +142,7 @@ class RinaEngine:
     def set_host(self, host):
         """host выполняет действия над окном (свернуть/показать/выйти)."""
         self._host = host
+        self._tools._ctx.host = host
         self._executor._host = host
 
     # ------------------------------------------------------------------
@@ -480,23 +496,37 @@ class RinaEngine:
             self._ask_llm_async(command, source)
             return
 
-        # Намерение, после которого ждём ответа, сначала становится вопросом.
-        # Какие именно — знает core/intent.py, а не набор условий здесь.
-        if intent.needs_answer:
-            self._dialog.ask(self._question_for(intent))
+        # Намерение, после которого ждём ответа, сначала исполняется
+        # (вопрос надо озвучить), а затем становится заданным вопросом.
+        # Порядок важен: подтверждение выдаётся при исполнении, и его
+        # идентификатор нужно положить в вопрос.
+        result = self._executor.execute(intent, source)
 
-        self._executor.execute(intent, source)
+        if intent.needs_answer:
+            self._dialog.ask(self._question_for(intent, result))
 
     @staticmethod
-    def _question_for(intent):
-        """Намерение, ждущее ответа, -> заданный вопрос."""
+    def _question_for(intent, result=None):
+        """
+        Намерение, ждущее ответа, -> заданный вопрос.
+
+        Для опасного действия в вопрос кладётся выданное подтверждение:
+        согласие человека относится к конкретному вызову, а не к тому, что
+        вопрос когда-то задавали (4.0-C05).
+        """
+        confirmation_id = ""
+        if result is not None:
+            confirmation_id = str(result.data.get("confirmation_id", ""))
+
         if intent.name == "app.ambiguous":
             return Question(kind=dialog_mod.CHOOSE_APP,
                             options=tuple(intent.arg("options") or ()),
                             query=intent.arg("query") or "")
         if intent.name == "system.confirm":
-            return Question.confirm_action(intent.arg("action"))
-        return Question.confirm_command(intent.arg("command_id") or "")
+            return Question.confirm_action(intent.arg("action"),
+                                           confirmation_id)
+        return Question.confirm_command(intent.arg("command_id") or "",
+                                        confirmation_id)
 
     def _dispatch_plugin(self, command):
         if self._plugins is None:
@@ -532,24 +562,28 @@ class RinaEngine:
 
 
     def _ask_llm_async(self, command, source):
-        """Спрашивает модель в фоне и отвечает, когда та ответит."""
-        from core import llm
+        """
+        Спрашивает модель в фоне и отвечает, когда та ответит.
 
+        Через реестр, а не напрямую: обращение к модели — сетевой вызов с
+        разрешением `network.local`, и он обязан попадать в журнал вызовов
+        наравне с остальными (4.0-C06, C07).
+        """
         def worker():
             self._emit(Events.THINKING, active=True)
             try:
-                answer = llm.ask(command, self._history.all())
-            except llm.LLMError:
-                # модель не ответила — ведём себя как без неё
+                result = self._tools.call(
+                    "ask_model",
+                    {"question": command, "context": self._history.all()},
+                    source=source)
+            finally:
                 self._emit(Events.THINKING, active=False)
-                self._fallback_reply(command, source)
+
+            if result.ok and result.message:
+                self.say(result.message)
                 return
-            except Exception:
-                self._emit(Events.THINKING, active=False)
-                self._fallback_reply(command, source)
-                return
-            self._emit(Events.THINKING, active=False)
-            self.say(answer)
+            # модель не ответила — ведём себя как без неё
+            self._fallback_reply(command, source)
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -560,13 +594,16 @@ class RinaEngine:
         В режиме «всегда слушать» не ищем: туда попадают шум и случайная
         речь, открывать по ним браузер нельзя.
         """
-        if self._settings.get("web_search_fallback", True) and source != "always":
-            from voice import websearch
-
-            found = websearch.fallback_search(
-                command, self._settings.get("search_engine", websearch.DEFAULT_ENGINE))
-            if found:
-                self.say(found)
+        allowed = (self._settings.get("web_search_fallback", True)
+                   and source != "always")
+        if allowed:
+            result = self._tools.call("web_search", {"query": command},
+                                      source=source)
+            if result.ok:
+                # Формулировка отличается от явного поиска: человек не
+                # просил искать, и об этом честнее сказать.
+                self.say(tr("Не нашла такой команды — поищу «{query}» "
+                            "в интернете.", query=command))
                 return
 
         self.say(tr("Извини, я не поняла команду."), sound="error")

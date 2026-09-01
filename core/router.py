@@ -128,12 +128,17 @@ def _answer_to_question(command, ctx):
                                         "action": pending.get("action", "")},
                           stage="pending")
         if any(w in words for w in ctx.yes_words):
+            # Подтверждение из вопроса едет вместе с намерением: без него
+            # опасное действие отклонит реестр (4.0-C05).
+            confirmation_id = pending.get("confirmation_id", "")
             if kind == "confirm_action":
                 return Intent("system.action",
-                              {"action": pending.get("action")},
+                              {"action": pending.get("action"),
+                               "confirmation_id": confirmation_id},
                               stage="pending")
             return Intent("user_command",
-                          {"command_id": pending.get("command_id", "")},
+                          {"command_id": pending.get("command_id", ""),
+                           "confirmation_id": confirmation_id},
                           stage="pending")
         return None            # невнятный ответ — вопрос снимется, см. ядро
 

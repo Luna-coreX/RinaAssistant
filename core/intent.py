@@ -218,6 +218,13 @@ class Result:
         return cls(ok=False, response=response, error_code=error_code,
                    data=data)
 
+    def with_data(self, **extra):
+        """Копия с дополненными данными: Result неизменяем."""
+        merged = dict(self.data)
+        merged.update(extra)
+        return Result(ok=self.ok, response=self.response,
+                      error_code=self.error_code, data=merged)
+
     def to_dict(self):
         return {"ok": self.ok, "response": self.response,
                 "error_code": self.error_code, "data": dict(self.data)}
