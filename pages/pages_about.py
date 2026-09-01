@@ -158,7 +158,7 @@ class AboutPage(QWidget):
         text.setStyleSheet(f"color: {Color.SUBTEXT}; font-size: 12px;")
         cl.addWidget(text)
 
-        copy = QLabel(tr("Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0."))
+        copy = QLabel(tr("© 2026 NeuroSync Foundry Team. Распространяется под лицензией MIT."))
         copy.setStyleSheet(f"color: {Color.OVERLAY}; font-size: 11px;")
         cl.addWidget(copy)
         return card

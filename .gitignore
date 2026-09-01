@@ -183,10 +183,6 @@ after.txt
 before.txt
 version_info.txt
 license_install.txt
-
-# Результаты прогонов: аудио стенда голоса, отчёты, слепые наборы.
-# Генерируются заново командой tools/voice_bench.py.
-out/
-
-# Рабочий каталог скилла дизайна.
-.impeccable/
+README.md
+README.md
+*.md

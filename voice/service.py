@@ -13,7 +13,7 @@ set_always_listen…), поэтому окно и страницы работа�
 from PySide6.QtCore import QObject, Signal
 
 from core.engine import RinaEngine
-from core.events import EventBus
+from core.events import bus
 from core.protocol import Events
 
 
@@ -31,24 +31,16 @@ class VoiceService(QObject):
 
     def __init__(self, plugin_manager=None, parent=None):
         super().__init__(parent)
-        # Своя шина, а не модульный синглтон: служба владеет своим ядром,
-        # и два экземпляра не должны слышать события друг друга (4.0-B05).
-        self.engine = RinaEngine(plugin_manager=plugin_manager,
-                                 event_bus=EventBus())
+        self.engine = RinaEngine(plugin_manager=plugin_manager, event_bus=bus)
         self._subscriptions = []
         self._connect_engine()
         self.engine.start_reminders()
 
     # ---------- мост между шиной ядра и сигналами Qt ----------
     def _connect_engine(self):
-        # Подписываемся на шину СВОЕГО ядра, а не на модульный синглтон.
-        # Раньше совпадало лишь потому, что ядро по умолчанию берёт тот же
-        # объект; со вторым ядром события уходили бы мимо (4.0-B05).
-        engine_bus = self.engine.bus
-
         def bind(event_name, handler):
             self._subscriptions.append((event_name, handler))
-            engine_bus.on(event_name, handler)
+            bus.on(event_name, handler)
 
         bind(Events.LISTENING_STARTED, lambda d: self.listening_started.emit())
         bind(Events.LISTENING_STOPPED, lambda d: self.listening_stopped.emit())
@@ -114,7 +106,7 @@ class VoiceService(QObject):
     def shutdown(self):
         self.engine.shutdown()
         for event_name, handler in self._subscriptions:
-            self.engine.bus.off(event_name, handler)
+            bus.off(event_name, handler)
         self._subscriptions.clear()
 
     # ---------- состояние ядра ----------

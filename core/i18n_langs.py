@@ -81,7 +81,6 @@ UK = {
     'Звуковые эффекты': 'Звукові ефекти',
     'Проверять обновления': 'Перевіряти оновлення',
     'Сохранять историю': 'Зберігати історію',
-    'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant — частина NeuroSync Foundry. © 2026 Luna-coreX. Ліцензія Apache 2.0.',
     'Не получилось выполнить команду: ': 'Не вдалося виконати команду: ',
 
     # диагностика: сбои проверок и распознавания
@@ -200,7 +199,6 @@ ES = {
     'Звуковые эффекты': 'Efectos de sonido',
     'Проверять обновления': 'Buscar actualizaciones',
     'Сохранять историю': 'Guardar historial',
-    'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant es parte de NeuroSync Foundry. © 2026 Luna-coreX. Licencia Apache 2.0.',
     'Не получилось выполнить команду: ': 'No pude ejecutar el comando: ',
 
     # диагностика: сбои проверок и распознавания
@@ -317,7 +315,6 @@ DE = {
     'Звуковые эффекты': 'Soundeffekte',
     'Проверять обновления': 'Nach Updates suchen',
     'Сохранять историю': 'Verlauf speichern',
-    'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant ist Teil von NeuroSync Foundry. © 2026 Luna-coreX. Apache-2.0-Lizenz.',
     'Не получилось выполнить команду: ': 'Befehl konnte nicht ausgeführt werden: ',
 
     # диагностика: сбои проверок и распознавания
