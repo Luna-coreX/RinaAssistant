@@ -28,6 +28,7 @@ ADR 0002: спецификация не зависит от транспорта
     events      каталог событий и потоковый текст (4.0-D11, 4.0-D06, §7, §10)
     tasks       жизненный цикл долгой задачи и отмена (4.0-D09, D10, §9)
     data        канал данных и обратное давление (4.0-D07, D08, §2, §8)
+    permissions канал разрешений поверх контура C05 (4.0-D12, §11)
 """
 
 from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
@@ -36,6 +37,7 @@ from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
 from core.wire.data import (Credit, DATA_FRAME_LIMIT, DataFrame,
                             DataFrameDecoder, DataReceiver, DataSender, KINDS,
                             capability_for_kind, encode_data_frame)
+from core.wire.permissions import Ask, PermissionChannel
 from core.wire.errors import (CATALOGUE, CATEGORIES, ErrorSpec, ProtocolError,
                               ProtocolFault, ERROR_FRAME_TOO_LARGE,
                               ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
@@ -63,6 +65,7 @@ __all__ = [
     "Credit", "DATA_FRAME_LIMIT", "DataFrame", "DataFrameDecoder",
     "DataReceiver", "DataSender", "KINDS", "capability_for_kind",
     "encode_data_frame",
+    "Ask", "PermissionChannel",
     "ALL_EVENTS", "EVENTS", "Router", "STREAM_CANCELLED", "STREAM_DONE",
     "STREAM_FAILED", "StreamReceiver", "StreamSender", "event",
     "validate_event",

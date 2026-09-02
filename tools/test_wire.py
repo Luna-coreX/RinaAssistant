@@ -32,6 +32,8 @@ from core.wire.tasks import FINAL, Registry, STATUS_UNKNOWN, TaskState, run
 from core.wire.data import (DATA_FRAME_LIMIT, DataFrame, DataFrameDecoder,
                             DataReceiver, DataSender, KINDS,
                             capability_for_kind, encode_data_frame)
+from core.wire.permissions import Ask, PermissionChannel
+from core.confirmations import ONCE, SCOPES, UNTIL, ConfirmationError
 
 fails = 0
 
@@ -929,6 +931,145 @@ check("stream.open доступен обеим сторонам",
 check("stream.credit доступен", pair_core.may_call("stream.credit"))
 check("вид screen.frame просит возможность, которой в 4.0 нет",
       capability_for_kind("screen.frame") not in pair_core.peer_capabilities)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D12: канал разрешений ===")
+
+check("областей две, и обе означают разное", set(SCOPES) == {ONCE, UNTIL})
+
+now = [1000.0]
+channel = PermissionChannel(clock=lambda: now[0])
+ask = channel.ask("power_action", {"action": "shutdown"},
+                  permission="system.power",
+                  reason="Пользователь сказал «выключи компьютер»",
+                  preview="Компьютер будет выключен немедленно.", ttl=60)
+
+payload = ask.to_payload()
+check("просьба несёт своё имя, причину и предпросмотр",
+      payload["permission"] == "system.power"
+      and payload["preview"].startswith("Компьютер будет")
+      and payload["reason"].startswith("Пользователь"))
+check("аргументы вызова наружу не уходят",
+      "args" not in payload and "shutdown" not in str(payload))
+check("просьба открыта", channel.pending == 1)
+check("просьба без предпросмотра не заводится",
+      fault(lambda: channel.ask("power_action", permission="system.power",
+                                reason="…", preview="   "),
+            ERROR_INVALID_PAYLOAD) is not None)
+
+# Идентификатор выпускает ядро: оболочка отвечает «да», а не приносит номер.
+answer = channel.resolve(ask.id, True)
+check("подтверждение выписано ядром", bool(answer["confirmation_id"]))
+check("ответ несёт срок и область",
+      answer["scope"] == ONCE and answer["expires_at"] > now[0])
+check("просьба закрыта", channel.pending == 0)
+check("ответить второй раз нельзя",
+      fault(lambda: channel.resolve(ask.id, True), ERROR_INVALID_STATE)
+      is not None)
+
+# Подтверждение годится ровно для того вызова, под который выдано.
+cid = answer["confirmation_id"]
+try:
+    channel.ledger.redeem(cid, "power_action", {"action": "sleep"})
+    check("подтверждение не подходит к другим аргументам", False)
+except ConfirmationError as exc:
+    check("подтверждение не подходит к другим аргументам",
+          exc.code == "confirmation.invalid")
+used = channel.ledger.redeem(cid, "power_action", {"action": "shutdown"})
+check("подтверждение принято для своего вызова", used.id == cid)
+try:
+    channel.ledger.redeem(cid, "power_action", {"action": "shutdown"})
+    check("однократное сгорело", False)
+except ConfirmationError:
+    check("однократное сгорело", True)
+
+# Отказ.
+denied_ask = channel.ask("power_action", {"action": "reboot"},
+                         permission="system.power", reason="…",
+                         preview="Компьютер будет перезагружен.")
+denied = channel.resolve(denied_ask.id, False)
+check("отказ не выдаёт подтверждения",
+      denied["granted"] is False and denied["confirmation_id"] is None)
+check("отказ назван причиной", denied["reason"] == "denied")
+
+# Отказ по умолчанию: молчание не согласие.
+silent = channel.ask("power_action", {"action": "shutdown"},
+                     permission="system.power", reason="…",
+                     preview="Компьютер будет выключен.", ttl=60)
+now[0] += 61
+late = channel.resolve(silent.id, True)
+check("поздний ответ «да» не разрешает",
+      late["granted"] is False and late["reason"] == "expired")
+
+forgotten = channel.ask("power_action", {"action": "shutdown"},
+                        permission="system.power", reason="…",
+                        preview="Компьютер будет выключен.", ttl=30)
+check("незакрытая просьба висит", channel.pending == 1)
+now[0] += 31
+check("просроченные просьбы убираются", channel.expire() == 1)
+check("после уборки не осталось", channel.pending == 0)
+
+# Опасному действию длительная область не выдаётся.
+risky = channel.ask("power_action", {"action": "shutdown"},
+                    permission="system.power", reason="…",
+                    preview="Компьютер будет выключен.")
+got = channel.resolve(risky.id, True, UNTIL)
+check("опасному действию область понижена до одноразовой",
+      got["scope"] == ONCE and got["downgraded"] is True)
+
+# Неопасному — выдаётся, и подтверждение переживает предъявление.
+mild = channel.ask("set_volume", {"level": 30}, permission="system.media",
+                   reason="…", preview="Громкость станет 30 %.")
+kept = channel.resolve(mild.id, True, UNTIL)
+check("неопасному действию область сохранена",
+      kept["scope"] == UNTIL and kept["downgraded"] is False)
+channel.ledger.redeem(kept["confirmation_id"], "set_volume", {"level": 30})
+again = channel.ledger.redeem(kept["confirmation_id"], "set_volume",
+                              {"level": 30})
+check("подтверждение «до срока» не сгорает при первом предъявлении",
+      again.id == kept["confirmation_id"])
+
+check("неизвестная область отклонена",
+      fault(lambda: channel.resolve(
+          channel.ask("set_volume", {"level": 1}, permission="system.media",
+                      reason="…", preview="Громкость станет 1 %.").id,
+          True, "навсегда"), ERROR_INVALID_PAYLOAD) is not None)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D13: канал актуации — только спецификация ===")
+
+actuation = CAPS["actuation"]
+section12 = spec_text[spec_text.index("## 12. Канал актуации"):]
+section12 = section12[:section12.index(chr(10) + "---" + chr(10))]
+spec_actuation = set()
+for line in section12.split("\n"):
+    if line.startswith("|") and not line.startswith("|---"):
+        spec_actuation |= set(re.findall(r"`([a-z]+\.[a-z.]+)`",
+                                         line.split("|")[1]))
+check("таблица §12 прочитана", len(spec_actuation) >= 7,
+      f"| {len(spec_actuation)}")
+check("методы актуации описаны и заведены",
+      spec_actuation == set(actuation.methods),
+      f"| только в документе: {sorted(spec_actuation - set(actuation.methods))},"
+      f" только в коде: {sorted(set(actuation.methods) - spec_actuation)}")
+check("возможность actuation не объявляет никто",
+      "actuation" not in SHELL_CAPABILITIES
+      and "actuation" not in CORE_CAPABILITIES)
+
+pair = Session(side=Side.CORE)
+pair.handle_hello(Session(side=Side.SHELL).hello_payload())
+for method in sorted(actuation.methods):
+    if fault(lambda m=method: pair.check_incoming(m),
+             ERROR_UNKNOWN_METHOD) is None:
+        check(f"{method} отвечает «неизвестный метод»", False)
+check("все методы актуации отвечают «неизвестный метод»", True,
+      f"| {len(actuation.methods)} шт.")
+check("вид потока screen.frame просит именно actuation",
+      capability_for_kind("screen.frame") == "actuation")
 
 print()
 print("ИТОГО ошибок:", fails)
