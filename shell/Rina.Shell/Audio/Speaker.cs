@@ -26,7 +26,7 @@ namespace Rina.Shell.Audio;
 /// </remarks>
 public sealed class Speaker : IDisposable
 {
-    private readonly WaveFormat _format;
+    private WaveFormat _format;
     private readonly object _lock = new();
     private WaveOutEvent? _device;
     private BufferedWaveProvider? _buffer;
@@ -73,6 +73,29 @@ public sealed class Speaker : IDisposable
             if (_device!.PlaybackState != PlaybackState.Playing) _device.Play();
         }
         SetSpeaking(true);
+    }
+
+    /// <summary>
+    /// Перейти на другую частоту.
+    /// </summary>
+    /// <remarks>
+    /// Движки говорят на разных частотах: Edge на 24000, системный на 22050.
+    /// Частота приходит в `format` при открытии потока; проиграть чужую в
+    /// прежнем устройстве значит услышать Рину ниже и медленнее, чем она
+    /// говорит.
+    /// </remarks>
+    public void Reopen(int sampleRate)
+    {
+        lock (_lock)
+        {
+            if (_device is not null && _format.SampleRate == sampleRate) return;
+            _device?.Stop();
+            _device?.Dispose();
+            _device = null;
+            _buffer = null;
+            _format = new WaveFormat(sampleRate, Microphone.Bits,
+                                     Microphone.Channels);
+        }
     }
 
     private void Ensure()

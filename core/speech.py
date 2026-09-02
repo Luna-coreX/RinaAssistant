@@ -325,12 +325,133 @@ class PiperSynthesiser:
         return bytes(chunks)
 
 
+def pcm_from_file(path: str) -> tuple[bytes, int]:
+    """
+    Прочитать звуковой файл как PCM 16 бит моно. Возвращает байты и частоту.
+
+    Движки 3.1.0 отдают файл — mp3 у сетевых, wav у системных, — а провод
+    несёт сырые образцы (§8). Пересчёта частоты здесь нет намеренно: она
+    объявляется в `format` при открытии потока, и сказать «я говорю на
+    24000» дешевле и честнее, чем пересчитывать без фильтра.
+    """
+    try:
+        import numpy
+        import soundfile
+
+        data, rate = soundfile.read(path, dtype="int16", always_2d=True)
+        # Моно: провод и динамик оболочки договорились об одном канале.
+        # Смешивать в int16 нельзя — переполнится; считаем в широком типе.
+        if data.shape[1] > 1:
+            data = data.mean(axis=1).astype(numpy.int16)
+        else:
+            data = data[:, 0]
+        return data.tobytes(), int(rate)
+    except Exception:                                   # noqa: BLE001
+        pass
+
+    # Запасной путь без сторонних пакетов — только для wav. Сетевые движки
+    # отдают mp3, и для них soundfile обязателен; сказать об этом честнее,
+    # чем молча промолчать голосом.
+    import wave
+
+    with wave.open(path, "rb") as source:
+        if source.getsampwidth() != SAMPLE_BYTES:
+            return b"", RATE
+        frames = source.readframes(source.getnframes())
+        if source.getnchannels() > 1:
+            frames = b"".join(frames[i:i + SAMPLE_BYTES]
+                              for i in range(0, len(frames),
+                                             SAMPLE_BYTES * source.getnchannels()))
+        return frames, source.getframerate()
+
+
+class EngineSynthesiser:
+    """
+    Синтез движками 3.1.0: edge, gtts, pyttsx3, piper.
+
+    Движки писались под «сказать вслух здесь же»: каждый делал временный
+    файл и сам его проигрывал. В 4.0 играет оболочка, поэтому берётся файл
+    (`TTSEngine.render`), а не звук из динамика ядра. Ядро без оболочки
+    молчит — и это верно: у процесса, который может работать сервисом, не
+    должно быть своего голоса.
+
+    Своего класса на каждый движок здесь нет: разница между ними —
+    внутри `voice/tts.py`, а для ядра все они одно и то же — текст на входе,
+    файл на выходе. Второй список движков разошёлся бы с первым.
+    """
+
+    def __init__(self, engine_id: str, settings=None):
+        self.name = engine_id
+        self._settings = settings
+        self._rate = RATE
+        self.last_error = ""
+
+    def _engine(self):
+        from voice import tts
+
+        return tts.get_engine(self.name)
+
+    def available(self) -> bool:
+        try:
+            return bool(self._engine().available)
+        except Exception as exc:                        # noqa: BLE001
+            self.last_error = str(exc)
+            return False
+
+    @property
+    def sample_rate(self) -> int:
+        """Частота последнего синтеза; до первого — частота микрофона."""
+        return self._rate
+
+    def synthesize(self, text: str, voice: str = "", rate: int = 100) -> bytes:
+        import os
+
+        if not text.strip():
+            return b""
+        volume = 75
+        if self._settings is not None:
+            try:
+                volume = int(self._settings.get("volume", 75) or 75)
+            except (TypeError, ValueError):
+                volume = 75
+
+        path = ""
+        try:
+            path = self._engine().render(text, voice=voice or None,
+                                         volume=volume, rate=rate) or ""
+            if not path or not os.path.isfile(path):
+                self.last_error = "движок не отдал файл"
+                return b""
+            pcm, self._rate = pcm_from_file(path)
+            return pcm
+        except Exception as exc:                        # noqa: BLE001
+            self.last_error = str(exc)
+            return b""
+        finally:
+            # Временный файл — наш: движок его создал по нашей просьбе.
+            if path:
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+
+
 def synthesiser_for(settings) -> Synthesiser:
-    """Какой синтез выбран в настройках."""
+    """
+    Какой синтез выбран в настройках.
+
+    Раньше здесь узнавался один Piper, а всё остальное молча становилось
+    тишиной: человек выбирал Edge, ядро отвечало текстом и не говорило.
+    Молчание вместо голоса — худший вид отказа, потому что выглядит как
+    работающая программа.
+    """
     engine = str(settings.get("tts_engine", "silent") or "silent")
-    if engine == "piper":
+    if engine in ("", "silent"):
+        return SilentSynthesiser()
+    if engine == "piper" and settings.get("piper_model"):
+        # Своя дорога: Piper отдаёт образцы прямо в память, без файла.
         return PiperSynthesiser(str(settings.get("piper_model", "") or ""))
-    return SilentSynthesiser()
+    return EngineSynthesiser(engine, settings)
 
 
 # ---------------------------------------------------------------------------

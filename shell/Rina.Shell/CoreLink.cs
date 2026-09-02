@@ -59,6 +59,46 @@ public sealed class CoreLink : IAsyncDisposable
         _boss.Connected += connection =>
             connection.RequestReceived += request => OnUi(
                 () => { _ = OnCoreRequestAsync(connection, request); });
+
+        // Звук заводится вместе со связью. До этого его в живой программе
+        // не было вовсе: `AudioLink` существовал, был проверен и не создан
+        // никем, кроме самой проверки. Ядро исправно синтезировало и слало
+        // речь в канал данных, который никто не читал, — Рина отвечала
+        // текстом и молчала.
+        _boss.Connected += connection => OnUi(() => StartVoice(connection));
+    }
+
+    private Audio.Speaker? _speaker;
+    private Audio.AudioLink? _voice;
+
+    /// <summary>Динамик и канал звука; `null`, пока нет связи.</summary>
+    public Audio.AudioLink? Voice => _voice;
+
+    /// <summary>
+    /// Завести звук на новой связи.
+    /// </summary>
+    /// <remarks>
+    /// Старое хозяйство выбрасывается: связь новая — значит ядро другое, и
+    /// поток речи прежнего ядра не продолжается, а начинается заново.
+    /// </remarks>
+    private void StartVoice(CoreConnection connection)
+    {
+        _voice?.Dispose();
+        _speaker?.Dispose();
+
+        _speaker = new Audio.Speaker();
+        _voice = new Audio.AudioLink(connection, connection.Data,
+                                     new Audio.Microphone(), _speaker);
+        _ = ApplyAudioSettingsAsync();
+    }
+
+    /// <summary>Выбранные человеком устройства — из настроек ядра.</summary>
+    private async Task ApplyAudioSettingsAsync()
+    {
+        var values = await GetAsync("input_device", "output_device");
+        if (values is null || _voice is null) return;
+        _voice.UseDevices(values["input_device"]?.GetValue<string>() ?? "default",
+                          values["output_device"]?.GetValue<string>() ?? "default");
     }
 
     public CoreState State => _boss.State;
@@ -151,6 +191,37 @@ public sealed class CoreLink : IAsyncDisposable
     private async Task OnCoreRequestAsync(CoreConnection connection,
                                           Envelope request)
     {
+        // Ядро открывает поток речи своим запросом: у звука есть формат, и
+        // частоту объявляют, а не угадывают. Ответить обязательно — иначе
+        // ядро ждёт и молчит.
+        if (request.Method == Methods.StreamOpen)
+        {
+            var kind = request.Payload["kind"]?.GetValue<string>() ?? "";
+            var rate = request.Payload["format"]?["rate"]?.GetValue<int>()
+                       ?? Audio.Microphone.SampleRate;
+            // Ядро кладёт номер потока в конверт; без него открывать нечего.
+            var stream = request.StreamId
+                         ?? request.Payload["stream_id"]?.GetValue<int>() ?? 0;
+            var credit = stream == 0
+                         ? 0 : _voice?.StartPlayback(stream, kind, rate) ?? 0;
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["accepted"] = credit > 0,
+                ["credit"] = credit,
+            });
+            return;
+        }
+
+        if (request.Method == Methods.StreamClose)
+        {
+            _voice?.StopPlayback();
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["closed"] = true,
+            });
+            return;
+        }
+
         if (request.Method != Methods.PermissionRequest)
         {
             // Метод, которого оболочка не знает, — не повод молчать: ядро

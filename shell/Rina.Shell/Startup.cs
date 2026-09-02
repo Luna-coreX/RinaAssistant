@@ -65,6 +65,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-voice"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckVoiceAsync(window);
+            return;
+        }
+
         if (args.Contains("--check-audio"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -488,6 +495,102 @@ public partial class App
             Check("ядро получило ровно отправленное",
                   got == sent && got == audio.Sent,
                   $"| ядро {got} Б, оболочка {sent} Б, учтено {audio.Sent} Б");
+        }
+
+        await link.DisposeAsync();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// E04 + F10: ядро синтезирует, оболочка воспроизводит.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Проверка сквозная и <b>звучит вслух</b>: только так видно, что путь
+    /// цел от текста до динамика. Каждое звено в отдельности было исправно,
+    /// а Рина молчала — синтез умел один Piper, а канал речи в живой
+    /// программе не читал никто.
+    /// </para>
+    /// <para>
+    /// Ядро поднимается под песочницей, потому что проверке нужно сменить
+    /// движок синтеза: настройки человека для этого не трогают.
+    /// </para>
+    /// </remarks>
+    private async Task CheckVoiceAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== E04/F10: Рина говорит ===");
+        var real = CoreLink.FindCore();
+        var sandboxed = new Rina.Protocol.CoreLaunch(
+            real.Python,
+            Path.Combine(real.WorkingDirectory, "tools", "_core_sandboxed.py"),
+            real.WorkingDirectory);
+
+        var link = new CoreLink(window, sandboxed);
+        window.Link = link;
+        await link.StartAsync();
+        for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
+            await Task.Delay(100);
+        Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
+              $"| {link.State}");
+
+        // Связь возникает в чужом потоке, а звук заводится в потоке окна:
+        // между «Ready» и «есть чем играть» лежит одна очередь сообщений.
+        for (var i = 0; i < 50 && link.Voice is null; i++) await Task.Delay(100);
+        Check("звук заведён вместе со связью", link.Voice is not null);
+
+        if (link.Connection is { Ready: true } connection && link.Voice is { } voice)
+        {
+            // Системный синтез: он есть на всякой Windows и не ходит в сеть.
+            var told = await connection.CallAsync(Rina.Protocol.Methods.SettingsSet,
+                new JsonObject
+                {
+                    ["values"] = new JsonObject
+                    {
+                        ["tts_engine"] = "pyttsx3",
+                        ["voice"] = "default",
+                    },
+                }, TimeSpan.FromSeconds(15));
+            Check("движок синтеза выбран",
+                  told.Payload["verdicts"]?["tts_engine"]?["accepted"]
+                      ?.GetValue<bool>() == true,
+                  $"| {told.Payload["verdicts"]?["tts_engine"]}");
+
+            await connection.CallAsync(Rina.Protocol.Methods.SpeechSay, new JsonObject
+            {
+                ["text"] = "Проверка голоса.",
+            }, TimeSpan.FromSeconds(30));
+
+            for (var i = 0; i < 200 && voice.Received == 0; i++)
+                await Task.Delay(100);
+            Check("речь пришла из ядра в оболочку", voice.Received > 0,
+                  $"| {voice.Received} Б");
+
+            // Слышно ли это на самом деле, машина сказать не может; но
+            // очередь динамика — то место, откуда звук уже никуда не
+            // денется, кроме как в устройство.
+            await Task.Delay(300);
+            Check("динамик получил речь",
+                  voice.Received > 0 && voice.Pending >= 0,
+                  $"| в очереди {voice.Pending} Б");
+
+            var seconds = voice.Received / 2.0 / 22050;
+            Check("речь похожа на фразу, а не на щелчок", seconds > 0.3,
+                  $"| около {seconds:0.0} с");
+            await Task.Delay(2000);          // дать договорить
         }
 
         await link.DisposeAsync();

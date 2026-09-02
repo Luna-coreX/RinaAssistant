@@ -97,8 +97,17 @@ class ProtocolServer:
             getattr(engine, "_settings", None) or {})
         self.synthesiser = synthesiser or speech.synthesiser_for(
             getattr(engine, "_settings", None) or {})
+        #: Переданные снаружи не переcобираются: проверка ставила их нарочно.
+        self._speech_given = (recogniser is not None, synthesiser is not None)
+        store = getattr(engine, "_settings", None)
+        self._speech_wanted = (
+            str((store.get("stt_engine", "disabled") if store else "disabled")
+                or "disabled"),
+            str((store.get("tts_engine", "silent") if store else "silent")
+                or "silent"))
         self.segmenter = speech.Segmenter()
         self._speech_stream = 0
+        self._speech_rate = 0
 
         #: Куда девать принятый звук, если распознавание не нужно.
         self.on_audio = None
@@ -742,6 +751,32 @@ class ProtocolServer:
             self.engine.bus.emit("speech.recognized", text=heard.text)
             self.engine.handle_command_async(heard.text, source="voice")
 
+    def _voice_follows_settings(self) -> None:
+        """
+        Пересобрать синтез и распознавание, если движок сменили.
+
+        Иначе выбор в настройках начинал действовать только после
+        перезапуска ядра: человек ставит Edge, слышит тишину и решает, что
+        сломано. Настройка, которая «применится когда-нибудь», — это не
+        настройка, а обещание; помеченные `restart_required` говорят об
+        этом честно, а эти две ничего такого не обещали.
+        """
+        store = self._settings()
+        if store is None:
+            return
+        # Сравнивается то, что попросили, а не то, что получилось: движок,
+        # которого ядро не умеет, даёт «выключено», и сверка по имени
+        # пересобирала бы его на каждой реплике.
+        wanted = (str(store.get("stt_engine", "disabled") or "disabled"),
+                  str(store.get("tts_engine", "silent") or "silent"))
+        if wanted == self._speech_wanted:
+            return
+        self._speech_wanted = wanted
+        if not self._speech_given[1]:
+            self.synthesiser = speech.synthesiser_for(store)
+        if not self._speech_given[0]:
+            self.recogniser = speech.recogniser_for(store)
+
     def _speak(self, text: str) -> None:
         """
         Синтезировать и отправить оболочке.
@@ -749,6 +784,7 @@ class ProtocolServer:
         Синтез в ядре, воспроизведение в оболочке: модели живут там, где
         ML-экосистема, а звук — там, где низкая задержка и нативное аудио.
         """
+        self._voice_follows_settings()
         if not self.synthesiser.available():
             return          # текст уже отправлен событием; голоса просто нет
         pcm = self.synthesiser.synthesize(
@@ -764,7 +800,20 @@ class ProtocolServer:
         """Отправить готовый звук оболочке кусками по каналу данных."""
         if self.channels.data is None:
             return
+
+        # Частота объявляется при открытии потока, поэтому смена движка —
+        # это новый поток, а не продолжение старого. Иначе речь на 24000
+        # поехала бы в поток, объявленный на 22050, и Рина заговорила бы
+        # ниже и медленнее, чем должна.
+        if self._speech_stream and self._speech_rate != sample_rate:
+            self.send(Envelope.request(
+                "stream.close", {"stream_id": self._speech_stream},
+                id=self.ids.next()))
+            self.data.close_stream(self._speech_stream)
+            self._speech_stream = 0
+
         if self._speech_stream == 0:
+            self._speech_rate = sample_rate
             self._speech_stream = 21
             self.data.open_stream(self._speech_stream, "audio.output")
             self.send(Envelope.request(

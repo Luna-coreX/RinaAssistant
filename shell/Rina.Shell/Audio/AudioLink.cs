@@ -53,6 +53,12 @@ public sealed class AudioLink : IDisposable
     /// <summary>Сколько байт ушло в ядро.</summary>
     public long Sent { get; private set; }
 
+    /// <summary>Сколько байт речи принято от ядра.</summary>
+    public long Received { get; private set; }
+
+    /// <summary>Сколько принятого ещё не проиграно.</summary>
+    public int Pending => _speaker.Pending;
+
     /// <summary>Уровень микрофона 0..1 — для полосы прибора.</summary>
     public event Action<float>? Level;
 
@@ -196,6 +202,7 @@ public sealed class AudioLink : IDisposable
             while (!token.IsCancellationRequested)
             {
                 var frame = await _data.ReceiveAsync(token).ConfigureAwait(false);
+                Received += frame.Payload.Length;
                 _speaker.Enqueue(frame.Payload);
                 // Кредит возвращается по мере воспроизведения, а не приёма:
                 // иначе ядро набьёт нам очередь на минуту вперёд, и «стоп»
@@ -209,6 +216,50 @@ public sealed class AudioLink : IDisposable
         }
         catch (OperationCanceledException) { /* закрываемся */ }
         catch (ChannelClosedException) { /* ядро ушло */ }
+    }
+
+    /// <summary>
+    /// Ядро открыло поток речи: начать слушать канал данных.
+    /// </summary>
+    /// <remarks>
+    /// Чтение канала раньше начиналось только вместе с захватом микрофона —
+    /// то есть речь можно было услышать, лишь если Рину перед этим слушали.
+    /// Воспроизведение и захват независимы: Рина отвечает и на набранное
+    /// руками.
+    ///
+    /// Возвращает выданный кредит: приёмник объявляет, сколько готов
+    /// принять, и это не формальность — динамик медленнее провода.
+    /// </remarks>
+    public int StartPlayback(int streamId, string kind, int sampleRate)
+    {
+        if (kind != OutputKind) return 0;
+
+        _outputStream = streamId;
+        _speaker.Reopen(sampleRate);
+
+        if (_reading is null)
+        {
+            _reading = new CancellationTokenSource();
+            _ = Task.Run(() => ReadAsync(_reading.Token));
+        }
+        return PlaybackCredit;
+    }
+
+    /// <summary>Сколько байт речи оболочка готова принять сразу.</summary>
+    /// <remarks>
+    /// Полсекунды звука при 24 кГц. Больше — и «стоп» перестанет быть
+    /// мгновенным: оборвать можно то, что ещё не отправлено, а не то, что
+    /// уже лежит в нашей очереди.
+    /// </remarks>
+    private const int PlaybackCredit = 24000 * 2 / 2;
+
+    private int _outputStream;
+
+    /// <summary>Поток речи закрыт ядром.</summary>
+    public void StopPlayback()
+    {
+        _outputStream = 0;
+        _speaker.Interrupt();
     }
 
     /// <summary>Оборвать речь: «стоп» обязан быть мгновенным.</summary>

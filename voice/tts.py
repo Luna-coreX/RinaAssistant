@@ -43,9 +43,22 @@ class TTSEngine:
         """Список (voice_id, human_label) доступных голосов."""
         return []
 
+    def render(self, text, voice=None, volume=75, rate=100):
+        """
+        Синтезировать в файл и вернуть путь. `None` — не вышло.
+
+        Появилось для 4.0: синтез в ядре, воспроизведение в оболочке
+        (`4.0-F10`). Движку и раньше приходилось делать файл — каждый писал
+        временный и тут же его проигрывал; разделение лишь называет этот шаг
+        вслух. Кто вызвал, тот и удаляет.
+        """
+        return None
+
     def speak(self, text, voice=None, volume=75, rate=100):
         """Блокирующе произносит текст. rate/volume — проценты (100 = норма)."""
-        raise NotImplementedError
+        path = self.render(text, voice=voice, volume=volume, rate=rate)
+        if path:
+            _play_audio_file(path, delete_after=True)
 
     def stop(self):
         pass
@@ -63,6 +76,9 @@ class SilentEngine(TTSEngine):
 
     def voices(self):
         return [("none", "— нет голоса —")]
+
+    def render(self, text, voice=None, volume=75, rate=100):
+        return None
 
     def speak(self, text, voice=None, volume=75, rate=100):
         # намеренно тихо; небольшая пауза ~ время «произношения»
@@ -116,17 +132,36 @@ class Pyttsx3Engine(TTSEngine):
         self._voices_cache = result
         return result
 
+    def _tune(self, eng, voice, volume, rate):
+        if voice and voice != "default":
+            eng.setProperty("voice", voice)
+        eng.setProperty("volume", max(0.0, min(1.0, volume / 100.0)))
+        # pyttsx3 rate ~ слов/мин; 200 ≈ норма. Масштабируем от rate%.
+        eng.setProperty("rate", int(200 * (rate / 100.0)))
+
+    def render(self, text, voice=None, volume=75, rate=100):
+        eng = self._get_engine()
+        if eng is None:
+            return None
+        with self._lock:
+            try:
+                self._tune(eng, voice, volume, rate)
+                tmp = new_temp_file(".wav", "rina_pyttsx3_")
+                eng.save_to_file(text, tmp)
+                eng.runAndWait()
+                return tmp if os.path.isfile(tmp) else None
+            except Exception:
+                return None
+
     def speak(self, text, voice=None, volume=75, rate=100):
+        # Произносит сам, а не через файл: системный синтез это умеет, и
+        # лишний круг через диск добавил бы задержку там, где её нет.
         eng = self._get_engine()
         if eng is None:
             return
         with self._lock:
             try:
-                if voice and voice != "default":
-                    eng.setProperty("voice", voice)
-                eng.setProperty("volume", max(0.0, min(1.0, volume / 100.0)))
-                # pyttsx3 rate ~ слов/мин; 200 ≈ норма. Масштабируем от rate%.
-                eng.setProperty("rate", int(200 * (rate / 100.0)))
+                self._tune(eng, voice, volume, rate)
                 eng.say(text)
                 eng.runAndWait()
             except Exception:
@@ -174,19 +209,17 @@ class GttsEngine(TTSEngine):
     def voices(self):
         return list(self.LANG_VOICES)
 
-    def speak(self, text, voice=None, volume=75, rate=100):
+    def render(self, text, voice=None, volume=75, rate=100):
         gTTS = self._try_import()
         if gTTS is None:
-            return
+            return None
         lang = voice if voice in dict(self.LANG_VOICES) else "ru"
         try:
             tmp = new_temp_file(".mp3", "rina_gtts_")
             gTTS(text=text, lang=lang, slow=(rate < 80)).save(tmp)
-            # единый путь воспроизведения: sounddevice+soundfile,
-            # с учётом выбранного устройства вывода
-            _play_audio_file(tmp, delete_after=True)
+            return tmp
         except Exception:
-            pass
+            return None
 
 
 # ---------------------------------------------------------------------------
@@ -360,10 +393,10 @@ class EdgeTTSEngine(TTSEngine):
     def voices(self):
         return list(self.VOICES)
 
-    def speak(self, text, voice=None, volume=75, rate=100):
+    def render(self, text, voice=None, volume=75, rate=100):
         edge_tts = self._try_import()
         if edge_tts is None:
-            return
+            return None
         voice_id = voice if voice and voice.endswith("Neural") else "ru-RU-SvetlanaNeural"
         # rate в edge-tts задаётся строкой вида "+10%" / "-20%"
         pct = int(rate) - 100
@@ -380,9 +413,9 @@ class EdgeTTSEngine(TTSEngine):
                 await communicate.save(tmp)
 
             asyncio.run(_gen())
-            _play_audio_file(tmp, delete_after=True)
+            return tmp
         except Exception:
-            pass
+            return None
 
 
 class PiperEngine(TTSEngine):
@@ -434,15 +467,15 @@ class PiperEngine(TTSEngine):
         self._cached_path = model_path
         return self._voice_cache
 
-    def speak(self, text, voice=None, volume=75, rate=100):
+    def render(self, text, voice=None, volume=75, rate=100):
         PiperVoice = self._try_import()
         if PiperVoice is None:
-            return
+            return None
         from core.settings_store import settings
         model_path = settings.get("piper_model", "")
         if not model_path or not os.path.isfile(model_path):
             self._last_error = "Модель Piper не выбрана или файл не найден"
-            return
+            return None
         import wave
         tmp = new_temp_file(".wav", "rina_piper_")
         try:
@@ -454,10 +487,11 @@ class PiperEngine(TTSEngine):
                 else:
                     # старый API: synthesize(text, wav_file)
                     voice_model.synthesize(text, wav)
-            _play_audio_file(tmp, delete_after=True)
+            return tmp
         except Exception as e:
             # не глушим молча — сохраняем причину, чтобы показать в UI/логах
             self._last_error = f"Ошибка Piper: {e}"
+            return None
             raise
 
 
