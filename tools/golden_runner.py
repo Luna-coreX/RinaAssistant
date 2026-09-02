@@ -36,6 +36,14 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+
+# Каталог данных — во временную папку, и это надо сделать до создания первого
+# хранилища. Подмены ниже закрывают то, что видно снаружи: звук, запуск
+# программ, браузер. Хранилище они не закрывали, и набор писал историю
+# разговоров и журнал вызовов в настоящие файлы пользователя.
+from sandbox import isolate_storage
+isolate_storage()
 
 from core.dialog import Question
 from core.intent import INTENTS, Intent, UnknownIntent, check_intent_name
