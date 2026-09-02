@@ -65,6 +65,10 @@ class RinaEngine:
         план, где доступно всё.
         """
         self.bus = event_bus or bus
+        #: Кто произносит вместо местного динамика. Ставит серверная сторона
+        #: протокола (4.0-E04); пока не поставлен, ядро говорит само, как в
+        #: 3.1.0 — приложение с окном на Qt этим и пользуется.
+        self.voice_out = None
         self._settings = settings if settings is not None else default_settings()
         self._features = features if features is not None else default_features()
         settings = self._settings          # локальное имя для кода ниже
@@ -168,6 +172,21 @@ class RinaEngine:
     def _speak_blocking(self, text):
         if not self._settings.get("voice_reply", True):
             return  # режим «молчать» — только текст, без голоса
+
+        # Если голос забирает кто-то снаружи — забирает целиком. В
+        # разделённой программе это оболочка (4.0-E04): ядро синтезирует,
+        # играет она. Двух путей быть не должно, иначе одна и та же реплика
+        # однажды прозвучит дважды — из динамика оболочки и из динамика ядра.
+        if self.voice_out is not None:
+            self._begin_speaking()
+            try:
+                self.voice_out(text)
+            except Exception as e:                       # noqa: BLE001
+                self._emit(Events.ERROR, text=tr("Ошибка озвучки: ") + str(e))
+            finally:
+                self._end_speaking()
+            return
+
         engine = tts_mod.get_engine(self._settings.get("tts_engine", "silent"))
         self._begin_speaking()
         try:

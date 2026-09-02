@@ -31,7 +31,7 @@ import threading
 import time
 from typing import Any, Callable
 
-from core import settings_schema
+from core import settings_schema, speech
 from core.confirmations import ConfirmationLedger
 from core.protocol import ALL_EVENTS
 from core.wire.data import (DataFrameDecoder, DataReceiver, DataSender,
@@ -55,7 +55,8 @@ class ProtocolServer:
                  versions=(1,), capabilities=None,
                  app_version: str = "4.0.0",
                  clock: Callable[[], float] = time.time,
-                 on_stop: Callable[[], None] | None = None):
+                 on_stop: Callable[[], None] | None = None,
+                 recogniser=None, synthesiser=None):
         self.engine = engine
         self.channels = channels
         self.clock = clock
@@ -89,10 +90,21 @@ class ProtocolServer:
         #: между «сказал» и «услышала».
         self.credit_window = 64 * 1024
         self.receiver = None
-        #: Куда девать принятый звук. Ставит E03; пока не поставлен, звук
-        #: считается и отбрасывается — честнее, чем копить в памяти то,
-        #: что некому распознать.
+        #: Распознавание и синтез. Передаются снаружи, чтобы их можно было
+        #: подменить в проверке: настоящие модели ставятся не на всякой
+        #: машине, а провод обязан проверяться везде.
+        self.recogniser = recogniser or speech.recogniser_for(
+            getattr(engine, "_settings", None) or {})
+        self.synthesiser = synthesiser or speech.synthesiser_for(
+            getattr(engine, "_settings", None) or {})
+        self.segmenter = speech.Segmenter()
+        self._speech_stream = 0
+
+        #: Куда девать принятый звук, если распознавание не нужно.
         self.on_audio = None
+
+        # Голос ядра уходит в оболочку, а не в местный динамик (4.0-E04).
+        engine.voice_out = self._speak
 
         self._send_lock = threading.Lock()
         self._running = False
@@ -555,13 +567,96 @@ class ProtocolServer:
             return
         state["bytes"] += len(frame.payload)
         state["frames"] += 1
-        if self.on_audio is not None and state["kind"] == "audio.input":
-            self.on_audio(frame.stream_id, frame.payload, state["format"])
+        if state["kind"] == "audio.input":
+            if self.on_audio is not None:
+                self.on_audio(frame.stream_id, frame.payload, state["format"])
+            self._hear(frame.payload)
         # Обработали — возвращаем кредит на обработанное.
         self.send(Envelope.event("stream.credit",
                                  {"bytes": len(frame.payload)},
                                  id=self.ids.next(),
                                  stream_id=frame.stream_id))
+
+    # -- речь (4.0-E03, E04) --------------------------------------------------
+
+    def _hear(self, pcm: bytes) -> None:
+        """
+        Накопить звук и распознать законченную фразу.
+
+        Нарезка на фразы делается здесь, а не в оболочке: только рядом с
+        распознаванием известно, сколько тишины считать паузой в
+        предложении, а сколько концом фразы.
+
+        Распознавание идёт в своём потоке: модель думает сотни миллисекунд,
+        а на этом же потоке читается канал данных — задержка превратилась бы
+        в пропущенный звук.
+        """
+        for phrase in self.segmenter.feed(pcm):
+            threading.Thread(target=self._recognise, args=(phrase,),
+                             name="rina-stt", daemon=True).start()
+
+    def _recognise(self, phrase: bytes) -> None:
+        with trace_scope():
+            if not self.recogniser.available():
+                # Молчать здесь нельзя: человек решит, что его не слышно, и
+                # станет говорить громче.
+                self.engine.bus.emit(
+                    "assistant.error",
+                    text="Распознавание недоступно: выберите модель в настройках.")
+                return
+            heard = self.recogniser.recognise(phrase)
+            if not heard.ok:
+                self.engine.bus.emit("assistant.error",
+                                     text=f"Не удалось распознать: {heard.error}")
+                return
+            if not heard.text:
+                return          # тишина — не ошибка и не повод сообщать
+            self.engine.bus.emit("speech.recognized", text=heard.text)
+            self.engine.handle_command_async(heard.text, source="voice")
+
+    def _speak(self, text: str) -> None:
+        """
+        Синтезировать и отправить оболочке.
+
+        Синтез в ядре, воспроизведение в оболочке: модели живут там, где
+        ML-экосистема, а звук — там, где низкая задержка и нативное аудио.
+        """
+        if not self.synthesiser.available():
+            return          # текст уже отправлен событием; голоса просто нет
+        pcm = self.synthesiser.synthesize(
+            text,
+            voice=str(self._settings().get("voice", "") if self._settings()
+                      else ""),
+            rate=int((self._settings() or {}).get("speed", 100) or 100))
+        if not pcm:
+            return
+        self.send_speech(pcm, self.synthesiser.sample_rate)
+
+    def send_speech(self, pcm: bytes, sample_rate: int) -> None:
+        """Отправить готовый звук оболочке кусками по каналу данных."""
+        if self.channels.data is None:
+            return
+        if self._speech_stream == 0:
+            self._speech_stream = 21
+            self.data.open_stream(self._speech_stream, "audio.output")
+            self.send(Envelope.request(
+                "stream.open",
+                {"stream_id": self._speech_stream, "kind": "audio.output",
+                 "format": {"encoding": "pcm_s16le", "rate": sample_rate,
+                            "channels": 1}},
+                id=self.ids.next()))
+            # Оболочка выдаст кредит, но ждать его молча нечестно по времени:
+            # первый кусок речи должен уйти сразу. Даём себе кредит на один
+            # ответ и дальше живём по выданному.
+            self.data.grant(self._speech_stream, 512 * 1024)
+
+        chunk = 8192
+        for offset in range(0, len(pcm), chunk):
+            piece = pcm[offset:offset + chunk]
+            if self.data.available(self._speech_stream) < len(piece):
+                break       # оболочка не успевает: обрывать речь честнее,
+                            # чем копить её в памяти
+            self.channels.data.send(self.data.send(self._speech_stream, piece))
 
     # -- обрыв ---------------------------------------------------------------
 
