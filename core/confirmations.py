@@ -111,8 +111,17 @@ class ConfirmationLedger:
     интерфейса.
     """
 
-    def __init__(self, ttl=DEFAULT_TTL):
+    def __init__(self, ttl=DEFAULT_TTL, clock=time.time):
         self._ttl = ttl
+        #: Часы передаются снаружи по той же причине, что и всюду в ядре:
+        #: срок надо уметь проверить, а не переждать. Но здесь есть и вторая,
+        #: важнее. Канал разрешений (4.0-D12) считает своё окно ожидания по
+        #: собственным часам и передаёт сюда остаток срока. Пока журнал жил по
+        #: системному времени, а канал — по своим, это были две разные шкалы в
+        #: одном контуре: срок, вычисленный на одной, проверялся на другой.
+        #: Заметил это conformance-набор, где просроченное подтверждение
+        #: спокойно прошло.
+        self._clock = clock
         self._items = {}
         self._lock = threading.RLock()
 
@@ -121,7 +130,7 @@ class ConfirmationLedger:
         """Выдать подтверждение на конкретный вызов."""
         if scope not in SCOPES:
             raise ValueError(f"неизвестная область: {scope!r}")
-        now = time.time()
+        now = self._clock()
         confirmation = Confirmation(
             id=secrets.token_urlsafe(12),
             tool=tool_name,
@@ -157,7 +166,7 @@ class ConfirmationLedger:
                     "подтверждение не найдено или уже использовано",
                     "confirmation.invalid", {"tool": tool_name})
 
-            if confirmation.expired(now):
+            if confirmation.expired(now if now is not None else self._clock()):
                 del self._items[confirmation_id]
                 raise ConfirmationError(
                     "подтверждение просрочено",
@@ -193,7 +202,7 @@ class ConfirmationLedger:
             return count
 
     def purge_expired(self, now=None):
-        now = now or time.time()
+        now = self._clock() if now is None else now
         with self._lock:
             dead = [i for i, c in self._items.items() if c.expired(now)]
             for i in dead:

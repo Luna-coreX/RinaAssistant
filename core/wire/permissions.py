@@ -95,7 +95,11 @@ class PermissionChannel:
 
     def __init__(self, ledger: ConfirmationLedger | None = None,
                  clock: Callable[[], float] = time.time):
-        self.ledger = ledger or ConfirmationLedger()
+        #: Журнал по умолчанию заводится **на тех же часах**. Разные шкалы
+        #: времени у канала и у журнала — это срок, вычисленный на одной и
+        #: проверяемый на другой; conformance-набор поймал ровно это.
+        #: Переданный снаружи журнал обязан идти по тому же времени.
+        self.ledger = ledger or ConfirmationLedger(clock=clock)
         self._clock = clock
         self._pending: dict[str, Ask] = {}
 
