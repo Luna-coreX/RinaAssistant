@@ -10,6 +10,7 @@ A decision belongs here when undoing it would mean rewriting rather than editing
 | [0002](0002-ipc-transport.md) | Transport between shell and core — named pipe, hosted by the shell | accepted | `4.0-D01` |
 | [0003](0003-voice-identity.md) | What "her own voice" means — a synthesised speaker vector | accepted | `V-01` |
 | [0004](0004-versioning-and-compatibility.md) | Versioning — four independent versions; the protocol decides compatibility | accepted | `4.0-U01` |
+| [0005](0005-control-library.md) | Control library — none; own styles over standard WPF | accepted | `4.0-F01b` |
 
 ## Decided but not yet written up
 
@@ -25,5 +26,4 @@ These were settled in discussion and are recorded in [`../ROADMAP.md`](../ROADMA
 
 | Question | Plan item | Blocks |
 |---|---|---|
-| Control library: WPF-UI, own styles, or a hybrid | `4.0-F01b` | shell skeleton |
 | Who owns the presentation of settings | `4.0-E06a` | settings over the protocol |
