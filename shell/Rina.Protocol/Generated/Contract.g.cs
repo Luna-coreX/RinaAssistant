@@ -89,6 +89,8 @@ public static class Methods
     /// <summary>Базовый метод.</summary>
     public const string SettingsGet = "settings.get";
     /// <summary>Базовый метод.</summary>
+    public const string SettingsOptions = "settings.options";
+    /// <summary>Базовый метод.</summary>
     public const string SettingsSet = "settings.set";
     /// <summary>Возможность: stt.</summary>
     public const string SpeechListenOnce = "speech.listen_once";
@@ -146,6 +148,7 @@ public static class Methods
             ["reminders.list"] = "reminders",
             ["settings.describe"] = null,
             ["settings.get"] = null,
+            ["settings.options"] = null,
             ["settings.set"] = null,
             ["speech.listen_once"] = "stt",
             ["speech.say"] = "tts",

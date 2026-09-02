@@ -78,7 +78,26 @@ public sealed class AudioLink : IDisposable
     /// действия: звук может прийти из файла при проверке голоса, и тогда
     /// микрофон не нужен вовсе.
     /// </param>
-    public async Task<bool> StartCaptureAsync(int deviceIndex = 0,
+    /// <summary>
+    /// Какими устройствами пользоваться. Имена — из настроек ядра.
+    /// </summary>
+    /// <remarks>
+    /// Ядро хранит выбор, но самих устройств не видит: звук в 4.0
+    /// принадлежит оболочке (<c>4.0-F09</c>). Поэтому имя разрешается здесь,
+    /// и «default» — не имя, а признак «не выбирали».
+    /// </remarks>
+    public void UseDevices(string input, string output)
+    {
+        _inputDevice = input is "default" or "" ? 0 : Microphone.IndexOf(input);
+        _speaker.Device = output is "default" or "" ? 0 : Speaker.IndexOf(output);
+    }
+
+    private int _inputDevice;
+
+    /// <param name="deviceIndex">
+    /// Номер устройства; <c>-1</c> — то, что выбрано в настройках.
+    /// </param>
+    public async Task<bool> StartCaptureAsync(int deviceIndex = -1,
                                               bool listen = true)
     {
         if (!_connection.MayCall(Methods.StreamOpen)) return false;
@@ -106,7 +125,8 @@ public sealed class AudioLink : IDisposable
 
         _reading = new CancellationTokenSource();
         _ = Task.Run(() => ReadAsync(_reading.Token));
-        if (listen) _microphone.Start(deviceIndex);
+        if (listen)
+            _microphone.Start(deviceIndex < 0 ? _inputDevice : deviceIndex);
         return true;
     }
 

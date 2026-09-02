@@ -42,6 +42,22 @@ public sealed class Speaker : IDisposable
         get { lock (_lock) return _buffer?.BufferedBytes ?? 0; }
     }
 
+    /// <summary>Куда выводить. Применится к следующему устройству.</summary>
+    public int Device { get; set; }
+
+    public static IReadOnlyList<AudioDevice> Devices()
+    {
+        var found = new List<AudioDevice>();
+        for (var i = 0; i < WaveOut.DeviceCount; i++)
+            found.Add(new AudioDevice(i, WaveOut.GetCapabilities(i).ProductName));
+        return found;
+    }
+
+    /// <summary>По имени — номер; не нашлось — устройство по умолчанию.</summary>
+    /// <remarks>Почему по имени — см. <see cref="Microphone.IndexOf"/>.</remarks>
+    public static int IndexOf(string name) => Devices()
+        .FirstOrDefault(d => d.Name == name)?.Index ?? 0;
+
     public Speaker(int sampleRate = Microphone.SampleRate,
                    int bits = Microphone.Bits, int channels = Microphone.Channels)
         => _format = new WaveFormat(sampleRate, bits, channels);
@@ -69,7 +85,12 @@ public sealed class Speaker : IDisposable
             BufferDuration = TimeSpan.FromSeconds(1.5),
             DiscardOnBufferOverflow = true,
         };
-        _device = new WaveOutEvent { DesiredLatency = 100 };
+        _device = new WaveOutEvent
+        {
+            DesiredLatency = 100,
+            DeviceNumber = WaveOut.DeviceCount > 0
+                ? Math.Clamp(Device, 0, WaveOut.DeviceCount - 1) : 0,
+        };
         _device.Init(_buffer);
     }
 

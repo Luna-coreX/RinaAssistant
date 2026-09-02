@@ -253,6 +253,7 @@ class ProtocolServer:
             "settings.get": self._settings_get,
             "settings.set": self._settings_set,
             "settings.describe": self._settings_describe,
+            "settings.options": self._settings_options,
             "reminders.list": self._reminders_list,
             "reminders.cancel": self._reminders_cancel,
             "commands.list": self._commands_list,
@@ -346,7 +347,7 @@ class ProtocolServer:
         verdicts: dict[str, dict] = {}
         accepted: dict[str, Any] = {}
         for key, value in values.items():
-            ok, code, text = settings_schema.validate(key, value)
+            ok, code, text = settings_schema.validate(key, value, store)
             verdicts[key] = {"accepted": ok, "code": code, "message": text}
             if ok:
                 accepted[key] = value
@@ -354,8 +355,35 @@ class ProtocolServer:
             with store.transaction():
                 for key, value in accepted.items():
                     store.set(key, value)
+            self._settle_voice(store, accepted, verdicts)
         return {"values": {k: store.get(k) for k in accepted},
                 "verdicts": verdicts}
+
+    @staticmethod
+    def _settle_voice(store, accepted: dict, verdicts: dict) -> None:
+        """
+        Сменился движок — сменить и голос, если старый ему чужой.
+
+        У каждого движка своя нумерация голосов: `ru-RU-SvetlanaNeural` для
+        одного и `default` для другого. Оставить прежнее значение — значит
+        оставить настройку, которая навсегда показывает «сейчас недоступно»
+        и ничего не озвучивает; заставлять человека выбирать голос заново
+        после каждой смены движка — значит требовать шага, который мы можем
+        сделать сами и почти всегда угадаем.
+
+        Об этом говорится вслух: тихо переписанная настройка — та самая
+        неожиданность, которую человек потом ищет глазами.
+        """
+        if "tts_engine" not in accepted:
+            return
+        choices = settings_schema.options_for("voice", store)
+        if not choices or store.get("voice") in {c["value"] for c in choices}:
+            return
+        picked = choices[0]
+        store.set("voice", picked["value"])
+        verdicts["tts_engine"] = dict(verdicts["tts_engine"],
+                                      message=f"Голос переключён на "
+                                              f"«{picked['title']}».")
 
     def _settings_describe(self, message: Envelope) -> dict:
         """
@@ -371,6 +399,20 @@ class ProtocolServer:
             "layout": None,
             "note": "раскладку описывает оболочка: ADR 0006",
         }
+
+    def _settings_options(self, message: Envelope) -> dict:
+        """
+        Какие значения ключ принимает сейчас, на этой машине.
+
+        Отдельный метод, а не поле в схеме: схема описывает то, что верно
+        всегда, а этот список меняется от установки модели и даже от того,
+        какой движок выбран сейчас. Держать изменчивое рядом с постоянным
+        значит однажды закешировать первое вместе со вторым.
+        """
+        store = self._settings()
+        keys = message.payload.get("keys") or []
+        return {"options": {key: settings_schema.options_for(key, store)
+                            for key in keys}}
 
     # -- напоминания ---------------------------------------------------------
 

@@ -55,6 +55,13 @@ class Constraint:
     #: Ключ больше не участвует, но данные не стёрты. Оболочка его не
     #: показывает; удалять из хранилища нечего и незачем.
     obsolete: bool = False
+    #: Набор значений известен ядру, но не заранее: какие голоса
+    #: установлены, какие движки доступны. Оболочка спрашивает списком
+    #: через `settings.options`.
+    dynamic: bool = False
+    #: Значение — путь. Чем именно его выбирать (окно выбора папки или
+    #: файла) решает оболочка; ядро говорит только, что это путь.
+    format: str = ""
     #: Код предупреждения, если значение опасно, но допустимо.
     warn_code: str = ""
 
@@ -68,6 +75,22 @@ CONSTRAINTS: dict[str, Constraint] = {
     "listen_seconds": Constraint(low=1, high=60),
     "llm_timeout": Constraint(low=1, high=600, depends_on="llm_enabled"),
     "log_level": Constraint(choices=("DEBUG", "INFO", "WARNING", "ERROR")),
+
+    # Набор значений известен ядру, но зависит от установленного: какие
+    # движки собрались, какие голоса нашлись. Статическим перечислением
+    # это не выразить — оболочка спросит списком.
+    "tts_engine": Constraint(dynamic=True),
+    "stt_engine": Constraint(dynamic=True),
+    "voice": Constraint(dynamic=True),
+    "whisper_model": Constraint(dynamic=True),
+
+    # Пути к моделям. Чем выбирать — дело оболочки; ядро говорит лишь,
+    # что это путь, а не имя.
+    "vosk_model": Constraint(format="folder"),
+    # Список папок состоит из путей: оболочке этого хватит, чтобы предложить
+    # выбор папки, а не поле, куда путь набирают руками с опечаткой.
+    "program_folders": Constraint(format="folder"),
+    "piper_model": Constraint(format="file"),
     "search_engine": Constraint(choices=("google", "yandex", "duckduckgo",
                                          "bing")),
 
@@ -129,6 +152,10 @@ def describe_key(key: str) -> dict[str, Any]:
         out["restart_required"] = True
     if rule.obsolete:
         out["obsolete"] = True
+    if rule.dynamic:
+        out["dynamic"] = True
+    if rule.format:
+        out["format"] = rule.format
     return out
 
 
@@ -151,7 +178,45 @@ def describe(keys=None) -> dict[str, dict[str, Any]]:
     return {key: describe_key(key) for key in names if key in SETTABLE}
 
 
-def validate(key: str, value: Any) -> tuple[bool, str, str]:
+def options_for(key: str, settings) -> list[dict[str, Any]]:
+    """
+    Какие значения ключ принимает **сейчас**, на этой машине.
+
+    Отвечает ядро, потому что знает только оно: какие движки собрались,
+    какие голоса установлены. Оболочка это перечислить не может — у неё
+    нет ни моделей, ни их каталогов.
+
+    **Имя вещи приходит оттуда, где вещь живёт.** «Vosk (офлайн)» —
+    название движка, часть того, чем движок является, как «Discord» —
+    название программы в индексе. Строка интерфейса — это «Слова
+    активации»; она по-прежнему в оболочке (`4.0-F08`). Граница проходит
+    между именами вещей и словами интерфейса, а не между процессами.
+    """
+    from voice import stt, tts
+
+    if key == "tts_engine":
+        return [{"value": i, "title": t, "available": bool(a)}
+                for i, t, a in tts.engine_choices()]
+    if key == "stt_engine":
+        return [{"value": i, "title": t, "available": bool(a)}
+                for i, t, a in stt.engine_choices()]
+    if key == "voice":
+        engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
+        return [{"value": i, "title": t, "available": True}
+                for i, t in engine.voices()]
+    if key == "whisper_model":
+        # Перечень моделей Whisper фиксирован и известен без установки:
+        # это имена, а не найденные файлы.
+        return [{"value": name, "title": title, "available": True}
+                for name, title in (("tiny", "tiny — самая быстрая"),
+                                    ("base", "base — по умолчанию"),
+                                    ("small", "small"),
+                                    ("medium", "medium"),
+                                    ("large", "large — самая точная"))]
+    return []
+
+
+def validate(key: str, value: Any, settings=None) -> tuple[bool, str, str]:
     """
     Проверить значение. Возвращает (принято, код, пояснение).
 
@@ -176,6 +241,14 @@ def validate(key: str, value: Any) -> tuple[bool, str, str]:
     if actual != expected:
         return False, "settings.invalid_value", \
             f"«{key}» ожидает {expected}, получено {actual}."
+
+    # Динамический набор проверяется по тому, что есть сейчас: список
+    # «какие голоса установлены» вчерашним быть не может.
+    if rule.dynamic:
+        allowed = {o["value"] for o in options_for(key, settings or {})}
+        if allowed and value not in allowed:
+            return False, "settings.invalid_value", \
+                f"«{key}»: такого значения сейчас нет."
 
     if rule.choices and value not in rule.choices:
         return False, "settings.invalid_value", \

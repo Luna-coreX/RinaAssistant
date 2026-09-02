@@ -40,6 +40,20 @@ public partial class SettingsPage : UserControl
     /// <summary>Ключей, которые ядро прислало, а оболочка разложила.</summary>
     public int KeyCount => _schema.Count;
 
+    /// <summary>Первый выпадающий список — для сквозной проверки.</summary>
+    public ComboBox? FirstChoice() =>
+        _editors.Values.OfType<ComboBox>().FirstOrDefault(b => b.Items.Count > 0);
+
+    /// <summary>
+    /// Прокрутить на столько-то — чтобы снимок доставал ниже сгиба.
+    /// </summary>
+    /// <remarks>
+    /// Половина экрана настроек не видна на первом экране, и проверять
+    /// снимком только верх значит не проверять список папок, выбор модели и
+    /// выбор устройств — ровно то, что здесь и делалось.
+    /// </remarks>
+    public void ScrollTo(double offset) => Scroll.ScrollToVerticalOffset(offset);
+
     /// <summary>Готово: схема получена и разложена.</summary>
     public event Action? Ready;
 
@@ -79,9 +93,59 @@ public partial class SettingsPage : UserControl
             foreach (var (key, value) in values)
                 _values[key] = value?.DeepClone();
 
+        await LoadOptionsAsync();
         Build();
         Ready?.Invoke();
     }
+
+    /// <summary>
+    /// Спросить у ядра списки, которые оно объявило изменчивыми.
+    /// </summary>
+    /// <remarks>
+    /// Схема говорит, что набор значений есть, но не какой: «какие голоса
+    /// установлены» вчерашним быть не может. Устройства при этом
+    /// перечисляет оболочка — их знает она (<see cref="SettingsLayout.ShellKnows"/>).
+    /// </remarks>
+    private async Task LoadOptionsAsync()
+    {
+        _options.Clear();
+
+        foreach (var key in SettingsLayout.ShellKnows)
+        {
+            if (!_schema.ContainsKey(key)) continue;
+            var devices = key == "input_device"
+                ? Audio.Microphone.Devices()
+                : Audio.Speaker.Devices();
+            var listed = new List<(string, string, bool)>
+            {
+                ("default", "Устройство по умолчанию", true),
+            };
+            listed.AddRange(devices.Select(d => (d.Name, d.Name, true)));
+            _options[key] = listed;
+        }
+
+        var dynamic = _schema.Where(pair => pair.Value["dynamic"] is not null)
+                             .Select(pair => pair.Key).ToArray();
+        if (dynamic.Length == 0) return;
+
+        var told = await Ask(Methods.SettingsOptions, new JsonObject
+        {
+            ["keys"] = new JsonArray(dynamic.Select(k => (JsonNode)k!).ToArray()),
+        });
+        if (told?["options"] is not JsonObject answered) return;
+
+        foreach (var (key, list) in answered)
+        {
+            if (list is not JsonArray items) continue;
+            _options[key] = items.Select(item => (
+                item?["value"]?.GetValue<string>() ?? "",
+                item?["title"]?.GetValue<string>() ?? "",
+                item?["available"]?.GetValue<bool>() ?? true)).ToList();
+        }
+    }
+
+    private readonly Dictionary<string, List<(string Value, string Title,
+                                              bool Available)>> _options = [];
 
     private void Build()
     {
@@ -170,6 +234,25 @@ public partial class SettingsPage : UserControl
         var type = spec["type"]?.GetValue<string>() ?? "string";
         var value = _values.GetValueOrDefault(key);
 
+        // Список известных значений — выпадающий список, а не строка.
+        // Набор пришёл от того, кто его знает: от ядра или от оболочки.
+        if (_options.TryGetValue(key, out var known))
+            return known.Count > 0
+                ? BuildChoice(key, known, value?.GetValue<string>() ?? "")
+                : Nothing();
+
+        // Путь: строка плюс «Обзор…». Каким окном выбирать — решает
+        // оболочка, ядро сказало лишь, что это путь.
+        // Порядок важен: у списка папок есть и тип «массив», и формат
+        // «путь». Массив решает, чем правят; формат — чем добавляют.
+        if (type == "array")
+            return BuildList(key, value as JsonArray,
+                             spec["format"]?.GetValue<string>() ?? "");
+        if (type == "object") return BuildMap(key, value as JsonObject);
+
+        if (spec["format"]?.GetValue<string>() is { } format)
+            return BuildPath(key, format, Show(value));
+
         if (type == "boolean")
         {
             var toggle = new CheckBox
@@ -187,9 +270,8 @@ public partial class SettingsPage : UserControl
         {
             var box = new ComboBox
             {
-                Width = 260,
-                Height = 36,
-                VerticalContentAlignment = VerticalAlignment.Center,
+                Style = (Style)FindResource("Choice"),
+                Width = 280,
                 ItemsSource = choices.Select(c => c!.GetValue<string>()).ToArray(),
                 SelectedItem = value?.GetValue<string>(),
             };
@@ -209,6 +291,259 @@ public partial class SettingsPage : UserControl
         };
         field.LostFocus += async (_, _) => await SaveAsync(key, Parse(field.Text, type));
         return field;
+    }
+
+    /// <summary>
+    /// Выпадающий список. Недоступное показано, но выбрать нельзя.
+    /// </summary>
+    /// <remarks>
+    /// Прятать неустановленный движок нельзя: человек не узнает, что такой
+    /// вообще бывает, и будет искать его в интернете, стоя перед списком, где
+    /// он есть. Показанный и погашенный — это ответ «такое бывает, но у вас
+    /// не установлено».
+    /// </remarks>
+    private FrameworkElement BuildChoice(string key,
+        List<(string Value, string Title, bool Available)> known, string current)
+    {
+        var box = new ComboBox
+        {
+            Style = (Style)FindResource("Choice"),
+            Width = 280,
+        };
+        foreach (var (value, title, available) in known)
+            box.Items.Add(new ComboBoxItem
+            {
+                Content = title.Length > 0 ? title : value,
+                Tag = value,
+                IsEnabled = available,
+            });
+
+        box.SelectedItem = box.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string?)item.Tag == current);
+
+        // Сохранённого значения в сегодняшнем наборе может не быть: движок
+        // сменили, модель удалили. Пустой список — худший из ответов: он
+        // выглядит как «ничего не выбрано», хотя выбрано, и работает.
+        if (box.SelectedItem is null && current.Length > 0)
+        {
+            var stale = new ComboBoxItem
+            {
+                Content = $"{current} — сейчас недоступно",
+                Tag = current,
+            };
+            box.Items.Insert(0, stale);
+            box.SelectedItem = stale;
+        }
+        box.SelectionChanged += async (_, _) =>
+        {
+            if (box.SelectedItem is ComboBoxItem { Tag: string chosen })
+                await SaveAsync(key, chosen);
+        };
+        return box;
+    }
+
+    /// <summary>
+    /// Выбирать не из чего — и это надо сказать, а не дать поле ввода.
+    /// </summary>
+    /// <remarks>
+    /// У «Без озвучки» голосов нет. Поле, куда можно вписать что угодно,
+    /// пообещало бы, что вписанное заработает.
+    /// </remarks>
+    private FrameworkElement Nothing()
+    {
+        var box = new ComboBox
+        {
+            Style = (Style)FindResource("Choice"),
+            Width = 280,
+            IsEnabled = false,
+        };
+        box.Items.Add(new ComboBoxItem { Content = "выбирать не из чего" });
+        box.SelectedIndex = 0;
+        return box;
+    }
+
+    /// <summary>Путь: поле и «Обзор…».</summary>
+    private FrameworkElement BuildPath(string key, string format, string current)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        var field = new TextBox
+        {
+            Style = (Style)FindResource("Field"),
+            Width = 200,
+            Text = current,
+            IsReadOnly = true,
+            ToolTip = current,
+        };
+        var browse = new Button
+        {
+            Style = (Style)FindResource("Btn"),
+            Content = "Обзор…",
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        browse.Click += async (_, _) =>
+        {
+            var picked = format == "folder" ? PickFolder() : PickFile();
+            if (picked is null) return;
+            field.Text = picked;
+            field.ToolTip = picked;
+            await SaveAsync(key, picked);
+        };
+        row.Children.Add(field);
+        row.Children.Add(browse);
+        return row;
+    }
+
+    private static string? PickFolder()
+    {
+        var dialog = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = "Где лежит модель",
+        };
+        return dialog.ShowDialog() == true ? dialog.FolderName : null;
+    }
+
+    private static string? PickFile()
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = "Выберите файл модели",
+            Filter = "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*",
+        };
+        return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    /// <summary>
+    /// Список: что в нём есть, что добавить, что убрать.
+    /// </summary>
+    /// <remarks>
+    /// Строка через запятую вместо списка была бы приглашением потерять
+    /// путь с запятой в имени. Здесь добавляют и убирают по одному.
+    /// </remarks>
+    private FrameworkElement BuildList(string key, JsonArray? current,
+                                       string format)
+    {
+        var items = (current ?? []).Select(v => v?.GetValue<string>() ?? "")
+                                   .Where(v => v.Length > 0).ToList();
+        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+
+        foreach (var item in items)
+        {
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+            };
+            row.Children.Add(new TextBlock
+            {
+                Text = item,
+                Style = (Style)FindResource("Text.Meta"),
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 220,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = item,
+            });
+            var drop = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = "Убрать",
+                Tag = item,
+            };
+            drop.Click += async (_, _) =>
+            {
+                items.Remove(item);
+                await SaveAsync(key, new JsonArray(
+                    items.Select(v => (JsonNode)v!).ToArray()));
+            };
+            row.Children.Add(drop);
+            stack.Children.Add(row);
+        }
+
+        async Task AddAsync(string what)
+        {
+            if (what.Length == 0 || items.Contains(what)) return;
+            items.Add(what);
+            await SaveAsync(key, new JsonArray(
+                items.Select(v => (JsonNode)v!).ToArray()));
+        }
+
+        var adding = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 4, 0, 0),
+        };
+
+        // Папку выбирают окном, слово набирают. Одна кнопка на оба случая
+        // означала бы либо путь с опечаткой, либо выбор папки вместо слова.
+        if (format == "folder")
+        {
+            var add = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = "Добавить папку…",
+            };
+            add.Click += async (_, _) =>
+            {
+                if (PickFolder() is { } folder) await AddAsync(folder);
+            };
+            adding.Children.Add(add);
+        }
+        else
+        {
+            var typed = new TextBox
+            {
+                Style = (Style)FindResource("Field"),
+                Width = 150,
+                Margin = new Thickness(0, 0, 8, 0),
+            };
+            var add = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = "Добавить",
+            };
+            add.Click += async (_, _) =>
+            {
+                await AddAsync(typed.Text.Trim());
+                typed.Clear();
+            };
+            adding.Children.Add(typed);
+            adding.Children.Add(add);
+        }
+        stack.Children.Add(adding);
+        return stack;
+    }
+
+    /// <summary>
+    /// Словарь: сколько записей и как забыть их все.
+    /// </summary>
+    /// <remarks>
+    /// Выученные соответствия правят не по одному: человек не помнит, какое
+    /// слово к какой программе привязалось, — он помнит, что Рина «путает».
+    /// Поэтому счётчик и «забыть все», как и было в 3.1.0.
+    /// </remarks>
+    private FrameworkElement BuildMap(string key, JsonObject? current)
+    {
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        row.Children.Add(new TextBlock
+        {
+            Text = $"записей: {current?.Count ?? 0}",
+            Style = (Style)FindResource("Text.Meta"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0),
+        });
+        var forget = new Button
+        {
+            Style = (Style)FindResource("Btn"),
+            Content = SettingsLayout.ClearWordOf(key),
+            IsEnabled = (current?.Count ?? 0) > 0,
+        };
+        forget.Click += async (_, _) => await SaveAsync(key, new JsonObject());
+        row.Children.Add(forget);
+        return row;
     }
 
     /// <summary>
@@ -272,6 +607,9 @@ public partial class SettingsPage : UserControl
             _values[key] = value;
             if (key == "finish" && _link is not null)
                 await _link.SetFinishAsync(value.GetValue<string>());
+            // Смена движка меняет набор голосов: списки перечитываются, а не
+            // остаются от прошлого движка.
+            if (key is "tts_engine" or "stt_engine") await LoadOptionsAsync();
             Build();          // зависимости могли измениться
         }
     }

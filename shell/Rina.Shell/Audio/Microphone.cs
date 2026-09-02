@@ -69,6 +69,18 @@ public sealed class Microphone : IDisposable
         return found;
     }
 
+    /// <summary>
+    /// Найти устройство по имени. Не нашлось — устройство по умолчанию.
+    /// </summary>
+    /// <remarks>
+    /// Настройка хранит имя, а не номер, потому что номера перетасовываются
+    /// от втыкания наушников: сохранённая «единица» назавтра оказывается
+    /// другим микрофоном молча. Имя же либо совпадает, либо честно не
+    /// находится — и тогда работает устройство по умолчанию, а не случайное.
+    /// </remarks>
+    public static int IndexOf(string name) => Devices()
+        .FirstOrDefault(d => d.Name == name)?.Index ?? 0;
+
     public void Start(int deviceIndex = 0, int chunkMilliseconds = 100)
     {
         if (Running) return;

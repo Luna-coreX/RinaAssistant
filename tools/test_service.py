@@ -480,5 +480,63 @@ danger.read(1)
 danger.wait()
 
 print()
+print("=== F04: список значений спрашивают, а не угадывают ===")
+
+# Изменчивое отделено от постоянного: `describe` говорит, что набор есть,
+# `options` — какой он сегодня. Проверяется в живом ядре, потому что ответ
+# зависит от того, что на машине действительно установлено.
+opt = Core()
+opt.handshake()
+
+opt.ask("settings.describe")
+schema = opt.read(1)[0].payload["schema"]
+dynamic = sorted(k for k, v in schema.items() if v.get("dynamic"))
+check("схема объявляет изменчивые ключи", len(dynamic) >= 4, f"| {dynamic}")
+check("у изменчивого ключа нет перечисления в схеме",
+      all("choices" not in schema[k] for k in dynamic),
+      "| иначе список закешируется вместе со схемой")
+check("путь объявлен форматом, а не догадкой",
+      schema.get("vosk_model", {}).get("format") == "folder"
+      and schema.get("piper_model", {}).get("format") == "file",
+      f"| {schema.get('vosk_model')}")
+
+opt.ask("settings.options", {"keys": dynamic})
+listed = opt.read(1)[0].payload["options"]
+check("ядро перечислило все спрошенные ключи",
+      set(listed) == set(dynamic), f"| {sorted(listed)}")
+check("варианты названы по-человечески",
+      all(o["title"] for o in listed["tts_engine"]),
+      f"| {[o['title'] for o in listed['tts_engine']][:2]}")
+check("недоступное показано, а не спрятано",
+      any(not o["available"] for o in listed["stt_engine"]),
+      "| иначе человек не узнает, что такое бывает")
+
+# Значение вне сегодняшнего набора не принимается: набор — это правда о
+# машине, а не украшение списка.
+opt.ask("settings.set", {"values": {"tts_engine": "такого-нет"}})
+verdict = opt.read(1)[0].payload["verdicts"]["tts_engine"]
+check("чужое значение отклонено", not verdict["accepted"],
+      f"| {verdict['code']}")
+
+# Смена движка уводит за собой голос: у каждого движка своя нумерация, и
+# оставленный чужой голос молчал бы навсегда.
+before = listed["voice"]
+opt.ask("settings.set", {"values": {"tts_engine": "silent"}})
+said = opt.read(1)[0].payload["verdicts"]["tts_engine"]
+check("движок принят", said["accepted"], f"| {said}")
+opt.ask("settings.get", {"keys": ["voice"]})
+now = opt.read(1)[0].payload["values"]["voice"]
+opt.ask("settings.options", {"keys": ["voice"]})
+after = opt.read(1)[0].payload["options"]["voice"]
+check("голос остался тем, что движок действительно умеет",
+      now in {o["value"] for o in after},
+      f"| голос {now!r}, движок предлагает "
+      f"{[o['value'] for o in after]} (было {[o['value'] for o in before]})")
+
+opt.ask("core.shutdown")
+opt.read(1)
+opt.wait()
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

@@ -120,6 +120,38 @@ public static class SettingsLayout
         "always_listen",
     ];
 
+    /// <summary>
+    /// Ключи, чей список значений знает оболочка, а не ядро.
+    /// </summary>
+    /// <remarks>
+    /// Устройства ввода и вывода — свойство звуковой подсистемы, а она в 4.0
+    /// принадлежит оболочке (<c>4.0-F09</c>). Ядро их не видит вовсе и
+    /// перечислить не может; оно лишь хранит выбранное имя. Это не исключение
+    /// из [ADR 0006](../../../docs/adr/0006-settings-ownership.md), а его
+    /// прямое следствие: смысл у того, кто знает.
+    /// </remarks>
+    public static readonly HashSet<string> ShellKnows =
+    [
+        "input_device",
+        "output_device",
+    ];
+
+    /// <summary>
+    /// Как называется «стереть всё» для конкретного ключа.
+    /// </summary>
+    /// <remarks>
+    /// Выученные соответствия <b>забывают</b>, назначенные сочетания
+    /// <b>сбрасывают</b>. Одно слово на оба случая было бы неправдой в
+    /// одном из них: забытое Рина выучит заново сама, сброшенное придётся
+    /// назначать руками.
+    /// </remarks>
+    public static string ClearWordOf(string key) => key switch
+    {
+        "app_aliases" => "Забыть все",
+        "action_hotkeys" => "Сбросить все",
+        _ => "Очистить",
+    };
+
     /// <summary>Все ключи, которые оболочка знает по имени.</summary>
     public static readonly HashSet<string> Known =
         Sections.SelectMany(s => s.Keys).Select(k => k.Key).ToHashSet();

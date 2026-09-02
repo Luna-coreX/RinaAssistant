@@ -70,6 +70,7 @@ BASE_METHODS = (
     "command.handle",
     "command.run_by_id",
     "settings.describe",
+    "settings.options",
     "settings.get",
     "settings.set",
     "core.shutdown",

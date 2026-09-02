@@ -21,6 +21,7 @@ public partial class App
     private Tray? _tray;
     private Hotkeys? _hotkeys;
     private string? _shotPath;
+    private double _shotScroll;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -39,6 +40,8 @@ public partial class App
         if (args.Contains("--check-core"))
         {
             _shotPath = Value(args, "--shot");
+            _shotScroll = double.TryParse(Value(args, "--scroll"), out var down)
+                ? down : 0;
             // Без окна WPF завершается сам, едва OnStartup вернёт управление:
             // по умолчанию приложение живёт, пока живо хотя бы одно окно.
             // Самопроверке окно показывать незачем, поэтому закрываемся мы
@@ -189,6 +192,27 @@ public partial class App
               settings is { KeyCount: > 20 },
               $"| {settings?.KeyCount}");
 
+        // Раскрытый список проверяется отдельно: всплывающее окно — своё
+        // окно, в снимок главного оно не попадает вовсе, и сломанный
+        // шаблон остался бы незамеченным ровно там, где он написан руками.
+        if (settings?.FirstChoice() is { } choice)
+        {
+            choice.IsDropDownOpen = true;
+            await Task.Delay(300);
+            var popup = choice.Template.FindName("PART_Popup", choice)
+                        as System.Windows.Controls.Primitives.Popup;
+            Check("список раскрывается своим шаблоном",
+                  popup is { IsOpen: true, Child: not null },
+                  $"| вариантов {choice.Items.Count}");
+            Check("варианты обрели вид",
+                  choice.ItemContainerGenerator.ContainerFromIndex(0)
+                      is FrameworkElement { IsLoaded: true });
+            choice.IsDropDownOpen = false;
+            await Task.Delay(100);
+        }
+        else Check("список раскрывается своим шаблоном", false,
+                   "| ни одного списка на странице");
+
         // Снимок живого окна, если попросили: настройки с настоящими
         // значениями от настоящего ядра — единственный способ увидеть, как
         // это выглядит на самом деле, а не как выглядит пустая страница.
@@ -196,6 +220,11 @@ public partial class App
         {
             window.ShowSectionFor("settings");
             await Task.Delay(800);
+            if (_shotScroll > 0 && window.CurrentPage is Pages.SettingsPage page)
+            {
+                page.ScrollTo(_shotScroll);
+                await Task.Delay(200);
+            }
             Save(window, shot);
         }
 
