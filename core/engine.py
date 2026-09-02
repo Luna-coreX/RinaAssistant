@@ -14,6 +14,7 @@
 """
 
 import queue
+import contextvars
 import threading
 import time
 
@@ -386,8 +387,9 @@ class RinaEngine:
         for cmd in self._cmd_store.all():
             if cmd.get("id") == command_id:
                 self._ensure_command_worker()
+                ctx = contextvars.copy_context()
                 threading.Thread(
-                    target=self._run_user_command, args=(cmd,),
+                    target=ctx.run, args=(self._run_user_command, cmd),
                     name="rina-run-command", daemon=True).start()
                 return
 
@@ -405,10 +407,10 @@ class RinaEngine:
 
     def _command_loop(self):
         while True:
-            text, require_wake, source, done = self._commands.get()
+            text, require_wake, source, done, ctx = self._commands.get()
             try:
-                self.handle_command(text, require_wake=require_wake,
-                                    source=source)
+                ctx.run(self.handle_command, text,
+                        require_wake=require_wake, source=source)
             except Exception as e:
                 # без этого исключение уносило бы воркер, и все следующие
                 # команды остались бы в очереди навсегда
@@ -433,7 +435,16 @@ class RinaEngine:
         """
         self._ensure_command_worker()
         done = threading.Event()
-        self._commands.put((text, require_wake, source, done))
+        # Вместе с командой в очередь кладётся контекст выполнения. В нём
+        # едет сквозная трассировка (4.0-D15): рабочий поток долгоживущий и
+        # обслуживает много команд подряд, поэтому связать его с одной из них
+        # нельзя — контекст принадлежит команде, а не потоку.
+        #
+        # Первый прогон двух процессов показал это прямо: ответ Рины приходил
+        # с трассировкой, не совпадающей с трассировкой запроса, и связать
+        # запрос с ответом в двух журналах было нечем.
+        self._commands.put((text, require_wake, source, done,
+                            contextvars.copy_context()))
         if wait:
             done.wait()
         return done
