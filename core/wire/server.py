@@ -355,7 +355,14 @@ class ProtocolServer:
             with store.transaction():
                 for key, value in accepted.items():
                     store.set(key, value)
-            self._settle_voice(store, accepted, verdicts)
+                self._settle_voice(store, accepted, verdicts)
+                # Записать на диск. `set()` только помечает группу
+                # изменившейся, и в 3.1.0 сохранял тот, кто менял, — экран
+                # настроек. Экран уехал в другой процесс, а вызов остался
+                # там: настройка держалась до конца работы ядра и пропадала.
+                # Пишем внутри транзакции, чтобы между изменением и записью
+                # не встрял чужой поток.
+                store.save()
         return {"values": {k: store.get(k) for k in accepted},
                 "verdicts": verdicts}
 

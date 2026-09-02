@@ -62,15 +62,28 @@ def isolate_storage():
     и хранилище, созданное раньше, уже смотрит в настоящий каталог.
 
     Повторный вызов ничего не делает: изолируем один раз за процесс.
+
+    `RINA_SANDBOX_DIR` задаёт каталог снаружи — и тогда его не удаляют на
+    выходе. Это нужно проверкам, которым важно, что переживает **перезапуск**
+    ядра: два процесса, каждый со своей временной папкой, ничего друг другу
+    не передадут, и проверка сохранности настроек всегда была бы зелёной,
+    ничего не проверяя. Убирает за собой тот, кто назначил каталог.
     """
     global _isolated
     if _isolated:
         return _isolated
-    _isolated = tempfile.mkdtemp(prefix="rina-sandbox-")
+
+    shared = os.environ.get("RINA_SANDBOX_DIR")
+    if shared:
+        os.makedirs(shared, exist_ok=True)
+        _isolated = shared
+    else:
+        _isolated = tempfile.mkdtemp(prefix="rina-sandbox-")
+        atexit.register(shutil.rmtree, _isolated, True)
+
     os.environ["APPDATA"] = _isolated
     os.environ["XDG_CONFIG_HOME"] = _isolated
     os.environ["HOME"] = _isolated
-    atexit.register(shutil.rmtree, _isolated, True)
     return _isolated
 
 

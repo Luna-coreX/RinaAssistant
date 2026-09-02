@@ -15,8 +15,10 @@ E01 + E02: ядро отдельным процессом, и с ним разг
 """
 
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
@@ -536,6 +538,75 @@ check("голос остался тем, что движок действите�
 opt.ask("core.shutdown")
 opt.read(1)
 opt.wait()
+
+print()
+print("=== E06a: настройка переживает перезапуск ядра ===")
+
+# Единственная проверка, которая ловит это: в одном процессе значение
+# читается обратно и без записи на диск — оно лежит в памяти. В 3.1.0
+# сохранял тот, кто менял, — экран настроек; экран уехал в другой процесс,
+# а вызов остался там, и настройка держалась ровно до выхода из ядра.
+# Оба ядра смотрят в один каталог: иначе «перезапуск» — это два разных
+# хранилища, и проверка зелена, ничего не проверив.
+shared_dir = tempfile.mkdtemp(prefix="rina-restart-")
+os.environ["RINA_SANDBOX_DIR"] = shared_dir
+
+keeper = Core()
+keeper.handshake()
+keeper.ask("settings.get", {"keys": ["speed"]})
+was = keeper.read(1)[0].payload["values"]["speed"]
+other = 133 if was != 133 else 145
+
+keeper.ask("settings.set", {"values": {"speed": other}})
+check("значение принято",
+      keeper.read(1)[0].payload["verdicts"]["speed"]["accepted"])
+keeper.ask("core.shutdown")
+keeper.read(1)
+keeper.wait()
+
+again = Core()
+again.handshake()
+again.ask("settings.get", {"keys": ["speed"]})
+now = again.read(1)[0].payload["values"]["speed"]
+check("после перезапуска ядра настройка на месте", now == other,
+      f"| было {was}, ставили {other}, прочитали {now}")
+
+again.ask("settings.set", {"values": {"speed": was}})
+again.read(1)
+again.ask("core.shutdown")
+again.read(1)
+again.wait()
+
+# И то же с другой стороны: ядро, которому меняют один ключ, не должно
+# уносить с собой остальные. Так пропали настройки вживую — оболочка
+# записала отделку, а на диск уехала вся группа умолчаниями, потому что
+# ядро файла не читало. Проверка кладёт заведомо чужие значения в файл до
+# запуска ядра и смотрит, что с ними станет.
+import json as _json3
+
+untouched = os.path.join(shared_dir, "RinaAssistant", "settings.json")
+kept = _json3.load(open(untouched, encoding="utf-8"))
+kept["tts_engine"] = "edge"
+kept["speed"] = 177
+_json3.dump(kept, open(untouched, "w", encoding="utf-8"), ensure_ascii=False)
+
+careful = Core()
+careful.handshake()
+careful.ask("settings.set", {"values": {"finish": "black"}})
+careful.read(1)
+careful.ask("core.shutdown")
+careful.read(1)
+careful.wait()
+
+after = _json3.load(open(untouched, encoding="utf-8"))
+check("соседние настройки пережили запись одной",
+      after.get("tts_engine") == "edge" and after.get("speed") == 177,
+      f"| движок {after.get('tts_engine')!r}, скорость {after.get('speed')!r}")
+check("а записанное записалось", after.get("finish") == "black",
+      f"| {after.get('finish')!r}")
+
+os.environ.pop("RINA_SANDBOX_DIR", None)
+shutil.rmtree(shared_dir, ignore_errors=True)
 
 print()
 print("ИТОГО ошибок:", fails)

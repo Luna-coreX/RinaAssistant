@@ -195,9 +195,18 @@ public partial class MainWindow : Window
     /// воспринимается как сломанная, — поэтому поведение выбирает человек, а
     /// не мы за него. Из трея выйти можно всегда.
     /// </remarks>
-    private void OnClose(object sender, RoutedEventArgs e)
+    private void OnClose(object sender, RoutedEventArgs e) => OnCloseButton();
+
+    /// <summary>То же, что нажать крестик. Отдельно — ради проверки.</summary>
+    /// <remarks>
+    /// Прятать окно можно только если значок в трее действительно заведён:
+    /// иначе вернуть окно будет нечем и программа останется работать
+    /// невидимой и недостижимой. Поэтому спрашивается не «есть ли объект
+    /// трея», а «получилось ли завести значок» — объект есть всегда.
+    /// </remarks>
+    public void OnCloseButton()
     {
-        if (MinimiseToTray && Tray is not null) Tray.Hide();
+        if (MinimiseToTray && Tray is { Created: true }) Tray.Hide();
         else System.Windows.Application.Current.Shutdown();
     }
 

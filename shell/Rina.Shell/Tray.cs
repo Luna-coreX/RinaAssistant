@@ -38,6 +38,17 @@ public sealed class Tray : IDisposable
     private readonly Window _window;
     private Icon? _drawn;
 
+    /// <summary>
+    /// Получилось ли завести значок.
+    /// </summary>
+    /// <remarks>
+    /// Спрашивать обязательно: если значка нет, прятать окно нельзя —
+    /// вернуть его будет нечем, и программа станет недостижимой, оставаясь
+    /// живой. Из двух неприятностей «крестик закрыл, хотя просили свернуть»
+    /// лучше, чем «программа исчезла».
+    /// </remarks>
+    public bool Created { get; private set; }
+
     /// <summary>Человек попросил выйти совсем.</summary>
     public event Action? ExitRequested;
 
@@ -63,7 +74,14 @@ public sealed class Tray : IDisposable
         {
             if (e.MouseEvent == MouseEvent.IconLeftMouseUp) Show();
         };
+        // Окно значка создаётся явно, и без этой строки значка не было
+        // вовсе. `Create()` у значка заводит запись в области уведомлений,
+        // но окно, которому система шлёт нажатия, остаётся несозданным —
+        // дескриптор нулевой, нажатия уходят в никуда. Снаружи это выглядит
+        // как «трей не работает», а изнутри — как будто всё сделано.
+        _icon.MessageWindow.Create();
         _icon.Create();
+        Created = _icon.MessageWindow.IsCreated;
     }
 
     /// <summary>
@@ -90,6 +108,13 @@ public sealed class Tray : IDisposable
         }
         return Icon.FromHandle(bitmap.GetHicon());
     }
+
+    /// <summary>Окно, которому система шлёт нажатия по значку.</summary>
+    /// <remarks>
+    /// Наружу — ради проверки: значок это прежде всего окно, и важно, на
+    /// каком потоке оно качает свою очередь сообщений.
+    /// </remarks>
+    public IntPtr MessageWindowHandle => _icon.MessageWindow.Handle;
 
     public void Show()
     {

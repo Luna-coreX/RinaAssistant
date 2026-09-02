@@ -129,6 +129,15 @@ def main(argv=None):
         print(f"канал не открылся: {exc}", file=sys.stderr)
         return EXIT_TRANSPORT
 
+    # Настройки читаются до всего остального и вслух: на них смотрят и
+    # движок распознавания, и голос, и планировщик. Хранилище прочитает
+    # себя и само при первом обращении, но тогда в журнале не будет ни
+    # строки о том, откуда взялись значения, — а это первый вопрос, когда
+    # программа ведёт себя не так, как настроена.
+    from core.settings_store import settings as settings_store
+    settings_store.load()
+    log.info("Настройки прочитаны: %s", settings_store.path)
+
     engine = RinaEngine(event_bus=EventBus())
     server = ProtocolServer(engine, channels, app_version=APP_VERSION)
 

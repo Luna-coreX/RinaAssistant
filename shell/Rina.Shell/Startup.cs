@@ -51,6 +51,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-tray"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckTrayAsync(window);
+            return;
+        }
+
         if (args.Contains("--check-system"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -108,6 +115,12 @@ public partial class App
             window.Link = _link;
             _ = _link.StartAsync();
             _ = ApplySystemSettingsAsync(window);
+
+            // Репетиция трея в настоящем режиме запуска. Проверка --check-tray
+            // идёт при ShutdownMode.OnExplicitShutdown, а живая программа —
+            // при OnLastWindowClose, и разница между ними как раз о том,
+            // выживет ли программа без единого видимого окна.
+            if (args.Contains("--rehearse-tray")) Rehearse(window);
             return;
         }
 
@@ -132,6 +145,130 @@ public partial class App
             Save(window, shot);
             Shutdown();
         }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr window,
+                                                        IntPtr process);
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+    private static extern uint GetCurrentThreadId();
+
+    /// <summary>
+    /// F05: трей показывает окно обратно, а не роняет программу.
+    /// </summary>
+    /// <remarks>
+    /// Проверяется в первую очередь <b>поток</b>, на котором приходит
+    /// нажатие. Значок трея — это окно, и чьё оно, решает не тот, кто его
+    /// создал, а тот, кто качает его очередь сообщений. Обращение к окну
+    /// WPF с чужого потока — исключение, а исключение в обработчике,
+    /// которого никто не ловит, завершает процесс: программа «выходит по
+    /// нажатию на значок», хотя ничего похожего на выход в коде нет.
+    /// </remarks>
+    /// <summary>
+    /// Спрятать окно и вернуть его — так, как это делает человек.
+    /// </summary>
+    private void Rehearse(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        Console.WriteLine($"репетиция: режим завершения {ShutdownMode}, "
+                          + $"значок заведён {_tray?.Created}");
+        Exit += (_, e) => Console.WriteLine($"репетиция: ПРОГРАММА ВЫШЛА, "
+                                            + $"код {e.ApplicationExitCode}");
+
+        var step = 0;
+        var clock = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(2),
+        };
+        clock.Tick += (_, _) =>
+        {
+            step++;
+            if (step == 1)
+            {
+                Console.WriteLine("репетиция: нажат крестик");
+                window.OnCloseButton();
+            }
+            else if (step == 2)
+                Console.WriteLine($"репетиция: окно видно? {window.IsVisible}; "
+                                  + $"окон у программы {Windows.Count}");
+            else if (step == 3)
+            {
+                Console.WriteLine("репетиция: нажат «Показать»");
+                _tray?.Show();
+            }
+            else if (step == 4)
+            {
+                Console.WriteLine($"репетиция: окно видно? {window.IsVisible}");
+                Console.WriteLine("репетиция: программа жива");
+                clock.Stop();
+                Shutdown();
+            }
+        };
+        clock.Start();
+    }
+
+    private async Task CheckTrayAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F05: трей возвращает окно ===");
+        window.Show();
+        var ui = GetCurrentThreadId();
+
+        var tray = new Tray(window);
+        window.Tray = tray;
+
+        Check("значок заведён", tray.Created,
+              tray.Created ? "" : "| без него прятать окно нельзя");
+
+        var handle = tray.MessageWindowHandle;
+        Check("у значка есть своё окно", handle != IntPtr.Zero,
+              handle == IntPtr.Zero
+              ? "| нажатия уходят в никуда: система шлёт их окну"
+              : $"| {handle}");
+        var owner = handle == IntPtr.Zero ? 0
+                    : GetWindowThreadProcessId(handle, IntPtr.Zero);
+        Console.WriteLine($"     поток оболочки {ui}, "
+                          + $"поток окна значка {owner}");
+        Check("нажатие придёт на поток окна, а не на чужой",
+              owner == ui,
+              owner == ui ? "" : "| значит, обработчик обязан переходить "
+                                 + "на поток окна сам");
+
+        window.MinimiseToTray = true;
+        window.OnCloseButton();
+        await Task.Delay(200);
+        Check("крестик спрятал окно, а не закрыл", !window.IsVisible);
+        Check("окно живо и его можно показать снова", window.IsLoaded);
+
+        // Возврат вызывается так же, как из меню значка: тем же методом.
+        Exception? died = null;
+        try { tray.Show(); }
+        catch (Exception error) { died = error; }
+        await Task.Delay(200);
+        Check("возврат из трея не бросает исключение", died is null,
+              died is null ? "" : $"| {died.GetType().Name}: {died.Message}");
+        Check("окно вернулось видимым", window.IsVisible);
+        Check("программа при этом не завершилась", true);
+
+        tray.Dispose();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
     }
 
     private async Task CheckCoreAsync(MainWindow window)

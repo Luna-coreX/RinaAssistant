@@ -167,6 +167,7 @@ class SettingsStore:
         self._data = defaults_for()
         self._dirty = set()      # какие группы изменились (для точечной записи)
         self._loaded = False
+        self._loading = False
 
     # ---------- атомарные изменения ----------
     @contextlib.contextmanager
@@ -364,7 +365,17 @@ class SettingsStore:
             return False
 
     def save(self):
-        """Сохраняет только изменённые группы (или все, если неизвестно)."""
+        """
+        Сохраняет только изменённые группы (или все, если неизвестно).
+
+        **Записывать можно только прочитанное.** Хранилище, которое не
+        читали, держит умолчания, и запись затирает файл человека ими —
+        причём не тем ключом, который меняли, а всей группой целиком. Так и
+        пропали настройки: ядро не звало `load()`, оболочка записала одну
+        отделку, и вместе с ней на диск уехали умолчания вместо голоса,
+        движка распознавания и темы.
+        """
+        self._ensure_loaded()
         # Настройки пишут несколько потоков сразу: команда из окна, ответ из
         # потока распознавания, сработавшее напоминание. Раньше save() шёл
         # прямо по self._dirty, и добавление ключа в другом потоке роняло
@@ -378,16 +389,42 @@ class SettingsStore:
             return ok
 
     def save_all(self):
+        self._ensure_loaded()
         with self._lock:
             for g in GROUPS:
                 self._save_group(g)
             self._dirty.clear()
 
     # ---------- доступ ----------
+    def _ensure_loaded(self):
+        """
+        Прочитать файлы, если этого ещё никто не сделал.
+
+        Загрузка была обязанностью того, кто первым обратится, — и в 3.1.0
+        это делало окно, единственный вход в программу. В 4.0 входов стало
+        два: окно уехало в другой процесс, а ядро запускается само. Ядро
+        `load()` не звало, и работало на умолчаниях: настройки читались не
+        те, что человек когда-то выбрал, а записывались поверх его файла.
+
+        Поэтому загрузка теперь не поручение, а свойство хранилища: первое
+        же обращение её вызывает. Забыть нельзя.
+        """
+        with self._lock:
+            if self._loaded or self._loading:
+                return
+            self._loading = True
+            try:
+                self.load()
+            finally:
+                self._loading = False
+
     def get(self, key, default=None):
+        self._ensure_loaded()
         return self._data.get(key, DEFAULTS.get(key, default))
 
     def set(self, key, value):
+        # Записать, не прочитав, значило бы затереть файл умолчаниями.
+        self._ensure_loaded()
         with self._lock:
             self._data[key] = value
             grp = _KEY_TO_GROUP.get(key)
@@ -399,6 +436,7 @@ class SettingsStore:
             self.set(k, v)
 
     def all(self) -> dict:
+        self._ensure_loaded()
         return dict(self._data)
 
     def reset(self, groups=("settings",)):
