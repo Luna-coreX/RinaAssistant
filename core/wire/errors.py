@@ -61,6 +61,8 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
           "рукопожатие ещё не состоялось; позже тот же вызов пройдёт"),
     _spec("protocol.invalid_envelope", "protocol", False,
           "конверт неполон или не разбирается"),
+    _spec("protocol.invalid_payload", "protocol", False,
+          "нагрузка не соответствует объявленной форме события"),
 
     # --- права и подтверждения ----------------------------------------------
     _spec("permission.denied", "user", False,
@@ -172,3 +174,4 @@ ERROR_UNKNOWN_METHOD = "protocol.unknown_method"
 ERROR_FRAME_TOO_LARGE = "protocol.frame_too_large"
 ERROR_NOT_READY = "protocol.not_ready"
 ERROR_INVALID_ENVELOPE = "protocol.invalid_envelope"
+ERROR_INVALID_PAYLOAD = "protocol.invalid_payload"

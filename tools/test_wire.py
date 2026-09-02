@@ -16,15 +16,17 @@ os.chdir(ROOT)
 import re
 
 from core.wire import (CATALOGUE, CONTROL_FRAME_LIMIT, CORE_CAPABILITIES,
-                       Envelope, FrameDecoder, IdGenerator, MessageType,
-                       NO_TRACE, ProtocolFault, SHELL_CAPABILITIES, Session,
-                       SessionState, Side, TraceFilter, current_trace, decode,
-                       encode, encode_frame, make, negotiate, new_trace_id,
-                       trace_scope)
+                       EVENTS, Envelope, FrameDecoder, IdGenerator,
+                       MessageType, NO_TRACE, ProtocolFault, Router,
+                       SHELL_CAPABILITIES, STREAM_DONE, STREAM_FAILED, Session,
+                       SessionState, Side, StreamReceiver, StreamSender,
+                       TraceFilter, current_trace, decode, encode,
+                       encode_frame, event, make, negotiate, new_trace_id,
+                       trace_scope, validate_event)
 from core.wire.errors import (CATEGORIES, ERROR_FRAME_TOO_LARGE,
                               ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
-                              ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
-                              ProtocolError)
+                              ERROR_INVALID_PAYLOAD, ERROR_NOT_READY,
+                              ERROR_UNKNOWN_METHOD, ProtocolError)
 
 fails = 0
 
@@ -420,6 +422,153 @@ kept = _Record()
 kept.trace = "t-своя"
 TraceFilter().filter(kept)
 check("готовое поле не затирается", kept.trace == "t-своя")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D11: каталог событий ===")
+
+# Сверка с перечнем 3.1.0: спецификация писалась по нему, и потерянное при
+# переносе событие — это поведение, о котором ядро сообщать перестанет.
+from core.protocol import ALL_EVENTS as EVENTS_310
+
+STREAMING = {"stream.chunk", "stream.end"}
+
+lost = sorted(set(EVENTS_310) - set(EVENTS))
+check("ни одно событие 3.1.0 не потеряно", not lost, f"| потеряно: {lost}")
+print(f"     событий 3.1.0: {len(EVENTS_310)}, в каталоге провода: {len(EVENTS)}")
+
+# Сверка с документом: таблица §6. Потоковые события живут в §7 и в этой
+# таблице отсутствуют законно.
+section = spec_text[spec_text.index("### Ядро → оболочка (события)"):]
+section = section[:section.index("### Ядро → оболочка (запросы)")]
+spec_events = set()
+for line in section.split("\n"):
+    if line.startswith("|") and not line.startswith("|---"):
+        cell = line.split("|")[1]
+        spec_events |= set(re.findall(r"`([a-z]+\.[a-z_]+)`", cell))
+check("таблица событий документа прочитана", len(spec_events) >= 10,
+      f"| {len(spec_events)}")
+check("документ и каталог событий совпадают",
+      spec_events == set(EVENTS) - STREAMING,
+      f"| только в документе: {sorted(spec_events - set(EVENTS))}, "
+      f"только в каталоге: {sorted(set(EVENTS) - spec_events - STREAMING)}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D11: нагрузка проверяется у отправителя ===")
+
+validate_event("history.changed", {})
+check("событие без полей проходит пустым", True)
+check("не хватает поля",
+      fault(lambda: validate_event("speech.recognized", {}),
+            ERROR_INVALID_PAYLOAD) is not None)
+err = fault(lambda: validate_event("speech.recognized",
+                                   {"text": "да", "мысли": "…"}),
+            ERROR_INVALID_PAYLOAD)
+check("лишнее поле названо поимённо",
+      err is not None and err.details.get("fields") == ["мысли"])
+check("не тот тип",
+      fault(lambda: validate_event("assistant.thinking", {"active": "да"}),
+            ERROR_INVALID_PAYLOAD) is not None)
+err = fault(lambda: validate_event("window.action", {"action": "станцуй"}),
+            ERROR_INVALID_PAYLOAD)
+check("значение вне перечисления отклонено",
+      err is not None and err.details.get("got") == "станцуй")
+validate_event("window.action", {"action": "screenshot"})
+check("значение из перечисления проходит", True)
+check("незнакомое событие отправить нельзя",
+      fault(lambda: validate_event("рина.загрустила", {}),
+            ERROR_INVALID_PAYLOAD) is not None)
+
+with trace_scope("t-ev"):
+    ev = event("assistant.response", {"text": "готово"}, id="c-500")
+check("событие собрано с трассировкой из контекста",
+      ev.trace_id == "t-ev" and ev.method == "assistant.response")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D11: приём и молчаливое игнорирование ===")
+
+seen = []
+broken = []
+router = Router(on_broken=lambda name, exc: broken.append(name))
+router.on("assistant.response", lambda p: seen.append(p["text"]))
+
+check("знакомое событие доставлено", router.dispatch(ev) is True)
+check("нагрузка дошла целиком", seen == ["готово"])
+
+# Незнакомое событие приходит от более новой стороны — и это не ошибка,
+# иначе правило «добавить событие можно, не меняя версию» было бы ложью.
+future = Envelope.event("рина.загрустила", {"уровень": 3}, id="c-501",
+                        trace_id="t-1")
+check("незнакомое событие проигнорировано молча",
+      router.dispatch(future) is False
+      and router.ignored == ["рина.загрустила"])
+
+# Знакомое, но испорченное, роняет только себя.
+bad_ev = Envelope.event("speech.recognized", {"text": 42}, id="c-502",
+                        trace_id="t-1")
+check("испорченное событие не доставлено", router.dispatch(bad_ev) is False)
+check("о нём сообщено наблюдателю", broken == ["speech.recognized"])
+check("подписчик не пострадал", seen == ["готово"])
+
+try:
+    Router().on("нет.такого", lambda p: None)
+    check("подписка на необъявленное событие отклонена", False)
+except ValueError:
+    check("подписка на необъявленное событие отклонена", True)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D06: потоковый текст ===")
+
+sender = StreamSender(IdGenerator("c-"))
+sid = sender.begin()
+check("номер потока занят", sid == 1 and sid in sender.open)
+
+with trace_scope("t-stream"):
+    parts = [sender.chunk(sid, t) for t in
+             ("Столица ", "Австралии — ", "Канберра.")]
+    closing = sender.end(sid, STREAM_DONE)
+
+check("части несут номер потока",
+      all(p.stream_id == sid for p in parts) and closing.stream_id == sid)
+check("части несут одну трассировку",
+      {p.trace_id for p in parts} == {"t-stream"})
+check("поток закрыт", sid not in sender.open)
+check("часть после закрытия не отправляется",
+      fault(lambda: sender.chunk(sid, "ещё"), ERROR_INVALID_PAYLOAD)
+      is not None)
+check("часть незанятого потока не отправляется",
+      fault(lambda: sender.chunk(99, "чужое"), ERROR_INVALID_PAYLOAD)
+      is not None)
+
+sid2 = sender.begin()
+check("неизвестная причина закрытия отклонена",
+      fault(lambda: sender.end(sid2, "надоело"), ERROR_INVALID_PAYLOAD)
+      is not None)
+sender.end(sid2, STREAM_FAILED)
+
+# §7: часть потока может прийти раньше ответа, открывшего поток. Приёмник,
+# отбрасывающий ранние части, терял бы начало каждого быстрого ответа —
+# тем чаще, чем быстрее отвечает модель.
+receiver = StreamReceiver()
+wire = b"".join(encode_frame(m) for m in parts + [closing])
+delivered = 0
+for message in FrameDecoder().feed(wire):
+    if receiver.accept(message):
+        delivered += 1
+check("все сообщения потока приняты", delivered == 4)
+check("текст собран в исходном порядке",
+      receiver.text(sid) == "Столица Австралии — Канберра.",
+      f"| {receiver.text(sid)!r}")
+check("поток отмечен завершённым",
+      receiver.done(sid) and receiver.finished[sid] == STREAM_DONE)
+check("приёмник не трогает чужие сообщения", receiver.accept(ev) is False)
 
 print()
 print("ИТОГО ошибок:", fails)
