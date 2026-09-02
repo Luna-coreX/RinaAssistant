@@ -48,10 +48,10 @@ public partial class MainWindow : Window
         _pages = new Dictionary<string, Func<UIElement>>
         {
             ["dialog"] = () => new Pages.DialoguePage(Link),
-            ["commands"] = () => Pages.Placeholder.For("Команды"),
+            ["commands"] = () => new Pages.CommandsPage(Link),
             ["reminders"] = () => new Pages.RemindersPage(Link),
             ["plugins"] = () => Pages.Placeholder.For("Плагины"),
-            ["settings"] = () => Pages.Placeholder.For("Настройки"),
+            ["settings"] = () => new Pages.SettingsPage(Link),
         };
 
         BuildSections();
@@ -73,6 +73,12 @@ public partial class MainWindow : Window
             Sections.Children.Add(item);
         }
     }
+
+    /// <summary>Что сейчас показано — для проверок.</summary>
+    public object? CurrentPage => Pane.Content;
+
+    /// <summary>Открыть раздел снаружи — для снимков и проверок.</summary>
+    public void ShowSectionFor(string section) => ShowSection(section);
 
     private void ShowSection(string section)
     {

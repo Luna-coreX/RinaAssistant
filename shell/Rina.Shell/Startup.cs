@@ -17,6 +17,7 @@ public partial class App
     /// смотреть вовсе. Снимок делает тот же код, что рисует настоящее окно.
     /// </remarks>
     private CoreLink? _link;
+    private string? _shotPath;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -34,6 +35,7 @@ public partial class App
         // выглядит; это показывает, что оно живое.
         if (args.Contains("--check-core"))
         {
+            _shotPath = Value(args, "--shot");
             // Без окна WPF завершается сам, едва OnStartup вернёт управление:
             // по умолчанию приложение живёт, пока живо хотя бы одно окно.
             // Самопроверке окно показывать незачем, поэтому закрываемся мы
@@ -62,6 +64,10 @@ public partial class App
         if (Value(args, "--core-state") is { } state)
             window.ShowCoreState(Enum.Parse<Rina.Protocol.CoreState>(state, true),
                                  Value(args, "--core-reason") ?? "");
+
+        // Снимок может показать любой раздел: проверять страницу, каждый
+        // раз щёлкая по колонке руками, — способ проверять её редко.
+        if (Value(args, "--section") is { } section) window.ShowSectionFor(section);
 
         window.Width = 940;
         window.Height = 620;
@@ -116,11 +122,57 @@ public partial class App
               window.FinishValue is "silver" or "black",
               $"| {window.FinishValue}");
 
+        // Страницы строятся только в живом дереве, поэтому окно показывается
+        // за краем экрана: проверять страницу, не показав её, значит
+        // проверять конструктор, а не страницу.
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+
+        window.ShowSectionFor("settings");
+        var settings = await WaitFor(() => window.CurrentPage as Pages.SettingsPage,
+                                     p => p.SectionCount > 0);
+        Check("настройки построены из схемы ядра", settings is not null,
+              settings is null ? "| страница пуста"
+                               : $"| секций {settings.SectionCount}, "
+                                 + $"ключей {settings.KeyCount}");
+        Check("ключей пришло столько, сколько ядро объявило",
+              settings is { KeyCount: > 20 },
+              $"| {settings?.KeyCount}");
+
+        // Снимок живого окна, если попросили: настройки с настоящими
+        // значениями от настоящего ядра — единственный способ увидеть, как
+        // это выглядит на самом деле, а не как выглядит пустая страница.
+        if (_shotPath is { } shot)
+        {
+            window.ShowSectionFor("settings");
+            await Task.Delay(800);
+            Save(window, shot);
+        }
+
+        window.ShowSectionFor("commands");
+        await Task.Delay(1500);
+        Check("страница команд открылась",
+              window.CurrentPage is Pages.CommandsPage);
+
+        window.Hide();
+
         await link.DisposeAsync();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    private static async Task<T?> WaitFor<T>(Func<T?> get, Func<T, bool> ready)
+        where T : class
+    {
+        for (var i = 0; i < 200; i++)
+        {
+            if (get() is { } value && ready(value)) return value;
+            await Task.Delay(100);
+        }
+        return null;
     }
 
     protected override void OnExit(ExitEventArgs e)

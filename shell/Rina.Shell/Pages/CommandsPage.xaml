@@ -1,0 +1,67 @@
+<UserControl x:Class="Rina.Shell.Pages.CommandsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Команды" Style="{StaticResource Text.Title}"
+               Margin="0,0,0,16" />
+
+    <StackPanel Grid.Row="1" Margin="0,0,0,12">
+      <TextBlock x:Name="Legend" Text="МОИ КОМАНДЫ"
+                 Style="{StaticResource Text.Section}" />
+      <TextBlock x:Name="Empty" Margin="0,12,0,0"
+                 Text="Своих команд пока нет."
+                 Style="{StaticResource Text.Body}" TextWrapping="Wrap"
+                 Foreground="{DynamicResource C.InkSoft}"
+                 Visibility="Collapsed" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="Items">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,6">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}"
+                             Style="{StaticResource Text.Body}" />
+                  <TextBlock Text="{Binding What}"
+                             Style="{StaticResource Text.Meta}"
+                             Margin="0,2,0,0" />
+                </StackPanel>
+                <CheckBox Grid.Column="1" Style="{StaticResource Toggle}"
+                          IsChecked="{Binding Enabled, Mode=OneWay}"
+                          Tag="{Binding Id}" Click="OnToggle"
+                          VerticalAlignment="Center" Margin="0,0,16,0" />
+                <Button Grid.Column="2" Style="{StaticResource Btn}"
+                        Content="Выполнить" Tag="{Binding Id}" Click="OnRun" />
+                <Button Grid.Column="3" Style="{StaticResource Btn}"
+                        Content="Удалить" Tag="{Binding Id}" Click="OnDelete" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
+      <Button Style="{StaticResource Btn}" Content="Импорт" Click="OnImport" />
+      <Button Style="{StaticResource Btn}" Content="Экспорт" Click="OnExport" />
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 VerticalAlignment="Center" Margin="16,0,0,0"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+  </Grid>
+</UserControl>

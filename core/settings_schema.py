@@ -30,7 +30,7 @@
 from dataclasses import dataclass
 from typing import Any
 
-from core.settings_store import DEFAULTS
+from core.settings_store import DEFAULTS, GROUPS
 
 #: Как питоновский тип значения по умолчанию называется в протоколе.
 _TYPE_NAMES = {
@@ -97,6 +97,12 @@ CONSTRAINTS: dict[str, Constraint] = {
     # Служебное: не настройки, а состояние хранилища.
     "config_version": Constraint(secret=True),
     "first_run": Constraint(secret=True),
+
+    # Слово активации в единственном числе — форма 3.1.0, зеркало первого
+    # из `wake_words`. Хранилище её пишет для совместимости, показывать её
+    # рядом со списком значило бы предлагать человеку править одно и то же
+    # дважды и по-разному.
+    "wake_word": Constraint(obsolete=True),
 }
 
 
@@ -126,10 +132,23 @@ def describe_key(key: str) -> dict[str, Any]:
     return out
 
 
+#: Что вообще является настройкой.
+#:
+#: Хранилище держит в одном файле и настройки, и данные: команды, историю,
+#: напоминания, состояние плагинов. Для хранилища это одно и то же — ключ и
+#: значение, — но для человека нет: «история» не настройка, и показывать её
+#: полем на экране настроек бессмысленно.
+#:
+#: Выяснилось это, когда экран настроек построился впервые: в секции «Прочее»
+#: оказались история, команды и напоминания. Схема описывает **группу
+#: настроек**, а не весь файл.
+SETTABLE = tuple(GROUPS["settings"])
+
+
 def describe(keys=None) -> dict[str, dict[str, Any]]:
     """Схема целиком или по перечисленным ключам."""
-    names = list(keys) if keys else list(DEFAULTS)
-    return {key: describe_key(key) for key in names if key in DEFAULTS}
+    names = list(keys) if keys else list(SETTABLE)
+    return {key: describe_key(key) for key in names if key in SETTABLE}
 
 
 def validate(key: str, value: Any) -> tuple[bool, str, str]:
@@ -140,7 +159,9 @@ def validate(key: str, value: Any) -> tuple[bool, str, str]:
     тексту. Пустой код при `принято=True` значит «всё в порядке»; непустой —
     что значение принято, но о нём стоит предупредить.
     """
-    if key not in DEFAULTS:
+    if key not in SETTABLE:
+        # Данные тоже лежат в хранилище, но настройками не являются:
+        # «история» не то, что настраивают полем.
         return False, "settings.unknown_key", f"Нет такой настройки: {key}."
 
     rule = CONSTRAINTS.get(key, Constraint())

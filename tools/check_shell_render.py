@@ -75,9 +75,13 @@ def main(argv) -> int:
     # Колонка разделов утоплена относительно панели: это ступень значения,
     # единственное средство возвышения в системе (теней нет).
     column = size["legend_column"]
+    # Фон колонки меряется у правого края, а не посередине: посередине лежат
+    # названия разделов, и точка попадает в букву. Сглаженная буква — это
+    # ни фон, ни чернила, а что-то между, и проверка ловила бы её.
+    inside = column - 8
     check("колонка разделов — FACE_LOW",
-          near(at(column / 2, height * 0.55), colors["FACE_LOW"]),
-          f"| {at(column / 2, height * 0.55)} против {colors['FACE_LOW']}")
+          near(at(inside, height * 0.55), colors["FACE_LOW"]),
+          f"| {at(inside, height * 0.55)} против {colors['FACE_LOW']}")
     # Панель меряется в поле между колонкой и содержимым раздела, а не
     # посреди него: раньше там было пусто, а с появлением страниц посреди
     # раздела лежит стеклянное поле — и проверка ловила бы содержимое,
@@ -90,24 +94,42 @@ def main(argv) -> int:
           near(at(width * 0.5, size["row"] / 2), colors["FACE_LOW"]),
           f"| {at(width * 0.5, size['row'] / 2)}")
 
-    # Отметка активного раздела — единственный акцент в системе.
+    # Отметка активного раздела — единственный акцент в системе. Какой
+    # раздел открыт, проверка не знает и знать не должна: она ищет отметку
+    # сама. Привязка к первому разделу делала бы её проверкой снимка, а не
+    # проверкой правила.
     row = size["row"]
-    marker = at(1, row + row / 2)
-    check("активный раздел отмечен акцентом",
-          near(marker, colors["SIGNAL"], 6),
-          f"| {marker} против {colors['SIGNAL']}")
-    check("акцент шириной ровно 2 точки",
-          near(at(1, row + row / 2), colors["SIGNAL"], 6)
-          and not near(at(4, row + row / 2), colors["SIGNAL"], 6),
-          f"| точка 4: {at(4, row + row / 2)}")
+    marked = [y for y in range(size["row"], height - size["level_strip"])
+              if near(at(1, y), colors["SIGNAL"], 6)]
+    check("активный раздел отмечен акцентом", marked,
+          f"| точек акцента: {len(marked)}")
 
-    # Активный раздел заподлицо с панелью, соседние — утоплены.
-    check("активный раздел заподлицо с панелью",
-          near(at(column / 2, row + row / 2), colors["FACE"]),
-          f"| {at(column / 2, row + row / 2)}")
-    check("неактивный раздел остаётся утопленным",
-          near(at(column / 2, row * 3), colors["FACE_LOW"]),
-          f"| {at(column / 2, row * 3)}")
+    if marked:
+        runs = []
+        start = previous = marked[0]
+        for y in marked[1:]:
+            if y != previous + 1:
+                runs.append((start, previous))
+                start = y
+            previous = y
+        runs.append((start, previous))
+        check("отметка одна", len(runs) == 1, f"| {runs}")
+
+        top, bottom = runs[0]
+        middle = (top + bottom) // 2
+        check("высота отметки — в строку раздела",
+              abs((bottom - top + 1) - row) <= 1, f"| {bottom - top + 1}")
+        check("акцент шириной ровно 2 точки",
+              not near(at(4, middle), colors["SIGNAL"], 6),
+              f"| точка 4: {at(4, middle)}")
+        check("активный раздел заподлицо с панелью",
+              near(at(inside, middle), colors["FACE"]),
+              f"| {at(inside, middle)}")
+
+        other = middle + row if bottom + row < height * 0.7 else middle - row
+        check("неактивный раздел остаётся утопленным",
+              near(at(inside, other), colors["FACE_LOW"]),
+              f"| {at(inside, other)}")
 
     # Полоса уровня вдоль нижней кромки всего окна: микрофон принадлежит
     # прибору целиком, а не текущему разделу.

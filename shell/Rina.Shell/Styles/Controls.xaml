@@ -190,6 +190,56 @@
     <Setter Property="Padding" Value="16" />
   </Style>
 
+  <!--
+    Полоса прокрутки. Своя, потому что стоковая приносит палитру Windows на
+    панель, у которой она своя, — и в чёрной отделке светло-серая полоса
+    видна первой, раньше содержимого.
+
+    Без стрелок: они принадлежат другому времени и занимают место, ничего не
+    добавляя. Ползунок — ступень значения, как и всё возвышение в системе.
+  -->
+  <Style x:Key="ScrollThumb" TargetType="Thumb">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Border x:Name="Bar" Background="{DynamicResource C.InkFaint}"
+                  CornerRadius="{StaticResource Radius.Max}" Opacity="0.5" />
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bar" Property="Opacity" Value="0.8" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ScrollBar">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ScrollBar">
+          <Track x:Name="PART_Track" IsDirectionReversed="True">
+            <Track.Thumb>
+              <Thumb Style="{StaticResource ScrollThumb}" />
+            </Track.Thumb>
+            <!-- Кнопки страницы обязаны существовать, но видимыми им быть
+                 незачем: полоса и есть орган управления. -->
+            <Track.IncreaseRepeatButton>
+              <RepeatButton Command="ScrollBar.PageDownCommand"
+                            Opacity="0" Focusable="False" />
+            </Track.IncreaseRepeatButton>
+            <Track.DecreaseRepeatButton>
+              <RepeatButton Command="ScrollBar.PageUpCommand"
+                            Opacity="0" Focusable="False" />
+            </Track.DecreaseRepeatButton>
+          </Track>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <!-- Карточка: приподнята ступенью значения, без рамки и без тени. -->
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
