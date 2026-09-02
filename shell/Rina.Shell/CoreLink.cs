@@ -93,6 +93,29 @@ public sealed class CoreLink : IAsyncDisposable
         }
     }
 
+    /// <summary>Прочитать настройки, которыми распоряжается оболочка.</summary>
+    /// <remarks>
+    /// Трей, автозапуск и хоткеи хранятся в ядре, а исполняются оболочкой:
+    /// ядро хранит намерение, оболочка приводит систему в соответствие.
+    /// Реестр и клавиатура — система, а системный слой в 4.0 принадлежит
+    /// оболочке.
+    /// </remarks>
+    public async Task<JsonObject?> GetAsync(params string[] keys)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return null;
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject
+                {
+                    ["keys"] = new JsonArray(keys.Select(k => (JsonNode)k!)
+                                                 .ToArray()),
+                }, TimeSpan.FromSeconds(10));
+            return answer.IsError ? null : answer.Payload["values"]?.AsObject();
+        }
+        catch { return null; }
+    }
+
     /// <summary>Сменить отделку и запомнить выбор в ядре.</summary>
     public async Task SetFinishAsync(string finish)
     {
@@ -173,6 +196,19 @@ public sealed class CoreLink : IAsyncDisposable
     }
 
     private Pages.ConfirmWindow? _asking;
+
+    /// <summary>Послушать один раз — по сочетанию клавиш.</summary>
+    public async Task ListenOnceAsync()
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        if (!connection.MayCall(Methods.SpeechListenOnce)) return;
+        try
+        {
+            await connection.CallAsync(Methods.SpeechListenOnce, null,
+                                       TimeSpan.FromSeconds(10));
+        }
+        catch { /* ядро занято или ушло */ }
+    }
 
     private static void OnUi(Action work)
     {

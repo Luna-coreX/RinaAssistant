@@ -1,4 +1,5 @@
 using System.IO;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -17,6 +18,8 @@ public partial class App
     /// смотреть вовсе. Снимок делает тот же код, что рисует настоящее окно.
     /// </remarks>
     private CoreLink? _link;
+    private Tray? _tray;
+    private Hotkeys? _hotkeys;
     private string? _shotPath;
 
     protected override void OnStartup(StartupEventArgs e)
@@ -42,6 +45,13 @@ public partial class App
             // сами и только когда закончим.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = CheckCoreAsync(window);
+            return;
+        }
+
+        if (args.Contains("--check-system"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckSystemAsync(window);
             return;
         }
 
@@ -78,9 +88,23 @@ public partial class App
             // которую тратит чужой процесс на запуск. Состояние связи он
             // при этом видит с первой же отрисовки (4.0-F12).
             window.Show();
+
+            // Трей и хоткеи заводятся до ядра: они принадлежат оболочке и
+            // обязаны работать, даже если ядро не поднялось. Помощник,
+            // которого нельзя вызвать с клавиатуры, потому что упал чужой
+            // процесс, — не помощник.
+            _tray = new Tray(window);
+            _tray.ExitRequested += () => Shutdown();
+            window.Tray = _tray;
+
+            _hotkeys = new Hotkeys();
+            _hotkeys.Attach(window);
+            _hotkeys.Refused += (name, why) => window.ShowNote($"{name}: {why}");
+
             _link = new CoreLink(window, CoreLink.FindCore());
             window.Link = _link;
             _ = _link.StartAsync();
+            _ = ApplySystemSettingsAsync(window);
             return;
         }
 
@@ -300,6 +324,101 @@ public partial class App
         Shutdown();
     }
 
+    /// <summary>
+    /// F05/F06: трей, автозапуск, сочетания клавиш.
+    /// </summary>
+    /// <remarks>
+    /// Автозапуск проверяется на настоящем реестре, но **возвращается как
+    /// было**: проверка не имеет права оставить после себя запись в
+    /// автозагрузке пользователя.
+    /// </remarks>
+    private Task CheckSystemAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F05/F06: трей, автозапуск, сочетания ===");
+
+        // --- F06: разбор сочетаний ---
+        Check("обычное сочетание разбирается",
+              Hotkeys.TryParse("Ctrl+Shift+R", out var mods, out var key)
+              && key != 0 && mods.HasFlag(Hotkeys.Mod.Control)
+              && mods.HasFlag(Hotkeys.Mod.Shift));
+        Check("Win и Alt тоже",
+              Hotkeys.TryParse("Win+Alt+Space", out var m2, out _)
+              && m2.HasFlag(Hotkeys.Mod.Win) && m2.HasFlag(Hotkeys.Mod.Alt));
+        Check("клавиша без модификатора отвергнута",
+              !Hotkeys.TryParse("R", out _, out _),
+              "| иначе «R» в чужом редакторе вызывал бы Рину");
+        Check("пустое отвергнуто", !Hotkeys.TryParse("", out _, out _));
+        Check("бессмыслица отвергнута",
+              !Hotkeys.TryParse("Ctrl+Кнопка", out _, out _));
+
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+
+        using var hotkeys = new Hotkeys();
+        hotkeys.Attach(window);
+        var pressed = 0;
+        var taken = hotkeys.Bind("проверка", "Ctrl+Alt+F24", () => pressed++);
+        Check("сочетание занято в системе", taken, $"| {hotkeys.Count}");
+        hotkeys.Unbind("проверка");
+        Check("и отпущено", hotkeys.Count == 0);
+
+        var refusals = new List<string>();
+        hotkeys.Refused += (name, why) => refusals.Add(why);
+        hotkeys.Bind("кривое", "Ctrl+Кнопка", () => { });
+        Check("о неразобранном сочетании сказано", refusals.Count == 1,
+              $"| {string.Join("; ", refusals)}");
+
+        // --- F05: трей ---
+        using var tray = new Tray(window);
+        Check("значок в трее создан", true);
+        tray.Hide();
+        Check("окно спрятано, программа жива", !window.IsVisible);
+        tray.Show();
+        Check("и возвращается по требованию", window.IsVisible);
+
+        // --- F05: автозапуск, с возвратом как было ---
+        var was = Autostart.Enabled;
+        Check("команда запуска указывает на нас",
+              Autostart.Command.Contains("Rina.Shell"), $"| {Autostart.Command}");
+        try
+        {
+            if (Autostart.Apply(!was))
+            {
+                Check("автозапуск переключается", Autostart.Enabled == !was);
+                Autostart.Apply(was);
+                Check("и возвращается как было", Autostart.Enabled == was);
+            }
+            else
+            {
+                Console.WriteLine("      автозапуск запрещён политикой — пропускаем");
+            }
+        }
+        finally
+        {
+            if (Autostart.Enabled != was) Autostart.Apply(was);
+        }
+
+        window.Hide();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+        return Task.CompletedTask;
+    }
+
     /// <summary>Синтетический звук: 440 Гц в формате микрофона.</summary>
     private static byte[] Tone(double seconds)
     {
@@ -326,10 +445,46 @@ public partial class App
         return null;
     }
 
+    /// <summary>
+    /// Привести систему в соответствие настройкам ядра.
+    /// </summary>
+    /// <remarks>
+    /// Ждём связи: настройки живут в ядре, и до рукопожатия их неоткуда
+    /// взять. Пока ждём, окно уже показано и работает — запуск не заложник
+    /// чужого процесса.
+    /// </remarks>
+    private async Task ApplySystemSettingsAsync(MainWindow window)
+    {
+        for (var i = 0; i < 300 && _link?.Connection is not { Ready: true }; i++)
+            await Task.Delay(100);
+
+        if (_link is null) return;
+        var values = await _link.GetAsync("autostart", "minimize_to_tray",
+                                          "start_minimized", "hotkey",
+                                          "action_hotkeys");
+        if (values is null) return;
+
+        var wanted = values["autostart"]?.GetValue<bool>() ?? false;
+        if (wanted != Autostart.Enabled && !Autostart.Apply(wanted))
+            window.ShowNote("Не удалось изменить автозапуск: запрещено политикой.");
+
+        window.MinimiseToTray = values["minimize_to_tray"]?.GetValue<bool>()
+                                ?? true;
+
+        // Основное сочетание: показать окно и начать слушать.
+        if (values["hotkey"]?.GetValue<string>() is { Length: > 0 } main)
+            _hotkeys?.Bind("main", main, () => window.OnMainHotkey());
+
+        if (values["start_minimized"]?.GetValue<bool>() == true)
+            window.Hide();
+    }
+
     protected override void OnExit(ExitEventArgs e)
     {
         // Ядро завершается само, увидев обрыв (§13), но попрощаться вежливо
         // дешевле, чем полагаться на это: у него есть что закрыть.
+        _hotkeys?.Dispose();
+        _tray?.Dispose();
         _link?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(6));
         base.OnExit(e);
     }

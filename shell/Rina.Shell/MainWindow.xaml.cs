@@ -181,5 +181,40 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized
             ? WindowState.Normal : WindowState.Maximized;
 
-    private void OnClose(object sender, RoutedEventArgs e) => System.Windows.Application.Current.Shutdown();
+    /// <summary>Значок в трее; ставится при запуске (<c>4.0-F05</c>).</summary>
+    public Tray? Tray { get; set; }
+
+    /// <summary>Сворачивать в трей вместо выхода. Решает человек.</summary>
+    public bool MinimiseToTray { get; set; } = true;
+
+    /// <summary>
+    /// Крестик: свернуть или выйти.
+    /// </summary>
+    /// <remarks>
+    /// Программа, не закрывающаяся по крестику вопреки ожиданию,
+    /// воспринимается как сломанная, — поэтому поведение выбирает человек, а
+    /// не мы за него. Из трея выйти можно всегда.
+    /// </remarks>
+    private void OnClose(object sender, RoutedEventArgs e)
+    {
+        if (MinimiseToTray && Tray is not null) Tray.Hide();
+        else System.Windows.Application.Current.Shutdown();
+    }
+
+    /// <summary>Нажато основное сочетание (<c>4.0-F06</c>).</summary>
+    public void OnMainHotkey()
+    {
+        Tray?.Show();
+        ShowSection("dialog");
+        // Слушать по нажатию — то, ради чего сочетание и нужно: помощника
+        // вызывают, когда есть что сказать.
+        _ = Link?.ListenOnceAsync();
+    }
+
+    /// <summary>Короткое сообщение человеку в подвале колонки.</summary>
+    public void ShowNote(string text)
+    {
+        CoreStateText.Text = text;
+        CoreStateText.SetResourceReference(ForegroundProperty, "C.Signal");
+    }
 }
