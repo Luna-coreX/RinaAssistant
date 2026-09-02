@@ -64,48 +64,45 @@ def build():
 
     * {{ box-sizing: border-box; }}
     body {{
-      margin: 0; padding: 32px;
-      background: #6e6b66; font-family: var(--ui);
-      color: #e8e6e1;
+      margin: 0; padding: 40px;
+      background: #141416; font-family: var(--ui);
+      color: #cfcdc8; -webkit-font-smoothing: antialiased;
     }}
-    h1 {{ font-size: 15px; letter-spacing: .06em; text-transform: uppercase;
-         font-weight: 700; margin: 0 0 6px; }}
-    .note {{ font-size: 12px; opacity: .7; margin: 0 0 20px; max-width: 780px;
-             line-height: 1.5; }}
-    .caption {{ font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-                opacity: .65; margin: 26px 0 8px; font-weight: 600; }}
+    h1 {{ font-size: 22px; font-weight: 600; letter-spacing: -.01em;
+         margin: 0 0 8px; color: #efece7; }}
+    .note {{ font-size: 13px; color: #8f8d87; margin: 0 0 28px;
+             max-width: 720px; line-height: 1.6; }}
+    .note code {{ font-family: var(--mono); font-size: 12px; }}
+    .caption {{ font-size: 11px; letter-spacing: .10em; text-transform: uppercase;
+                color: #6f6d68; margin: 40px 0 12px; font-weight: 600; }}
 
     /* ---------- каркас окна ---------- */
     .win {{
-      width: 880px; background: var(--c-face); color: var(--c-ink);
-      border-radius: var(--radius); overflow: hidden;
+      width: 940px; background: var(--c-face); color: var(--c-ink);
+      border-radius: 6px; overflow: hidden;
       display: grid; grid-template-rows: auto 1fr auto;
-      border: var(--sp-hair) solid var(--c-seam);
     }}
     .titlebar {{
       display: flex; align-items: center; justify-content: space-between;
-      padding: 0 var(--sp-within); height: var(--control);
+      padding: 0 var(--sp-within); height: var(--row);
       background: var(--c-face-low);
-      border-bottom: var(--sp-hair) solid var(--c-seam);
-      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-      font-weight: 600; color: var(--c-ink-soft);
+      font-size: 12px; font-weight: 500; color: var(--c-ink-soft);
     }}
-    .wbtn {{ display: inline-block; width: 26px; text-align: center;
-             color: var(--c-ink-soft); }}
+    .wbtn {{ display: inline-block; width: 30px; text-align: center;
+             font-style: normal; color: var(--c-ink-faint); }}
     .body {{ display: grid; grid-template-columns: var(--legend-col) 1fr;
-             min-height: 430px; }}
+             min-height: 470px; }}
 
     /* ---------- колонка разделов ---------- */
     .nav {{
       background: var(--c-face-low);
-      border-right: var(--sp-hair) solid var(--c-seam);
-      display: flex; flex-direction: column; padding: var(--sp-within) 0;
+      display: flex; flex-direction: column; padding: var(--sp-tight) 0;
     }}
     .nav a {{
       display: block; padding: 0 var(--sp-within);
       height: var(--row); line-height: var(--row);
-      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-      font-weight: 600; color: var(--c-ink-soft); text-decoration: none;
+      font-size: 13px; font-weight: 500;
+      color: var(--c-ink-soft); text-decoration: none;
       border-left: 2px solid transparent;
       transition: background var(--t-state) var(--ease);
     }}
@@ -113,95 +110,106 @@ def build():
                  border-left-color: var(--c-signal); }}
     .nav a.hover {{ background: var(--c-face-high); }}
     .nav .foot {{ margin-top: auto; padding: var(--sp-within);
-                  border-top: var(--sp-hair) solid var(--c-seam);
-                  font-size: 11px; color: var(--c-ink-faint); }}
+                  font-size: 11px; color: var(--c-ink-faint); line-height: 1.7; }}
     .nav .foot b {{ display: block; font-family: var(--mono);
                     color: var(--c-ink-soft); font-weight: 400; }}
 
     /* ---------- содержимое ---------- */
     .pane {{ padding: var(--sp-between); display: flex; flex-direction: column;
              gap: var(--sp-between); overflow: hidden; }}
-    .section > .legend {{
-      font-size: 11px; letter-spacing: .08em; text-transform: uppercase;
-      font-weight: 600; color: var(--c-ink-soft);
-      margin-bottom: var(--sp-tight);
+    .pane > .head {{
+      font-size: 20px; font-weight: 600; letter-spacing: -.01em;
+      color: var(--c-ink); margin: 0 0 calc(0px - var(--sp-within));
     }}
-    .rows {{ display: flex; flex-direction: column; gap: var(--sp-within); }}
+    .section > .legend {{
+      font-size: 11px; letter-spacing: .10em; text-transform: uppercase;
+      font-weight: 600; color: var(--c-ink-soft);
+      margin-bottom: var(--sp-within);
+    }}
+    .rows {{ display: flex; flex-direction: column; gap: var(--sp-tight); }}
     .row {{ display: flex; align-items: center; justify-content: space-between;
-            height: var(--row); }}
+            gap: var(--sp-within); min-height: var(--row); }}
     .row .label {{ font-size: 13px; }}
-    .row .hint {{ font-size: 11px; color: var(--c-ink-soft); }}
+    .row .hint {{ font-size: 13px; color: var(--c-ink-soft); }}
 
     /* ---------- стекло ---------- */
     .glass {{
       background: var(--c-glass); color: var(--c-glass-text);
       border-radius: var(--radius); padding: var(--sp-within);
       flex: 1; display: flex; flex-direction: column; gap: var(--sp-within);
-      font-size: 14px; line-height: 1.5; overflow: hidden;
+      font-size: 15px; line-height: 1.6; overflow: hidden;
     }}
     .turn {{ display: flex; gap: var(--sp-within); }}
     .turn .who {{ font-size: 11px; color: var(--c-glass-dim);
-                  min-width: 44px; font-family: var(--mono); }}
+                  min-width: 46px; font-family: var(--mono);
+                  line-height: 1.9; }}
     .turn .said {{ flex: 1; }}
     .turn.rina .said {{ color: var(--c-glass-text); }}
 
-    /* ---------- управление ---------- */
+    /* ---------- управление ----------
+       Второстепенная кнопка не нарисована коробкой: она заподлицо с панелью
+       и проявляется при наведении. Заметность даёт единственная первичная
+       кнопка, залитая чернилами, — иерархия без второго акцента. */
     .btn {{
       height: var(--control); padding: 0 var(--sp-within);
-      background: var(--c-face-high); color: var(--c-ink);
-      border: var(--sp-hair) solid var(--c-seam); border-radius: var(--radius);
-      font-family: var(--ui); font-size: 12px; cursor: default;
+      background: transparent; color: var(--c-ink);
+      border: 0; border-radius: var(--radius);
+      font-family: var(--ui); font-size: 13px; font-weight: 500;
+      cursor: default; white-space: nowrap;
       transition: background var(--t-press) var(--ease);
     }}
-    .btn.hover {{ background: var(--c-face); }}
+    .btn.hover {{ background: var(--c-face-high); }}
     .btn.press {{ background: var(--c-face-low); }}
-    .btn.focus {{ outline: 2px solid var(--c-signal); outline-offset: 1px; }}
+    .btn.focus {{ outline: 2px solid var(--c-signal); outline-offset: 2px; }}
     .btn[disabled] {{ color: var(--c-ink-faint); }}
+    .btn.primary {{ background: var(--c-ink); color: var(--c-face); }}
     .btn.danger {{
       margin-top: var(--sp-danger);
       background-image: repeating-linear-gradient(
         {hatch['angle']}deg,
-        color-mix(in srgb, var(--c-hatch) {int(hatch['opacity']*100)}%, transparent) 0 {hatch['line']}px,
+        color-mix(in srgb, var(--c-hatch) {int(hatch['opacity'] * 100)}%, transparent) 0 {hatch['line']}px,
         transparent {hatch['line']}px {hatch['gap']}px);
     }}
     .field {{
       height: var(--control); flex: 1; padding: 0 var(--sp-inner);
       background: var(--c-face-sunk); color: var(--c-ink);
-      border: var(--sp-hair) solid var(--c-seam); border-radius: var(--radius);
-      font-family: var(--ui); font-size: 13px; line-height: var(--control);
+      border: 0; border-radius: var(--radius);
+      font-family: var(--ui); font-size: 14px; line-height: var(--control);
     }}
     .field.placeholder {{ color: var(--c-ink-faint); }}
     .field.error {{ color: var(--c-signal); }}
-    .toggle {{ width: 34px; height: 18px; border-radius: var(--radius);
+    .toggle {{ width: 40px; height: 22px; border-radius: 11px; flex: none;
                background: var(--c-face-sunk); position: relative;
-               border: var(--sp-hair) solid var(--c-seam); }}
-    .toggle i {{ position: absolute; top: 2px; left: 2px;
-                 width: 12px; height: 12px; background: var(--c-ink-faint); }}
+               transition: background var(--t-state) var(--ease); }}
+    .toggle i {{ position: absolute; top: 4px; left: 4px;
+                 width: 14px; height: 14px; border-radius: 50%;
+                 background: var(--c-ink-faint); }}
     .toggle.on {{ background: var(--c-signal); }}
-    .toggle.on i {{ left: auto; right: 2px; background: var(--c-face-high); }}
+    .toggle.on i {{ left: auto; right: 4px; background: var(--c-face-high); }}
     .figure {{ font-family: var(--mono); font-size: 13px;
                font-variant-numeric: tabular-nums; }}
     .card {{
-      border: var(--sp-hair) solid var(--c-seam); border-radius: var(--radius);
-      background: var(--c-face-high); padding: var(--sp-within);
+      border: 0; border-radius: var(--radius); min-height: 56px;
+      background: var(--c-face-high); padding: var(--sp-inner) var(--sp-within);
       display: flex; align-items: center; gap: var(--sp-within);
     }}
     .card .grow {{ flex: 1; }}
-    .card .title {{ font-size: 13px; }}
-    .card .meta {{ font-size: 11px; color: var(--c-ink-soft); }}
-    .empty {{ font-size: 13px; color: var(--c-ink-soft);
+    .card .title {{ font-size: 14px; }}
+    .card .meta {{ font-size: 12px; color: var(--c-ink-soft); margin-top: 2px; }}
+    .empty {{ font-size: 14px; color: var(--c-ink-soft);
               padding: var(--sp-between) 0; }}
-    .bar {{ display: flex; gap: var(--sp-within); align-items: center; }}
+    .bar {{ display: flex; gap: var(--sp-tight); align-items: center; }}
+    .bar.wide {{ gap: var(--sp-within); }}
 
     /* ---------- полоса уровня ---------- */
     .strip {{ height: var(--strip); background: var(--c-face-sunk);
-              border-top: var(--sp-hair) solid var(--c-seam); position: relative; }}
+              position: relative; }}
     .strip i {{ position: absolute; inset: 0 62% 0 0;
                 background: linear-gradient(90deg,
                   var(--c-signal), color-mix(in srgb, var(--c-signal) 25%, transparent)); }}
     .strip.idle i {{ inset: 0 92% 0 0; opacity: .35; }}
 
-    .pair {{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+    .pair {{ display: grid; grid-template-columns: 1fr 1fr; gap: 28px;
              align-items: start; }}
     """
 
@@ -220,7 +228,7 @@ def build():
         <div class="nav">{nav}
           <div class="foot">вид · о программе<b>4.0.0</b></div>
         </div>
-        <div class="pane">{content}</div>
+        <div class="pane"><div class="head">{active}</div>{content}</div>
       </div>
       <div class="strip {strip_class}" title="{strip_note}"><i></i></div>
     </div>"""
@@ -236,14 +244,14 @@ def build():
         <div class="turn rina"><span class="who">Рина</span>
           <span class="said">Засекла 1 ч 30 мин.</span></div>
       </div>
-      <div class="bar">
+      <div class="bar wide">
         <span class="field placeholder">Скажите или напишите команду…</span>
-        <button class="btn">Отправить</button>
+        <button class="btn primary">Отправить</button>
       </div>
-      <div class="bar">
-        <span class="row" style="gap:8px"><span class="toggle on"><i></i></span>
+      <div class="bar wide">
+        <span class="row" style="gap:10px"><span class="toggle on"><i></i></span>
           <span class="hint">Отвечать голосом</span></span>
-        <span class="row" style="gap:8px"><span class="toggle"><i></i></span>
+        <span class="row" style="gap:10px"><span class="toggle"><i></i></span>
           <span class="hint">Всегда слушать</span></span>
       </div>"""
 
@@ -265,20 +273,20 @@ def build():
       </div>
       <div class="section">
         <div class="legend">Найденные программы</div>
-        <div class="bar"><span class="figure">124</span>
+        <div class="bar wide"><span class="figure">124</span>
           <span class="hint">обновлено сегодня в 19:04</span>
           <button class="btn">Обновить</button></div>
       </div>
-      <div class="bar"><button class="btn">Новая команда</button>
+      <div class="bar"><button class="btn primary">Новая команда</button>
         <button class="btn">Импорт</button><button class="btn">Экспорт</button></div>"""
 
     reminders = """
       <div class="section">
         <div class="legend">Новое напоминание</div>
-        <div class="bar"><span class="field placeholder">О чём напомнить…</span>
+        <div class="bar wide"><span class="field placeholder">О чём напомнить…</span>
           <span class="field figure" style="max-width:72px">10</span>
-          <span class="field" style="max-width:104px">минут</span>
-          <button class="btn">Поставить</button></div>
+          <span class="field" style="max-width:112px">минут</span>
+          <button class="btn primary">Поставить</button></div>
       </div>
       <div class="section">
         <div class="legend">Запланировано · 2</div>
@@ -299,11 +307,11 @@ def build():
         <div class="legend">Голос</div>
         <div class="rows">
           <div class="row"><span class="label">Система синтеза</span>
-            <span class="field" style="max-width:260px">Edge Neural</span></div>
+            <span class="field" style="max-width:280px">Edge Neural</span></div>
           <div class="row"><span class="label">Распознавание</span>
-            <span class="field" style="max-width:260px">Vosk (офлайн)</span></div>
+            <span class="field" style="max-width:280px">Vosk (офлайн)</span></div>
           <div class="row"><span class="label">Слова активации</span>
-            <span class="field" style="max-width:260px">Рина, Rina</span></div>
+            <span class="field" style="max-width:280px">Рина, Rina</span></div>
           <div class="row"><span class="label">Проверка голоса</span>
             <button class="btn">Проверить</button></div>
         </div>
@@ -336,7 +344,7 @@ def build():
             <span class="toggle"><i></i></span></div>
         </div>
       </div>
-      <div class="bar"><button class="btn">Из папки</button>
+      <div class="bar"><button class="btn primary">Из папки</button>
         <button class="btn">Из архива</button>
         <button class="btn" disabled>Обновить…</button></div>"""
 
@@ -349,11 +357,12 @@ def build():
           <button class="btn press">Нажатие</button>
           <button class="btn focus">Фокус</button>
           <button class="btn" disabled>Выключено</button>
+          <button class="btn primary">Первичная</button>
         </div>
       </div>
       <div class="section">
         <div class="legend">Поле</div>
-        <div class="bar">
+        <div class="bar wide">
           <span class="field">значение</span>
           <span class="field placeholder">подсказка</span>
           <span class="field error">не удалось проверить связь</span>
@@ -404,7 +413,7 @@ def build():
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
     print(f"собрано: {os.path.relpath(OUT, ROOT)}")
-    print(f"  экранов: {len(screens)} × 2 отделки + состояния")
+    print(f"  экранов: {len(screens)} по 2 отделки + состояния")
     return 0
 
 
