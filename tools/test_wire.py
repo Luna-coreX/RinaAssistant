@@ -29,6 +29,9 @@ from core.wire.errors import (CATEGORIES, ERROR_FRAME_TOO_LARGE,
                               ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
                               ProtocolError)
 from core.wire.tasks import FINAL, Registry, STATUS_UNKNOWN, TaskState, run
+from core.wire.data import (DATA_FRAME_LIMIT, DataFrame, DataFrameDecoder,
+                            DataReceiver, DataSender, KINDS,
+                            capability_for_kind, encode_data_frame)
 
 fails = 0
 
@@ -463,6 +466,18 @@ undocumented = sorted(n for n in EVENTS if n not in spec_text)
 check("каждое событие каталога описано в спецификации", not undocumented,
       f"| нет в документе: {undocumented}")
 
+# То же для методов: метод, о котором документ молчит, — договорённость,
+# известная одной стороне.
+from core.wire.handshake import BASE_METHODS, CAPABILITIES as CAPS
+
+all_methods = set(BASE_METHODS)
+for cap in CAPS.values():
+    all_methods |= set(cap.methods)
+unknown_methods = sorted(m for m in all_methods if m not in spec_text)
+check("каждый метод описан в спецификации", not unknown_methods,
+      f"| нет в документе: {unknown_methods}")
+print(f"     методов: {len(all_methods)}, событий: {len(EVENTS)}")
+
 
 # ---------------------------------------------------------------------------
 print()
@@ -718,6 +733,202 @@ modern.accept_hello_result({"protocol_version": 1,
                             "capabilities": list(core_now.capabilities),
                             "core_version": "4.0.0", "session_id": "y"})
 check("ядро с возможностью tasks принимает", modern.may_call("task.cancel"))
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D07: бинарный канал ===")
+
+sender = DataSender()
+sender.open_stream(11, "audio.input")
+check("вид потока знает свою возможность",
+      capability_for_kind("audio.input") == "audio.input"
+      and capability_for_kind("screen.frame") == "actuation")
+check("неизвестный вид потока отклонён",
+      fault(lambda: sender.open_stream(12, "запах"), ERROR_INVALID_PAYLOAD)
+      is not None)
+check("повторное открытие того же потока отклонено",
+      fault(lambda: sender.open_stream(11, "audio.input"), ERROR_INVALID_STATE)
+      is not None)
+
+sender.grant(11, 100000)
+pcm = bytes(range(256)) * 4          # 1024 байта «звука»
+frames = [sender.send(11, pcm) for _ in range(8)]
+
+decoder = DataFrameDecoder()
+receiver = DataReceiver()
+for raw in frames:
+    for frame in decoder.feed(raw):
+        receiver.accept(frame)
+check("звук доехал побайтно", bytes(receiver.data[11]) == pcm * 8)
+check("порядковые номера подряд, пропусков нет", receiver.gaps == [])
+
+# Кадр, пришедший по кускам, и два кадра в одном куске.
+split = DataFrameDecoder()
+joined = b"".join(frames[:2])
+check("половина кадра данных не даёт кадра",
+      list(split.feed(joined[:5])) == [] and split.pending == 5)
+check("остаток собирает оба кадра", len(list(split.feed(joined[5:]))) == 2)
+
+# Пропуск номера не обрывает приём, но записывается.
+gappy = DataReceiver()
+gappy.accept(DataFrame(7, 1, b"a"))
+gappy.accept(DataFrame(7, 3, b"c"))
+check("пропуск замечен и назван", gappy.gaps == [(7, 2, 3)], f"| {gappy.gaps}")
+check("приём при этом продолжился", bytes(gappy.data[7]) == b"ac")
+
+# Предел — по заявленной длине, до выделения памяти.
+header_only = (DATA_FRAME_LIMIT + 1).to_bytes(4, "big")
+check("огромный кадр данных отвергнут по заголовку",
+      fault(lambda: list(DataFrameDecoder().feed(header_only)),
+            ERROR_FRAME_TOO_LARGE) is not None)
+check("кадр короче собственного заголовка отвергнут",
+      fault(lambda: list(DataFrameDecoder().feed((4).to_bytes(4, "big")
+                                                 + b"abcd")),
+            ERROR_INVALID_PAYLOAD) is not None)
+check("свой кадр сверх предела не отправляется",
+      fault(lambda: encode_data_frame(DataFrame(1, 1,
+                                                b"x" * DATA_FRAME_LIMIT)),
+            ERROR_FRAME_TOO_LARGE) is not None)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D07: звук не задерживает управление ===")
+
+# Требование §15.6 — «поток PCM не ухудшает задержку управляющего канала».
+# Настоящую задержку измеряют на живом канале, и это работа D16. Здесь
+# измеряется то, откуда задержка берётся: сколько байт управляющему разбору
+# придётся проглотить, прежде чем он дойдёт до команды. Сравниваются две
+# раскладки одной и той же нагрузки — принятая и отвергнутая (§2, base64
+# внутри JSON), обе собранные настоящим кодом.
+import base64
+
+BURST = 200
+command = Envelope.request("command.handle", {"text": "стоп", "source": "voice"},
+                           id="s-9000", trace_id="t-9000")
+
+# Отвергнутая раскладка: звук едет управляющим каналом как base64.
+rejected = b""
+for i in range(BURST):
+    rejected += encode_frame(Envelope.event(
+        "assistant.response",
+        {"text": base64.b64encode(pcm).decode("ascii")},
+        id=f"c-{i}", trace_id="t-9000"))
+before_rejected = len(rejected)
+rejected += encode_frame(command)
+
+# Принятая: звук в своём канале, команда в своём.
+data_bytes = b""
+burst_sender = DataSender()
+burst_sender.open_stream(51, "audio.input")
+burst_sender.grant(51, BURST * len(pcm))
+for _ in range(BURST):
+    data_bytes += burst_sender.send(51, pcm)
+accepted = encode_frame(command)
+before_accepted = 0
+
+# Сколько байт управляющий разбор съедает до команды — в обоих случаях.
+def bytes_before_command(stream):
+    eaten = 0
+    decoder = FrameDecoder()
+    for offset in range(0, len(stream), 4096):
+        piece = stream[offset:offset + 4096]
+        eaten += len(piece)
+        for message in decoder.feed(piece):
+            if message.method == "command.handle":
+                return eaten
+    return None
+
+eaten_rejected = bytes_before_command(rejected)
+eaten_accepted = bytes_before_command(accepted)
+check("в отвергнутой раскладке команда за всем звуком",
+      eaten_rejected is not None and eaten_rejected > before_rejected,
+      f"| {eaten_rejected} байт")
+check("в принятой команда достаётся сразу",
+      eaten_accepted is not None and eaten_accepted < 4096,
+      f"| {eaten_accepted} байт")
+check("звук из управляющего канала ушёл целиком",
+      len(accepted) < len(pcm),
+      f"| управляющий канал {len(accepted)} байт при {len(pcm)} байт звука")
+print(f"     всплеск {BURST} кадров: до команды {eaten_rejected} байт против "
+      f"{eaten_accepted}, звук отдельно — {len(data_bytes)} байт")
+
+# И то, что делает разделение возможным: звук вообще не попадает в JSON.
+audio_frame = encode_data_frame(DataFrame(11, 1, pcm))
+check("кадр данных не является JSON",
+      not audio_frame.lstrip(b"\x00").startswith(b"{"))
+check("двоичный кадр компактнее base64 в JSON",
+      len(audio_frame) < len(base64.b64encode(pcm)),
+      f"| {len(audio_frame)} против {len(base64.b64encode(pcm))}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D08: обратное давление ===")
+
+fresh = DataSender()
+fresh.open_stream(21, "audio.output")
+check("начальный кредит — ноль", fresh.available(21) == 0)
+check("без кредита не отправляют",
+      fault(lambda: fresh.send(21, b"rano"), ERROR_INVALID_STATE) is not None)
+
+fresh.grant(21, 10)
+fresh.send(21, b"12345")
+check("кредит списывается по байтам", fresh.available(21) == 5)
+check("превышение кредита отклонено",
+      fault(lambda: fresh.send(21, b"123456"), ERROR_INVALID_STATE)
+      is not None)
+fresh.send(21, b"12345")
+check("кредит исчерпан ровно", fresh.available(21) == 0)
+check("нулевой кредит не выдаётся",
+      fault(lambda: fresh.grant(21, 0), ERROR_INVALID_PAYLOAD) is not None)
+
+# Кредит считается по потоку: микрофон и синтез идут одновременно и в разные
+# стороны, и общий счёт связал бы их скорости без всякой причины.
+two = DataSender()
+two.open_stream(31, "audio.input")
+two.open_stream(32, "audio.output")
+two.grant(31, 100)
+check("кредит одного потока не виден другому",
+      two.available(31) == 100 and two.available(32) == 0)
+
+# Кредит выдаётся по мере обработки, а не по мере получения: кредит за
+# необработанное — это и есть та неограниченная очередь, ради устранения
+# которой схема существует.
+flow = DataSender()
+flow.open_stream(41, "audio.input")
+flow.grant(41, 4096)
+sink = DataReceiver(window=2048)
+dec = DataFrameDecoder()
+for frame in dec.feed(flow.send(41, b"z" * 1500)):
+    sink.accept(frame)
+back = sink.take_credit(41)
+check("приёмник вернул кредит на обработанное", back == 1500, f"| {back}")
+check("повторно тот же кредит не выдаётся", sink.take_credit(41) == 0)
+big_sink = DataReceiver(window=1000)
+big_sink.consumed[41] = 5000
+check("кредит не превышает окно приёмника",
+      big_sink.take_credit(41) == 1000)
+
+check("закрытый поток не принимает данные",
+      (flow.close_stream(41) or True)
+      and fault(lambda: flow.send(41, b"pozdno"), ERROR_INVALID_STATE)
+      is not None)
+
+# Методы управления потоком базовые: сам метод есть всегда, а вид отпирается
+# возможностью собеседника.
+pair_shell = Session(side=Side.SHELL)
+pair_core = Session(side=Side.CORE)
+pair_core.handle_hello(pair_shell.hello_payload())
+pair_shell.accept_hello_result({"protocol_version": 1,
+                                "capabilities": list(pair_core.capabilities),
+                                "core_version": "4.0.0", "session_id": "z"})
+check("stream.open доступен обеим сторонам",
+      pair_shell.may_call("stream.open") and pair_core.may_call("stream.open"))
+check("stream.credit доступен", pair_core.may_call("stream.credit"))
+check("вид screen.frame просит возможность, которой в 4.0 нет",
+      capability_for_kind("screen.frame") not in pair_core.peer_capabilities)
 
 print()
 print("ИТОГО ошибок:", fails)

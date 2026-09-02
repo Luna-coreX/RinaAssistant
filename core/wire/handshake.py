@@ -69,6 +69,12 @@ BASE_METHODS = (
     "core.shutdown",
     "ping",
     "pong",
+    # Управление потоками — базовое, а вот вид потока отпирается
+    # возможностью: метод существует всегда, но открыть `audio.input` у
+    # собеседника без микрофона нельзя. См. core/wire/data.py::KINDS.
+    "stream.open",
+    "stream.close",
+    "stream.credit",
 )
 
 _CAPABILITY_LIST = (
