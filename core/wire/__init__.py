@@ -21,28 +21,34 @@ ADR 0002: спецификация не зависит от транспорта
 
 Состав:
 
-    errors      форма ошибки как части контракта (§5)
+    errors      каталог ошибок как части контракта (4.0-D05, §5)
+    trace       сквозная трассировка через контекст (4.0-D15, §14)
     envelope    конверт и кадрирование управляющего канала (4.0-D04, §2–3)
     handshake   рукопожатие, версии и возможности (4.0-D03, §4)
 """
 
 from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
                                 IdGenerator, MessageType, decode, encode,
-                                encode_frame, new_trace_id)
-from core.wire.errors import (ProtocolError, ProtocolFault, CATEGORIES,
-                              ERROR_FRAME_TOO_LARGE, ERROR_INCOMPATIBLE,
-                              ERROR_INVALID_ENVELOPE, ERROR_NOT_READY,
-                              ERROR_UNKNOWN_METHOD)
+                                encode_frame)
+from core.wire.errors import (CATALOGUE, CATEGORIES, ErrorSpec, ProtocolError,
+                              ProtocolFault, ERROR_FRAME_TOO_LARGE,
+                              ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
+                              ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
+                              fault, make)
 from core.wire.handshake import (CAPABILITIES, CORE_CAPABILITIES,
                                  SHELL_CAPABILITIES, Session, SessionState,
                                  Side, capability_of, negotiate)
+from core.wire.trace import (NO_TRACE, TraceFilter, current_trace,
+                             new_trace_id, require_trace, trace_scope)
 
 __all__ = [
     "CONTROL_FRAME_LIMIT", "Envelope", "FrameDecoder", "IdGenerator",
-    "MessageType", "decode", "encode", "encode_frame", "new_trace_id",
-    "ProtocolError", "ProtocolFault", "CATEGORIES",
+    "MessageType", "decode", "encode", "encode_frame",
+    "CATALOGUE", "CATEGORIES", "ErrorSpec", "ProtocolError", "ProtocolFault",
     "ERROR_FRAME_TOO_LARGE", "ERROR_INCOMPATIBLE", "ERROR_INVALID_ENVELOPE",
-    "ERROR_NOT_READY", "ERROR_UNKNOWN_METHOD",
+    "ERROR_NOT_READY", "ERROR_UNKNOWN_METHOD", "fault", "make",
     "CAPABILITIES", "CORE_CAPABILITIES", "SHELL_CAPABILITIES", "Session",
     "SessionState", "Side", "capability_of", "negotiate",
+    "NO_TRACE", "TraceFilter", "current_trace", "new_trace_id",
+    "require_trace", "trace_scope",
 ]

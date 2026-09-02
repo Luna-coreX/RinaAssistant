@@ -26,12 +26,12 @@
 import json
 import struct
 import time
-import uuid
 from dataclasses import dataclass, field
 from typing import Any, Iterator
 
 from core.wire.errors import (ERROR_FRAME_TOO_LARGE, ERROR_INVALID_ENVELOPE,
-                              protocol_fault)
+                              fault)
+from core.wire.trace import new_trace_id, require_trace
 
 #: Предел одного управляющего сообщения (§2). Больше — дефект или попытка
 #: исчерпать память, и то и другое лечится разрывом, а не разбором.
@@ -111,19 +111,27 @@ class Envelope:
 
     @staticmethod
     def request(method: str, payload: dict[str, Any], *, id: str,
-                trace_id: str, v: int = PROTOCOL_VERSION,
+                trace_id: str | None = None, v: int = PROTOCOL_VERSION,
                 stream_id: int | None = None) -> "Envelope":
         return Envelope(type=MessageType.REQUEST, id=id, method=method,
-                        payload=payload, trace_id=trace_id, v=v,
-                        stream_id=stream_id, timestamp=time.time())
+                        payload=payload, trace_id=trace_id or require_trace(),
+                        v=v, stream_id=stream_id, timestamp=time.time())
 
     @staticmethod
     def event(method: str, payload: dict[str, Any], *, id: str,
-              trace_id: str, v: int = PROTOCOL_VERSION,
+              trace_id: str | None = None, v: int = PROTOCOL_VERSION,
               stream_id: int | None = None) -> "Envelope":
+        """
+        Событие.
+
+        `trace_id` по умолчанию берётся из контекста обработки (`4.0-D15`), а
+        не задаётся вызывающим: событие рождается глубоко — реестр вызывает
+        исполнение, исполнение поднимает событие, — и требовать, чтобы каждый
+        участник цепочки протащил идентификатор, значит однажды его потерять.
+        """
         return Envelope(type=MessageType.EVENT, id=id, method=method,
-                        payload=payload, trace_id=trace_id, v=v,
-                        stream_id=stream_id, timestamp=time.time())
+                        payload=payload, trace_id=trace_id or require_trace(),
+                        v=v, stream_id=stream_id, timestamp=time.time())
 
     def reply(self, payload: dict[str, Any], *, id: str) -> "Envelope":
         """
@@ -149,7 +157,7 @@ class Envelope:
 def _validate(type_, id_, v, timestamp, trace_id, method, correlation_id,
               stream_id, payload):
     def bad(text, **details):
-        raise protocol_fault(ERROR_INVALID_ENVELOPE, text, **details)
+        raise fault(ERROR_INVALID_ENVELOPE, text, **details)
 
     if type_ not in ALL_TYPES:
         bad(f"неизвестный тип сообщения: {type_!r}", field="type")
@@ -192,19 +200,19 @@ def decode(raw: bytes) -> Envelope:
     try:
         data = json.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise protocol_fault(ERROR_INVALID_ENVELOPE,
-                             "сообщение не разбирается как JSON в UTF-8",
-                             reason=str(exc)) from None
+        raise fault(ERROR_INVALID_ENVELOPE,
+                    "сообщение не разбирается как JSON в UTF-8",
+                    reason=str(exc)) from None
     if not isinstance(data, dict):
-        raise protocol_fault(ERROR_INVALID_ENVELOPE,
-                             "сообщение обязано быть объектом")
+        raise fault(ERROR_INVALID_ENVELOPE,
+                    "сообщение обязано быть объектом")
 
     missing = [name for name in ("v", "type", "id", "timestamp", "trace_id",
                                  "payload") if name not in data]
     if missing:
-        raise protocol_fault(ERROR_INVALID_ENVELOPE,
-                             "в конверте нет обязательных полей",
-                             fields=missing)
+        raise fault(ERROR_INVALID_ENVELOPE,
+                    "в конверте нет обязательных полей",
+                    fields=missing)
 
     return Envelope(
         type=data["type"],
@@ -223,7 +231,7 @@ def encode_frame(envelope: Envelope) -> bytes:
     """Кадр управляющего канала: длина полезной нагрузки, затем она сама."""
     body = encode(envelope)
     if len(body) > CONTROL_FRAME_LIMIT:
-        raise protocol_fault(
+        raise fault(
             ERROR_FRAME_TOO_LARGE,
             "сообщение больше предела управляющего канала",
             size=len(body), limit=CONTROL_FRAME_LIMIT)
@@ -256,7 +264,7 @@ class FrameDecoder:
             if size > self._limit:
                 # Буфер не очищается: после такого канал разрывают, а не
                 # пытаются продолжить с середины неизвестно чего.
-                raise protocol_fault(
+                raise fault(
                     ERROR_FRAME_TOO_LARGE,
                     "объявленный размер кадра больше предела",
                     size=size, limit=self._limit)
@@ -291,14 +299,3 @@ class IdGenerator:
     def next(self) -> str:
         self._n += 1
         return f"{self._prefix}{self._n:04d}"
-
-
-def new_trace_id() -> str:
-    """
-    Начало новой цепочки: нажатие в оболочке или распознанная фраза.
-
-    Дальше значение переносится во все порождённые сообщения (§14), а не
-    рождается заново — иначе в двух журналах лежат два несвязанных набора
-    строк, и это ровно та беда, ради которой поле существует.
-    """
-    return "t-" + uuid.uuid4().hex[:12]

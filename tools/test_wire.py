@@ -13,13 +13,18 @@ ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
-from core.wire import (CONTROL_FRAME_LIMIT, CORE_CAPABILITIES, Envelope,
-                       FrameDecoder, IdGenerator, MessageType, ProtocolFault,
-                       SHELL_CAPABILITIES, Session, SessionState, Side,
-                       decode, encode, encode_frame, new_trace_id, negotiate)
-from core.wire.errors import (ERROR_FRAME_TOO_LARGE, ERROR_INCOMPATIBLE,
-                              ERROR_INVALID_ENVELOPE, ERROR_NOT_READY,
-                              ERROR_UNKNOWN_METHOD, ProtocolError)
+import re
+
+from core.wire import (CATALOGUE, CONTROL_FRAME_LIMIT, CORE_CAPABILITIES,
+                       Envelope, FrameDecoder, IdGenerator, MessageType,
+                       NO_TRACE, ProtocolFault, SHELL_CAPABILITIES, Session,
+                       SessionState, Side, TraceFilter, current_trace, decode,
+                       encode, encode_frame, make, negotiate, new_trace_id,
+                       trace_scope)
+from core.wire.errors import (CATEGORIES, ERROR_FRAME_TOO_LARGE,
+                              ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
+                              ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
+                              ProtocolError)
 
 fails = 0
 
@@ -293,6 +298,128 @@ except ValueError:
 
 check("закрытая сессия перестаёт пускать",
       (core.close() or True) and not core.may_call("command.handle"))
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D05: каталог ошибок ===")
+
+check("категории только объявленные",
+      all(spec.category in CATEGORIES for spec in CATALOGUE.values()))
+check("код в записи совпадает с ключом",
+      all(code == spec.code for code, spec in CATALOGUE.items()))
+
+e = make("app.not_found", "Не нашла программу «фотошоп».", query="фотошоп")
+check("категория берётся из каталога, а не от вызывающего",
+      e.category == "user" and e.retryable is False)
+check("подробности сохранены", e.details == {"query": "фотошоп"})
+check("полезная нагрузка ошибки — по §5",
+      set(e.to_payload()) == {"code", "category", "retryable", "message",
+                              "details"})
+
+try:
+    make("выдуманный.код", "…")
+    check("незнакомый код отклонён", False)
+except ValueError:
+    check("незнакомый код отклонён", True)
+
+check("not_ready повторяем, incompatible нет",
+      CATALOGUE["protocol.not_ready"].retryable is True
+      and CATALOGUE["protocol.incompatible"].retryable is False)
+check("просроченное подтверждение не повторяемо тем же вызовом",
+      CATALOGUE["confirmation.expired"].retryable is False)
+
+# Сверка с тем, что ядро действительно умеет отправлять. Список, который
+# пишут руками и не сверяют, расходится с кодом на первом же инструменте.
+from core.toolbox import ALL_TOOLS
+from core.tools import (ERROR_INVALID_ARGUMENTS, ERROR_PERMISSION_DENIED,
+                        ERROR_UNKNOWN_TOOL)
+
+declared = {code for tool in ALL_TOOLS for code in tool.errors}
+declared |= {ERROR_UNKNOWN_TOOL, ERROR_INVALID_ARGUMENTS,
+             ERROR_PERMISSION_DENIED}
+missing = sorted(declared - set(CATALOGUE))
+check("каждый код инструментов есть в каталоге", not missing,
+      f"| нет: {missing}")
+print(f"     кодов у инструментов: {len(declared)}, "
+      f"в каталоге: {len(CATALOGUE)}")
+
+# Сверка с документом: код и спецификация не должны разъезжаться.
+spec_text = open("docs/protocol/PROTOCOL-v1.md", encoding="utf-8").read()
+section = spec_text[spec_text.index("Начальный каталог:"):]
+# Резать по "---" нельзя: разделитель шапки таблицы «|---|---|---|» тоже
+# содержит эти символы, и срез пришёлся бы до первой строки данных.
+section = section[:section.index(chr(10) + "---" + chr(10))]
+spec_codes = set(re.findall(r"^\| `([a-z_.]+)` \|", section, re.M))
+check("каталог документа непуст", len(spec_codes) >= 15, f"| {len(spec_codes)}")
+check("код документа = код программы",
+      spec_codes == set(CATALOGUE),
+      f"| только в документе: {sorted(spec_codes - set(CATALOGUE))}, "
+      f"только в программе: {sorted(set(CATALOGUE) - spec_codes)}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D15: сквозная трассировка ===")
+
+check("вне действия трассировки нет", current_trace() is None)
+with trace_scope("t-outer") as outer:
+    check("область задаёт трассировку", current_trace() == "t-outer")
+    check("область возвращает её же", outer == "t-outer")
+    with trace_scope("t-inner"):
+        check("вложенная область перекрывает", current_trace() == "t-inner")
+    check("выход возвращает прежнюю", current_trace() == "t-outer")
+check("после выхода трассировки снова нет", current_trace() is None)
+
+with trace_scope() as born:
+    check("вход без аргумента начинает цепочку",
+          born.startswith("t-") and current_trace() == born)
+
+# Событие рождается глубоко и трассировку не получает параметром.
+def deep_event():
+    """Как если бы его поднял реестр инструментов изнутри исполнения."""
+    return Envelope.event("assistant.response", {"text": "готово"}, id="c-77")
+
+with trace_scope("t-deep"):
+    ev = deep_event()
+check("событие подхватило трассировку из контекста", ev.trace_id == "t-deep")
+check("вне контекста событие всё равно с трассировкой",
+      deep_event().trace_id.startswith("t-"))
+
+# Требование §15.12: trace_id во всей цепочке от запроса до финального события.
+with trace_scope() as chain:
+    ask = Envelope.request("command.handle", {"text": "выключи компьютер"},
+                           id="s-100")
+    ok = ask.reply({"accepted": True}, id="c-100")
+    note = Envelope.event("assistant.thinking", {"active": True}, id="c-101")
+    bad = ask.fail(make("permission.denied", "Не разрешено."), id="c-102")
+same = {ask.trace_id, ok.trace_id, note.trace_id, bad.trace_id}
+check("вся цепочка несёт одну трассировку (§15.12)", same == {chain},
+      f"| {sorted(same)}")
+
+# Через канал: трассировка переживает сериализацию и продолжается на той
+# стороне — именно так её и подхватывает получатель.
+wire = list(FrameDecoder().feed(encode_frame(ask)))[0]
+with trace_scope(wire.trace_id):
+    answer = Envelope.event("history.changed", {}, id="c-200")
+check("получатель продолжает чужую цепочку", answer.trace_id == chain)
+
+
+class _Record:
+    pass
+
+
+rec = _Record()
+TraceFilter().filter(rec)
+check("вне действия в журнал идёт прочерк", rec.trace == NO_TRACE)
+with trace_scope("t-log"):
+    rec2 = _Record()
+    TraceFilter().filter(rec2)
+check("внутри действия в журнал идёт идентификатор", rec2.trace == "t-log")
+kept = _Record()
+kept.trace = "t-своя"
+TraceFilter().filter(kept)
+check("готовое поле не затирается", kept.trace == "t-своя")
 
 print()
 print("ИТОГО ошибок:", fails)

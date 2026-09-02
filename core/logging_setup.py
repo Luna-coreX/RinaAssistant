@@ -22,6 +22,8 @@ import os
 import sys
 import threading
 
+from core.wire.trace import TraceFilter
+
 
 LOGGER_NAME = "rina"
 FILE_NAME = "rina.log"
@@ -48,7 +50,13 @@ _LEVEL_VALUES = {
     "ERROR": logging.ERROR,
 }
 
-_FORMAT = "%(asctime)s %(levelname)-7s %(name)-20s %(message)s"
+# `trace` — сквозной идентификатор действия (4.0-D15, §14 спецификации).
+# Он в формате потому, что журнал без него в двухпроцессной системе
+# бесполезен: две программы пишут два несвязанных набора строк, и вопрос
+# «что произошло после того нажатия» отвечается сверкой отметок времени,
+# то есть догадкой. Поле подставляет `core.wire.trace.TraceFilter`; там же
+# объяснено, почему прочерк честнее выдуманного значения.
+_FORMAT = "%(asctime)s %(levelname)-7s %(trace)-14s %(name)-20s %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _lock = threading.Lock()
@@ -151,12 +159,18 @@ def setup(force: bool = False) -> None:
                 pass
 
         formatter = logging.Formatter(_FORMAT, datefmt=_DATE_FORMAT)
+        # Фильтр вешается на обработчики, а не на логгер: так поле получает
+        # и запись, созданная в обход наших путей, и формат не падает на
+        # KeyError посреди разбора сбоя — ровно тогда, когда журнал нужнее
+        # всего.
+        trace_filter = TraceFilter()
 
         try:
             file_handler = logging.handlers.RotatingFileHandler(
                 log_path(), maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT,
                 encoding="utf-8")
             file_handler.setFormatter(formatter)
+            file_handler.addFilter(trace_filter)
             file_handler.setLevel(current_level())
             logger.addHandler(file_handler)
         except OSError:
@@ -168,15 +182,16 @@ def setup(force: bool = False) -> None:
         if getattr(sys, "stderr", None) is not None:
             stream_handler = logging.StreamHandler(sys.stderr)
             stream_handler.setFormatter(formatter)
+            stream_handler.addFilter(trace_filter)
             stream_handler.setLevel(logging.WARNING)
             logger.addHandler(stream_handler)
 
-        _setup_security_handler(formatter)
+        _setup_security_handler(formatter, trace_filter)
         _install_excepthooks()
         _configured = True
 
 
-def _setup_security_handler(formatter):
+def _setup_security_handler(formatter, trace_filter=None):
     """Свой файл для журнала безопасности, независимо от общего уровня."""
     security = logging.getLogger(SECURITY_LOGGER_NAME)
     security.setLevel(logging.INFO)
@@ -191,6 +206,8 @@ def _setup_security_handler(formatter):
             os.path.join(logs_dir(), SECURITY_FILE_NAME),
             maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8")
         handler.setFormatter(formatter)
+        if trace_filter is not None:
+            handler.addFilter(trace_filter)
         handler.setLevel(logging.INFO)
         security.addHandler(handler)
     except OSError:

@@ -186,26 +186,37 @@
 
 `protocol.invalid_envelope` добавлен при реализации `4.0-D04`: требование §15.1 объявляло отсутствие обязательного поля ошибкой категории `protocol`, но кода для неё в каталоге не было. Поля, которых не хватило, перечисляются в `details.fields` — иначе сообщение «конверт неполон» отправляет отлаживающего искать вручную.
 
+**`retryable` значит «имеет ли смысл повторить то же самое»**, а не «поможет ли что-нибудь». Просроченное подтверждение неповторяемо: тот же вызов с тем же идентификатором провалится снова. Получить новое подтверждение и позвать заново, разумеется, можно — но это уже не повтор.
+
 Начальный каталог:
 
-| Код | Категория | Повтор |
-|---|---|---|
-| `protocol.incompatible` | protocol | нет |
-| `protocol.unknown_method` | protocol | нет |
-| `protocol.frame_too_large` | protocol | нет |
-| `protocol.not_ready` | protocol | да |
-| `protocol.invalid_envelope` | protocol | нет |
-| `permission.denied` | user | нет |
-| `permission.required` | user | нет |
-| `confirmation.invalid` | protocol | нет |
-| `app.not_found` | user | нет |
-| `app.launch_failed` | system | да |
-| `stt.unavailable` | system | нет |
-| `stt.failed` | system | да |
-| `tts.unavailable` | system | нет |
-| `llm.unavailable` | system | да |
-| `task.cancelled` | user | нет |
-| `internal` | system | да |
+| Код | Категория | Повтор | Когда |
+|---|---|---|---|
+| `protocol.incompatible` | protocol | нет | общей версии протокола нет |
+| `protocol.unknown_method` | protocol | нет | метода нет либо его возможность не объявлена |
+| `protocol.frame_too_large` | protocol | нет | кадр больше предела канала |
+| `protocol.not_ready` | protocol | да | рукопожатие ещё не состоялось |
+| `protocol.invalid_envelope` | protocol | нет | конверт неполон или не разбирается |
+| `permission.denied` | user | нет | разрешение не выдано |
+| `permission.required` | user | нет | действие требует разрешения, которого не спрашивали |
+| `confirmation.required` | user | нет | опасное действие вызвано без подтверждения |
+| `confirmation.invalid` | protocol | нет | подтверждение выдано под другой вызов или аргументы |
+| `confirmation.expired` | user | нет | срок истёк; нужно новое, а не повтор того же |
+| `tool.unknown` | protocol | нет | вызвана несуществующая возможность |
+| `tool.invalid_arguments` | protocol | нет | аргументы не проходят схему инструмента |
+| `app.not_found` | user | нет | программа не найдена в индексе |
+| `app.launch_failed` | system | да | запуск сорвался |
+| `stt.unavailable` | system | нет | распознавания нет |
+| `stt.failed` | system | да | распознать не удалось |
+| `tts.unavailable` | system | нет | синтеза нет |
+| `llm.unavailable` | system | да | модель недоступна |
+| `task.cancelled` | user | нет | задача снята по просьбе человека |
+| `calc.zero_division` | user | нет | деление на ноль в выражении |
+| `internal` | system | да | непредусмотренный сбой |
+
+**Каталог сверяется с кодом, а не поддерживается на веру.** `tools/test_wire.py` читает эту таблицу и сравнивает её с `core/wire/errors.py` в обе стороны, а сверх того требует, чтобы каждый код, объявленный любым инструментом реестра, здесь присутствовал. Первый прогон нашёл пять пропусков: `tool.unknown`, `tool.invalid_arguments`, `confirmation.required`, `confirmation.expired` и `calc.zero_division` — ядро их отправляло, а документ о них не знал.
+
+**Подтверждения и разрешения — разные вещи и разные коды.** `permission.*` относится к каталогу разрешений (`4.0-C04`): есть ли у действия право в принципе. `confirmation.*` относится к предъявленному подтверждению (`4.0-C05`): спрошен ли человек про этот конкретный вызов с этими аргументами. Одно не заменяет другого, и слить их в один код значило бы потерять различие между «так нельзя» и «так можно, но спросите».
 
 ---
 

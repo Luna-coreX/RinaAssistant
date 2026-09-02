@@ -29,7 +29,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from core.wire.errors import (ERROR_INCOMPATIBLE, ERROR_NOT_READY,
-                              ERROR_UNKNOWN_METHOD, protocol_fault)
+                              ERROR_UNKNOWN_METHOD, fault)
 
 
 class Side:
@@ -144,12 +144,12 @@ def negotiate(local: list[int], remote: list[int]) -> int:
     ADR 0004 держать предыдущую версию остаётся декоративным.
     """
     if not local or not remote:
-        raise protocol_fault(ERROR_INCOMPATIBLE,
-                             "сторона не объявила ни одной версии протокола",
-                             local=list(local), remote=list(remote))
+        raise fault(ERROR_INCOMPATIBLE,
+                    "сторона не объявила ни одной версии протокола",
+                    local=list(local), remote=list(remote))
     common = sorted(set(local) & set(remote))
     if not common:
-        raise protocol_fault(
+        raise fault(
             ERROR_INCOMPATIBLE,
             "Общей версии протокола нет: здесь понимают "
             f"{_versions(local)}, у собеседника {_versions(remote)}. "
@@ -218,7 +218,7 @@ class Session:
         remote = payload.get("protocol_versions")
         if not isinstance(remote, list) or not all(
                 isinstance(v, int) and not isinstance(v, bool) for v in remote):
-            raise protocol_fault(
+            raise fault(
                 ERROR_INCOMPATIBLE,
                 "в рукопожатии нет списка версий протокола",
                 got=remote)
@@ -241,11 +241,11 @@ class Session:
         """Оболочка принимает ответ ядра и переходит в рабочее состояние."""
         chosen = payload.get("protocol_version")
         if isinstance(chosen, bool) or not isinstance(chosen, int):
-            raise protocol_fault(ERROR_INCOMPATIBLE,
-                                 "ядро не назвало выбранную версию протокола",
-                                 got=chosen)
+            raise fault(ERROR_INCOMPATIBLE,
+                        "ядро не назвало выбранную версию протокола",
+                        got=chosen)
         if chosen not in self.versions:
-            raise protocol_fault(
+            raise fault(
                 ERROR_INCOMPATIBLE,
                 f"ядро выбрало версию {chosen}, которой здесь нет "
                 f"(объявлено: {_versions(self.versions)}).",
@@ -283,16 +283,16 @@ class Session:
         процесса — самый дорогой способ узнавать о своих ошибках.
         """
         if not self.ready:
-            raise protocol_fault(ERROR_NOT_READY,
-                                 "рукопожатие ещё не состоялось",
-                                 method=method)
+            raise fault(ERROR_NOT_READY,
+                        "рукопожатие ещё не состоялось",
+                        method=method)
         cap = capability_of(method)
         if cap is _UNKNOWN:
-            raise protocol_fault(ERROR_UNKNOWN_METHOD,
-                                 f"метод {method!r} протоколу неизвестен",
-                                 method=method)
+            raise fault(ERROR_UNKNOWN_METHOD,
+                        f"метод {method!r} протоколу неизвестен",
+                        method=method)
         if cap is not None and cap not in self.peer_capabilities:
-            raise protocol_fault(
+            raise fault(
                 ERROR_UNKNOWN_METHOD,
                 f"собеседник не объявил возможность {cap!r}, "
                 f"метод {method!r} звать нельзя",
@@ -309,7 +309,7 @@ class Session:
         «неизвестный метод», а не «нет права»: в 4.0 их не существует.
         """
         if not self.ready and method != "hello":
-            raise protocol_fault(
+            raise fault(
                 ERROR_NOT_READY,
                 "до рукопожатия принимается только hello",
                 method=method)
@@ -317,11 +317,11 @@ class Session:
             return
         cap = capability_of(method)
         if cap is _UNKNOWN:
-            raise protocol_fault(ERROR_UNKNOWN_METHOD,
-                                 f"метод {method!r} протоколу неизвестен",
-                                 method=method)
+            raise fault(ERROR_UNKNOWN_METHOD,
+                        f"метод {method!r} протоколу неизвестен",
+                        method=method)
         if cap is not None and cap not in self.capabilities:
-            raise protocol_fault(
+            raise fault(
                 ERROR_UNKNOWN_METHOD,
                 f"метод {method!r} здесь не поддерживается",
                 method=method, capability=cap)
