@@ -19,6 +19,7 @@ import threading
 import time
 
 from core.events import bus
+from core.trace import trace_scope
 from core.i18n import t as tr
 from core import router as router_mod
 from core import dialog as dialog_mod
@@ -309,12 +310,30 @@ class RinaEngine:
         self._reminder_thread.start()
 
     def _reminder_worker(self):
+        """
+        Планировщик: раз в секунду смотрит, не пора ли.
+
+        **Каждое срабатывание открывает свою цепочку трассировки** (4.0-D15).
+        Напоминание никем не вызвано — оно само и есть начало действия, и
+        всё, что за ним последует (событие оболочке, произнесённая фраза,
+        записи в журнале), принадлежит одной цепочке. Без этого сработавший
+        будильник выглядел бы в журнале набором несвязанных строк, а
+        разобрать «почему она заговорила ночью» было бы нечем.
+        """
         store = self._reminders
         while not self._stop_reminders.wait(1.0):
             try:
                 for item in store.due():
-                    store.mark_done(item["id"])
-                    self._emit(Events.REMINDER_FIRED, item=item)
+                    with trace_scope():
+                        store.mark_done(item["id"])
+                        # Снимок из due() сделан до пометки и всё ещё говорит
+                        # done: false. Отправить его как есть значит сообщить
+                        # оболочке о срабатывании напоминания, которое по
+                        # собственным словам не сработало: событие
+                        # противоречило бы хранилищу, откуда оболочка возьмёт
+                        # список секундой позже.
+                        self._emit(Events.REMINDER_FIRED,
+                                   item={**item, "done": True})
             except Exception:
                 pass          # сбой чтения не должен убивать планировщик
 

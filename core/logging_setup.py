@@ -22,7 +22,7 @@ import os
 import sys
 import threading
 
-from core.wire.trace import TraceFilter
+from core.trace import TraceFilter
 
 
 LOGGER_NAME = "rina"
@@ -54,7 +54,7 @@ _LEVEL_VALUES = {
 # Он в формате потому, что журнал без него в двухпроцессной системе
 # бесполезен: две программы пишут два несвязанных набора строк, и вопрос
 # «что произошло после того нажатия» отвечается сверкой отметок времени,
-# то есть догадкой. Поле подставляет `core.wire.trace.TraceFilter`; там же
+# то есть догадкой. Поле подставляет `core.trace.TraceFilter`; там же
 # объяснено, почему прочерк честнее выдуманного значения.
 _FORMAT = "%(asctime)s %(levelname)-7s %(trace)-14s %(name)-20s %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"

@@ -42,7 +42,7 @@ from core.wire.handshake import CORE_CAPABILITIES, Session, Side
 from core.wire.liveness import Liveness, VolatileState
 from core.wire.permissions import PermissionChannel
 from core.wire.tasks import Registry
-from core.wire.trace import trace_scope
+from core.trace import trace_scope
 from core.wire.transport import Channels, TransportClosed
 
 

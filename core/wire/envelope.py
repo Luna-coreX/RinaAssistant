@@ -31,7 +31,7 @@ from typing import Any, Iterator
 
 from core.wire.errors import (ERROR_FRAME_TOO_LARGE, ERROR_INVALID_ENVELOPE,
                               fault)
-from core.wire.trace import new_trace_id, require_trace
+from core.trace import new_trace_id, require_trace
 
 #: Предел одного управляющего сообщения (§2). Больше — дефект или попытка
 #: исчерпать память, и то и другое лечится разрывом, а не разбором.

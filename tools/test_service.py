@@ -72,6 +72,8 @@ class Core:
         seen = []
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and len(seen) < limit:
+            if self.proc.poll() is not None:
+                break                # ядро умерло — ждать больше нечего
             batch = self.read(1, timeout=deadline - time.monotonic())
             if not batch:
                 break
@@ -246,6 +248,60 @@ core.ask("core.shutdown")
 core.read(1)
 code = core.wait()
 check("по просьбе ядро завершилось с нулём", code == 0, f"| код {code}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== E05: напоминание срабатывает само ===")
+
+# Первый настоящий потребитель канала событий: до сих пор его проверяли
+# заглушками. Напоминание ставится голосовой командой — через настоящий
+# разбор, — и приходит push-событием, которого никто не запрашивал.
+timer = Core()
+timer.handshake()
+
+timer.ask("command.handle", {"text": "засеки 3 секунды", "source": "voice"})
+booked = timer.read_until("assistant.response", timeout=20)
+check("команда принята и подтверждена вслух",
+      any(m.method == "assistant.response" for m in booked),
+      f"| {[m.method for m in booked]}")
+
+# Ответ на список и само срабатывание идут по одному каналу и могут
+# перемешаться: таймер трёхсекундный, а ответ приходит когда приходит.
+# Поэтому читается один поток до срабатывания, а разбирается он потом.
+# Первая редакция этой проверки ждала их по очереди — и цикл ожидания
+# ответа съедал пришедшее следом событие, после чего второй цикл ждал
+# того, что уже прочитано.
+timer.ask("reminders.list")
+alarm = timer.read_until("reminder.fired", timeout=25, limit=30)
+
+answers = [m for m in alarm if m.type == MessageType.RESPONSE]
+items = answers[-1].payload["items"] if answers else []
+check("ядро знает о запланированном", len(items) == 1, f"| {items}")
+if items:
+    check("напоминание описано по форме §10",
+          set(items[0]) == {"id", "kind", "text", "fire_at", "created_at",
+                            "done"},
+          f"| {sorted(items[0])}")
+    check("это таймер", items[0]["kind"] == "timer",
+          f"| {items[0]['kind']}")
+
+fired = [m for m in alarm if m.method == "reminder.fired"]
+check("сработавшее напоминание пришло push-событием", fired,
+      f"| {[m.method for m in alarm]}")
+if fired:
+    item = fired[0].payload["item"]
+    check("событие несёт само напоминание",
+          set(item) == {"id", "kind", "text", "fire_at", "created_at", "done"},
+          f"| {sorted(item)}")
+    check("оно помечено сработавшим", item["done"] is True)
+    check("у срабатывания своя цепочка трассировки",
+          fired[0].trace_id and fired[0].trace_id != booked[0].trace_id,
+          f"| {fired[0].trace_id}")
+
+timer.ask("core.shutdown")
+timer.read(1)
+check("ядро с планировщиком завершается штатно", timer.wait() == 0)
 
 
 # ---------------------------------------------------------------------------

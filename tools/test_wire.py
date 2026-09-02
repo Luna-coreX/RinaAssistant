@@ -1258,6 +1258,40 @@ for what, change in (("новое необязательное поле", add_op
     check(f"пропущено разрешённое: {what}", not breaks and len(ok) == 1,
           f"| можно: {ok}, ломает: {breaks}")
 
+
+# ---------------------------------------------------------------------------
+print()
+print("=== E05: форма сработавшего напоминания ===")
+
+# Хранилищу подсовывается память, а не диск: проверка не должна ничего
+# писать даже во временную папку, если может обойтись.
+from core.settings_api import MemorySettings
+from voice.reminders import ReminderStore
+
+fired = ReminderStore(MemorySettings()).add("timer", 9e9, "проверить тесты")
+
+# Форма из §10 спецификации читается прямо оттуда, а не переписывается сюда.
+section10 = spec_text[spec_text.index("### Форма `reminder.fired.item`"):]
+section10 = section10[:section10.index(chr(10) + chr(10) + "**")]
+documented = set(re.findall(r"^\| `([a-z_]+)` \|", section10, re.M))
+check("форма описана в спецификации", len(documented) >= 5,
+      f"| {sorted(documented)}")
+check("хранилище кладёт ровно описанные поля",
+      set(fired) == documented,
+      f"| только в документе: {sorted(documented - set(fired))}, "
+      f"только в хранилище: {sorted(set(fired) - documented)}")
+
+# И всё это обязано пережить провод: событие несёт item объектом.
+import json as _json2
+
+check("напоминание сериализуется без потерь",
+      _json2.loads(_json2.dumps(fired, ensure_ascii=False)) == fired)
+carried = event("reminder.fired", {"item": fired}, id="c-700",
+                trace_id="t-rem")
+back = decode(encode(carried))
+check("и доезжает через конверт целым", back.payload["item"] == fired)
+check("событие объявлено в каталоге", "reminder.fired" in EVENTS)
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

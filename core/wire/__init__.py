@@ -22,7 +22,6 @@ ADR 0002: спецификация не зависит от транспорта
 Состав:
 
     errors      каталог ошибок как части контракта (4.0-D05, §5)
-    trace       сквозная трассировка через контекст (4.0-D15, §14)
     envelope    конверт и кадрирование управляющего канала (4.0-D04, §2–3)
     handshake   рукопожатие, версии и возможности (4.0-D03, §4)
     events      каталог событий и потоковый текст (4.0-D11, 4.0-D06, §7, §10)
@@ -54,7 +53,7 @@ from core.wire.tasks import FINAL, Registry, Task, TaskState, run
 from core.wire.handshake import (CAPABILITIES, CORE_CAPABILITIES,
                                  SHELL_CAPABILITIES, Session, SessionState,
                                  Side, capability_of, negotiate)
-from core.wire.trace import (NO_TRACE, TraceFilter, current_trace,
+from core.trace import (NO_TRACE, TraceFilter, current_trace,
                              new_trace_id, require_trace, trace_scope)
 
 __all__ = [
