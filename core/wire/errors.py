@@ -63,6 +63,8 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
           "конверт неполон или не разбирается"),
     _spec("protocol.invalid_payload", "protocol", False,
           "нагрузка не соответствует объявленной форме события"),
+    _spec("protocol.invalid_state", "protocol", False,
+          "сообщение не к месту: поток закрыт, задача уже завершена"),
 
     # --- права и подтверждения ----------------------------------------------
     _spec("permission.denied", "user", False,
@@ -175,3 +177,4 @@ ERROR_FRAME_TOO_LARGE = "protocol.frame_too_large"
 ERROR_NOT_READY = "protocol.not_ready"
 ERROR_INVALID_ENVELOPE = "protocol.invalid_envelope"
 ERROR_INVALID_PAYLOAD = "protocol.invalid_payload"
+ERROR_INVALID_STATE = "protocol.invalid_state"

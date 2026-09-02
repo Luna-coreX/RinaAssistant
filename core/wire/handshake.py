@@ -96,6 +96,8 @@ _CAPABILITY_LIST = (
                "плагины"),
     Capability("llm", Side.CORE, (),
                "ядро умеет отвечать моделью; отдельного метода нет"),
+    Capability("tasks", Side.CORE, ("task.cancel",),
+               "долгие задачи с прогрессом и отменой (4.0-D09, D10)"),
     # --- не объявляется никем в 4.0 (§12) ---
     Capability("actuation", Side.CORE,
                ("actuation.session.begin", "actuation.session.end",

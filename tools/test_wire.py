@@ -25,8 +25,10 @@ from core.wire import (CATALOGUE, CONTROL_FRAME_LIMIT, CORE_CAPABILITIES,
                        trace_scope, validate_event)
 from core.wire.errors import (CATEGORIES, ERROR_FRAME_TOO_LARGE,
                               ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
-                              ERROR_INVALID_PAYLOAD, ERROR_NOT_READY,
-                              ERROR_UNKNOWN_METHOD, ProtocolError)
+                              ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE,
+                              ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
+                              ProtocolError)
+from core.wire.tasks import FINAL, Registry, STATUS_UNKNOWN, TaskState, run
 
 fails = 0
 
@@ -432,8 +434,6 @@ print("=== D11: каталог событий ===")
 # переносе событие — это поведение, о котором ядро сообщать перестанет.
 from core.protocol import ALL_EVENTS as EVENTS_310
 
-STREAMING = {"stream.chunk", "stream.end"}
-
 lost = sorted(set(EVENTS_310) - set(EVENTS))
 check("ни одно событие 3.1.0 не потеряно", not lost, f"| потеряно: {lost}")
 print(f"     событий 3.1.0: {len(EVENTS_310)}, в каталоге провода: {len(EVENTS)}")
@@ -449,10 +449,19 @@ for line in section.split("\n"):
         spec_events |= set(re.findall(r"`([a-z]+\.[a-z_]+)`", cell))
 check("таблица событий документа прочитана", len(spec_events) >= 10,
       f"| {len(spec_events)}")
-check("документ и каталог событий совпадают",
-      spec_events == set(EVENTS) - STREAMING,
-      f"| только в документе: {sorted(spec_events - set(EVENTS))}, "
-      f"только в каталоге: {sorted(set(EVENTS) - spec_events - STREAMING)}")
+# Таблица §6 описывает ровно перенос 3.1.0: ничего не потеряно и ничего не
+# придумано. Потоковые события живут в §7, события задач — в §9, и сверять
+# их с этой таблицей значило бы требовать от неё того, чем она не является.
+check("таблица §6 = события 3.1.0", spec_events == set(EVENTS_310),
+      f"| только в документе: {sorted(spec_events - set(EVENTS_310))}, "
+      f"только в 3.1.0: {sorted(set(EVENTS_310) - spec_events)}")
+# Зато каждое событие каталога обязано быть описано хоть где-то: событие,
+# которого контракт не упоминает, — договорённость, о которой знает одна
+# сторона. Список исключений не ведётся намеренно, иначе он и станет тем
+# местом, где события прячут.
+undocumented = sorted(n for n in EVENTS if n not in spec_text)
+check("каждое событие каталога описано в спецификации", not undocumented,
+      f"| нет в документе: {undocumented}")
 
 
 # ---------------------------------------------------------------------------
@@ -541,10 +550,10 @@ check("части несут одну трассировку",
       {p.trace_id for p in parts} == {"t-stream"})
 check("поток закрыт", sid not in sender.open)
 check("часть после закрытия не отправляется",
-      fault(lambda: sender.chunk(sid, "ещё"), ERROR_INVALID_PAYLOAD)
+      fault(lambda: sender.chunk(sid, "ещё"), ERROR_INVALID_STATE)
       is not None)
 check("часть незанятого потока не отправляется",
-      fault(lambda: sender.chunk(99, "чужое"), ERROR_INVALID_PAYLOAD)
+      fault(lambda: sender.chunk(99, "чужое"), ERROR_INVALID_STATE)
       is not None)
 
 sid2 = sender.begin()
@@ -569,6 +578,146 @@ check("текст собран в исходном порядке",
 check("поток отмечен завершённым",
       receiver.done(sid) and receiver.finished[sid] == STREAM_DONE)
 check("приёмник не трогает чужие сообщения", receiver.accept(ev) is False)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D09: жизненный цикл долгой задачи ===")
+
+registry = Registry(IdGenerator("c-"))
+task = registry.create()
+check("ответ на запрос сообщает номер и приём",
+      task.accepted_payload() == {"task_id": task.id, "status": "accepted"})
+check("задача начинается принятой", task.state == TaskState.ACCEPTED)
+
+with trace_scope("t-task"):
+    task.start()
+    m1 = task.progress("читаю файлы", fraction=0.25)
+    m2 = task.progress("без доли")
+    m3 = task.partial({"файлов": 12})
+    m4 = task.done({"файлов": 40})
+
+check("задача перешла в работу и завершилась",
+      task.state == TaskState.DONE)
+check("прогресс несёт номер задачи и пояснение",
+      m1.payload["task_id"] == task.id and m1.payload["note"] == "читаю файлы")
+check("доля попала в нагрузку", m1.payload.get("fraction") == 0.25)
+check("доля необязательна", "fraction" not in m2.payload)
+check("промежуточный результат отдан", m3.payload["result"] == {"файлов": 12})
+check("события задачи несут трассировку контекста",
+      {m.trace_id for m in (m1, m2, m3, m4)} == {"t-task"})
+
+finals = [m.method for m in task.events if m.method in
+          ("task.done", "task.failed", "task.cancelled")]
+check("ровно одно финальное событие", finals == ["task.done"], f"| {finals}")
+
+# После финала любое сообщение задачи — дефект отправителя.
+for what, call in (("прогресс", lambda: task.progress("ещё")),
+                   ("промежуточный", lambda: task.partial(1)),
+                   ("второй done", lambda: task.done(1)),
+                   ("failed после done", lambda: task.failed(
+                       make("internal", "…"))),
+                   ("cancelled после done", lambda: task.cancelled())):
+    check(f"после завершения отклонён {what}",
+          fault(call, ERROR_INVALID_STATE) is not None)
+
+check("доля вне 0..1 отклонена",
+      fault(lambda: registry.create().progress("шаг", fraction=1.5),
+            ERROR_INVALID_PAYLOAD) is not None)
+
+failing = registry.create()
+failing.start()
+bad = failing.failed(make("llm.unavailable", "Модель не отвечает."))
+check("провал несёт ошибку по §5",
+      bad.payload["error"]["code"] == "llm.unavailable"
+      and bad.payload["error"]["category"] == "system"
+      and bad.payload["error"]["retryable"] is True)
+check("проваленная задача финальна", failing.state == TaskState.FAILED)
+
+# §15.7: задача на шестьдесят секунд. Часы поддельные — требование про форму
+# последовательности, а не про ожидание в реальном времени; держать проверку
+# минуту ради этого значило бы платить минутой за ничто.
+clock = [0.0]
+long_task = registry.create()
+events = run(long_task, steps=12, clock=lambda: clock[0],
+             advance=lambda d: clock.__setitem__(0, clock[0] + d),
+             seconds=60.0, partial_every=4)
+kinds = [m.method for m in events]
+check("часы прошли шестьдесят секунд", clock[0] == 60.0, f"| {clock[0]}")
+check("прогресс отдан", kinds.count("task.progress") == 12)
+check("промежуточные результаты отданы", kinds.count("task.partial") == 3)
+check("ровно одно финальное событие у долгой задачи",
+      len([k for k in kinds if k in ("task.done", "task.failed",
+                                     "task.cancelled")]) == 1)
+check("финальное — последнее", kinds[-1] == "task.done")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D10: кооперативная отмена ===")
+
+live = registry.create()
+live.start()
+ack = live.request_cancel()
+check("подтверждение получения — не остановка",
+      ack == {"accepted": True, "status": TaskState.RUNNING})
+check("задача ещё не завершена", not live.finished)
+check("задача видит просьбу", live.cancel_requested is True)
+check("повторная просьба не ломает", live.request_cancel()["accepted"] is True)
+
+stop = live.cancelled()
+check("остановка приходит третьим шагом",
+      stop.method == "task.cancelled" and live.state == TaskState.CANCELLED)
+check("у отменённой задачи тоже ровно одно финальное событие",
+      len([m for m in live.events if m.method in
+           ("task.done", "task.failed", "task.cancelled")]) == 1)
+
+# Отмена, доехавшая до задачи посреди работы, останавливает её на границе шага.
+clock2 = [0.0]
+racing = registry.create()
+racing.start()
+racing.progress("первый шаг")
+racing.request_cancel()
+racing.state = TaskState.ACCEPTED          # вернуть в исходное для run()
+racing.events.clear()
+stopped = run(racing, steps=10, clock=lambda: clock2[0],
+              advance=lambda d: clock2.__setitem__(0, clock2[0] + d),
+              seconds=60.0)
+check("задача остановилась, не доработав",
+      [m.method for m in stopped] == ["task.cancelled"],
+      f"| {[m.method for m in stopped]}")
+check("часы почти не сдвинулись", clock2[0] == 0.0, f"| {clock2[0]}")
+
+# Гонка §9: задача успела завершиться сама.
+quick = registry.create()
+quick.start()
+quick.done({"итог": "уже"})
+late = registry.cancel(quick.id)
+check("отмена завершённой задачи не принимается",
+      late == {"accepted": False, "status": TaskState.DONE})
+check("task.cancelled при этом не отправляется",
+      [m.method for m in quick.events] == ["task.done"])
+
+check("отмена неизвестной задачи говорит правду",
+      registry.cancel("task-9999") == {"accepted": False,
+                                       "status": STATUS_UNKNOWN})
+
+# Возможность: оболочка не зовёт task.cancel у ядра, которое задач не умеет.
+plain = Session(side=Side.SHELL)
+old_core = Session(side=Side.CORE, capabilities=("stt", "tts"))
+old_core.handle_hello(plain.hello_payload())
+plain.accept_hello_result({"protocol_version": 1,
+                           "capabilities": list(old_core.capabilities),
+                           "core_version": "4.0.0", "session_id": "x"})
+check("ядро без задач не принимает task.cancel",
+      not plain.may_call("task.cancel"))
+modern = Session(side=Side.SHELL)
+core_now = Session(side=Side.CORE)
+core_now.handle_hello(modern.hello_payload())
+modern.accept_hello_result({"protocol_version": 1,
+                            "capabilities": list(core_now.capabilities),
+                            "core_version": "4.0.0", "session_id": "y"})
+check("ядро с возможностью tasks принимает", modern.may_call("task.cancel"))
 
 print()
 print("ИТОГО ошибок:", fails)

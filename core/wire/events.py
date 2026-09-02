@@ -29,7 +29,8 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from core.wire.envelope import Envelope
-from core.wire.errors import ERROR_INVALID_PAYLOAD, fault
+from core.wire.errors import (ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE,
+                              fault)
 
 #: Типы полей. Тот же словарь, что у реестра инструментов, — намеренно:
 #: два разных языка описания данных внутри одного ядра пришлось бы сверять.
@@ -40,6 +41,10 @@ _TYPES = {
     "number": (int, float),
     "object": dict,
     "array": list,
+    # Результат задачи бывает каким угодно: строкой у переписанного текста,
+    # объектом у разбора, списком у поиска. Навязать здесь форму значило бы
+    # решить за пятую версию, чем занимаются долгие задачи.
+    "any": object,
 }
 
 
@@ -48,6 +53,9 @@ class Field:
     name: str
     type: str
     choices: tuple[str, ...] = ()
+    required: bool = True
+    low: float | None = None
+    high: float | None = None
 
 
 @dataclass(frozen=True)
@@ -61,8 +69,8 @@ def _e(name, *fields, note=""):
     return EventSpec(name, tuple(fields), note)
 
 
-def _f(name, type_, *choices):
-    return Field(name, type_, tuple(choices))
+def _f(name, type_, *choices, required=True, low=None, high=None):
+    return Field(name, type_, tuple(choices), required, low, high)
 
 
 #: Все события. Первые двенадцать — поведение 3.1.0, перенесённое без
@@ -99,6 +107,17 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
        note="часть ответа; поток назван stream_id в конверте"),
     _e("stream.end", _f("reason", "string", "done", "cancelled", "failed"),
        note="при failed рядом идёт error с тем же stream_id"),
+
+    # --- долгие задачи (4.0-D09, §9) ----------------------------------------
+    _e("task.progress", _f("task_id", "string"), _f("note", "string"),
+       _f("fraction", "number", required=False, low=0.0, high=1.0),
+       note="доля необязательна: она известна не всякой задаче, "
+            "а пояснение обязано быть — молчаливый прогресс бесполезен"),
+    _e("task.partial", _f("task_id", "string"), _f("result", "any"),
+       note="промежуточный результат; сколько угодно раз"),
+    _e("task.done", _f("task_id", "string"), _f("result", "any")),
+    _e("task.failed", _f("task_id", "string"), _f("error", "object")),
+    _e("task.cancelled", _f("task_id", "string")),
 )}
 
 ALL_EVENTS = tuple(EVENTS)
@@ -131,6 +150,8 @@ def validate_event(name: str, payload: dict[str, Any]) -> None:
                     event=name, fields=extra)
     for fname, spec_field in expected.items():
         if fname not in payload:
+            if not spec_field.required:
+                continue
             raise fault(ERROR_INVALID_PAYLOAD,
                         f"у события {name!r} не хватает поля {fname!r}",
                         event=name, field=fname)
@@ -149,6 +170,14 @@ def validate_event(name: str, payload: dict[str, Any]) -> None:
             raise fault(ERROR_INVALID_PAYLOAD,
                         f"поле {fname!r} принимает только "
                         f"{', '.join(spec_field.choices)}",
+                        event=name, field=fname, got=value)
+        if spec_field.low is not None and value < spec_field.low:
+            raise fault(ERROR_INVALID_PAYLOAD,
+                        f"поле {fname!r} меньше {spec_field.low}",
+                        event=name, field=fname, got=value)
+        if spec_field.high is not None and value > spec_field.high:
+            raise fault(ERROR_INVALID_PAYLOAD,
+                        f"поле {fname!r} больше {spec_field.high}",
                         event=name, field=fname, got=value)
 
 
@@ -246,7 +275,7 @@ class StreamSender:
 
     def _require(self, stream_id: int):
         if stream_id not in self.open:
-            raise fault(ERROR_INVALID_PAYLOAD,
+            raise fault(ERROR_INVALID_STATE,
                         f"поток {stream_id} не открыт или уже закрыт",
                         stream_id=stream_id)
 

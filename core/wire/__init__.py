@@ -26,6 +26,7 @@ ADR 0002: спецификация не зависит от транспорта
     envelope    конверт и кадрирование управляющего канала (4.0-D04, §2–3)
     handshake   рукопожатие, версии и возможности (4.0-D03, §4)
     events      каталог событий и потоковый текст (4.0-D11, 4.0-D06, §7, §10)
+    tasks       жизненный цикл долгой задачи и отмена (4.0-D09, D10, §9)
 """
 
 from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
@@ -34,11 +35,13 @@ from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
 from core.wire.errors import (CATALOGUE, CATEGORIES, ErrorSpec, ProtocolError,
                               ProtocolFault, ERROR_FRAME_TOO_LARGE,
                               ERROR_INCOMPATIBLE, ERROR_INVALID_ENVELOPE,
-                              ERROR_INVALID_PAYLOAD, ERROR_NOT_READY,
-                              ERROR_UNKNOWN_METHOD, fault, make)
+                              ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE,
+                              ERROR_NOT_READY, ERROR_UNKNOWN_METHOD,
+                              fault, make)
 from core.wire.events import (ALL_EVENTS, EVENTS, Router, STREAM_CANCELLED,
                               STREAM_DONE, STREAM_FAILED, StreamReceiver,
                               StreamSender, event, validate_event)
+from core.wire.tasks import FINAL, Registry, Task, TaskState, run
 from core.wire.handshake import (CAPABILITIES, CORE_CAPABILITIES,
                                  SHELL_CAPABILITIES, Session, SessionState,
                                  Side, capability_of, negotiate)
@@ -50,8 +53,9 @@ __all__ = [
     "MessageType", "decode", "encode", "encode_frame",
     "CATALOGUE", "CATEGORIES", "ErrorSpec", "ProtocolError", "ProtocolFault",
     "ERROR_FRAME_TOO_LARGE", "ERROR_INCOMPATIBLE", "ERROR_INVALID_ENVELOPE",
-    "ERROR_INVALID_PAYLOAD", "ERROR_NOT_READY", "ERROR_UNKNOWN_METHOD",
-    "fault", "make",
+    "ERROR_INVALID_PAYLOAD", "ERROR_INVALID_STATE", "ERROR_NOT_READY",
+    "ERROR_UNKNOWN_METHOD", "fault", "make",
+    "FINAL", "Registry", "Task", "TaskState", "run",
     "ALL_EVENTS", "EVENTS", "Router", "STREAM_CANCELLED", "STREAM_DONE",
     "STREAM_FAILED", "StreamReceiver", "StreamSender", "event",
     "validate_event",
