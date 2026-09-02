@@ -25,6 +25,28 @@ import os
 import queue
 import sys
 import threading
+import time
+
+try:                                  # только Windows; на другой системе
+    import msvcrt                     # именованных каналов у нас и нет
+except ImportError:                   # pragma: no cover
+    msvcrt = None                     # type: ignore[assignment]
+
+
+def _peek_named_pipe():
+    """`PeekNamedPipe` или `None`, если заглянуть в канал нечем."""
+    if msvcrt is None or not sys.platform.startswith("win"):
+        return None
+    import ctypes
+    from ctypes import wintypes
+
+    peek = ctypes.WinDLL("kernel32", use_last_error=True).PeekNamedPipe
+    peek.argtypes = [wintypes.HANDLE, wintypes.LPVOID, wintypes.DWORD,
+                     ctypes.POINTER(wintypes.DWORD),
+                     ctypes.POINTER(wintypes.DWORD),
+                     ctypes.POINTER(wintypes.DWORD)]
+    peek.restype = wintypes.BOOL
+    return peek
 
 
 class TransportClosed(Exception):
@@ -158,12 +180,36 @@ class PipeClientTransport(Transport):
     Ядро подключается, а не слушает: сервером канала работает оболочка
     (ADR 0002). В Python это обычный файл — ни `pywin32`, ни асинхронного
     цикла не требуется.
+
+    **Чтение не имеет права запирать запись, и это стоило отдельного
+    решения.** У синхронного файлового дескриптора Windows операции
+    сериализуются: пока главный поток висит в `ReadFile`, `WriteFile` из
+    рабочего потока ждёт его завершения. Ядро при этом молчит, пока
+    оболочка чего-нибудь не пришлёт, — то есть push-события (§10) не
+    работают вовсе, а выглядит это как «ядро задумалось».
+
+    Дефект нашёлся только на настоящем канале: внутрипроцессный
+    conformance-набор поймать его не мог по построению — там нет ни
+    дескриптора, ни сериализации, а протокол ни при чём. Отсюда правило:
+    независимость протокола от транспорта (ADR 0002) не отменяет проверки
+    самого транспорта, и `shell/Rina.Protocol.Probe` — она и есть.
+
+    Лечится без сторонних библиотек: один замок на дескриптор и
+    `PeekNamedPipe` перед чтением. `ReadFile` вызывается, только когда байты
+    уже пришли, поэтому висеть внутри замка не на чем, и запись всегда
+    находит дескриптор свободным. Цена — опрос раз в несколько миллисекунд;
+    альтернатива (перекрытый ввод-вывод) требует `pywin32`, а его отсутствие
+    было половиной довода ADR 0002 в пользу этой раскладки.
     """
+
+    #: Как часто заглядывать в канал, когда он пуст.
+    POLL = 0.004
 
     def __init__(self, name: str):
         self.name = name
         self._file = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
+        self._peek = _peek_named_pipe()
 
     @staticmethod
     def path(session: str, channel: str) -> str:
@@ -201,22 +247,62 @@ class PipeClientTransport(Transport):
                 raise TransportClosed(str(exc)) from None
 
     def recv(self, max_bytes: int = 65536) -> bytes:
+        """
+        Прочитать доступное. Пустые байты — «пока ничего», не «конец».
+
+        Замок держится только на время самого чтения, и читаем мы лишь
+        тогда, когда `PeekNamedPipe` уже насчитал байты. Без этого
+        отправляющий поток ждал бы завершения чужого чтения.
+        """
         if self._file is None:
             raise TransportClosed("канал не открыт")
-        try:
-            chunk = self._file.read(max_bytes)
-        except OSError as exc:
-            raise TransportClosed(str(exc)) from None
+        with self._lock:
+            if self._file is None:
+                raise TransportClosed("канал закрыт")
+            available = self._available()
+            if available == 0:
+                return b""
+            try:
+                chunk = self._file.read(min(available, max_bytes))
+            except OSError as exc:
+                raise TransportClosed(str(exc)) from None
         if not chunk:
             raise TransportClosed("оболочка закрыла канал")
         return chunk
 
+    def _available(self) -> int:
+        """
+        Сколько байт уже лежит в канале. Ноль — пусто, исключение — конец.
+
+        Если заглянуть нечем (не Windows, дескриптор недоступен), считаем,
+        что байты есть: тогда поведение возвращается к простому блокирующему
+        чтению, и хуже, чем было, не станет.
+        """
+        if self._peek is None:
+            time.sleep(self.POLL)
+            return 65536
+        import ctypes
+
+        count = ctypes.c_ulong(0)
+        try:
+            handle = msvcrt.get_osfhandle(self._file.fileno())
+        except (OSError, ValueError):
+            raise TransportClosed("дескриптор канала потерян") from None
+        ok = self._peek(ctypes.c_void_p(handle), None, 0, None,
+                        ctypes.byref(count), None)
+        if not ok:
+            raise TransportClosed("оболочка закрыла канал")
+        if count.value == 0:
+            time.sleep(self.POLL)
+        return int(count.value)
+
     def close(self) -> None:
-        if self._file is not None:
-            try:
-                self._file.close()
-            finally:
-                self._file = None
+        with self._lock:
+            if self._file is not None:
+                try:
+                    self._file.close()
+                finally:
+                    self._file = None
 
 
 def open_channels(mode: str, session: str = "") -> Channels:

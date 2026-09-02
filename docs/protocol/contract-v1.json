@@ -389,6 +389,7 @@
     "command.handle": null,
     "command.run_by_id": null,
     "core.shutdown": null,
+    "hello": null,
     "permission.request": "permissions",
     "ping": null,
     "plugins.action": "plugins",
