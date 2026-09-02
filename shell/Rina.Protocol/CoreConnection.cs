@@ -41,7 +41,7 @@ public sealed class CoreConnection : IAsyncDisposable
 {
     private readonly IdGenerator _ids = new("s-");
     private readonly ControlChannel _control;
-    private readonly ControlChannel _data;
+    private readonly DataChannel _data;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<Envelope>>
         _pending = new();
     private readonly System.Text.StringBuilder _coreLog = new();
@@ -65,6 +65,9 @@ public sealed class CoreConnection : IAsyncDisposable
     /// <summary>Незнакомые события: их игнорируют молча, но считать полезно.</summary>
     public List<string> IgnoredEvents { get; } = [];
 
+    /// <summary>Канал данных: звук и кадры экрана, мимо JSON (§2).</summary>
+    public DataChannel Data => _data;
+
     /// <summary>Когда в последний раз что-либо пришло от ядра (§13).</summary>
     public DateTimeOffset LastHeard { get; private set; } = DateTimeOffset.UtcNow;
 
@@ -72,7 +75,7 @@ public sealed class CoreConnection : IAsyncDisposable
     {
         Session = session ?? Guid.NewGuid().ToString("N")[..12];
         _control = new ControlChannel(Session, "control");
-        _data = new ControlChannel(Session, "data");
+        _data = new DataChannel(Session);
     }
 
     public async Task StartAsync(CoreLaunch launch, TimeSpan timeout,

@@ -45,6 +45,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-audio"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckAudioAsync();
+            return;
+        }
+
         var shot = Value(args, "--shot");
         if (shot is null)
         {
@@ -162,6 +169,132 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>
+    /// F09/F10: звук ходит в ядро и обратно, кредит соблюдается.
+    /// </summary>
+    /// <remarks>
+    /// Часть проверок не трогает устройство вовсе: путь звука один и тот же,
+    /// приходит он с микрофона или из генератора, и проверять надо путь.
+    /// Иначе набор не запустится на машине без микрофона — то есть на любом
+    /// сервере сборки.
+    /// </remarks>
+    private async Task CheckAudioAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F09/F10: звук между оболочкой и ядром ===");
+
+        var devices = Audio.Microphone.Devices();
+        Console.WriteLine($"      устройств записи: {devices.Count}"
+            + (devices.Count > 0 ? $" — {devices[0].Name}" : ""));
+
+        // --- F10: очередь и прерывание. Ядра для этого не нужно. ---
+        var speaker = new Audio.Speaker();
+        var speaking = new List<bool>();
+        speaker.Speaking += value => speaking.Add(value);
+
+        var tone = Tone(seconds: 1.0);
+        speaker.Enqueue(tone);
+        Check("речь началась", speaker.IsSpeaking);
+        Check("в очереди есть что играть", speaker.Pending > 0,
+              $"| {speaker.Pending} Б");
+
+        await Task.Delay(150);
+        speaker.Interrupt();
+        Check("прерывание опустошает очередь сейчас же", speaker.Pending == 0,
+              $"| {speaker.Pending} Б");
+        Check("о конце речи сообщено",
+              speaking.Count >= 2 && speaking[^1] is false,
+              "| " + string.Join(" -> ", speaking));
+
+        // --- «не слушать себя»: заглушка, а не остановка устройства ---
+        var microphone = new Audio.Microphone();
+        speaker.Speaking += value => microphone.Muted = value;
+        speaker.Enqueue(tone);
+        Check("пока Рина говорит, микрофон заглушен", microphone.Muted);
+        speaker.Interrupt();
+        Check("после речи слушает снова", !microphone.Muted);
+        speaker.Dispose();
+
+        // --- уровень: тишина и звук различаются ---
+        Check("тишина даёт ноль",
+              Audio.Microphone.LevelOf(new byte[3200]) < 0.01f);
+        var loud = Audio.Microphone.LevelOf(tone);
+        Check("звук даёт заметный уровень", loud > 0.3f, $"| {loud:0.00}");
+
+        // --- F09: поток в настоящее ядро с кредитом ---
+        var link = new CoreLink(new MainWindow(), CoreLink.FindCore());
+        await link.StartAsync();
+        for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
+            await Task.Delay(100);
+        Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
+              $"| {link.State}");
+
+        if (link.Connection is { Ready: true } connection)
+        {
+            using var audio = new Audio.AudioLink(connection, connection.Data,
+                                                  microphone, new Audio.Speaker());
+            // Устройство не включаем: иначе в поток пойдёт и настоящий
+            // звук из комнаты, и проверка будет считать чужое.
+            var opened = await audio.StartCaptureAsync(listen: false);
+            Check("ядро приняло поток микрофона", opened);
+            Check("первый кредит выдан вместе с согласием", audio.Credit > 0,
+                  $"| {audio.Credit} Б");
+
+            var chunk = Tone(seconds: 0.1);
+            var sent = 0;
+            for (var i = 0; i < 8 && audio.Push(chunk); i++) sent += chunk.Length;
+            Check("звук ушёл в ядро", sent > 0, $"| {sent} Б");
+
+            var big = new byte[(int)audio.Credit + 4096];
+            Check("сверх кредита не отправляется", !audio.Push(big));
+            Check("отброшенное посчитано", audio.Dropped >= big.Length,
+                  $"| {audio.Dropped} Б");
+
+            await Task.Delay(900);
+            var closed = await connection.CallAsync("stream.close",
+                new System.Text.Json.Nodes.JsonObject
+                {
+                    ["stream_id"] = 11,
+                }, TimeSpan.FromSeconds(10));
+            var got = closed.Payload["bytes"]?.GetValue<int>() ?? 0;
+            Check("ядро получило ровно отправленное",
+                  got == sent && got == audio.Sent,
+                  $"| ядро {got} Б, оболочка {sent} Б, учтено {audio.Sent} Б");
+        }
+
+        await link.DisposeAsync();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>Синтетический звук: 440 Гц в формате микрофона.</summary>
+    private static byte[] Tone(double seconds)
+    {
+        var samples = (int)(Audio.Microphone.SampleRate * seconds);
+        var pcm = new byte[samples * 2];
+        for (var i = 0; i < samples; i++)
+        {
+            var value = (short)(Math.Sin(2 * Math.PI * 440 * i
+                / Audio.Microphone.SampleRate) * 12000);
+            pcm[i * 2] = (byte)(value & 0xFF);
+            pcm[i * 2 + 1] = (byte)((value >> 8) & 0xFF);
+        }
+        return pcm;
     }
 
     private static async Task<T?> WaitFor<T>(Func<T?> get, Func<T, bool> ready)

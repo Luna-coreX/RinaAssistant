@@ -9,4 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Rina.Protocol\Rina.Protocol.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="2.2.1" />
+  </ItemGroup>
 </Project>

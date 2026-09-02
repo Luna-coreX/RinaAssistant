@@ -34,10 +34,11 @@ from typing import Any, Callable
 from core import settings_schema
 from core.confirmations import ConfirmationLedger
 from core.protocol import ALL_EVENTS
-from core.wire.data import DataSender
+from core.wire.data import (DataFrameDecoder, DataReceiver, DataSender,
+                            capability_for_kind)
 from core.wire.envelope import Envelope, FrameDecoder, IdGenerator, encode_frame
-from core.wire.errors import (ERROR_UNKNOWN_METHOD, ProtocolFault, fault,
-                              make)
+from core.wire.errors import (ERROR_INVALID_PAYLOAD, ERROR_UNKNOWN_METHOD,
+                              ProtocolFault, fault, make)
 from core.wire.events import StreamSender, event, validate_event
 from core.wire.handshake import CORE_CAPABILITIES, Session, Side
 from core.wire.liveness import Liveness, VolatileState
@@ -80,6 +81,18 @@ class ProtocolServer:
             permissions=self.permissions, tasks=self.tasks,
             data_streams=self.data, text_streams=self.text,
             session=self.session)
+
+        #: Открытые входящие потоки: номер -> что про него известно.
+        self.incoming: dict[int, dict] = {}
+        #: Сколько байт разрешаем держать в полёте. Небольшое окно: звук
+        #: приходит непрерывно, и большой кредит означает большую задержку
+        #: между «сказал» и «услышала».
+        self.credit_window = 64 * 1024
+        self.receiver = None
+        #: Куда девать принятый звук. Ставит E03; пока не поставлен, звук
+        #: считается и отбрасывается — честнее, чем копить в памяти то,
+        #: что некому распознать.
+        self.on_audio = None
 
         self._send_lock = threading.Lock()
         self._running = False
@@ -134,6 +147,15 @@ class ProtocolServer:
         больше нечего делать.
         """
         self._running = True
+
+        # Канал данных читает свой поток — в этом и был смысл двух труб:
+        # всплеск звука не должен задерживать команду. Запускается здесь, а
+        # не снаружи: снаружи его заводили раньше, чем поднимался флаг
+        # работы, и поток умирал на первой же проверке условия, молча.
+        if self.channels.data is not None:
+            threading.Thread(target=self.pump_data, name="rina-data",
+                             daemon=True).start()
+
         try:
             while self._running:
                 try:
@@ -215,6 +237,9 @@ class ProtocolServer:
             "history.export": self._history_export,
             "task.cancel": self._task_cancel,
             "plugins.install": self._plugins_install,
+            "stream.open": self._stream_open,
+            "stream.close": self._stream_close,
+            "stream.credit": self._stream_credit,
         }
 
     def _hello(self, message: Envelope) -> dict:
@@ -448,6 +473,95 @@ class ProtocolServer:
 
     def _task_cancel(self, message: Envelope) -> dict:
         return self.tasks.cancel(str(message.payload.get("task_id", "")))
+
+    # -- потоки данных (4.0-D07, D08; сторона ядра для 4.0-F09) ---------------
+
+    def _stream_open(self, message: Envelope) -> dict:
+        """
+        Открыть двоичный поток и сразу выдать первый кредит.
+
+        Начальный кредит — ноль (§8), и пока приёмник его не выдаст,
+        отправитель молчит. Выдаём здесь же: ядро готово принимать ровно с
+        того мгновения, как согласилось открыть поток, и заставлять оболочку
+        ждать отдельного сообщения не за чем.
+        """
+        stream_id = message.payload.get("stream_id")
+        kind = str(message.payload.get("kind", ""))
+        if not isinstance(stream_id, int) or isinstance(stream_id, bool):
+            raise fault(ERROR_INVALID_PAYLOAD, "у потока обязан быть номер")
+
+        capability = capability_for_kind(kind)
+        if capability not in self.session.capabilities \
+                and capability not in self.session.peer_capabilities:
+            raise fault(ERROR_UNKNOWN_METHOD,
+                        f"вид потока {kind!r} в этой сессии не объявлен",
+                        kind=kind, capability=capability)
+
+        self.incoming[stream_id] = {
+            "kind": kind,
+            "format": dict(message.payload.get("format") or {}),
+            "bytes": 0,
+            "frames": 0,
+        }
+        self.receiver = self.receiver or DataReceiver(window=self.credit_window)
+        granted = self.credit_window
+        self.send(Envelope.event("stream.credit", {"bytes": granted},
+                                 id=self.ids.next(), stream_id=stream_id))
+        return {"accepted": True, "credit": granted}
+
+    def _stream_close(self, message: Envelope) -> dict:
+        stream_id = message.payload.get("stream_id")
+        state = self.incoming.pop(stream_id, None)
+        return {"closed": state is not None,
+                "bytes": (state or {}).get("bytes", 0)}
+
+    def _stream_credit(self, message: Envelope) -> dict:
+        """Кредит от оболочки — для потоков, которые шлёт ядро (4.0-F10)."""
+        stream_id = message.payload.get("stream_id")
+        extra = int(message.payload.get("bytes") or 0)
+        if stream_id in self.data.open and extra > 0:
+            self.data.grant(stream_id, extra)
+        return {"accepted": True}
+
+    def pump_data(self) -> str:
+        """
+        Читать канал данных, пока он жив.
+
+        Отдельный поток, потому что канал отдельный, — в этом и был смысл
+        двух труб: всплеск звука не должен задерживать команду. Кредит
+        выдаётся **по мере обработки**, а не получения: кредит за то, что
+        лежит непрочитанным в буфере, и есть та неограниченная очередь,
+        ради устранения которой схема существует.
+        """
+        if self.channels.data is None:
+            return "канала данных нет"
+        decoder = DataFrameDecoder()
+        while self._running:
+            try:
+                chunk = self.channels.data.recv()
+            except TransportClosed:
+                return "канал данных закрыт"
+            if chunk == b"":
+                continue
+            for frame in decoder.feed(chunk):
+                self._on_data(frame)
+        return "остановлено"
+
+    def _on_data(self, frame) -> None:
+        state = self.incoming.get(frame.stream_id)
+        if state is None:
+            # Поток, о котором не договаривались. Не обрыв: отправитель мог
+            # не успеть узнать, что мы его закрыли.
+            return
+        state["bytes"] += len(frame.payload)
+        state["frames"] += 1
+        if self.on_audio is not None and state["kind"] == "audio.input":
+            self.on_audio(frame.stream_id, frame.payload, state["format"])
+        # Обработали — возвращаем кредит на обработанное.
+        self.send(Envelope.event("stream.credit",
+                                 {"bytes": len(frame.payload)},
+                                 id=self.ids.next(),
+                                 stream_id=frame.stream_id))
 
     # -- обрыв ---------------------------------------------------------------
 
