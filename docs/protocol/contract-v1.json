@@ -107,6 +107,10 @@
       "category": "system",
       "retryable": true
     },
+    "llm.remote_address": {
+      "category": "user",
+      "retryable": true
+    },
     "llm.unavailable": {
       "category": "system",
       "retryable": true
@@ -144,6 +148,14 @@
       "retryable": true
     },
     "protocol.unknown_method": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "settings.invalid_value": {
+      "category": "user",
+      "retryable": false
+    },
+    "settings.unknown_key": {
       "category": "protocol",
       "retryable": false
     },

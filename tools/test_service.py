@@ -189,13 +189,58 @@ check("неизвестный метод отклонён по коду",
       and refusal.payload["code"] == "protocol.unknown_method",
       f"| {refusal.payload.get('code')}")
 
-core.ask("settings.describe")
+core.ask("settings.describe", {"keys": ["volume", "log_level", "llm_url",
+                                       "ui_language", "first_run"]})
 described = core.read(1)[0]
-check("схема настроек отдана", "schema" in described.payload)
-check("раскладка честно не описана",
+schema = described.payload["schema"]
+check("схема отдана по запрошенным ключам", set(schema) == {
+    "volume", "log_level", "llm_url", "ui_language", "first_run"},
+      f"| {sorted(schema)}")
+check("ядро называет тип и умолчание",
+      schema["volume"]["type"] == "integer" and schema["volume"]["default"] == 75)
+check("и диапазон", schema["volume"]["low"] == 0
+      and schema["volume"]["high"] == 100)
+check("и перечисление", "DEBUG" in schema["log_level"]["choices"])
+check("и зависимость между полями",
+      schema["llm_url"]["depends_on"] == "llm_enabled")
+check("и что перезапуск обязателен",
+      schema["ui_language"]["restart_required"] is True)
+check("и что ключ служебный", schema["first_run"]["secret"] is True)
+check("раскладку ядро не описывает намеренно",
       described.payload.get("layout") is None
-      and "E06a" in described.payload.get("note", ""),
+      and "ADR 0006" in described.payload.get("note", ""),
       f"| {described.payload.get('note')}")
+
+# Запись: вердикт по каждому ключу, а не одно «получилось» на всю посылку.
+core.ask("settings.set", {"values": {"volume": 42, "log_level": "TRACE",
+                                     "llm_url": "http://192.168.1.9:11434",
+                                     "нетакого": 1}})
+written = core.read(1)[0]
+verdicts = written.payload["verdicts"]
+check("верное значение принято", verdicts["volume"]["accepted"] is True)
+check("значение вне перечисления отклонено кодом",
+      verdicts["log_level"] == {"accepted": False,
+                                "code": "settings.invalid_value",
+                                "message": verdicts["log_level"]["message"]},
+      f"| {verdicts['log_level']}")
+check("несуществующий ключ отклонён своим кодом",
+      verdicts["нетакого"]["code"] == "settings.unknown_key")
+check("нелокальный адрес принят, но с предупреждением",
+      verdicts["llm_url"]["accepted"] is True
+      and verdicts["llm_url"]["code"] == "llm.remote_address",
+      f"| {verdicts['llm_url']}")
+check("предупреждение объясняет, чем это обернётся",
+      "192.168.1.9" in verdicts["llm_url"]["message"],
+      f"| {verdicts['llm_url']['message']}")
+check("записано только принятое",
+      set(written.payload["values"]) == {"volume", "llm_url"},
+      f"| {sorted(written.payload['values'])}")
+
+core.ask("settings.get", {"keys": ["volume", "first_run"]})
+values = core.read(1)[0].payload["values"]
+check("значение действительно сохранилось", values.get("volume") == 42)
+check("служебный ключ наружу не отдаётся", "first_run" not in values,
+      f"| {sorted(values)}")
 
 core.ask("core.shutdown")
 core.read(1)

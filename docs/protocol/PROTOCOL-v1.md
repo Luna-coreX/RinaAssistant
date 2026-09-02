@@ -211,6 +211,9 @@
 | `confirmation.expired` | user | нет | срок истёк; нужно новое, а не повтор того же |
 | `tool.unknown` | protocol | нет | вызвана несуществующая возможность |
 | `tool.invalid_arguments` | protocol | нет | аргументы не проходят схему инструмента |
+| `settings.unknown_key` | protocol | нет | такой настройки нет |
+| `settings.invalid_value` | user | нет | значение не проходит ограничения ключа |
+| `llm.remote_address` | user | да | адрес модели не локальный: значение принято, человека предупреждают |
 | `app.not_found` | user | нет | программа не найдена в индексе |
 | `app.launch_failed` | system | да | запуск сорвался |
 | `stt.unavailable` | system | нет | распознавания нет |

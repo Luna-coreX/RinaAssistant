@@ -30,6 +30,7 @@ import threading
 import time
 from typing import Any, Callable
 
+from core import settings_schema
 from core.confirmations import ConfirmationLedger
 from core.protocol import ALL_EVENTS
 from core.wire.data import DataSender
@@ -254,34 +255,54 @@ class ProtocolServer:
     def _settings_get(self, message: Envelope) -> dict:
         keys = message.payload.get("keys") or []
         store = self._settings()
-        return {"values": {k: store.get(k) for k in keys}}
+        schema = settings_schema.describe(keys)
+        # Секретное наружу не уходит вовсе: config_version и first_run —
+        # состояние хранилища, а не настройки, и показывать их незачем.
+        return {"values": {k: store.get(k) for k in keys
+                           if not schema.get(k, {}).get("secret")}}
 
     def _settings_set(self, message: Envelope) -> dict:
+        """
+        Записать значения и отчитаться по каждому.
+
+        Отчёт по ключу, а не одно «получилось» на всю посылку: из десяти
+        значений одно может не пройти, и сказать про это «не сохранилось»
+        значит не сказать ничего. Вердикты — кодами каталога D05, чтобы
+        оболочка ветвилась по ним, а не по тексту.
+
+        Предупреждение — не отказ. «Адрес модели не локальный» значит, что
+        значение принято и записано, а человеку сказано, чем это обернётся:
+        решать ему, а не нам.
+        """
         values = message.payload.get("values") or {}
         store = self._settings()
-        with store.transaction():
-            for key, value in values.items():
-                store.set(key, value)
-        return {"values": {k: store.get(k) for k in values}}
+        verdicts: dict[str, dict] = {}
+        accepted: dict[str, Any] = {}
+        for key, value in values.items():
+            ok, code, text = settings_schema.validate(key, value)
+            verdicts[key] = {"accepted": ok, "code": code, "message": text}
+            if ok:
+                accepted[key] = value
+        if accepted:
+            with store.transaction():
+                for key, value in accepted.items():
+                    store.set(key, value)
+        return {"values": {k: store.get(k) for k in accepted},
+                "verdicts": verdicts}
 
     def _settings_describe(self, message: Envelope) -> dict:
         """
-        Схема типов, но **не** раскладка.
+        Смысл значений, но **не** их вид (ADR 0006).
 
-        Владеет ли ядро описанием формы — открытый вопрос `4.0-E06a`. Пока он
-        открыт, отдаётся только то, чем ядро владеет несомненно: имена и типы
-        значений. Придумать раскладку сейчас значило бы закрыть решение
-        реализацией, что как раз и запрещено рубежом.
+        `layout` отдаётся как `null` явно, а не опускается: отсутствие ключа
+        читалось бы как «ещё не сделали», тогда как `null` читается как «это
+        не наше дело» — что и есть действительное положение вещей.
         """
-        store = self._settings()
-        values = store.all() if hasattr(store, "all") else {}
-        types = {"str": "string", "bool": "boolean", "int": "integer",
-                 "float": "number", "dict": "object", "list": "array"}
+        keys = message.payload.get("keys") or None
         return {
-            "schema": {key: types.get(type(value).__name__, "string")
-                       for key, value in values.items()},
+            "schema": settings_schema.describe(keys),
             "layout": None,
-            "note": "раскладка не описывается: решение 4.0-E06a не принято",
+            "note": "раскладку описывает оболочка: ADR 0006",
         }
 
     # -- напоминания ---------------------------------------------------------
