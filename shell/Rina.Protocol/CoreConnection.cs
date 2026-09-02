@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text.Json.Nodes;
 using Rina.Protocol.Transport;
@@ -14,7 +15,7 @@ public sealed record CoreLaunch(string Python, string Script,
                                 IReadOnlyList<string>? ExtraArguments = null);
 
 /// <summary>
-/// Связь оболочки с ядром: запуск процесса, каналы, рукопожатие, разговор.
+/// Одна связь оболочки с ядром: процесс, каналы, рукопожатие, разговор.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -24,9 +25,16 @@ public sealed record CoreLaunch(string Python, string Script,
 /// созданием труб. Обратный порядок работал бы почти всегда — и тем хуже.
 /// </para>
 /// <para>
+/// <b>Канал читает один насос, а не тот, кто спросил.</b> Первая редакция
+/// читала прямо в <c>CallAsync</c>, и это работало ровно до второго читателя:
+/// события приходят без запроса, и услышать их некому, пока никто ничего не
+/// спрашивает. Теперь ответы разбираются по <c>correlation_id</c>, а события
+/// уходят подписчикам — это же нужно и надзору (<c>4.0-E07</c>), которому
+/// слышать канал надо постоянно.
+/// </para>
+/// <para>
 /// Ответ на команду — <c>accepted</c>, а не текст: сам ответ приходит событием
-/// <c>assistant.response</c>, когда появится. Поэтому здесь есть и ожидание
-/// ответа на запрос, и подписка на события, и это разные вещи.
+/// <c>assistant.response</c>, когда появится.
 /// </para>
 /// </remarks>
 public sealed class CoreConnection : IAsyncDisposable
@@ -34,8 +42,12 @@ public sealed class CoreConnection : IAsyncDisposable
     private readonly IdGenerator _ids = new("s-");
     private readonly ControlChannel _control;
     private readonly ControlChannel _data;
-    private Process? _core;
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<Envelope>>
+        _pending = new();
     private readonly System.Text.StringBuilder _coreLog = new();
+    private readonly CancellationTokenSource _stopping = new();
+    private Process? _core;
+    private Task? _pump;
 
     public string Session { get; }
     public int NegotiatedVersion { get; private set; }
@@ -44,11 +56,17 @@ public sealed class CoreConnection : IAsyncDisposable
     public string SessionId { get; private set; } = "";
     public bool Ready { get; private set; }
 
-    /// <summary>События, пришедшие без запроса (§10).</summary>
+    /// <summary>События ядра, пришедшие без запроса (§10).</summary>
     public event Action<Envelope>? EventReceived;
+
+    /// <summary>Связь оборвалась: ядро умерло или закрыло канал.</summary>
+    public event Action<string>? Broken;
 
     /// <summary>Незнакомые события: их игнорируют молча, но считать полезно.</summary>
     public List<string> IgnoredEvents { get; } = [];
+
+    /// <summary>Когда в последний раз что-либо пришло от ядра (§13).</summary>
+    public DateTimeOffset LastHeard { get; private set; } = DateTimeOffset.UtcNow;
 
     public CoreConnection(string? session = null)
     {
@@ -80,8 +98,8 @@ public sealed class CoreConnection : IAsyncDisposable
             ?? throw new InvalidOperationException("ядро не запустилось");
 
         // Журнал ядра вычитывается сразу и в фоне. Не только ради отладки:
-        // труба ядра невелика, и процесс, которому некуда писать в поток
-        // ошибок, однажды встанет на записи в него. К тому же 4.0-F12 обязан
+        // труба невелика, и процесс, которому некуда писать в поток ошибок,
+        // однажды встанет на записи в него. К тому же 4.0-F12 обязан
         // показывать состояние связи, а последняя строка журнала ядра —
         // самое внятное, что можно показать при обрыве.
         _core.ErrorDataReceived += (_, e) =>
@@ -90,12 +108,65 @@ public sealed class CoreConnection : IAsyncDisposable
         };
         _core.BeginErrorReadLine();
 
-        var done = await Task.WhenAny(accepting, Task.Delay(timeout, token))
+        // Ядро может умереть, не подключившись, — и тогда ждать трубу до
+        // конца срока бессмысленно. Ждём оба исхода сразу.
+        var exited = WaitForExitAsync(_core);
+        var done = await Task.WhenAny(accepting, exited, Task.Delay(timeout, token))
                              .ConfigureAwait(false);
+        if (done == exited)
+            throw new ChannelClosedException(
+                $"ядро вышло с кодом {_core.ExitCode}, не подключившись");
         if (done != accepting)
             throw new ChannelClosedException(
                 $"ядро не подключилось за {timeout.TotalSeconds:0} с");
         await accepting.ConfigureAwait(false);
+
+        _pump = Task.Run(PumpAsync);
+    }
+
+    private static Task WaitForExitAsync(Process process)
+    {
+        var tcs = new TaskCompletionSource();
+        process.EnableRaisingEvents = true;
+        process.Exited += (_, _) => tcs.TrySetResult();
+        if (process.HasExited) tcs.TrySetResult();
+        return tcs.Task;
+    }
+
+    /// <summary>Единственный читатель канала.</summary>
+    private async Task PumpAsync()
+    {
+        try
+        {
+            while (!_stopping.IsCancellationRequested)
+            {
+                var message = await _control.ReceiveAsync(_stopping.Token)
+                                            .ConfigureAwait(false);
+                LastHeard = DateTimeOffset.UtcNow;
+
+                if (message.IsEvent) { Dispatch(message); continue; }
+
+                if (message.CorrelationId is { } id
+                    && _pending.TryRemove(id, out var waiting))
+                    waiting.TrySetResult(message);
+                // Ответ на запрос, которого никто не ждёт, — не повод падать:
+                // ждавший мог сдаться по своему сроку.
+            }
+        }
+        catch (OperationCanceledException) { /* закрываемся */ }
+        catch (Exception e)
+        {
+            Ready = false;
+            FailPending(e);
+            Broken?.Invoke(e.Message);
+        }
+    }
+
+    private void FailPending(Exception cause)
+    {
+        foreach (var id in _pending.Keys.ToArray())
+            if (_pending.TryRemove(id, out var waiting))
+                waiting.TrySetException(cause);
     }
 
     /// <summary>Рукопожатие (§4): версии наборами, возможности списком.</summary>
@@ -110,7 +181,7 @@ public sealed class CoreConnection : IAsyncDisposable
             ["locale"] = "ru",
         };
 
-        var answer = await CallAsync(Methods.Hello, hello, token)
+        var answer = await CallAsync(Methods.Hello, hello, token: token)
             .ConfigureAwait(false);
         if (answer.IsError)
             throw new ProtocolException(answer.ErrorCode, answer.ErrorMessage);
@@ -138,56 +209,73 @@ public sealed class CoreConnection : IAsyncDisposable
         return capability is null || CoreCapabilities.Contains(capability);
     }
 
-    /// <summary>
-    /// Запрос и ответ на него. События, пришедшие по пути, не теряются.
-    /// </summary>
+    /// <summary>Запрос и ответ на него.</summary>
     public async Task<Envelope> CallAsync(string method, JsonObject? payload = null,
+                                          TimeSpan? timeout = null,
                                           CancellationToken token = default,
                                           string? traceId = null)
     {
         var request = Envelope.Request(method, payload, _ids.Next(),
                                        traceId ?? Trace.New());
-        await _control.SendAsync(request, token).ConfigureAwait(false);
+        var waiting = new TaskCompletionSource<Envelope>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        _pending[request.Id] = waiting;
 
-        while (true)
+        try
         {
-            var message = await _control.ReceiveAsync(token).ConfigureAwait(false);
-            if (message.IsEvent)
-            {
-                Dispatch(message);
-                continue;
-            }
-            if (message.CorrelationId == request.Id)
-                return message;
-            // Ответ на чужой запрос: в 4.0 запросов в полёте по одному, но
-            // терять чужое молча — привычка, которая аукнется на первом же
-            // параллельном вызове.
-            Dispatch(message);
+            await _control.SendAsync(request, token).ConfigureAwait(false);
+            var limit = timeout ?? TimeSpan.FromSeconds(30);
+            var done = await Task.WhenAny(waiting.Task, Task.Delay(limit, token))
+                                 .ConfigureAwait(false);
+            if (done != waiting.Task)
+                throw new TimeoutException(
+                    $"ядро не ответило на {method} за {limit.TotalSeconds:0} с");
+            return await waiting.Task.ConfigureAwait(false);
+        }
+        finally
+        {
+            _pending.TryRemove(request.Id, out _);
         }
     }
 
-    /// <summary>Читать канал, пока не придёт названное событие.</summary>
+    /// <summary>Дождаться названного события.</summary>
     public async Task<Envelope?> WaitForEventAsync(string method, TimeSpan timeout,
                                                    CancellationToken token = default)
     {
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
-        cts.CancelAfter(timeout);
+        var waiting = new TaskCompletionSource<Envelope>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void Watch(Envelope e)
+        {
+            if (e.Method == method) waiting.TrySetResult(e);
+        }
+
+        EventReceived += Watch;
         try
         {
-            while (true)
-            {
-                var message = await _control.ReceiveAsync(cts.Token)
-                                            .ConfigureAwait(false);
-                Dispatch(message);
-                if (message.IsEvent && message.Method == method) return message;
-            }
+            var done = await Task.WhenAny(waiting.Task, Task.Delay(timeout, token))
+                                 .ConfigureAwait(false);
+            return done == waiting.Task ? await waiting.Task.ConfigureAwait(false)
+                                        : null;
         }
-        catch (OperationCanceledException) { return null; }
+        finally { EventReceived -= Watch; }
     }
+
+    /// <summary>
+    /// Спросить «жив ли» (§13).
+    /// </summary>
+    /// <remarks>
+    /// Отдельный метод, а не таймер внутри: решать, когда спрашивать, — дело
+    /// надзора, который знает и про тишину, и про то, сколько раз уже не
+    /// ответили. Здесь только сам вопрос.
+    /// </remarks>
+    public Task<Envelope> PingAsync(TimeSpan timeout,
+                                    CancellationToken token = default) =>
+        CallAsync(Methods.Ping, null, timeout, token);
 
     private void Dispatch(Envelope message)
     {
-        if (message.IsEvent && !Events.All.Contains(message.Method ?? ""))
+        if (!Events.All.Contains(message.Method ?? ""))
         {
             // §3: неизвестное событие игнорируется молча. Асимметрия с
             // запросом намеренна — пропущенный запрос есть потерянное
@@ -201,6 +289,10 @@ public sealed class CoreConnection : IAsyncDisposable
     /// <summary>Что ядро написало в поток ошибок к этому моменту.</summary>
     public string CoreLog { get { lock (_coreLog) return _coreLog.ToString(); } }
 
+    /// <summary>Номер процесса ядра. Нужен надзору и журналу: в двух
+    /// процессах «какое из ядер» — вопрос, который задают часто.</summary>
+    public int? CorePid => _core?.Id;
+
     public bool CoreAlive => _core is { HasExited: false };
     public int? CoreExitCode => _core is { HasExited: true } p ? p.ExitCode : null;
 
@@ -209,9 +301,15 @@ public sealed class CoreConnection : IAsyncDisposable
         try
         {
             if (Ready && _core is { HasExited: false })
-                await CallAsync(Methods.CoreShutdown).ConfigureAwait(false);
+                await CallAsync(Methods.CoreShutdown,
+                                timeout: TimeSpan.FromSeconds(5))
+                    .ConfigureAwait(false);
         }
         catch { /* ядро уже могло уйти */ }
+
+        await _stopping.CancelAsync().ConfigureAwait(false);
+        if (_pump is not null)
+            try { await _pump.ConfigureAwait(false); } catch { /* уже всё */ }
 
         _control.Dispose();
         _data.Dispose();
@@ -223,5 +321,6 @@ public sealed class CoreConnection : IAsyncDisposable
             if (!_core.WaitForExit(5000)) _core.Kill(entireProcessTree: true);
         }
         _core?.Dispose();
+        _stopping.Dispose();
     }
 }

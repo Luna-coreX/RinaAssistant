@@ -145,6 +145,73 @@ catch (Exception e)
     Check($"без исключений: {e.GetType().Name}", false, $"| {e.Message}");
 }
 
+// ---------------------------------------------------------------------------
+// E07: надзор — запустить, заметить смерть, поднять заново.
+Console.WriteLine();
+Console.WriteLine("=== E07: оболочка следит за ядром ===");
+
+var states = new List<CoreState>();
+await using (var boss = new CoreSupervisor(launch)
+             {
+                 Silence = TimeSpan.FromSeconds(2),
+                 ConnectTimeout = TimeSpan.FromSeconds(30),
+             })
+{
+    boss.StateChanged += (state, why) =>
+    {
+        states.Add(state);
+        Console.WriteLine($"      состояние: {state} — {why}");
+    };
+
+    await boss.StartAsync();
+    Check("надзор поднял ядро", boss.State == CoreState.Ready);
+    var firstSession = boss.Connection!.SessionId;
+    Check("сессия получена", firstSession.Length == 32);
+
+    // Убиваем ядро так, как это сделал бы сбой: без предупреждения.
+    KillCore(boss.Connection!);
+
+    var restored = await WaitUntil(() => boss.State == CoreState.Ready
+                                         && boss.Connection is not null
+                                         && boss.Connection.SessionId != firstSession,
+                                   TimeSpan.FromSeconds(90));
+    Check("после падения ядро поднято заново", restored,
+          $"| состояние {boss.State}, перезапусков {boss.Restarts}");
+    Check("связь новая, а не прежняя",
+          boss.Connection?.SessionId is { Length: 32 } s2 && s2 != firstSession);
+    Check("состояние проходило через «переподключаемся»",
+          states.Contains(CoreState.Reconnecting), "| " + string.Join(" → ", states));
+    Check("перезапуск посчитан", boss.Restarts >= 1, $"| {boss.Restarts}");
+
+    if (boss.Connection is not null)
+    {
+        var alive = await boss.Connection.CallAsync(Methods.RemindersList,
+                                                    timeout: TimeSpan.FromSeconds(20));
+        Check("с новым ядром снова разговаривают", !alive.IsError,
+              $"| {alive.Payload.ToJsonString()}");
+    }
+}
+
+// Ядро, которое не поднимается вовсе: надзор обязан сдаться, а не крутиться.
+await using (var doomed = new CoreSupervisor(
+                 launch with { Script = Path.Combine(root, "нет-такого-ядра.py") })
+             {
+                 MaxAttempts = 3,
+                 FirstBackoff = TimeSpan.FromMilliseconds(50),
+                 ConnectTimeout = TimeSpan.FromSeconds(5),
+             })
+{
+    var started = DateTime.UtcNow;
+    await doomed.StartAsync();
+    var spent = DateTime.UtcNow - started;
+    Check("надзор сдался, а не крутится вечно",
+          doomed.State == CoreState.Failed, $"| {doomed.State}");
+    Check("сдался быстро", spent < TimeSpan.FromSeconds(30),
+          $"| {spent.TotalSeconds:0.0} с");
+    Check("причина названа", doomed.LastReason.Length > 0,
+          $"| {doomed.LastReason}");
+}
+
 if (fails > 0)
 {
     Console.WriteLine();
@@ -155,6 +222,31 @@ if (fails > 0)
 Console.WriteLine();
 Console.WriteLine($"Проверок: {checks}, ошибок: {fails}");
 return fails == 0 ? 0 : 1;
+
+static void KillCore(CoreConnection connection)
+{
+    // Аварийная смерть: ядру не дают ни попрощаться, ни закрыть хранилище.
+    // Именно так это выглядит при настоящем сбое, и надзор обязан справиться
+    // с этим, а не только с вежливым завершением.
+    if (connection.CorePid is not { } pid) return;
+    try
+    {
+        using var process = System.Diagnostics.Process.GetProcessById(pid);
+        process.Kill(entireProcessTree: true);
+    }
+    catch { /* уже ушло */ }
+}
+
+static async Task<bool> WaitUntil(Func<bool> condition, TimeSpan timeout)
+{
+    var deadline = DateTime.UtcNow + timeout;
+    while (DateTime.UtcNow < deadline)
+    {
+        if (condition()) return true;
+        await Task.Delay(100);
+    }
+    return condition();
+}
 
 static string FindRoot()
 {
