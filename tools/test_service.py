@@ -335,6 +335,86 @@ check("метод до hello отклонён",
 strict.proc.stdin.close()
 strict.wait()
 
+
+# ---------------------------------------------------------------------------
+print()
+print("=== F04: команды и история через протокол ===")
+
+# Шесть возможностей инвентаря были недостижимы: место в архитектуре у них
+# было, а метода не было. Здесь проверяется, что теперь достижимы.
+work = Core()
+work.handshake()
+check("ядро объявило возможности команд и истории",
+      "commands" in work.session.peer_capabilities
+      and "history" in work.session.peer_capabilities,
+      f"| {work.session.peer_capabilities}")
+
+work.ask("commands.list")
+items = work.read(1)[0].payload["items"]
+check("список своих команд отдаётся", isinstance(items, list), f"| {items}")
+
+work.ask("commands.save", {"command": {"name": "мой дискорд",
+                                       "kind": "app", "target": "Discord",
+                                       "enabled": True}})
+saved = work.read(1)[0].payload["command"]
+check("команда создана и получила номер", bool(saved.get("id")), f"| {saved}")
+
+work.ask("commands.set_enabled", {"id": saved["id"], "enabled": False})
+after = work.read(1)[0].payload["items"]
+mine = [c for c in after if c["id"] == saved["id"]]
+check("команду можно выключить, а не только удалить",
+      mine and mine[0].get("enabled") is False, f"| {mine}")
+
+work.ask("commands.export")
+dump = work.read(1)[0].payload["commands"]
+check("экспорт отдаёт содержимое, а не пишет файл",
+      isinstance(dump, list) and len(dump) == len(after), f"| {len(dump)}")
+
+work.ask("commands.import", {"commands": dump})
+merged = work.read(1)[0].payload
+check("импорт не затирает уже настроенное",
+      merged["added"] == 0 and merged["skipped"] == len(dump), f"| {merged}")
+
+work.ask("commands.import", {"commands": [{"id": "cmd_new", "name": "чужая",
+                                           "kind": "app", "target": "X"}]})
+check("новая команда из импорта принята",
+      work.read(1)[0].payload["added"] == 1)
+
+work.ask("commands.delete", {"id": saved["id"]})
+check("команда удаляется", work.read(1)[0].payload["deleted"] is True)
+
+# История: разговор виден, стирается и выгружается.
+work.ask("command.handle", {"text": "который час", "source": "typed"})
+work.read_until("assistant.response")
+work.ask("history.list", {"limit": 10})
+told = work.read(1)[0].payload
+check("история видна оболочке", told["total"] > 0, f"| {told['total']}")
+check("записи описаны полями",
+      told["items"] and {"ts", "kind", "text"} <= set(told["items"][0]),
+      f"| {told['items'][:1]}")
+
+work.ask("history.export")
+check("история выгружается",
+      len(work.read(1)[0].payload["items"]) == told["total"])
+
+work.ask("history.clear")
+cleared = work.read(1)[0].payload["cleared"]
+work.ask("history.list")
+check("история стирается по просьбе человека",
+      cleared > 0 and work.read(1)[0].payload["total"] == 0,
+      f"| стёрто {cleared}")
+
+# Установка плагина честно отвечает «ещё нет», а не молчит.
+work.ask("plugins.install", {"source": "C:/nowhere"})
+answer = work.read(1)[0]
+check("установка плагина отвечает честным отказом",
+      answer.type == MessageType.ERROR and "H" in answer.payload["message"],
+      f"| {answer.payload.get('message')}")
+
+work.ask("core.shutdown")
+work.read(1)
+work.wait()
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

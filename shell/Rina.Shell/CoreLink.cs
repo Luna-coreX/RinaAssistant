@@ -50,10 +50,20 @@ public sealed class CoreLink : IAsyncDisposable
         _boss.Connected += connection => OnUi(
             () => { _ = LoadFinishAsync(connection); });
 
-        _boss.EventReceived += message => OnUi(() => _window.OnCoreEvent(message));
+        _boss.EventReceived += message => OnUi(() =>
+        {
+            _window.OnCoreEvent(message);
+            CoreEvent?.Invoke(message);
+        });
     }
 
     public CoreState State => _boss.State;
+
+    /// <summary>Текущая связь; `null`, пока её нет.</summary>
+    public CoreConnection? Connection => _boss.Connection;
+
+    /// <summary>События ядра для страниц. Уже в потоке окна.</summary>
+    public event Action<Envelope>? CoreEvent;
 
     public Task StartAsync() => _boss.StartAsync();
 

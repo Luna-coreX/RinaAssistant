@@ -104,8 +104,20 @@ _CAPABILITY_LIST = (
                "таймеры и будильники живут в ядре (4.0-E05)"),
     Capability("plugins", Side.CORE,
                ("plugins.list", "plugins.set_enabled", "plugins.page",
-                "plugins.action"),
+                "plugins.action", "plugins.install"),
                "плагины"),
+    # Пользовательские команды и история. Заведены в 4.0-F04: инвентарь
+    # поверхности требует их, а методов не было вовсе — оболочка не могла
+    # ни показать список команд, ни очистить историю. Правило рубежа
+    # запрещает терять возможности, и без этих методов терялись бы шесть.
+    Capability("commands", Side.CORE,
+               ("commands.list", "commands.save", "commands.delete",
+                "commands.set_enabled", "commands.export",
+                "commands.import"),
+               "свои команды пользователя"),
+    Capability("history", Side.CORE,
+               ("history.list", "history.clear", "history.export"),
+               "разговор: посмотреть, стереть, выгрузить"),
     Capability("llm", Side.CORE, (),
                "ядро умеет отвечать моделью; отдельного метода нет"),
     Capability("tasks", Side.CORE, ("task.cancel",),

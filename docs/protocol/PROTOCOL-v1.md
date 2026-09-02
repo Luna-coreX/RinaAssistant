@@ -140,7 +140,9 @@
 | `stt` | ядро | `speech.listen_once`, `speech.set_always_listen` |
 | `tts` | ядро | `speech.say` |
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
-| `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.action` |
+| `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.action`, `plugins.install` |
+| `commands` | ядро | `commands.list`, `commands.save`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
+| `history` | ядро | `history.list`, `history.clear`, `history.export` |
 | `llm` | ядро | — |
 | `tasks` | ядро | `task.cancel` |
 | `actuation` | ядро | §12; **в 4.0 не объявляется никем** |
@@ -252,8 +254,22 @@
 | `plugins.set_enabled` | `plugin_id`, `enabled` | состояние |
 | `plugins.page` | `plugin_id` | декларативное описание страницы |
 | `plugins.action` | `plugin_id`, `action`, `values` | новое описание страницы |
+| `plugins.install` | `source` | установленный плагин |
+| `commands.list` | — | список своих команд |
+| `commands.save` | `command` | сохранённая команда; создание и правка — один метод |
+| `commands.delete` | `id` | удалено ли |
+| `commands.set_enabled` | `id`, `enabled` | список после изменения |
+| `commands.export` | — | `commands` — содержимое, файл пишет оболочка |
+| `commands.import` | `commands` | `added`, `skipped` |
+| `history.list` | `limit` | `items`, `total` |
+| `history.clear` | — | сколько стёрто |
+| `history.export` | — | `items` — содержимое, файл пишет оболочка |
 | `task.cancel` | `task_id` | принята ли просьба, см. §9 |
 | `core.shutdown` | — | подтверждение |
+
+**Команды и история появились в `4.0-F04`, и это была дыра.** Методы §6 выведены из инвентаря поведения, но инвентарь поверхности проверялся отдельно — и на стыке потерялись шесть возможностей: список своих команд, их создание и правка, включение, импорт и экспорт, и вся история. Место в информационной архитектуре у них было (`4.0-R11` это проверял), а метода, которым оболочка это сделает, не было. Место отвечает на вопрос «где кнопка», протокол — на вопрос «что произойдёт, когда её нажмут», и между ними уместилась пропасть. Теперь её стережёт `tools/check_surface_reachable.py`.
+
+**Экспорт отдаёт содержимое, а не пишет файл.** Диалог выбора места — работа оболочки, ядро его и не умеет; ядро отдаёт то, что выгружают. То же для импорта, с одной оговоркой: команда, чей идентификатор уже есть, пропускается. «Перенести на другую машину» и «затереть настроенное» — разные намерения, и по умолчанию верно второго не делать.
 
 ### Ядро → оболочка (события)
 

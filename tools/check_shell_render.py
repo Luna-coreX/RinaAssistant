@@ -78,9 +78,14 @@ def main(argv) -> int:
     check("колонка разделов — FACE_LOW",
           near(at(column / 2, height * 0.55), colors["FACE_LOW"]),
           f"| {at(column / 2, height * 0.55)} против {colors['FACE_LOW']}")
+    # Панель меряется в поле между колонкой и содержимым раздела, а не
+    # посреди него: раньше там было пусто, а с появлением страниц посреди
+    # раздела лежит стеклянное поле — и проверка ловила бы содержимое,
+    # выдавая это за поломку каркаса.
+    pane_margin = column + tokens["space"]["between"] / 2
     check("панель раздела — FACE",
-          near(at(width * 0.7, height * 0.5), colors["FACE"]),
-          f"| {at(width * 0.7, height * 0.5)} против {colors['FACE']}")
+          near(at(pane_margin, height * 0.5), colors["FACE"]),
+          f"| {at(pane_margin, height * 0.5)} против {colors['FACE']}")
     check("полоса заголовка — FACE_LOW",
           near(at(width * 0.5, size["row"] / 2), colors["FACE_LOW"]),
           f"| {at(width * 0.5, size['row'] / 2)}")

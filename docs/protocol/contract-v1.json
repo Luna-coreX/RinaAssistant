@@ -28,6 +28,25 @@
       "methods": [],
       "side": "shell"
     },
+    "commands": {
+      "methods": [
+        "commands.delete",
+        "commands.export",
+        "commands.import",
+        "commands.list",
+        "commands.save",
+        "commands.set_enabled"
+      ],
+      "side": "core"
+    },
+    "history": {
+      "methods": [
+        "history.clear",
+        "history.export",
+        "history.list"
+      ],
+      "side": "core"
+    },
     "llm": {
       "methods": [],
       "side": "core"
@@ -41,6 +60,7 @@
     "plugins": {
       "methods": [
         "plugins.action",
+        "plugins.install",
         "plugins.list",
         "plugins.page",
         "plugins.set_enabled"
@@ -388,11 +408,21 @@
     "apps.launch": "apps",
     "command.handle": null,
     "command.run_by_id": null,
+    "commands.delete": "commands",
+    "commands.export": "commands",
+    "commands.import": "commands",
+    "commands.list": "commands",
+    "commands.save": "commands",
+    "commands.set_enabled": "commands",
     "core.shutdown": null,
     "hello": null,
+    "history.clear": "history",
+    "history.export": "history",
+    "history.list": "history",
     "permission.request": "permissions",
     "ping": null,
     "plugins.action": "plugins",
+    "plugins.install": "plugins",
     "plugins.list": "plugins",
     "plugins.page": "plugins",
     "plugins.set_enabled": "plugins",

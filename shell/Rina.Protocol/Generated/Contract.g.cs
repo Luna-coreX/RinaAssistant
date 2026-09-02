@@ -42,16 +42,36 @@ public static class Methods
     public const string CommandHandle = "command.handle";
     /// <summary>Базовый метод.</summary>
     public const string CommandRunById = "command.run_by_id";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsDelete = "commands.delete";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsExport = "commands.export";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsImport = "commands.import";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsList = "commands.list";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsSave = "commands.save";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsSetEnabled = "commands.set_enabled";
     /// <summary>Базовый метод.</summary>
     public const string CoreShutdown = "core.shutdown";
     /// <summary>Базовый метод.</summary>
     public const string Hello = "hello";
+    /// <summary>Возможность: history.</summary>
+    public const string HistoryClear = "history.clear";
+    /// <summary>Возможность: history.</summary>
+    public const string HistoryExport = "history.export";
+    /// <summary>Возможность: history.</summary>
+    public const string HistoryList = "history.list";
     /// <summary>Возможность: permissions.</summary>
     public const string PermissionRequest = "permission.request";
     /// <summary>Базовый метод.</summary>
     public const string Ping = "ping";
     /// <summary>Возможность: plugins.</summary>
     public const string PluginsAction = "plugins.action";
+    /// <summary>Возможность: plugins.</summary>
+    public const string PluginsInstall = "plugins.install";
     /// <summary>Возможность: plugins.</summary>
     public const string PluginsList = "plugins.list";
     /// <summary>Возможность: plugins.</summary>
@@ -103,11 +123,21 @@ public static class Methods
             ["apps.launch"] = "apps",
             ["command.handle"] = null,
             ["command.run_by_id"] = null,
+            ["commands.delete"] = "commands",
+            ["commands.export"] = "commands",
+            ["commands.import"] = "commands",
+            ["commands.list"] = "commands",
+            ["commands.save"] = "commands",
+            ["commands.set_enabled"] = "commands",
             ["core.shutdown"] = null,
             ["hello"] = null,
+            ["history.clear"] = "history",
+            ["history.export"] = "history",
+            ["history.list"] = "history",
             ["permission.request"] = "permissions",
             ["ping"] = null,
             ["plugins.action"] = "plugins",
+            ["plugins.install"] = "plugins",
             ["plugins.list"] = "plugins",
             ["plugins.page"] = "plugins",
             ["plugins.set_enabled"] = "plugins",
@@ -304,6 +334,10 @@ public static class Capabilities
     public const string AudioInput = "audio.input";
     /// <summary>Объявляет shell.</summary>
     public const string AudioOutput = "audio.output";
+    /// <summary>Объявляет core.</summary>
+    public const string Commands = "commands";
+    /// <summary>Объявляет core.</summary>
+    public const string History = "history";
     /// <summary>Объявляет core.</summary>
     public const string Llm = "llm";
     /// <summary>Объявляет shell.</summary>

@@ -42,9 +42,17 @@ public partial class MainWindow : Window
         // Страницы заводятся отложенно: раздел, на который не заходили, не
         // должен ничего строить. Это же и место, куда F04 подставит
         // настоящие страницы, не трогая окно.
-        _pages = SectionList.ToDictionary(
-            s => s.Name,
-            s => (Func<UIElement>)(() => Pages.Placeholder.For(s.Title)));
+        // Страницы строятся отложенно и получают связь, а не окно: раздел,
+        // дотянувшийся до родителя, — первый шаг к god-object'у, ради
+        // избавления от которого затевался блок B.
+        _pages = new Dictionary<string, Func<UIElement>>
+        {
+            ["dialog"] = () => new Pages.DialoguePage(Link),
+            ["commands"] = () => Pages.Placeholder.For("Команды"),
+            ["reminders"] = () => new Pages.RemindersPage(Link),
+            ["plugins"] = () => Pages.Placeholder.For("Плагины"),
+            ["settings"] = () => Pages.Placeholder.For("Настройки"),
+        };
 
         BuildSections();
         ShowSection("dialog");
@@ -69,6 +77,7 @@ public partial class MainWindow : Window
     private void ShowSection(string section)
     {
         if (!_pages.TryGetValue(section, out var build)) return;
+        _section = section;
         Pane.Content = build();
 
         foreach (var child in Sections.Children.OfType<RadioButton>())
@@ -77,7 +86,20 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Связь с ядром; ставится при запуске (<c>4.0-F07</c>, <c>F12</c>).</summary>
-    public CoreLink? Link { get; set; }
+    public CoreLink? Link
+    {
+        get => _link;
+        set
+        {
+            _link = value;
+            // Раздел, показанный до появления связи, надо построить заново:
+            // он уже сообщил человеку, что ядра нет.
+            ShowSection(_section);
+        }
+    }
+
+    private CoreLink? _link;
+    private string _section = "dialog";
 
     private string _finish = "black";
 

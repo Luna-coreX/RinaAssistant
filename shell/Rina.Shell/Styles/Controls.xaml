@@ -142,6 +142,54 @@
     </Setter>
   </Style>
 
+  <!--
+    Переключатель. Включённое положение — отметка акцентом: это состояние
+    «выбрано» из таблицы §6, а не второй смысл акцента.
+  -->
+  <Style x:Key="Toggle" TargetType="CheckBox">
+    <Setter Property="Cursor" Value="Hand" />
+    <!-- Подпись у органа управления обязательна (направление), и цвет ей
+         даёт система, а не умолчание WPF: иначе она окажется той серой,
+         которую никто не выбирал. -->
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Body.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <StackPanel Orientation="Horizontal">
+            <Border x:Name="Track" Width="40" Height="22" CornerRadius="11"
+                    Background="{DynamicResource C.FaceSunk}"
+                    VerticalAlignment="Center">
+              <Ellipse x:Name="Knob" Width="14" Height="14"
+                       HorizontalAlignment="Left" Margin="4,0,0,0"
+                       Fill="{DynamicResource C.InkFaint}" />
+            </Border>
+            <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Track" Property="Background"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Knob" Property="HorizontalAlignment"
+                      Value="Right" />
+              <Setter TargetName="Knob" Property="Margin" Value="0,0,4,0" />
+              <Setter TargetName="Knob" Property="Fill"
+                      Value="{DynamicResource C.FaceHigh}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Стеклянное поле: единственная светящаяся поверхность прибора. -->
+  <Style x:Key="Glass" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource C.Glass}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
   <!-- Карточка: приподнята ступенью значения, без рамки и без тени. -->
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />

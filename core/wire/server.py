@@ -26,6 +26,7 @@
 """
 
 import contextvars
+import secrets
 import threading
 import time
 from typing import Any, Callable
@@ -203,7 +204,17 @@ class ProtocolServer:
             "settings.describe": self._settings_describe,
             "reminders.list": self._reminders_list,
             "reminders.cancel": self._reminders_cancel,
+            "commands.list": self._commands_list,
+            "commands.save": self._commands_save,
+            "commands.delete": self._commands_delete,
+            "commands.set_enabled": self._commands_set_enabled,
+            "commands.export": self._commands_export,
+            "commands.import": self._commands_import,
+            "history.list": self._history_list,
+            "history.clear": self._history_clear,
+            "history.export": self._history_export,
             "task.cancel": self._task_cancel,
+            "plugins.install": self._plugins_install,
         }
 
     def _hello(self, message: Envelope) -> dict:
@@ -322,6 +333,116 @@ class ProtocolServer:
             return {"cancelled": int(store.clear_active())}
         item_id = message.payload.get("id")
         return {"cancelled": 1 if store.remove(item_id) else 0}
+
+    # -- свои команды пользователя -------------------------------------------
+
+    def _commands(self):
+        return getattr(self.engine, "_cmd_store", None)
+
+    def _commands_list(self, message: Envelope) -> dict:
+        return {"items": [dict(c) for c in self._commands().all()]}
+
+    def _commands_save(self, message: Envelope) -> dict:
+        """
+        Создать или изменить — один метод, а не два.
+
+        Для оболочки это одно действие: человек правит карточку и нажимает
+        «сохранить». Разделять по тому, есть ли уже идентификатор, значит
+        заставлять её знать то, что знает хранилище.
+        """
+        store = self._commands()
+        command = dict(message.payload.get("command") or {})
+        if command.get("id"):
+            store.update(command)
+        else:
+            # Номер назначает ядро, а не оболочка. Идентификатор, пришедший
+            # снаружи, — это чужое право решать, какая команда какая; та же
+            # причина, по которой confirmation_id выпускает ядро (§11).
+            command["id"] = "cmd_" + secrets.token_hex(3)
+            store.add(command)
+        return {"command": dict(command)}
+
+    def _commands_delete(self, message: Envelope) -> dict:
+        # Хранилище не говорит, удалило ли оно что-нибудь, поэтому считаем
+        # сами: «удалено» и «такой не было» — разные ответы для оболочки.
+        store = self._commands()
+        was = len(store.all())
+        store.remove(str(message.payload.get("id", "")))
+        return {"deleted": len(store.all()) < was}
+
+    def _commands_set_enabled(self, message: Envelope) -> dict:
+        store = self._commands()
+        store.set_enabled(str(message.payload.get("id", "")),
+                          bool(message.payload.get("enabled")))
+        return {"items": [dict(c) for c in store.all()]}
+
+    def _commands_export(self, message: Envelope) -> dict:
+        """
+        Отдать команды, а не записать файл.
+
+        Файл выбирает и пишет оболочка: диалог выбора места — её работа, а
+        ядро её и не умеет. Ядро отдаёт содержимое.
+        """
+        return {"commands": [dict(c) for c in self._commands().all()]}
+
+    def _commands_import(self, message: Envelope) -> dict:
+        """
+        Принять команды. Существующие не затираются молча.
+
+        Совпадение по идентификатору значит, что команда уже есть, и импорт
+        её пропускает: «перенести на другую машину» и «затереть то, что
+        человек уже настроил» — разные намерения, и по умолчанию верно
+        второе не делать.
+        """
+        store = self._commands()
+        known = {c.get("id") for c in store.all()}
+        added, skipped = 0, 0
+        for command in message.payload.get("commands") or []:
+            if not isinstance(command, dict):
+                skipped += 1
+                continue
+            if command.get("id") in known:
+                skipped += 1
+                continue
+            store.add(dict(command))
+            added += 1
+        return {"added": added, "skipped": skipped}
+
+    # -- история разговора ----------------------------------------------------
+
+    def _history(self):
+        return getattr(self.engine, "_history", None)
+
+    def _history_list(self, message: Envelope) -> dict:
+        items = self._history().all()
+        limit = message.payload.get("limit")
+        if isinstance(limit, int) and not isinstance(limit, bool) and limit > 0:
+            items = items[-limit:]
+        return {"items": [dict(i) for i in items], "total": len(items)}
+
+    def _history_clear(self, message: Envelope) -> dict:
+        store = self._history()
+        was = len(store.all())
+        store.clear()
+        return {"cleared": was}
+
+    def _history_export(self, message: Envelope) -> dict:
+        return {"items": [dict(i) for i in self._history().all()]}
+
+    # -- плагины --------------------------------------------------------------
+
+    def _plugins_install(self, message: Envelope) -> dict:
+        """
+        Установка плагина: пока отвечает честным отказом.
+
+        Плагин в 4.0 живёт в отдельном процессе (`4.0-H07`), и установка —
+        работа блока H целиком. Метод объявлен здесь, чтобы страница плагинов
+        писалась под настоящий контракт, а не под будущий: отвечать «ещё нет»
+        честнее, чем не иметь метода и делать вид, что возможность не
+        терялась.
+        """
+        raise fault("internal",
+                    "Установка плагинов появится вместе с блоком H (4.0-H).")
 
     # -- задачи --------------------------------------------------------------
 

@@ -1,0 +1,54 @@
+<UserControl x:Class="Rina.Shell.Pages.RemindersPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Напоминания"
+               Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+
+    <StackPanel Grid.Row="1" Margin="0,0,0,16">
+      <TextBlock x:Name="Legend" Text="ЗАПЛАНИРОВАНО"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <TextBlock x:Name="Empty" Text="Ничего не запланировано."
+                 Style="{StaticResource Text.Body}"
+                 Foreground="{DynamicResource C.InkSoft}"
+                 Visibility="Collapsed" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <ItemsControl x:Name="Items">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <Border Style="{StaticResource Card}" Margin="0,0,0,6">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="{Binding Kind}"
+                             Style="{StaticResource Text.Body}" />
+                  <TextBlock Text="{Binding Text}"
+                             Style="{StaticResource Text.Meta}"
+                             Margin="0,2,0,0" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding When}"
+                           Style="{StaticResource Text.Figure}"
+                           VerticalAlignment="Center" Margin="0,0,16,0" />
+                <Button Grid.Column="2" Style="{StaticResource Btn}"
+                        Content="Отменить" Tag="{Binding Id}"
+                        Click="OnCancel" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>
