@@ -1,0 +1,152 @@
+<!--
+  Органы управления. Написаны, а не взяты из библиотеки — ADR 0005.
+
+  Второстепенная кнопка не нарисована коробкой: она заподлицо с панелью и
+  проявляется при наведении. Заметность даёт единственная первичная кнопка,
+  залитая чернилами, — иерархия без второго акцента. Акцент в системе один,
+  и означает он «здесь внимание», а не «это важная кнопка».
+
+  Теней нет нигде. Возвышение выражается ступенью значения и волосяным швом:
+  у приборной панели нет источника света, и тень имитировала бы то, чего
+  не существует.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style x:Key="Btn" TargetType="Button">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Cursor" Value="Arrow" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Face" Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource Radius.Max}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter HorizontalAlignment="Center"
+                              VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Face" Property="Background"
+                      Value="{DynamicResource C.FaceHigh}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Face" Property="Background"
+                      Value="{DynamicResource C.FaceLow}" />
+            </Trigger>
+            <!-- Фокус рамкой, а не подсветкой фона: пользователь клавиатуры
+                 должен видеть, где он, не гадая, выделено это или наведено. -->
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Face" Property="BorderBrush"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Face" Property="BorderThickness" Value="2" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Первичная: одна на экран. Залита чернилами, а не акцентом. -->
+  <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Face}" />
+  </Style>
+
+  <!-- Управление окном: знаки, а не слова. Это соглашение системы. -->
+  <Style x:Key="Btn.Window" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="{StaticResource Size.Row}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+  </Style>
+
+  <!-- Раздел в колонке. Отметка активного — единственный акцент. -->
+  <Style x:Key="Nav.Item" TargetType="RadioButton">
+    <Setter Property="Height" Value="{StaticResource Size.Row}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Nav.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Nav.Weight}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Grid x:Name="Row" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="2" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <Rectangle x:Name="Mark" Grid.Column="0" Fill="Transparent" />
+            <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
+                              Margin="14,0,0,0" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Row" Property="Background"
+                      Value="{DynamicResource C.FaceHigh}" />
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Row" Property="Background"
+                      Value="{DynamicResource C.Face}" />
+              <Setter TargetName="Mark" Property="Fill"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Поле: утоплено, без рамки. Граница нарисована ступенью значения. -->
+  <Style x:Key="Field" TargetType="TextBox">
+    <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource C.Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Well" Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource Radius.Max}"
+                  Padding="{TemplateBinding Padding}">
+            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Well" Property="BorderBrush"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Well" Property="BorderThickness" Value="2" />
+              <Setter TargetName="Well" Property="Padding" Value="10,0" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- Карточка: приподнята ступенью значения, без рамки и без тени. -->
+  <Style x:Key="Card" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="MinHeight" Value="56" />
+  </Style>
+</ResourceDictionary>

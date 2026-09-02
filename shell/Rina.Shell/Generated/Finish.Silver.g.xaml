@@ -1,0 +1,43 @@
+<!--
+    Порождено из docs/design/tokens.json.
+    Не править руками: правьте токены и перезапустите
+    python tools/gen_xaml_tokens.py
+
+    Здесь только значения. Стили — решения о том, как выглядит контрол, —
+    пишутся и читаются человеком и живут в Styles/.
+-->
+
+<!-- Отделка «Серебро» -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <Color x:Key="Color.Face">#e5e3de</Color>
+  <SolidColorBrush x:Key="C.Face" Color="#e5e3de" />
+  <Color x:Key="Color.FaceHigh">#f0efeb</Color>
+  <SolidColorBrush x:Key="C.FaceHigh" Color="#f0efeb" />
+  <Color x:Key="Color.FaceLow">#d8d6d0</Color>
+  <SolidColorBrush x:Key="C.FaceLow" Color="#d8d6d0" />
+  <Color x:Key="Color.FaceSunk">#cecbc4</Color>
+  <SolidColorBrush x:Key="C.FaceSunk" Color="#cecbc4" />
+  <Color x:Key="Color.Seam">#c9c6be</Color>
+  <SolidColorBrush x:Key="C.Seam" Color="#c9c6be" />
+  <Color x:Key="Color.Glass">#17181a</Color>
+  <SolidColorBrush x:Key="C.Glass" Color="#17181a" />
+  <Color x:Key="Color.GlassText">#eceae5</Color>
+  <SolidColorBrush x:Key="C.GlassText" Color="#eceae5" />
+  <Color x:Key="Color.GlassDim">#918f88</Color>
+  <SolidColorBrush x:Key="C.GlassDim" Color="#918f88" />
+  <Color x:Key="Color.Ink">#232220</Color>
+  <SolidColorBrush x:Key="C.Ink" Color="#232220" />
+  <Color x:Key="Color.InkSoft">#5e5a52</Color>
+  <SolidColorBrush x:Key="C.InkSoft" Color="#5e5a52" />
+  <Color x:Key="Color.InkFaint">#807b70</Color>
+  <SolidColorBrush x:Key="C.InkFaint" Color="#807b70" />
+  <Color x:Key="Color.Signal">#b03e16</Color>
+  <SolidColorBrush x:Key="C.Signal" Color="#b03e16" />
+  <Color x:Key="Color.SignalSunk">#8f3010</Color>
+  <SolidColorBrush x:Key="C.SignalSunk" Color="#8f3010" />
+  <Color x:Key="Color.Hatch">#232220</Color>
+  <SolidColorBrush x:Key="C.Hatch" Color="#232220" />
+</ResourceDictionary>

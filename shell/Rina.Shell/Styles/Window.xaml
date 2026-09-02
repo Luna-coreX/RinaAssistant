@@ -1,0 +1,35 @@
+<!--
+  Каркас окна. Своя рама, потому что своя типографика и свои цвета: системный
+  заголовок принёс бы шрифт и палитру Windows на панель, у которой они свои.
+
+  Скругление углов самого окна оставлено системе: в Windows 11 его рисует
+  диспетчер окон, и повторять это своими руками значит спорить с ним о
+  полпикселя на каждом мониторе.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework">
+
+  <Style x:Key="Window.Apparatus" TargetType="Window">
+    <Setter Property="Background" Value="{DynamicResource C.Face}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="MinWidth" Value="720" />
+    <Setter Property="MinHeight" Value="480" />
+    <Setter Property="shell:WindowChrome.WindowChrome">
+      <Setter.Value>
+        <!--
+          CaptionHeight равен высоте нашей полосы заголовка: за неё окно
+          таскают, по ней же двойной щелчок разворачивает. GlassFrameThickness
+          в единицу оставляет системе тень и скругление окна, ResizeBorder —
+          привычные края для изменения размера.
+        -->
+        <shell:WindowChrome CaptionHeight="40"
+                            CornerRadius="0"
+                            GlassFrameThickness="1"
+                            ResizeBorderThickness="6"
+                            UseAeroCaptionButtons="False" />
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>

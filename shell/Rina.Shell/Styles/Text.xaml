@@ -1,0 +1,67 @@
+<!--
+  Роли текста дизайн-системы (§3). Размеры и начертания берутся из
+  порождённых токенов; здесь только решение о том, как роль применяется.
+
+  Прописные и трекинг остались ровно у одной роли — «секция». После правки
+  исполнения (R03/R05) прописные перестали быть общим приёмом: гравировка,
+  которой всё вокруг, перестаёт быть гравировкой.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <Style x:Key="Text.Base" TargetType="TextBlock">
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+    <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+  </Style>
+
+  <Style x:Key="Text.Title" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Title.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Title.Weight}" />
+  </Style>
+
+  <Style x:Key="Text.Section" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Section.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Section.Weight}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <!-- Трекинг в WPF задаётся межсимвольным интервалом шрифта; 0.10 em
+         на 11 px это 1.1 px, и округление до целого здесь безвредно. -->
+    <Setter Property="Typography.Capitals" Value="Normal" />
+  </Style>
+
+  <Style x:Key="Text.Nav" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Nav.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Nav.Weight}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
+  <Style x:Key="Text.Body" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Body.Size}" />
+  </Style>
+
+  <Style x:Key="Text.Legend" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Legend.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Legend.Weight}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
+  <Style x:Key="Text.Meta" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Meta.Size}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+  </Style>
+
+  <!-- Показания прибора: цифры не должны прыгать при смене значения. -->
+  <Style x:Key="Text.Figure" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Figure.Size}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
+  <Style x:Key="Text.Speech" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontSize" Value="{StaticResource Type.Speech.Size}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.GlassText}" />
+    <Setter Property="TextWrapping" Value="Wrap" />
+    <Setter Property="LineHeight" Value="24" />
+  </Style>
+</ResourceDictionary>

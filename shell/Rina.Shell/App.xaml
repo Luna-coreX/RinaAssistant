@@ -1,0 +1,17 @@
+<Application x:Class="Rina.Shell.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Application.Resources>
+    <ResourceDictionary>
+      <ResourceDictionary.MergedDictionaries>
+        <!-- Порождено из tokens.json; см. tools/gen_xaml_tokens.py -->
+        <ResourceDictionary Source="Generated/Tokens.g.xaml" />
+        <!-- Отделка подставляется на старте: две равноправные (4.0-R08) -->
+        <ResourceDictionary Source="Generated/Finish.Silver.g.xaml" />
+        <ResourceDictionary Source="Styles/Text.xaml" />
+        <ResourceDictionary Source="Styles/Controls.xaml" />
+        <ResourceDictionary Source="Styles/Window.xaml" />
+      </ResourceDictionary.MergedDictionaries>
+    </ResourceDictionary>
+  </Application.Resources>
+</Application>
