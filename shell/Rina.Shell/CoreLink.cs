@@ -55,6 +55,10 @@ public sealed class CoreLink : IAsyncDisposable
             _window.OnCoreEvent(message);
             CoreEvent?.Invoke(message);
         });
+
+        _boss.Connected += connection =>
+            connection.RequestReceived += request => OnUi(
+                () => { _ = OnCoreRequestAsync(connection, request); });
     }
 
     public CoreState State => _boss.State;
@@ -106,6 +110,69 @@ public sealed class CoreLink : IAsyncDisposable
             // Показали уже; не запомнилось — узнаем при следующем запуске.
         }
     }
+
+    /// <summary>
+    /// Ядро просит разрешения — спросить человека (<c>4.0-F11</c>, §11).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Окно одно на всё опасное: два одновременных вопроса о необратимом —
+    /// это два способа согласиться не глядя.
+    /// </para>
+    /// <para>
+    /// <b>Отказ по умолчанию.</b> Что бы ни случилось — закрыли окно, истёк
+    /// срок, оболочка не поняла запрос — ответ «нет». Согласие бывает только
+    /// явным.
+    /// </para>
+    /// </remarks>
+    private async Task OnCoreRequestAsync(CoreConnection connection,
+                                          Envelope request)
+    {
+        if (request.Method != Methods.PermissionRequest)
+        {
+            // Метод, которого оболочка не знает, — не повод молчать: ядро
+            // ждёт ответа, и молчание превратится в его таймаут.
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["granted"] = false,
+                ["reason"] = "оболочка не умеет этот запрос",
+            });
+            return;
+        }
+
+        var preview = request.Payload["preview"]?.GetValue<string>()
+                      ?? "Точно выполнить?";
+        var reason = request.Payload["reason"]?.GetValue<string>() ?? "";
+        var ttl = request.Payload["ttl"]?.GetValue<int>() ?? 60;
+
+        var granted = false;
+        try
+        {
+            _asking?.Withdraw();
+            var window = new Pages.ConfirmWindow(preview, reason, ttl);
+            if (_window.IsVisible) window.Owner = _window;
+            _asking = window;
+            window.ShowDialog();
+            granted = window.Result == Pages.Consent.Granted;
+        }
+        catch
+        {
+            granted = false;        // не смогли спросить — значит не разрешено
+        }
+        finally
+        {
+            _asking = null;
+        }
+
+        await connection.ReplyAsync(request, new JsonObject
+        {
+            ["request_id"] = request.Payload["request_id"]?.DeepClone(),
+            ["granted"] = granted,
+            ["scope"] = "once",
+        });
+    }
+
+    private Pages.ConfirmWindow? _asking;
 
     private static void OnUi(Action work)
     {

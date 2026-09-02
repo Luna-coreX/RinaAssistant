@@ -62,6 +62,12 @@ public sealed class CoreConnection : IAsyncDisposable
     /// <summary>Связь оборвалась: ядро умерло или закрыло канал.</summary>
     public event Action<string>? Broken;
 
+    /// <summary>
+    /// Ядро о чём-то просит (§1: у него ровно два вида запросов — разрешение
+    /// и данные, которыми владеет оболочка).
+    /// </summary>
+    public event Action<Envelope>? RequestReceived;
+
     /// <summary>Незнакомые события: их игнорируют молча, но считать полезно.</summary>
     public List<string> IgnoredEvents { get; } = [];
 
@@ -148,6 +154,12 @@ public sealed class CoreConnection : IAsyncDisposable
                 LastHeard = DateTimeOffset.UtcNow;
 
                 if (message.IsEvent) { Dispatch(message); continue; }
+
+                if (message.Type == MessageType.Request)
+                {
+                    RequestReceived?.Invoke(message);
+                    continue;
+                }
 
                 if (message.CorrelationId is { } id
                     && _pending.TryRemove(id, out var waiting))
@@ -239,6 +251,29 @@ public sealed class CoreConnection : IAsyncDisposable
         {
             _pending.TryRemove(request.Id, out _);
         }
+    }
+
+    /// <summary>
+    /// Ответить на запрос ядра.
+    /// </summary>
+    /// <remarks>
+    /// Трассировка и версия наследуются от запроса: сквозная цепочка (§14)
+    /// обязана быть свойством конструкции, иначе её однажды забудут.
+    /// </remarks>
+    public async Task ReplyAsync(Envelope request, JsonObject payload,
+                                 CancellationToken token = default)
+    {
+        var answer = new Envelope
+        {
+            Type = MessageType.Response,
+            Id = _ids.Next(),
+            CorrelationId = request.Id,
+            TraceId = request.TraceId,
+            Version = request.Version,
+            Timestamp = Clock.Now(),
+            Payload = payload,
+        };
+        await _control.SendAsync(answer, token).ConfigureAwait(false);
     }
 
     /// <summary>Дождаться названного события.</summary>

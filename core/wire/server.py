@@ -105,6 +105,12 @@ class ProtocolServer:
 
         # Голос ядра уходит в оболочку, а не в местный динамик (4.0-E04).
         engine.voice_out = self._speak
+        # Опасное подтверждается окном, а не только словами (4.0-F11).
+        engine.on_question = self._on_question
+
+        #: Наши запросы, ждущие ответа оболочки. Сервер до сих пор умел
+        #: только отвечать; чтобы спросить (§11), надо уметь и дождаться.
+        self._awaiting: dict[str, Callable[[Envelope], None]] = {}
 
         self._send_lock = threading.Lock()
         self._running = False
@@ -194,6 +200,17 @@ class ProtocolServer:
     def dispatch(self, message: Envelope) -> list[Envelope]:
         """Обработать одно сообщение и отправить всё, что положено в ответ."""
         out: list[Envelope] = []
+
+        # Ответ на наш собственный запрос — не метод, и искать для него
+        # обработчик значило бы ответить «неизвестный метод» на собственный
+        # вопрос.
+        if message.type in ("response", "error") and message.correlation_id:
+            waiting = self._awaiting.pop(message.correlation_id, None)
+            if waiting is not None:
+                with trace_scope(message.trace_id):
+                    waiting(message)
+            return out
+
         with trace_scope(message.trace_id):
             method = message.method or ""
             try:
@@ -576,6 +593,68 @@ class ProtocolServer:
                                  {"bytes": len(frame.payload)},
                                  id=self.ids.next(),
                                  stream_id=frame.stream_id))
+
+    # -- вопрос человеку (4.0-F11, §11) ---------------------------------------
+
+    def ask_shell(self, method: str, payload: dict,
+                  on_answer: Callable[[Envelope], None]) -> Envelope:
+        """Задать вопрос оболочке и запомнить, кто ждёт ответа."""
+        request = Envelope.request(method, payload, id=self.ids.next())
+        self._awaiting[request.id] = on_answer
+        return self.send(request)
+
+    def _on_question(self, question) -> None:
+        """
+        Ядро задало вопрос — показать его человеку окном (§11).
+
+        Спрашивается **только необратимое**: у уточняющего «какой из трёх
+        телеграмов» нет ни опасности, ни предпросмотра, и вырывать его в
+        модальное окно значило бы прерывать разговор ради выбора, который
+        удобнее сделать словами.
+
+        Голосовой путь при этом не отменяется: человек может ответить «да»
+        вслух, и вопрос закроется сам — окно тогда просто перестанет быть
+        нужным.
+        """
+        if question.kind not in ("confirm_action", "confirm_command"):
+            return
+        if not self.session.ready:
+            return
+        if "permissions" not in self.session.peer_capabilities:
+            return          # оболочка не умеет спрашивать — останется голосом
+
+        asked = question.to_dict()
+        action = asked.get("action") or ""
+        command_id = asked.get("command_id") or ""
+
+        # Предпросмотр — то, что человеку показывают вместо названия
+        # действия. §11 требует показать, **что именно произойдёт**:
+        # «Выключить компьютер?» человек успевает осознать, а «power_action»
+        # не значит ничего.
+        if action:
+            from voice import system_control
+
+            preview = system_control.confirm_question(action)
+        else:
+            preview = "Выполнить сохранённую команду?"
+
+        self.ask_shell("permission.request", {
+            "request_id": question.confirmation_id or "",
+            "permission": "system.power" if action else "process.launch",
+            "action": action or command_id,
+            "reason": "Сказано голосом" if action else "Запуск своей команды",
+            "preview": preview,
+            "ttl": int(getattr(question, "TTL", 0)
+                       or getattr(question, "ttl", 0) or 60),
+        }, self._on_permission_answer)
+
+    def _on_permission_answer(self, message: Envelope) -> None:
+        """
+        Ответ оболочки. Отказ по умолчанию: всё, кроме явного «да», — «нет».
+        """
+        granted = (message.type == "response"
+                   and message.payload.get("granted") is True)
+        self.engine.answer_question(granted)
 
     # -- речь (4.0-E03, E04) --------------------------------------------------
 

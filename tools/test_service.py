@@ -415,6 +415,70 @@ work.ask("core.shutdown")
 work.read(1)
 work.wait()
 
+
+# ---------------------------------------------------------------------------
+print()
+print("=== F11: опасное подтверждается, а не выполняется ===")
+
+# Ядро не может выполнить необратимое само: оно просит, оболочка спрашивает
+# человека, решение возвращается. До сих пор канал разрешений существовал, но
+# им никто не пользовался — опасное действие просто отклонялось.
+danger = Core()
+danger.handshake()
+
+danger.ask("command.handle", {"text": "выключи компьютер", "source": "voice"})
+# Ждём именно запрос разрешения: сторожевое слово, которого не
+# бывает, заставляло бы ждать весь срок впустую.
+asked = danger.read_until("permission.request", timeout=25, limit=10)
+requests = [m for m in asked if m.type == MessageType.REQUEST
+            and m.method == "permission.request"]
+check("ядро спросило разрешения", requests,
+      f"| {[(m.type, m.method) for m in asked]}")
+
+if requests:
+    ask = requests[0]
+    check("показано, что именно произойдёт, а не имя действия",
+          "компьютер" in ask.payload["preview"].lower()
+          and ask.payload["preview"] != ask.payload["action"],
+          f"| {ask.payload['preview']!r}")
+    check("названа причина", ask.payload.get("reason"),
+          f"| {ask.payload.get('reason')!r}")
+    check("назван срок", ask.payload.get("ttl", 0) > 0,
+          f"| {ask.payload.get('ttl')} с")
+    check("запрос несёт свой номер", bool(ask.payload.get("request_id")))
+
+    # --- отказ ---
+    # Отвечаем так же, как отвечала бы оболочка: ответ наследует
+    # трассировку и версию у запроса.
+    danger.send(ask.reply({"granted": False, "scope": "once"},
+                          id=danger.ids.next()))
+    after = danger.read_until("assistant.response", timeout=20, limit=8)
+    said = [m.payload.get("text", "") for m in after
+            if m.method == "assistant.response"]
+    check("после отказа Рина отвечает словами, а не молчит", said,
+          f"| {said}")
+
+# --- согласие: то же действие, но разрешённое ---
+danger.ask("command.handle", {"text": "выключи компьютер", "source": "voice"})
+asked2 = danger.read_until("permission.request", timeout=25, limit=10)
+requests2 = [m for m in asked2 if m.type == MessageType.REQUEST
+             and m.method == "permission.request"]
+check("на второй раз спрошено снова", requests2,
+      "| согласие одноразовое, и повтор обязан спросить опять")
+
+if requests2:
+    ask2 = requests2[0]
+    danger.send(ask2.reply({"granted": True, "scope": "once"},
+                           id=danger.ids.next()))
+    done = danger.read_until("assistant.response", timeout=20, limit=8)
+    check("после согласия действие дошло до исполнения",
+          any(m.method == "assistant.response" for m in done),
+          f"| {[m.method for m in done]}")
+
+danger.ask("core.shutdown")
+danger.read(1)
+danger.wait()
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

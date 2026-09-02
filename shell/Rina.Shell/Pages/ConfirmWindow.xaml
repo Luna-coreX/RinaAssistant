@@ -1,0 +1,57 @@
+<Window x:Class="Rina.Shell.Pages.ConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Style="{StaticResource Window.Apparatus}"
+        Title="Подтверждение" Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        MinWidth="520" MinHeight="0" ResizeMode="NoResize">
+
+  <!--
+    Единая точка для всех опасных действий (4.0-F11, §11).
+
+    Опасность обозначена штриховкой, а не цветом: цвет опасности размывается
+    от повторения, а штриховка встречается в одном месте и потому всегда
+    значит одно и то же. Красного в палитре нет вовсе.
+
+    Второе средство — пустота: необратимое отделено просветом вдвое большим
+    обычного. Оно работает и для того, кто узора не различает.
+  -->
+  <Grid Margin="32">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" x:Name="Preview" Style="{StaticResource Text.Title}"
+               TextWrapping="Wrap" Text="Точно выполнить?" />
+
+    <TextBlock Grid.Row="1" x:Name="Reason" Style="{StaticResource Text.Meta}"
+               TextWrapping="Wrap" Margin="0,12,0,0" />
+
+    <!-- Просвет 64: необратимое отделяется пустотой (§4 дизайн-системы) -->
+    <Grid Grid.Row="2" Margin="0,64,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <Button Grid.Column="0" x:Name="Confirm" Style="{StaticResource Btn.Danger}"
+              Content="Выполнить" Click="OnConfirm" />
+
+      <TextBlock Grid.Column="1" x:Name="Countdown"
+                 Style="{StaticResource Text.Figure}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+      <Button Grid.Column="2" x:Name="Refuse" Style="{StaticResource Btn}"
+              Content="Отмена" Click="OnRefuse" IsCancel="True" />
+    </Grid>
+
+    <TextBlock Grid.Row="3" Style="{StaticResource Text.Meta}"
+               Margin="0,16,0,0" TextWrapping="Wrap"
+               Text="Если не ответить, действие не выполнится." />
+  </Grid>
+</Window>

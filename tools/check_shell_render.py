@@ -52,6 +52,59 @@ def near(a, b, tolerance=2) -> bool:
     return all(abs(x - y) <= tolerance for x, y in zip(a[:3], b))
 
 
+def check_confirm(image, colors, tokens) -> int:
+    """
+    Окно подтверждения (4.0-F11): опасность штриховкой, а не цветом.
+
+    Штриховка ищется по разбросу яркости в полосе кнопки: узор — это
+    чередование, и на ровной заливке разброса не будет. Искать конкретную
+    точку узора значило бы проверять, где именно легла линия, а не то, что
+    узор есть.
+    """
+    width, height = image.size
+    print(f"=== F11: окно подтверждения, {width}x{height} ===")
+
+    check("окно на панели, а не на системном фоне",
+          near(image.getpixel((width // 2, 8)), colors["FACE"]),
+          f"| {image.getpixel((width // 2, 8))}")
+
+    # Полоса, где стоит кнопка необратимого.
+    row = int(height * 0.66)
+    strip = [image.getpixel((x, row)) for x in range(24, 170)]
+    greys = sorted({p[0] for p in strip})
+    check("кнопка необратимого заштрихована",
+          len(greys) >= 3 and max(greys) - min(greys) > 20,
+          f"| оттенков {len(greys)}, размах {max(greys) - min(greys)}")
+
+    # `getdata` объявлен к удалению в Pillow 14. Тот же случай, что и
+    # `audioop` в ядре: узнать об этом при обновлении библиотеки — худший
+    # момент, а `getcolors` делает ровно нужное и заодно считает точки.
+    everything = {colour for _, colour in image.getcolors(1 << 24)}
+    reds = [p for p in everything if p[0] > 150 and p[1] < 60 and p[2] < 60]
+    check("красного нет нигде", not reds, f"| {reds[:3]}")
+
+    check("акцент есть — это рамка фокуса на отказе",
+          any(near(p, colors["SIGNAL"], 24) for p in everything))
+
+    # Просвет вокруг необратимого — вдвое больше обычного (§4).
+    gap = tokens["space"]["danger"]
+    check("просвет вокруг необратимого объявлен вдвое большим",
+          gap >= tokens["space"]["between"] * 2, f"| {gap}")
+
+    # Верхняя граница выборки не должна задевать саму кнопку: она высотой в
+    # орган управления, и половина её лежит выше середины строки.
+    control = int(tokens["size"]["control"])
+    above = [image.getpixel((60, y))
+             for y in range(row - gap + 8, row - control // 2 - 4)]
+    check("над кнопкой действительно пусто",
+          all(near(p, colors["FACE"], 3) for p in above),
+          f"| {sorted(set(above))} в просвете")
+
+    print()
+    print("ИТОГО ошибок:", fails)
+    return 1 if fails else 0
+
+
 def main(argv) -> int:
     if len(argv) < 2:
         print("нужно: путь-к-снимку отделка")
@@ -66,6 +119,9 @@ def main(argv) -> int:
 
     image = Image.open(path).convert("RGB")
     width, height = image.size
+
+    if len(argv) > 2 and argv[2] == "confirm":
+        return check_confirm(image, colors, tokens)
     print(f"=== F03: {os.path.basename(path)}, отделка «{finish_name}», "
           f"{width}x{height} ===")
 

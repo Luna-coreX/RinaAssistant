@@ -69,6 +69,9 @@ class RinaEngine:
         #: протокола (4.0-E04); пока не поставлен, ядро говорит само, как в
         #: 3.1.0 — приложение с окном на Qt этим и пользуется.
         self.voice_out = None
+        #: Кому сообщать о заданном вопросе (4.0-F11). Ставит серверная
+        #: сторона: спросить человека умеет только оболочка.
+        self.on_question = None
         self._settings = settings if settings is not None else default_settings()
         self._features = features if features is not None else default_features()
         settings = self._settings          # локальное имя для кода ниже
@@ -408,6 +411,29 @@ class RinaEngine:
     def _ask(self, question):
         """Задать вопрос и озвучить его."""
         self._dialog.ask(question)
+        self._announce_question(question)
+
+    def _announce_question(self, question):
+        """Сообщить наружу, что задан вопрос (4.0-F11)."""
+        if self.on_question is None:
+            return
+        try:
+            self.on_question(question)
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось объявить заданный вопрос")
+
+    def answer_question(self, yes: bool) -> None:
+        """
+        Ответить на заданный вопрос за человека.
+
+        **Тем же путём, что и голосом.** Согласие проходит через разбор,
+        как если бы человек сказал «да»: у него ровно одна дорога, и вторая
+        реализация согласия — это второе место, где можно ошибиться в
+        безопасном действии. Слова берутся из роутера, а не из интерфейса:
+        это часть разбора, а не подпись на кнопке.
+        """
+        word = (router_mod.YES_WORDS if yes else router_mod.NO_WORDS)[0]
+        self.handle_command_async(word, source="typed")
 
 
     def _run_user_command(self, user_cmd):
@@ -552,7 +578,9 @@ class RinaEngine:
         result = self._executor.execute(intent, source)
 
         if intent.needs_answer:
-            self._dialog.ask(self._question_for(intent, result))
+            question = self._question_for(intent, result)
+            self._dialog.ask(question)
+            self._announce_question(question)
 
     @staticmethod
     def _question_for(intent, result=None):

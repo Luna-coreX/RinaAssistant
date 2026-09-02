@@ -57,6 +57,41 @@
     </Setter>
   </Style>
 
+  <!--
+    Штриховка необратимого. Единственный признак опасности в системе, и
+    встречается ровно в одном месте — потому и значит всегда одно и то же.
+
+    Цветом опасность не обозначается: он размывается от повторения, и там,
+    где красным красят каждую неприятность, красный перестаёт значить
+    «осторожно». Красного в палитре нет вовсе.
+
+    Угол, толщина, шаг и прозрачность — из tokens.json.
+  -->
+  <DrawingBrush x:Key="Hatch" TileMode="Tile" Stretch="None"
+                Viewport="0,0,7,7" ViewportUnits="Absolute"
+                Opacity="0.2">
+    <DrawingBrush.Drawing>
+      <GeometryDrawing>
+        <GeometryDrawing.Pen>
+          <Pen Brush="{DynamicResource C.Hatch}" Thickness="2" />
+        </GeometryDrawing.Pen>
+        <GeometryDrawing.Geometry>
+          <LineGeometry StartPoint="0,7" EndPoint="7,0" />
+        </GeometryDrawing.Geometry>
+      </GeometryDrawing>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+
+  <!--
+    Кнопка необратимого действия. Не залита акцентом и не красная: она
+    заштрихована. Второе средство — просвет вокруг неё, вдвое больше
+    обычного; оно работает и для того, кто узора не различает.
+  -->
+  <Style x:Key="Btn.Danger" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="{StaticResource Hatch}" />
+    <Setter Property="Padding" Value="20,0" />
+  </Style>
+
   <!-- Первичная: одна на экран. Залита чернилами, а не акцентом. -->
   <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Background" Value="{DynamicResource C.Ink}" />

@@ -52,6 +52,24 @@ public partial class App
             return;
         }
 
+        // Снимок окна подтверждения: проверять вид необратимого, каждый раз
+        // выключая компьютер, — способ не проверять его вовсе.
+        if (Value(args, "--shot-confirm") is { } confirmShot)
+        {
+            var ask = new Pages.ConfirmWindow(
+                "Компьютер будет выключен немедленно.",
+                "Сказано голосом", 60);
+            ask.Left = -4000;
+            ask.Top = -4000;
+            ask.Show();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Save(ask, confirmShot);
+                Shutdown();
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            return;
+        }
+
         var shot = Value(args, "--shot");
         if (shot is null)
         {
@@ -322,7 +340,7 @@ public partial class App
         return at >= 0 && at + 1 < args.Length ? args[at + 1] : null;
     }
 
-    private static void Save(Window window, string path)
+    internal static void Save(Window window, string path)
     {
         var source = PresentationSource.FromVisual(window);
         var dpi = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
