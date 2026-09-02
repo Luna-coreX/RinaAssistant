@@ -288,7 +288,14 @@ public partial class App
         }
 
         Console.WriteLine("=== F07/F12: оболочка поднимает ядро и спрашивает вид ===");
-        var link = new CoreLink(window, CoreLink.FindCore());
+        var launch = CoreLink.FindCore();
+        Console.WriteLine($"     ядро запускает: {launch.Python}");
+        Check("ядро запускается окружением проекта, если оно есть",
+              !launch.Python.Equals("python",
+                                        StringComparison.OrdinalIgnoreCase)
+              || !Directory.Exists(Path.Combine(launch.WorkingDirectory, "venv")),
+              "| иначе голосов и моделей у ядра не будет");
+        var link = new CoreLink(window, launch);
         window.Link = link;
         var seen = new List<Rina.Protocol.CoreState>();
         window.CoreStateShown += state => seen.Add(state);

@@ -226,6 +226,36 @@ public sealed class CoreLink : IAsyncDisposable
         while (dir is not null && !File.Exists(Path.Combine(dir, "rina_core.py")))
             dir = Path.GetDirectoryName(dir);
         var root = dir ?? AppContext.BaseDirectory;
-        return new CoreLaunch("python", Path.Combine(root, "rina_core.py"), root);
+        return new CoreLaunch(Interpreter(root),
+                              Path.Combine(root, "rina_core.py"), root);
+    }
+
+    /// <summary>
+    /// Каким Python запускать ядро.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Окружение проекта, если оно есть, — и только потом тот `python`,
+    /// который найдётся в `PATH`. Разница не косметическая: голоса, модели
+    /// распознавания и звук стоят <b>в окружении</b>, а не в системном
+    /// интерпретаторе. Запущенное «просто питоном» ядро поднимается, отвечает
+    /// на всё и честно сообщает, что ни одного движка синтеза и ни одного
+    /// движка распознавания нет, — программа выглядит работающей и не делает
+    /// ровно того, ради чего она есть.
+    /// </para>
+    /// <para>
+    /// В 3.1.0 вопроса не было: программу запускали тем же интерпретатором,
+    /// в котором она жила. Разделив процессы, мы отдали выбор интерпретатора
+    /// оболочке — и обязаны выбирать осознанно.
+    /// </para>
+    /// </remarks>
+    public static string Interpreter(string root)
+    {
+        string[] candidates =
+        [
+            Path.Combine(root, "venv", "Scripts", "python.exe"),
+            Path.Combine(root, ".venv", "Scripts", "python.exe"),
+        ];
+        return candidates.FirstOrDefault(File.Exists) ?? "python";
     }
 }
