@@ -52,6 +52,9 @@ class Constraint:
     secret: bool = False
     #: Вступает в силу только после перезапуска.
     restart_required: bool = False
+    #: Ключ больше не участвует, но данные не стёрты. Оболочка его не
+    #: показывает; удалять из хранилища нечего и незачем.
+    obsolete: bool = False
     #: Код предупреждения, если значение опасно, но допустимо.
     warn_code: str = ""
 
@@ -78,11 +81,18 @@ CONSTRAINTS: dict[str, Constraint] = {
     # только при включённой истории.
     "log_texts": Constraint(depends_on="save_history"),
 
-    # Меняются редко и требуют перезапуска: их применение затрагивает окно
-    # целиком, а не отдельный экран.
+    # Отделка меняется на лету: обе равноправны, и подменяется целый словарь
+    # ресурсов, а не пересчитываются цвета от базового. Перезапуска не
+    # требует — а требовать его значило бы соврать о том, как это устроено.
+    "finish": Constraint(choices=("silver", "black")),
+
+    # Язык меняется редко и затрагивает окно целиком.
     "ui_language": Constraint(restart_required=True),
-    "theme": Constraint(restart_required=True),
-    "accent": Constraint(restart_required=True),
+
+    # Пять заимствованных палитр 3.1.0. Заменены двумя отделками (4.0-R08);
+    # значения остаются в хранилище, но наружу не отдаются.
+    "theme": Constraint(obsolete=True),
+    "accent": Constraint(obsolete=True),
 
     # Служебное: не настройки, а состояние хранилища.
     "config_version": Constraint(secret=True),
@@ -111,6 +121,8 @@ def describe_key(key: str) -> dict[str, Any]:
         out["secret"] = True
     if rule.restart_required:
         out["restart_required"] = True
+    if rule.obsolete:
+        out["obsolete"] = True
     return out
 
 

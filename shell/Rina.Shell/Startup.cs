@@ -16,6 +16,8 @@ public partial class App
     /// человека смотреть на окно после каждой правки — способ перестать
     /// смотреть вовсе. Снимок делает тот же код, что рисует настоящее окно.
     /// </remarks>
+    private CoreLink? _link;
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -25,12 +27,41 @@ public partial class App
         ApplyFinish(finish);
 
         var window = new MainWindow();
+        window.ShowFinish(finish);
+
+        // Сквозная самопроверка: поднять настоящее ядро, дождаться связи,
+        // сказать, что получилось, и выйти. Снимок показывает, как окно
+        // выглядит; это показывает, что оно живое.
+        if (args.Contains("--check-core"))
+        {
+            // Без окна WPF завершается сам, едва OnStartup вернёт управление:
+            // по умолчанию приложение живёт, пока живо хотя бы одно окно.
+            // Самопроверке окно показывать незачем, поэтому закрываемся мы
+            // сами и только когда закончим.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckCoreAsync(window);
+            return;
+        }
+
         var shot = Value(args, "--shot");
         if (shot is null)
         {
+            // Ядро поднимается после того, как окно показано, а не до:
+            // человек должен увидеть программу сразу, а не через секунду,
+            // которую тратит чужой процесс на запуск. Состояние связи он
+            // при этом видит с первой же отрисовки (4.0-F12).
             window.Show();
+            _link = new CoreLink(window, CoreLink.FindCore());
+            window.Link = _link;
+            _ = _link.StartAsync();
             return;
         }
+
+        // Снимок может изображать состояние связи: проверять индикацию,
+        // дожидаясь настоящего обрыва, — способ проверять её редко.
+        if (Value(args, "--core-state") is { } state)
+            window.ShowCoreState(Enum.Parse<Rina.Protocol.CoreState>(state, true),
+                                 Value(args, "--core-reason") ?? "");
 
         window.Width = 940;
         window.Height = 620;
@@ -43,6 +74,61 @@ public partial class App
             Save(window, shot);
             Shutdown();
         }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+    }
+
+    private async Task CheckCoreAsync(MainWindow window)
+    {
+        // Вывод в файл буферизуется блоками, и если процесс убьют по сроку,
+        // буфер пропадёт вместе с ответом на вопрос «почему так долго».
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F07/F12: оболочка поднимает ядро и спрашивает вид ===");
+        var link = new CoreLink(window, CoreLink.FindCore());
+        window.Link = link;
+        var seen = new List<Rina.Protocol.CoreState>();
+        window.CoreStateShown += state => seen.Add(state);
+
+        await link.StartAsync();
+        for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
+            await Task.Delay(100);
+
+        Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
+              $"| {link.State}");
+        Check("состояние доехало до окна", seen.Count > 0,
+              "| " + string.Join(" → ", seen));
+        Check("окно показывает связь словами",
+              window.CoreStateTextValue.Contains("ядро"),
+              $"| «{window.CoreStateTextValue}»");
+
+        // Отделку оболочка не читает из файла, а спрашивает у ядра.
+        await Task.Delay(1500);
+        Check("отделка получена от ядра",
+              window.FinishValue is "silver" or "black",
+              $"| {window.FinishValue}");
+
+        await link.DisposeAsync();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        // Ядро завершается само, увидев обрыв (§13), но попрощаться вежливо
+        // дешевле, чем полагаться на это: у него есть что закрыть.
+        _link?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(6));
+        base.OnExit(e);
     }
 
     private static string? Value(string[] args, string name)

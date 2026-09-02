@@ -256,10 +256,12 @@ class ProtocolServer:
         keys = message.payload.get("keys") or []
         store = self._settings()
         schema = settings_schema.describe(keys)
-        # Секретное наружу не уходит вовсе: config_version и first_run —
-        # состояние хранилища, а не настройки, и показывать их незачем.
+        # Секретное и устаревшее наружу не уходит: config_version и first_run
+        # — состояние хранилища, а theme и accent заменены отделками (R08).
+        # Данные при этом целы, просто оболочке они больше не нужны.
         return {"values": {k: store.get(k) for k in keys
-                           if not schema.get(k, {}).get("secret")}}
+                           if not schema.get(k, {}).get("secret")
+                           and not schema.get(k, {}).get("obsolete")}}
 
     def _settings_set(self, message: Envelope) -> dict:
         """

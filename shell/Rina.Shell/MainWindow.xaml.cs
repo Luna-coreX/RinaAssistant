@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Rina.Protocol;
 
 namespace Rina.Shell;
@@ -75,7 +76,36 @@ public partial class MainWindow : Window
                 child.IsChecked = true;
     }
 
-    /// <summary>Показать состояние связи с ядром (заготовка <c>4.0-F12</c>).</summary>
+    /// <summary>Связь с ядром; ставится при запуске (<c>4.0-F07</c>, <c>F12</c>).</summary>
+    public CoreLink? Link { get; set; }
+
+    private string _finish = "black";
+
+    /// <summary>Что окно показывает про связь — для самопроверки.</summary>
+    public string CoreStateTextValue => CoreStateText.Text;
+
+    /// <summary>Какая отделка сейчас показана — для самопроверки.</summary>
+    public string FinishValue => _finish;
+
+    /// <summary>Состояние сменилось. Слушает самопроверка.</summary>
+    public event Action<CoreState>? CoreStateShown;
+
+    /// <summary>
+    /// Показать состояние связи с ядром (<c>4.0-F12</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Состояние видно всегда, а не по запросу: §13 требует, чтобы окно не
+    /// выглядело зависшим, и человек должен понимать, что происходит, не
+    /// нажимая ничего.
+    /// </para>
+    /// <para>
+    /// Неполадка окрашивается акцентом, а не красным. Красного в палитре нет
+    /// вовсе (§2 дизайн-системы): цвет опасности размывается от повторения,
+    /// и там, где им красят каждую неприятность, он перестаёт значить
+    /// «осторожно». «Ядро не отвечает» — это ошибка, а не опасность.
+    /// </para>
+    /// </remarks>
     public void ShowCoreState(CoreState state, string reason)
     {
         var text = state switch
@@ -87,6 +117,33 @@ public partial class MainWindow : Window
             _ => "ядро не запускалось",
         };
         CoreStateText.Text = reason.Length > 0 ? $"{text} · {reason}" : text;
+        CoreStateText.SetResourceReference(
+            ForegroundProperty,
+            state is CoreState.Ready or CoreState.Stopped ? "C.InkFaint"
+                                                          : "C.Signal");
+        CoreStateShown?.Invoke(state);
+    }
+
+    /// <summary>Событие ядра. Пока — только полоса уровня.</summary>
+    public void OnCoreEvent(Envelope message)
+    {
+        // Разбор событий по разделам — 4.0-F04. Здесь остаётся то, что
+        // принадлежит прибору целиком, а не разделу: полоса уровня.
+        if (message.Method is "listening.capturing")
+            Level.Width = message.Payload["active"]?.GetValue<bool>() == true
+                ? ActualWidth * 0.4 : 0;
+    }
+
+    /// <summary>Отделка, которую показывает окно.</summary>
+    public void ShowFinish(string finish) => _finish = finish;
+
+    private async void OnSwitchFinish(object sender, RoutedEventArgs e)
+    {
+        // Две отделки равноправны (4.0-R08), поэтому переключатель, а не
+        // список: выбирать не из чего, кроме как между ними.
+        _finish = _finish == "black" ? "silver" : "black";
+        if (Link is not null) await Link.SetFinishAsync(_finish);
+        else App.ApplyFinish(_finish);
     }
 
     private void OnMinimise(object sender, RoutedEventArgs e) =>

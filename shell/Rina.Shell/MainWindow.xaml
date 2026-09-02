@@ -52,10 +52,22 @@
 
         <!-- Подвал: вид, «о программе», версия и состояние связи -->
         <StackPanel Grid.Row="1" Margin="16,12,16,12">
+          <!--
+            Состояние связи (4.0-F12). Стоит рядом с версией, в подвале
+            колонки: это справка о приборе, а не работа. Видно всегда —
+            §13 требует, чтобы окно не выглядело зависшим, а для этого
+            человек должен понимать, что происходит, без нажатий.
+          -->
           <TextBlock x:Name="CoreStateText" Style="{StaticResource Text.Meta}"
-                     Text="ядро: не запускалось" TextWrapping="Wrap" />
-          <TextBlock Style="{StaticResource Text.Meta}" Margin="0,6,0,0"
-                     Text="вид · о программе" />
+                     Text="ядро не запускалось" TextWrapping="Wrap" />
+          <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+            <TextBlock x:Name="FinishSwitch" Style="{StaticResource Text.Meta}"
+                       Text="вид" Cursor="Hand"
+                       MouseLeftButtonUp="OnSwitchFinish"
+                       ToolTip="Серебро или чёрное" />
+            <TextBlock Style="{StaticResource Text.Meta}" Text=" · " />
+            <TextBlock Style="{StaticResource Text.Meta}" Text="о программе" />
+          </StackPanel>
           <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
                      Text="4.0.0" Margin="0,2,0,0" />
         </StackPanel>

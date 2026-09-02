@@ -124,6 +124,31 @@ def main(argv) -> int:
     check("между колонкой и панелью нет тени",
           all(near(p, colors["FACE"], 3) for p in edge), f"| {edge}")
 
+    # --- F12: состояние связи видно и окрашено правильно -------------------
+    # Проверяется по области подвала целиком, а не по отдельной точке: текст
+    # сглажен, и попасть точкой в штрих буквы — это проверять удачу, а не цвет.
+    if len(argv) > 2:
+        wanted_state = argv[2]
+        footer = image.crop((0, int(height * 0.86), int(size["legend_column"]),
+                             height - size["level_strip"]))
+        painted = set(footer.getdata())
+
+        def has(colour, tolerance=24):
+            return any(near(p, colour, tolerance) for p in painted)
+
+        if wanted_state == "failed":
+            check("неполадка окрашена акцентом", has(colors["SIGNAL"]),
+                  f"| акцент {colors['SIGNAL']} среди {len(painted)} оттенков")
+        else:
+            check("спокойное состояние акцентом не кричит",
+                  not has(colors["SIGNAL"], 12),
+                  "| акцент в подвале быть не должен")
+
+        # Красного в палитре нет вовсе: цвет опасности размывается от
+        # повторения, и неполадка — не опасность.
+        reds = [p for p in painted if p[0] > 150 and p[1] < 60 and p[2] < 60]
+        check("красного в подвале нет", not reds, f"| {reds[:3]}")
+
     print()
     print("ИТОГО ошибок:", fails)
     return 1 if fails else 0
