@@ -190,6 +190,17 @@ class Registry:
         self.tasks[task.id] = task
         return task
 
+    def clear(self) -> int:
+        """
+        Забыть все задачи — при обрыве связи (`4.0-D14`).
+
+        Именно забыть, а не отменить: отменить значит сообщить о
+        `task.cancelled`, а сообщать некому — собеседника нет.
+        """
+        count = len(self.tasks)
+        self.tasks.clear()
+        return count
+
     def get(self, task_id: str) -> Task | None:
         return self.tasks.get(task_id)
 

@@ -273,6 +273,12 @@ class StreamSender:
         self.open.discard(stream_id)
         return message
 
+    def close_all(self) -> int:
+        """Забыть все потоки: обрыв уносит их с собой (§13)."""
+        count = len(self.open)
+        self.open.clear()
+        return count
+
     def _require(self, stream_id: int):
         if stream_id not in self.open:
             raise fault(ERROR_INVALID_STATE,

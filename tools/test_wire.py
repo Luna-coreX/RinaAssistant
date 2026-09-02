@@ -33,6 +33,7 @@ from core.wire.data import (DATA_FRAME_LIMIT, DataFrame, DataFrameDecoder,
                             DataReceiver, DataSender, KINDS,
                             capability_for_kind, encode_data_frame)
 from core.wire.permissions import Ask, PermissionChannel
+from core.wire.liveness import MISSED_LIMIT, SILENCE, Liveness, VolatileState
 from core.confirmations import ONCE, SCOPES, UNTIL, ConfirmationError
 
 fails = 0
@@ -1070,6 +1071,192 @@ check("все методы актуации отвечают «неизвест�
       f"| {len(actuation.methods)} шт.")
 check("вид потока screen.frame просит именно actuation",
       capability_for_kind("screen.frame") == "actuation")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D14: живость канала ===")
+
+t = [100.0]
+live = Liveness(clock=lambda: t[0])
+check("свежая сторона жива и вопросов не требует",
+      not live.due() and not live.dead())
+
+t[0] += SILENCE - 0.1
+check("до порога тишины не спрашиваем", not live.due())
+t[0] += 0.2
+check("после порога пора спросить", live.due())
+
+live.sent_ping()
+check("вопрос задан и ждёт ответа", live.awaiting and live.missed == 1)
+live.note_pong()
+check("понг снимает счётчик", live.missed == 0 and not live.awaiting)
+
+# Любое сообщение считается за ответ: занятый канал пинговать незачем.
+t[0] += 10
+live.sent_ping()
+live.note_traffic()
+check("обычное сообщение засчитано как признак жизни",
+      live.missed == 0 and not live.due())
+
+# Три неотвеченных подряд — смерть; двух мало.
+for i in range(MISSED_LIMIT - 1):
+    t[0] += SILENCE
+    live.sent_ping()
+check("двух неотвеченных мало", not live.dead(), f"| {live.missed}")
+t[0] += SILENCE
+live.sent_ping()
+check("три неотвеченных подряд — сторона мертва",
+      live.dead(), f"| {live.missed}")
+live.reset()
+check("после переподключения счётчик чист",
+      not live.dead() and live.missed == 0)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D14: что обрыв уносит с собой ===")
+
+clock = [500.0]
+perm = PermissionChannel(clock=lambda: clock[0])
+granted = perm.resolve(perm.ask("set_volume", {"level": 20},
+                                permission="system.media", reason="…",
+                                preview="Громкость станет 20 %.").id,
+                       True, UNTIL)
+perm.ask("power_action", {"action": "shutdown"}, permission="system.power",
+         reason="…", preview="Компьютер будет выключен.")
+
+jobs = Registry(IdGenerator("c-"))
+running_task = jobs.create()
+running_task.start()
+
+bytes_out = DataSender()
+bytes_out.open_stream(61, "audio.input")
+bytes_out.open_stream(62, "audio.output")
+
+words_out = StreamSender(IdGenerator("c-"))
+words_out.begin()
+
+link = Session(side=Side.CORE)
+link.handle_hello(Session(side=Side.SHELL).hello_payload())
+
+volatile = VolatileState(permissions=perm, tasks=jobs,
+                         data_streams=bytes_out, text_streams=words_out,
+                         session=link)
+before = volatile.snapshot()
+check("до обрыва всё на месте",
+      before == {"разрешения": 1, "просьбы": 1, "задачи": 1,
+                 "потоки данных": 2, "потоки текста": 1},
+      f"| {before}")
+
+was = volatile.reset()
+after = volatile.snapshot()
+check("обрыв унёс всё перечисленное в §13",
+      after == {"разрешения": 0, "просьбы": 0, "задачи": 0,
+                "потоки данных": 0, "потоки текста": 0},
+      f"| {after}")
+check("сброс отчитался, чего сколько было", was == before)
+check("сессия снова требует рукопожатия",
+      not link.ready and link.state == SessionState.CLOSED)
+
+# Главное: выданное разрешение не переживает обрыв.
+try:
+    perm.ledger.redeem(granted["confirmation_id"], "set_volume", {"level": 20})
+    check("разрешение, выданное до обрыва, не действует", False)
+except ConfirmationError as exc:
+    check("разрешение, выданное до обрыва, не действует",
+          exc.code == "confirmation.invalid")
+
+check("после обрыва поток открывается заново без спора",
+      (bytes_out.open_stream(61, "audio.input") or True)
+      and bytes_out.available(61) == 0)
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== D17: правила совместимости проверяемы ===")
+
+import json as _json
+from tools.check_contract import SNAPSHOT, current as contract_now, diff
+
+check("снимок контракта существует", os.path.isfile(SNAPSHOT))
+snapshot = _json.load(open(SNAPSHOT, encoding="utf-8"))
+same_added, same_broken = diff(snapshot, contract_now())
+check("код и снимок сходятся", not same_added and not same_broken,
+      f"| можно: {same_added}, ломает: {same_broken}")
+
+# Проверка обязана ловить каждое из ломающих изменений §4 — иначе она
+# декоративна, а декоративная проверка хуже её отсутствия: на неё полагаются.
+base = contract_now()
+
+
+def mutated(change):
+    copy = _json.loads(_json.dumps(base))
+    change(copy)
+    return diff(base, copy)
+
+
+def drop_method(c):
+    c["methods"].pop("speech.say")
+
+
+def move_method(c):
+    c["methods"]["task.cancel"] = "plugins"
+
+
+def retype_field(c):
+    c["events"]["assistant.thinking"]["active"]["type"] = "string"
+
+
+def require_field(c):
+    c["events"]["speech.recognized"]["язык"] = {
+        "type": "string", "required": True, "choices": [],
+        "low": None, "high": None}
+
+
+def drop_choice(c):
+    c["events"]["stream.end"]["reason"]["choices"].remove("failed")
+
+
+def change_error(c):
+    c["errors"]["app.not_found"]["retryable"] = True
+
+
+def drop_field(c):
+    c["events"]["apps.not_found"].pop("query")
+
+
+for what, change in (("удаление метода", drop_method),
+                     ("переезд метода в другую возможность", move_method),
+                     ("смена типа поля", retype_field),
+                     ("новое обязательное поле", require_field),
+                     ("убранное значение перечисления", drop_choice),
+                     ("смена повторяемости ошибки", change_error),
+                     ("удаление поля события", drop_field)):
+    _, breaks = mutated(change)
+    check(f"поймано ломающее: {what}", len(breaks) == 1, f"| {breaks}")
+
+
+def add_optional(c):
+    c["events"]["history.changed"]["когда"] = {
+        "type": "number", "required": False, "choices": [],
+        "low": None, "high": None}
+
+
+def add_event(c):
+    c["events"]["рина.загрустила"] = {}
+
+
+def add_choice(c):
+    c["events"]["window.action"]["action"]["choices"].append("restore")
+
+
+for what, change in (("новое необязательное поле", add_optional),
+                     ("новое событие", add_event),
+                     ("новое значение перечисления", add_choice)):
+    ok, breaks = mutated(change)
+    check(f"пропущено разрешённое: {what}", not breaks and len(ok) == 1,
+          f"| можно: {ok}, ломает: {breaks}")
 
 print()
 print("ИТОГО ошибок:", fails)

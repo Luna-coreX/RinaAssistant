@@ -198,6 +198,14 @@ class DataSender:
         del self._seq[stream_id]
         del self._credit[stream_id]
 
+    def close_all(self) -> int:
+        """Закрыть все потоки: обрыв канала данных закрывает их все (§8)."""
+        count = len(self.open)
+        self.open.clear()
+        self._seq.clear()
+        self._credit.clear()
+        return count
+
     def _require(self, stream_id: int) -> Credit:
         if stream_id not in self.open:
             raise fault(ERROR_INVALID_STATE,

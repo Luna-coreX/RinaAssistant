@@ -195,6 +195,20 @@ class PermissionChannel:
     def pending(self) -> int:
         return len(self._pending)
 
+    def drop_all(self) -> int:
+        """
+        Забыть всё: незакрытые просьбы и выданные подтверждения.
+
+        Нужно при обрыве связи (`4.0-D14`). Разрешение, выданное до обрыва,
+        относится к разговору, которого больше нет: неизвестно, что успело
+        произойти на той стороне, и человек, соглашавшийся минуту назад,
+        соглашался не на это.
+        """
+        count = len(self._pending) + self.ledger.pending()
+        self._pending.clear()
+        self.ledger.revoke_all()
+        return count
+
     def _refusal(self, ask: Ask, why: str) -> dict[str, Any]:
         return {
             "request_id": ask.id,

@@ -1,0 +1,412 @@
+{
+  "capabilities": {
+    "actuation": {
+      "methods": [
+        "actuation.input.click",
+        "actuation.input.key",
+        "actuation.input.type",
+        "actuation.screen.capture",
+        "actuation.session.begin",
+        "actuation.session.end",
+        "window.focus",
+        "window.list"
+      ],
+      "side": "core"
+    },
+    "apps": {
+      "methods": [
+        "apps.index",
+        "apps.launch"
+      ],
+      "side": "shell"
+    },
+    "audio.input": {
+      "methods": [],
+      "side": "shell"
+    },
+    "audio.output": {
+      "methods": [],
+      "side": "shell"
+    },
+    "llm": {
+      "methods": [],
+      "side": "core"
+    },
+    "permissions": {
+      "methods": [
+        "permission.request"
+      ],
+      "side": "shell"
+    },
+    "plugins": {
+      "methods": [
+        "plugins.action",
+        "plugins.list",
+        "plugins.page",
+        "plugins.set_enabled"
+      ],
+      "side": "core"
+    },
+    "reminders": {
+      "methods": [
+        "reminders.cancel",
+        "reminders.list"
+      ],
+      "side": "core"
+    },
+    "stt": {
+      "methods": [
+        "speech.listen_once",
+        "speech.set_always_listen"
+      ],
+      "side": "core"
+    },
+    "tasks": {
+      "methods": [
+        "task.cancel"
+      ],
+      "side": "core"
+    },
+    "tts": {
+      "methods": [
+        "speech.say"
+      ],
+      "side": "core"
+    },
+    "window.actions": {
+      "methods": [],
+      "side": "shell"
+    }
+  },
+  "errors": {
+    "app.launch_failed": {
+      "category": "system",
+      "retryable": true
+    },
+    "app.not_found": {
+      "category": "user",
+      "retryable": false
+    },
+    "calc.zero_division": {
+      "category": "user",
+      "retryable": false
+    },
+    "confirmation.expired": {
+      "category": "user",
+      "retryable": false
+    },
+    "confirmation.invalid": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "confirmation.required": {
+      "category": "user",
+      "retryable": false
+    },
+    "internal": {
+      "category": "system",
+      "retryable": true
+    },
+    "llm.unavailable": {
+      "category": "system",
+      "retryable": true
+    },
+    "permission.denied": {
+      "category": "user",
+      "retryable": false
+    },
+    "permission.required": {
+      "category": "user",
+      "retryable": false
+    },
+    "protocol.frame_too_large": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "protocol.incompatible": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "protocol.invalid_envelope": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "protocol.invalid_payload": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "protocol.invalid_state": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "protocol.not_ready": {
+      "category": "protocol",
+      "retryable": true
+    },
+    "protocol.unknown_method": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "stt.failed": {
+      "category": "system",
+      "retryable": true
+    },
+    "stt.unavailable": {
+      "category": "system",
+      "retryable": false
+    },
+    "task.cancelled": {
+      "category": "user",
+      "retryable": false
+    },
+    "tool.invalid_arguments": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "tool.unknown": {
+      "category": "protocol",
+      "retryable": false
+    },
+    "tts.unavailable": {
+      "category": "system",
+      "retryable": false
+    }
+  },
+  "events": {
+    "apps.not_found": {
+      "query": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "assistant.error": {
+      "text": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "assistant.response": {
+      "text": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "assistant.thinking": {
+      "active": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "boolean"
+      }
+    },
+    "history.changed": {},
+    "listening.always": {
+      "enabled": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "boolean"
+      }
+    },
+    "listening.capturing": {
+      "active": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "boolean"
+      }
+    },
+    "listening.started": {},
+    "listening.stopped": {},
+    "reminder.fired": {
+      "item": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "object"
+      }
+    },
+    "speech.recognized": {
+      "text": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "stream.chunk": {
+      "text": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "stream.end": {
+      "reason": {
+        "choices": [
+          "cancelled",
+          "done",
+          "failed"
+        ],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "task.cancelled": {
+      "task_id": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "task.done": {
+      "result": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "any"
+      },
+      "task_id": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "task.failed": {
+      "error": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "object"
+      },
+      "task_id": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "task.partial": {
+      "result": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "any"
+      },
+      "task_id": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "task.progress": {
+      "fraction": {
+        "choices": [],
+        "high": 1.0,
+        "low": 0.0,
+        "required": false,
+        "type": "number"
+      },
+      "note": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      },
+      "task_id": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
+    "window.action": {
+      "action": {
+        "choices": [
+          "minimize",
+          "quit",
+          "screenshot",
+          "show"
+        ],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    }
+  },
+  "methods": {
+    "actuation.input.click": "actuation",
+    "actuation.input.key": "actuation",
+    "actuation.input.type": "actuation",
+    "actuation.screen.capture": "actuation",
+    "actuation.session.begin": "actuation",
+    "actuation.session.end": "actuation",
+    "apps.index": "apps",
+    "apps.launch": "apps",
+    "command.handle": null,
+    "command.run_by_id": null,
+    "core.shutdown": null,
+    "permission.request": "permissions",
+    "ping": null,
+    "plugins.action": "plugins",
+    "plugins.list": "plugins",
+    "plugins.page": "plugins",
+    "plugins.set_enabled": "plugins",
+    "pong": null,
+    "reminders.cancel": "reminders",
+    "reminders.list": "reminders",
+    "settings.describe": null,
+    "settings.get": null,
+    "settings.set": null,
+    "speech.listen_once": "stt",
+    "speech.say": "tts",
+    "speech.set_always_listen": "stt",
+    "stream.close": null,
+    "stream.credit": null,
+    "stream.open": null,
+    "task.cancel": "tasks",
+    "window.focus": "actuation",
+    "window.list": "actuation"
+  },
+  "protocol_version": 1,
+  "scopes": [
+    "once",
+    "until"
+  ],
+  "stream_kinds": {
+    "audio.input": "audio.input",
+    "audio.output": "audio.output",
+    "screen.frame": "actuation"
+  }
+}

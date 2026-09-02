@@ -29,6 +29,7 @@ ADR 0002: спецификация не зависит от транспорта
     tasks       жизненный цикл долгой задачи и отмена (4.0-D09, D10, §9)
     data        канал данных и обратное давление (4.0-D07, D08, §2, §8)
     permissions канал разрешений поверх контура C05 (4.0-D12, §11)
+    liveness    живость, обрыв, переподключение (4.0-D14, §13)
 """
 
 from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
@@ -37,6 +38,8 @@ from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
 from core.wire.data import (Credit, DATA_FRAME_LIMIT, DataFrame,
                             DataFrameDecoder, DataReceiver, DataSender, KINDS,
                             capability_for_kind, encode_data_frame)
+from core.wire.liveness import (MISSED_LIMIT, SILENCE, Liveness,
+                                VolatileState)
 from core.wire.permissions import Ask, PermissionChannel
 from core.wire.errors import (CATALOGUE, CATEGORIES, ErrorSpec, ProtocolError,
                               ProtocolFault, ERROR_FRAME_TOO_LARGE,
@@ -66,6 +69,7 @@ __all__ = [
     "DataReceiver", "DataSender", "KINDS", "capability_for_kind",
     "encode_data_frame",
     "Ask", "PermissionChannel",
+    "MISSED_LIMIT", "SILENCE", "Liveness", "VolatileState",
     "ALL_EVENTS", "EVENTS", "Router", "STREAM_CANCELLED", "STREAM_DONE",
     "STREAM_FAILED", "StreamReceiver", "StreamSender", "event",
     "validate_event",
