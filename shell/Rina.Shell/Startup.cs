@@ -80,6 +80,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-confirm"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckConfirmAsync();
+            return;
+        }
+
         if (args.Contains("--check-platform"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -727,6 +734,74 @@ public partial class App
 
         window.Toast.Close();
         window.Plaque.Close();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// F11: у вопроса есть срок, но не у всякого.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Поймано человеком, а не проверкой: «Сбросить настройки» открывало
+    /// окно, которое пропадало раньше, чем его успевали прочесть.
+    /// Переданный ноль означал «без срока», а конструктор превращал его в
+    /// одну секунду.
+    /// </para>
+    /// <para>
+    /// Снимок такое не ловит — на снимке окно правильное. Ловится только
+    /// временем: подождать и посмотреть, здесь ли оно ещё.
+    /// </para>
+    /// </remarks>
+    private async Task CheckConfirmAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F11: срок у вопроса ===");
+
+        // Вопрос, который человек открыл сам: срока нет.
+        var mine = new Pages.ConfirmWindow("Настройки вернутся к умолчанию.",
+                                           "Команды останутся.", 0);
+        mine.Left = -4000;
+        mine.Top = -4000;
+        mine.Show();
+        Check("вопрос по нажатию — без срока", !mine.Timed);
+        Check("счётчик спрятан",
+              mine.Countdown.Visibility != Visibility.Visible);
+
+        await Task.Delay(2500);
+        Check("и через две с половиной секунды окно на месте",
+              mine.IsVisible, "| ноль значит «ждать», а не «одна секунда»");
+        Check("невыбранный ответ — отказ, а не «истёк»",
+              mine.Result == Pages.Consent.Refused, $"| {mine.Result}");
+        mine.Close();
+
+        // Вопрос от ядра: срок есть, и по нему окно закрывается само.
+        var theirs = new Pages.ConfirmWindow("Компьютер будет выключен.",
+                                             "Сказано голосом", 2);
+        theirs.Left = -4000;
+        theirs.Top = -4000;
+        theirs.Show();
+        Check("вопрос от ядра — со сроком", theirs.Timed);
+        Check("счётчик показан",
+              theirs.Countdown.Visibility == Visibility.Visible);
+
+        await Task.Delay(3200);
+        Check("по сроку окно закрылось само", !theirs.IsVisible);
+        Check("молчание засчитано отказом",
+              theirs.Result == Pages.Consent.Expired, $"| {theirs.Result}");
+
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

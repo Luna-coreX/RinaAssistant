@@ -49,16 +49,50 @@ public partial class ConfirmWindow : Window
     /// <summary>Решение человека. До ответа — отказ.</summary>
     public Consent Result { get; private set; } = Consent.Expired;
 
+    /// <summary>Есть ли у вопроса срок. Без срока окно ждёт сколько угодно.</summary>
+    public bool Timed { get; }
+
+    /// <param name="ttlSeconds">
+    /// Сколько секунд ждать ответа. <b>Ноль или меньше — ждать без срока.</b>
+    /// </param>
+    /// <remarks>
+    /// <para>
+    /// Срок нужен не всякому вопросу. Он существует для того, что затеяно
+    /// <b>голосом</b>: человек сказал «выключи компьютер», отошёл, и окно
+    /// не должно висеть до утра — молчание тогда значит «нет».
+    /// </para>
+    /// <para>
+    /// Вопрос, который человек открыл сам нажатием, — другое дело: он
+    /// сидит перед экраном и уже смотрит на окно. Срок здесь означал бы,
+    /// что окно исчезнет, пока он читает, — и это ровно то, что случилось
+    /// со «Сбросить настройки»: `Math.Max(ttl, 1)` превращал переданный
+    /// ноль в одну секунду, и окно пропадало раньше, чем его успевали
+    /// прочесть.
+    /// </para>
+    /// </remarks>
     public ConfirmWindow(string preview, string reason, int ttlSeconds)
     {
         InitializeComponent();
         Preview.Text = preview;
         Reason.Text = reason;
 
-        _deadline = DateTimeOffset.UtcNow.AddSeconds(Math.Max(ttlSeconds, 1));
-        _timer.Tick += OnTick;
-        _timer.Start();
-        Tick();
+        Timed = ttlSeconds > 0;
+        if (Timed)
+        {
+            _deadline = DateTimeOffset.UtcNow.AddSeconds(ttlSeconds);
+            _timer.Tick += OnTick;
+            _timer.Start();
+            Tick();
+        }
+        else
+        {
+            // Показания нет — и место под него не занимаем: пустая ячейка
+            // на месте счётчика читалась бы как «сейчас что-то появится».
+            Countdown.Visibility = Visibility.Collapsed;
+            // Без срока «не ответили» невозможно, поэтому и отказ по
+            // умолчанию другой: закрыли окно — отказались.
+            Result = Consent.Refused;
+        }
 
         // Опасное не подтверждают по инерции: фокус на отказе, а не на
         // действии. Пробел и Enter тогда отказывают, и случайное нажатие
