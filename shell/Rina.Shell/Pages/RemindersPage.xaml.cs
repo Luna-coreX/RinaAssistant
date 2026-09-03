@@ -33,8 +33,8 @@ public partial class RemindersPage : UserControl
 
         if (_link is null)
         {
-            Empty.Text = S("Ядро не на связи — список недоступен.");
-            Empty.Visibility = Visibility.Visible;
+            Show(EmptyState.For(S("Ядро не на связи"),
+                            S("Список напоминаний живёт в ядре, а связи с ним сейчас нет.")));
             return;
         }
 
@@ -72,8 +72,28 @@ public partial class RemindersPage : UserControl
         }
 
         Legend.Text = S("ЗАПЛАНИРОВАНО · {0}", _items.Count);
-        Empty.Visibility = _items.Count == 0 ? Visibility.Visible
-                                             : Visibility.Collapsed;
+        if (_items.Count == 0)
+            Show(EmptyState.For(
+                S("Пока ни одного напоминания"),
+                S("Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом."),
+                S("«напомни через 15 минут выключить духовку»")));
+        else Show(null);
+    }
+
+    /// <summary>
+    /// Показать пустое состояние вместо списка или убрать его.
+    /// </summary>
+    /// <remarks>
+    /// Они делят одно место, а не соседствуют: список и объяснение, почему
+    /// список пуст, одновременно не бывают верны.
+    /// </remarks>
+    private void Show(FrameworkElement? nothing)
+    {
+        Empty.Content = nothing;
+        Empty.Visibility = nothing is null ? Visibility.Collapsed
+                                           : Visibility.Visible;
+        List.Visibility = nothing is null ? Visibility.Visible
+                                          : Visibility.Collapsed;
     }
 
     /// <summary>Готовые отсрочки: минуты от «сейчас».</summary>

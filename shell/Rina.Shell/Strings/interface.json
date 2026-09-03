@@ -38,6 +38,12 @@
   "«{0}»: не понял значение.": {
     "English": "“{0}”: didn’t understand the value."
   },
+  "«который час» · «запусти браузер» · «посчитай 15 * 12»": {
+    "English": "“what time is it” · “open the browser” · “calculate 15 * 12”"
+  },
+  "«напомни через 15 минут выключить духовку»": {
+    "English": "“remind me in 15 minutes to turn off the oven”"
+  },
   "Адрес модели": {
     "English": "Model address"
   },
@@ -106,6 +112,9 @@
   },
   "Выученные соответствия": {
     "English": "Learned matches"
+  },
+  "ГДЕ ЧТО ЛЕЖИТ": {
+    "English": "WHERE THINGS ARE"
   },
   "Где искать, когда Рина не поняла команду": {
     "English": "Where to search when Rina didn’t understand"
@@ -185,6 +194,9 @@
   "Жду": {
     "English": "Waiting"
   },
+  "Журналы": {
+    "English": "Logs"
+  },
   "ЗАПЛАНИРОВАНО": {
     "English": "SCHEDULED"
   },
@@ -238,6 +250,9 @@
     "Українська": "Звукові ефекти",
     "Español": "Efectos de sonido",
     "Deutsch": "Soundeffekte"
+  },
+  "Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом.": {
+    "English": "Everything you ask to be reminded of lands here — from the field above or by voice."
   },
   "ИЗ ЧЕГО СОБРАНА": {
     "English": "WHAT IT'S MADE OF"
@@ -295,6 +310,9 @@
   },
   "Команды Рины (*.json)|*.json": {
     "English": "Rina commands (*.json)|*.json"
+  },
+  "Команды живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Commands live in the core, and there’s no connection to it."
   },
   "Комбинации действий": {
     "English": "Action shortcuts"
@@ -380,6 +398,9 @@
     "Español": "Ajustes",
     "Deutsch": "Einstellungen"
   },
+  "Настройки, история, команды": {
+    "English": "Settings, history, commands"
+  },
   "Начинать свёрнутой": {
     "English": "Start minimised"
   },
@@ -400,12 +421,6 @@
   },
   "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
     "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
-  },
-  "Ничего не запланировано.": {
-    "English": "Nothing is scheduled.",
-    "Українська": "Нічого не заплановано.",
-    "Español": "No hay nada programado.",
-    "Deutsch": "Es ist nichts geplant."
   },
   "Новая команда": {
     "English": "New command",
@@ -503,14 +518,20 @@
     "Español": "Barra de comandos flotante",
     "Deutsch": "Schwebende Befehlszeile"
   },
-  "Плагинов пока нет.": {
-    "English": "No plugins yet."
+  "Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой.": {
+    "English": "A plugin gives Rina a new skill: a command, a section, or both. Put the plugin folder next to the program."
+  },
+  "Плагинов пока нет": {
+    "English": "No plugins yet"
   },
   "Плагины": {
     "English": "Plugins",
     "Українська": "Плагіни",
     "Español": "Complementos",
     "Deutsch": "Plug-ins"
+  },
+  "Плагины живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Plugins live in the core, and there’s no connection to it."
   },
   "Поведение": {
     "English": "Behavior",
@@ -535,6 +556,9 @@
   },
   "Поисковая система": {
     "English": "Search engine"
+  },
+  "Пока ни одного напоминания": {
+    "English": "No reminders yet"
   },
   "Пока ни одного шага. Добавьте первый — он выполнится первым.": {
     "English": "No steps yet. Add the first one — it runs first."
@@ -596,8 +620,14 @@
   "Развернуть": {
     "English": "Maximise"
   },
+  "Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново.": {
+    "English": "The core runs the conversation, and there’s no connection. The shell is trying to start it again."
+  },
   "Разговор выгружен: {0}": {
     "English": "Conversation exported: {0}"
+  },
+  "Разговор пуст": {
+    "English": "The conversation is empty"
   },
   "Раздел появится в 4.0-F04.": {
     "English": "This section arrives in 4.0-F04."
@@ -632,8 +662,8 @@
   "Свернуть": {
     "English": "Minimise"
   },
-  "Своих команд пока нет.": {
-    "English": "No commands of your own yet."
+  "Своих команд пока нет": {
+    "English": "No commands of your own yet"
   },
   "Сворачивать в трей": {
     "English": "Minimize to tray",
@@ -641,11 +671,17 @@
     "Español": "Minimizar a la bandeja",
     "Deutsch": "In den Infobereich minimieren"
   },
+  "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
+    "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
+  },
   "Серебро или чёрное": {
     "English": "Silver or black"
   },
   "Система синтеза": {
     "English": "Synthesis engine"
+  },
+  "Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск.": {
+    "English": "Say it out loud or type below. Everything said lands here and survives a restart."
   },
   "Скажите или напишите: «запусти браузер»": {
     "English": "Say or type: “open the browser”"
@@ -703,6 +739,9 @@
   },
   "Сочетания, назначенные отдельным действиям": {
     "English": "Combinations assigned to individual actions"
+  },
+  "Список напоминаний живёт в ядре, а связи с ним сейчас нет.": {
+    "English": "The reminder list lives in the core, and there’s no connection to it."
   },
   "Таймер": {
     "English": "Timer",
@@ -809,20 +848,11 @@
   "Ядро": {
     "English": "Core"
   },
-  "Ядро не на связи — команды недоступны.": {
-    "English": "The core is offline — commands are unavailable."
+  "Ядро не на связи": {
+    "English": "Core not connected"
   },
   "Ядро не на связи — настройки недоступны.": {
     "English": "The core is offline — settings are unavailable."
-  },
-  "Ядро не на связи — плагины недоступны.": {
-    "English": "The core is offline — plugins are unavailable."
-  },
-  "Ядро не на связи — разговор недоступен.": {
-    "English": "The core is offline — the conversation is unavailable."
-  },
-  "Ядро не на связи — список недоступен.": {
-    "English": "The core is offline — the list is unavailable."
   },
   "Ядро не объявило возможность «плагины».": {
     "English": "The core didn’t declare the “plugins” capability."

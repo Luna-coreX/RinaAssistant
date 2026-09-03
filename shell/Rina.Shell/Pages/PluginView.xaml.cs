@@ -284,7 +284,7 @@ public partial class PluginView : UserControl
                 {
                     Background = (System.Windows.Media.Brush)FindResource(
                         tone is "danger" or "warn" ? "C.Signal" : "C.FaceHigh"),
-                    CornerRadius = new CornerRadius(10),
+                    CornerRadius = new CornerRadius(3),   // предел системы
                     Padding = new Thickness(10, 3, 10, 3),
                     HorizontalAlignment = HorizontalAlignment.Left,
                     Margin = new Thickness(0, 2, 0, 2),

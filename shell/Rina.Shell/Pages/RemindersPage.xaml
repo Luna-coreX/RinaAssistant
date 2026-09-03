@@ -45,17 +45,20 @@
 
       <TextBlock x:Name="Legend" Text="{loc:S 'ЗАПЛАНИРОВАНО'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-      <TextBlock x:Name="Empty" Text="{loc:S 'Ничего не запланировано.'}"
-                 Style="{StaticResource Text.Body}"
-                 Foreground="{DynamicResource C.InkSoft}"
-                 Visibility="Collapsed" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <!-- Пустое состояние занимает весь остаток и центрируется в нём:
+         прижатое к верху читается как обрезанная страница, а не как
+         состояние прибора. -->
+    <ContentControl x:Name="Empty" Grid.Row="2" Visibility="Collapsed" />
+
+    <ScrollViewer x:Name="List" Grid.Row="2"
+                  VerticalScrollBarVisibility="Auto">
+      <Border Style="{StaticResource Rows}">
       <ItemsControl x:Name="Items">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Style="{StaticResource Card}" Margin="0,0,0,6">
+            <Border Style="{StaticResource Rows.Item}">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
@@ -80,6 +83,7 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </Border>
     </ScrollViewer>
   </Grid>
 </UserControl>

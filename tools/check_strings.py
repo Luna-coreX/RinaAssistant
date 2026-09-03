@@ -52,6 +52,8 @@ RUS = re.compile(r"[А-Яа-яЁё]")
 #: `S(...)` переводит здесь, `Word(...)` помечает строку для перевода
 #: в другом месте — обе формы одинаково законны и обе дают ключ.
 CALL = re.compile(r'\b(?:S|Word)\(\s*@?"([^"]*)"')
+#: `S("часть" + "часть")` — фраза, собранная из двух переводов.
+GLUE = re.compile(r'(?:S|Word)\(\s*@?"[^"]*"\s*\+')
 XAML_CALL = re.compile(r"\{loc:S '([^']*)'\}")
 CS_LITERAL = re.compile(r'"([^"\n]*[А-Яа-яЁё][^"\n]*)"')
 XAML_ATTR = re.compile(r'\b(?:Text|Content|ToolTip|Title)="([^"{}]*[А-Яа-яЁё][^"{}]*)"')
@@ -117,6 +119,20 @@ def main() -> int:
             for body in CS_LITERAL.findall(line):
                 if body not in table:
                     loose.append((f"{short}:{number}", body))
+
+    # Склеенная строка переводится по кускам: в таблице оказываются
+    # обрывки, а человек видит фразу, собранную из двух переводов. Ловим
+    # это прямо, а не по следам в таблице.
+    glued = []
+    for path, kind in sources():
+        if kind == 'xaml':
+            continue
+        text = io.open(path, encoding='utf-8').read()
+        short = os.path.relpath(path, ROOT)
+        for found in GLUE.finditer(text):
+            line = text[:found.start()].count(chr(10)) + 1
+            glued.append(f'{short}:{line}')
+    check('строка интерфейса не склеена из кусков', not glued, f'| {glued}')
 
     print(f"строк в таблице: {len(table)}, использовано в коде: {len(used)}")
 

@@ -42,6 +42,7 @@ public partial class AboutPage : UserControl
 
         Version.Text = ShellVersion;
         BuildLinks();
+        BuildPlaces();
         Loaded += async (_, _) => await ShowPartsAsync();
     }
 
@@ -85,7 +86,8 @@ public partial class AboutPage : UserControl
 
     private void Add(string what, string version, string why)
     {
-        var row = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        var line = new Border { Style = (Style)FindResource("Rows.Item") };
+        var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(160),
@@ -119,7 +121,106 @@ public partial class AboutPage : UserControl
         Grid.SetColumn(shown, 1);
         row.Children.Add(shown);
 
-        Parts.Children.Add(row);
+        line.Child = row;
+        Parts.Children.Add(line);
+
+        if (Parts.Children[^1] is Border last)
+        {
+            foreach (var one in Parts.Children.OfType<Border>())
+                one.BorderThickness = new Thickness(0, 0, 0, 1);
+            last.BorderThickness = new Thickness(0);
+        }
+    }
+
+    /// <summary>
+    /// Где лежат данные, журналы и плагины.
+    /// </summary>
+    /// <remarks>
+    /// Это первое, что спрашивают при разборе неполадки, и последнее, что
+    /// человек может найти сам: каталог приложения спрятан в `AppData`, и
+    /// путь к нему нельзя ни угадать, ни продиктовать по телефону.
+    ///
+    /// Папка открывается проводником — тем же способом, каким её открыл бы
+    /// человек, если бы знал дорогу.
+    /// </remarks>
+    private void BuildPlaces()
+    {
+        var data = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RinaAssistant");
+
+        foreach (var (what, path) in new[]
+        {
+            (S("Настройки, история, команды"), data),
+            (S("Журналы"), System.IO.Path.Combine(data, "logs")),
+            (S("Плагины"), System.IO.Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "..", "plugins")),
+        })
+        {
+            var row = new Border
+            {
+                Style = (Style)FindResource("Rows.Item"),
+            };
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(1, GridUnitType.Star),
+            });
+            grid.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+            });
+
+            var about = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            about.Children.Add(new TextBlock
+            {
+                Text = what,
+                Style = (Style)FindResource("Text.Body"),
+            });
+            about.Children.Add(new TextBlock
+            {
+                Text = Short(path),
+                Style = (Style)FindResource("Text.Meta"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = path,
+            });
+            Grid.SetColumn(about, 0);
+            grid.Children.Add(about);
+
+            var open = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = S("Открыть"),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var target = path;
+            open.Click += (_, _) => Open(target);
+            Grid.SetColumn(open, 1);
+            grid.Children.Add(open);
+
+            row.Child = grid;
+            Places.Children.Add(row);
+        }
+
+        if (Places.Children[^1] is Border tail)
+            tail.BorderThickness = new Thickness(0);
+    }
+
+    /// <summary>Путь покороче: домашний каталог заменяется на «~».</summary>
+    private static string Short(string path)
+    {
+        try
+        {
+            var full = System.IO.Path.GetFullPath(path);
+            var home = Environment.GetFolderPath(
+                Environment.SpecialFolder.UserProfile);
+            return home.Length > 0 && full.StartsWith(home)
+                ? "~" + full[home.Length..] : full;
+        }
+        catch
+        {
+            return path;
+        }
     }
 
     private void BuildLinks()

@@ -35,7 +35,9 @@ public partial class CommandsPage : UserControl
 
         if (_link is null)
         {
-            Empty.Text = S("Ядро не на связи — команды недоступны.");
+            Empty.Content = EmptyState.For(
+                S("Ядро не на связи"),
+                S("Команды живут в ядре, а связи с ним сейчас нет."));
             Empty.Visibility = Visibility.Visible;
             return;
         }
@@ -72,6 +74,13 @@ public partial class CommandsPage : UserControl
         }
 
         Legend.Text = S("МОИ КОМАНДЫ · {0}", _items.Count);
+        // Здесь пустое состояние не занимает страницу: ниже перечень того,
+        // что Рина умеет и без своих команд, и он куда полезнее пустоты.
+        Empty.Content = _items.Count == 0
+            ? EmptyState.For(
+                S("Своих команд пока нет"),
+                S("Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд."))
+            : null;
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
     }
@@ -199,8 +208,7 @@ public partial class CommandsPage : UserControl
         {
             var card = new Border
             {
-                Style = (Style)FindResource("Card"),
-                Margin = new Thickness(0, 0, 0, 6),
+                Style = (Style)FindResource("Rows.Item"),
             };
             var about = new StackPanel();
             about.Children.Add(new TextBlock
@@ -218,6 +226,12 @@ public partial class CommandsPage : UserControl
             card.Child = about;
             Builtin.Children.Add(card);
         }
+
+        // Последняя строка без шва: он совпал бы с краем блока и
+        // перечеркнул бы скругление.
+        if (Builtin.Children.Count > 0
+            && Builtin.Children[^1] is Border tail)
+            tail.BorderThickness = new Thickness(0);
 
         BuiltinCount = Builtin.Children.Count;
     }

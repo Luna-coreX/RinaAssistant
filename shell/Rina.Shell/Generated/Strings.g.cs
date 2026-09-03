@@ -79,6 +79,16 @@ public static partial class Loc
                 {
                     ["English"] = "“{0}”: didn’t understand the value.",
                 },
+            ["«который час» · «запусти браузер» · «посчитай 15 * 12»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“what time is it” · “open the browser” · “calculate 15 * 12”",
+                },
+            ["«напомни через 15 минут выключить духовку»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“remind me in 15 minutes to turn off the oven”",
+                },
             ["Адрес модели"] =
                 new Dictionary<string, string>
                 {
@@ -216,6 +226,11 @@ public static partial class Loc
                 {
                     ["English"] = "Where the model lives",
                 },
+            ["ГДЕ ЧТО ЛЕЖИТ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WHERE THINGS ARE",
+                },
             ["Говорю…"] =
                 new Dictionary<string, string>
                 {
@@ -324,6 +339,11 @@ public static partial class Loc
                 {
                     ["English"] = "Waiting",
                 },
+            ["Журналы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Logs",
+                },
             ["Забыть"] =
                 new Dictionary<string, string>
                 {
@@ -415,6 +435,11 @@ public static partial class Loc
                     ["English"] = "Sound effects",
                     ["Español"] = "Efectos de sonido",
                     ["Українська"] = "Звукові ефекти",
+                },
+            ["Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Everything you ask to be reminded of lands here — from the field above or by voice.",
                 },
             ["ИЗ ЧЕГО СОБРАНА"] =
                 new Dictionary<string, string>
@@ -511,6 +536,11 @@ public static partial class Loc
                     ["English"] = "Commands",
                     ["Español"] = "Comandos",
                     ["Українська"] = "Команди",
+                },
+            ["Команды живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Commands live in the core, and there’s no connection to it.",
                 },
             ["Команды Рины (*.json)|*.json"] =
                 new Dictionary<string, string>
@@ -679,6 +709,11 @@ public static partial class Loc
                     ["Español"] = "Ajustes",
                     ["Українська"] = "Налаштування",
                 },
+            ["Настройки, история, команды"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings, history, commands",
+                },
             ["Начинать свёрнутой"] =
                 new Dictionary<string, string>
                 {
@@ -728,14 +763,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Nobody has confirmed who released it or that it wasn’t tampered with.",
-                },
-            ["Ничего не запланировано."] =
-                new Dictionary<string, string>
-                {
-                    ["Deutsch"] = "Es ist nichts geplant.",
-                    ["English"] = "Nothing is scheduled.",
-                    ["Español"] = "No hay nada programado.",
-                    ["Українська"] = "Нічого не заплановано.",
                 },
             ["НОВАЯ КОМАНДА"] =
                 new Dictionary<string, string>
@@ -923,15 +950,20 @@ public static partial class Loc
                     ["Español"] = "Barra de comandos flotante",
                     ["Українська"] = "Плаваючий рядок команд",
                 },
+            ["Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A plugin gives Rina a new skill: a command, a section, or both. Put the plugin folder next to the program.",
+                },
             ["плагин не загрузился"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "the plugin didn’t load",
                 },
-            ["Плагинов пока нет."] =
+            ["Плагинов пока нет"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "No plugins yet.",
+                    ["English"] = "No plugins yet",
                 },
             ["Плагины"] =
                 new Dictionary<string, string>
@@ -940,6 +972,11 @@ public static partial class Loc
                     ["English"] = "Plugins",
                     ["Español"] = "Complementos",
                     ["Українська"] = "Плагіни",
+                },
+            ["Плагины живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugins live in the core, and there’s no connection to it.",
                 },
             ["Поведение"] =
                 new Dictionary<string, string>
@@ -976,6 +1013,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Search engine",
+                },
+            ["Пока ни одного напоминания"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No reminders yet",
                 },
             ["Пока ни одного шага. Добавьте первый — он выполнится первым."] =
                 new Dictionary<string, string>
@@ -1086,10 +1128,20 @@ public static partial class Loc
                 {
                     ["English"] = "Maximise",
                 },
+            ["Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core runs the conversation, and there’s no connection. The shell is trying to start it again.",
+                },
             ["Разговор выгружен: {0}"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Conversation exported: {0}",
+                },
+            ["Разговор пуст"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The conversation is empty",
                 },
             ["Раздел появится в 4.0-F04."] =
                 new Dictionary<string, string>
@@ -1139,10 +1191,10 @@ public static partial class Loc
                 {
                     ["English"] = "Minimise",
                 },
-            ["Своих команд пока нет."] =
+            ["Своих команд пока нет"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "No commands of your own yet.",
+                    ["English"] = "No commands of your own yet",
                 },
             ["Сворачивать в трей"] =
                 new Dictionary<string, string>
@@ -1151,6 +1203,11 @@ public static partial class Loc
                     ["English"] = "Minimize to tray",
                     ["Español"] = "Minimizar a la bandeja",
                     ["Українська"] = "Згортати в трей",
+                },
+            ["Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row.",
                 },
             ["связь потеряна, поднимаем"] =
                 new Dictionary<string, string>
@@ -1171,6 +1228,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Synthesis engine",
+                },
+            ["Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say it out loud or type below. Everything said lands here and survives a restart.",
                 },
             ["Скажите или напишите: «запусти браузер»"] =
                 new Dictionary<string, string>
@@ -1258,6 +1320,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Combinations assigned to individual actions",
+                },
+            ["Список напоминаний живёт в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The reminder list lives in the core, and there’s no connection to it.",
                 },
             ["ССЫЛКИ"] =
                 new Dictionary<string, string>
@@ -1492,30 +1559,15 @@ public static partial class Loc
                 {
                     ["English"] = "the core hasn’t been started",
                 },
-            ["Ядро не на связи — команды недоступны."] =
+            ["Ядро не на связи"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "The core is offline — commands are unavailable.",
+                    ["English"] = "Core not connected",
                 },
             ["Ядро не на связи — настройки недоступны."] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "The core is offline — settings are unavailable.",
-                },
-            ["Ядро не на связи — плагины недоступны."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The core is offline — plugins are unavailable.",
-                },
-            ["Ядро не на связи — разговор недоступен."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The core is offline — the conversation is unavailable.",
-                },
-            ["Ядро не на связи — список недоступен."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The core is offline — the list is unavailable.",
                 },
             ["Ядро не объявило возможность «плагины»."] =
                 new Dictionary<string, string>

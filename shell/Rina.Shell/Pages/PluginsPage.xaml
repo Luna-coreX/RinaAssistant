@@ -17,12 +17,12 @@
         <TextBlock x:Name="Legend" Text="{loc:S 'УСТАНОВЛЕННЫЕ'}"
                    Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
 
-        <TextBlock x:Name="Empty" Text="{loc:S 'Плагинов пока нет.'}"
-                   Style="{StaticResource Text.Body}"
-                   Foreground="{DynamicResource C.InkSoft}"
-                   Visibility="Collapsed" Margin="0,0,0,12" />
+        <ContentControl x:Name="Empty" Visibility="Collapsed"
+                        Margin="0,0,0,12" />
 
-        <StackPanel x:Name="Items" />
+        <Border Style="{StaticResource Rows}">
+          <StackPanel x:Name="Items" />
+        </Border>
 
         <!-- Страница плагина: то, что он сам о себе рассказал. -->
         <StackPanel x:Name="PageBox" Margin="0,24,0,0" Visibility="Collapsed">

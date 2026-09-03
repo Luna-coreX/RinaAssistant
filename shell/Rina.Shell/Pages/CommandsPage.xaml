@@ -16,11 +16,8 @@
     <StackPanel Grid.Row="1" Margin="0,0,0,12">
       <TextBlock x:Name="Legend" Text="{loc:S 'МОИ КОМАНДЫ'}"
                  Style="{StaticResource Text.Section}" />
-      <TextBlock x:Name="Empty" Margin="0,12,0,0"
-                 Text="{loc:S 'Своих команд пока нет.'}"
-                 Style="{StaticResource Text.Body}" TextWrapping="Wrap"
-                 Foreground="{DynamicResource C.InkSoft}"
-                 Visibility="Collapsed" />
+      <ContentControl x:Name="Empty" Margin="0,12,0,0"
+                      Visibility="Collapsed" />
     </StackPanel>
 
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
@@ -29,7 +26,7 @@
       <ItemsControl x:Name="Items">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Style="{StaticResource Card}" Margin="0,0,0,6">
+            <Border Style="{StaticResource Rows.Item}">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
@@ -68,7 +65,9 @@
       <StackPanel x:Name="BuiltinBox" Margin="0,24,0,0">
         <TextBlock x:Name="BuiltinLegend" Text="{loc:S 'УМЕЕТ СРАЗУ'}"
                    Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-        <StackPanel x:Name="Builtin" />
+        <Border Style="{StaticResource Rows}">
+          <StackPanel x:Name="Builtin" />
+        </Border>
       </StackPanel>
       </StackPanel>
     </ScrollViewer>

@@ -45,7 +45,13 @@ public partial class DialoguePage : UserControl
 
         if (_link is null)
         {
-            _turns.Add(new Turn("", S("Ядро не на связи — разговор недоступен.")));
+            // Не репликой: строка в ленте разговора читается как сказанное
+            // Риной, а это говорит окно о самом себе.
+            Empty.Content = EmptyState.For(
+                S("Ядро не на связи"),
+                S("Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."),
+                onGlass: true);
+            Empty.Visibility = Visibility.Visible;
             return;
         }
 
@@ -68,6 +74,7 @@ public partial class DialoguePage : UserControl
             var stamp = item?["ts"]?.GetValue<double>() ?? 0;
             _turns.Add(new Turn(kind == "assistant" ? S("Рина") : When(stamp), text));
         }
+        ShowEmpty();
         ScrollToEnd();
 
         var values = await Ask(Methods.SettingsGet, new JsonObject
@@ -103,7 +110,29 @@ public partial class DialoguePage : UserControl
     {
         if (said.Length == 0) return;
         _turns.Add(new Turn(who, said));
+        ShowEmpty();
         ScrollToEnd();
+    }
+
+    /// <summary>
+    /// Объяснить пустое стекло.
+    /// </summary>
+    /// <remarks>
+    /// Разговор, которого ещё не было, — не поломка и не «загружается».
+    /// Пустое стекло без объяснения читается именно так, особенно на первом
+    /// запуске, когда человек ещё не знает, что сюда можно писать.
+    /// </remarks>
+    private void ShowEmpty()
+    {
+        var nothing = _turns.Count == 0;
+        Empty.Content = nothing
+            ? EmptyState.For(
+                S("Разговор пуст"),
+                S("Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."),
+                S("«который час» · «запусти браузер» · «посчитай 15 * 12»"),
+                onGlass: true)
+            : null;
+        Empty.Visibility = nothing ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void ScrollToEnd() => Dispatcher.BeginInvoke(

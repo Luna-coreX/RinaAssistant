@@ -238,10 +238,7 @@ public static class AppIndex
             var process = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = "-NoProfile -NonInteractive -Command "
-                            + "\"Get-StartApps | Where-Object AppID -like "
-                            + "'*!*' | ForEach-Object { $_.Name + '|' + "
-                            + "$_.AppID }\"",
+                Arguments = "-NoProfile -NonInteractive -Command \"Get-StartApps | Where-Object AppID -like '*!*' | ForEach-Object { $_.Name + '|' + $_.AppID }\"",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,

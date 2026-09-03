@@ -216,12 +216,42 @@ public partial class SettingsPage : UserControl
         return stack;
     }
 
+    /// <summary>
+    /// Ширина колонки органов управления.
+    /// </summary>
+    /// <remarks>
+    /// Одна на всю страницу. Раньше колонка была «по содержимому», и
+    /// каждый ряд начинал орган там, где кончалась его подпись, — правый
+    /// край рвался, а панель читалась как список, а не как прибор.
+    /// </remarks>
+    private const double ControlColumn = 330;
+
+    /// <summary>Ширина колонки проверок. Пустая у большинства рядов.</summary>
+    private const double ProbeColumn = 150;
+
     private UIElement BuildRow(string key)
     {
         var spec = _schema[key];
-        var row = new Grid { MinHeight = 40, Margin = new Thickness(0, 0, 0, 6) };
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var row = new Grid { MinHeight = 40 };
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        // Колонка органов управления одной ширины на всю страницу: иначе
+        // каждый ряд начинается там, где кончился его собственный, и
+        // правый край рвётся. У лицевой панели органы стоят в столбец.
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(ControlColumn),
+        });
+        // Третья колонка — для проверки, и она **тоже одной ширины на все
+        // ряды**. С «по содержимому» ряд с кнопкой отбирал место у своей
+        // подписи, и его орган уезжал левее соседних: колонки принадлежат
+        // панели, а не ряду.
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(ProbeColumn),
+        });
 
         var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         label.Children.Add(new TextBlock
@@ -249,12 +279,17 @@ public partial class SettingsPage : UserControl
         Grid.SetColumn(label, 0);
         row.Children.Add(label);
 
-        var made = BuildEditor(key, spec);
-        // Проверка встраивается **вокруг** редактора, а не вместо него:
-        // построить редактор дважды значило бы завести два поля, из
-        // которых сохраняет одно.
-        var editor = BuildProbe(key, made) ?? made;
+        var editor = BuildEditor(key, spec);
         _editors[key] = editor;
+
+        // Проверка стоит рядом, но в своей колонке.
+        if (BuildProbe(key) is { } probe)
+        {
+            Grid.SetColumn(probe, 2);
+            probe.VerticalAlignment = VerticalAlignment.Center;
+            probe.Margin = new Thickness(8, 0, 0, 0);
+            row.Children.Add(probe);
+        }
 
         // Редактор-список встаёт под подписью во всю ширину. Рядом ему
         // тесно: подпись сжимается в столбик из букв, а сам он всё равно
@@ -274,11 +309,25 @@ public partial class SettingsPage : UserControl
         else
         {
             Grid.SetColumn(editor, 1);
+            // Влево внутри своей колонки, а не вправо по краю окна: общий
+            // левый край и делает из органов столбец.
+            editor.HorizontalAlignment = HorizontalAlignment.Left;
+            editor.VerticalAlignment = VerticalAlignment.Center;
         }
         row.Children.Add(editor);
 
         ApplyDependency(key, spec, row);
-        return row;
+
+        // Волосяной шов между настройками — то же средство, что и в
+        // списках: области панели отделяются значением и швом, а не
+        // пустотой между плитками.
+        return new Border
+        {
+            BorderBrush = (System.Windows.Media.Brush)FindResource("C.Seam"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(0, 8, 0, 10),
+            Child = row,
+        };
     }
 
     /// <summary>
@@ -296,16 +345,9 @@ public partial class SettingsPage : UserControl
     /// у неё. Та же граница, что и везде (ADR 0009).
     /// </para>
     /// </remarks>
-    private FrameworkElement? BuildProbe(string key, FrameworkElement editor)
+    private FrameworkElement? BuildProbe(string key)
     {
         if (key is not ("voice" or "input_device")) return null;
-
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        row.Children.Add(editor);
 
         var probe = new Button
         {
@@ -325,8 +367,7 @@ public partial class SettingsPage : UserControl
             }
             finally { probe.IsEnabled = true; }
         };
-        row.Children.Add(probe);
-        return row;
+        return probe;
     }
 
     /// <summary>Сказать пробную фразу и услышать её.</summary>
@@ -707,7 +748,6 @@ public partial class SettingsPage : UserControl
             var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
             };
             row.Children.Add(new TextBlock
             {
@@ -745,7 +785,6 @@ public partial class SettingsPage : UserControl
         var adding = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 4, 0, 0),
         };
 
@@ -911,7 +950,6 @@ public partial class SettingsPage : UserControl
         var row = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            HorizontalAlignment = HorizontalAlignment.Right,
             Margin = new Thickness(0, 4, 0, 0),
         };
         row.Children.Add(new TextBlock

@@ -55,7 +55,10 @@ public partial class PluginsPage : UserControl
 
         if (_link is null)
         {
-            Note.Text = S("Ядро не на связи — плагины недоступны.");
+            Empty.Content = EmptyState.For(
+                S("Ядро не на связи"),
+                S("Плагины живут в ядре, а связи с ним сейчас нет."));
+            Empty.Visibility = Visibility.Visible;
             return;
         }
         Loaded += async (_, _) => await LoadAsync();
@@ -186,6 +189,17 @@ public partial class PluginsPage : UserControl
             Items.Children.Add(BuildRow(item));
         }
 
+        // Последняя строка без шва: он совпал бы с краем блока и
+        // перечеркнул бы скругление.
+        if (Items.Children.Count > 0
+            && Items.Children[^1] is Border tail)
+            tail.BorderThickness = new Thickness(0);
+
+        Empty.Content = items.Count == 0
+            ? EmptyState.For(
+                S("Плагинов пока нет"),
+                S("Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой."))
+            : null;
         Empty.Visibility = items.Count == 0 ? Visibility.Visible
                                             : Visibility.Collapsed;
         Legend.Text = items.Count == 0 ? S("УСТАНОВЛЕННЫЕ")
@@ -202,8 +216,7 @@ public partial class PluginsPage : UserControl
 
         var card = new Border
         {
-            Style = (Style)FindResource("Card"),
-            Margin = new Thickness(0, 0, 0, 6),
+            Style = (Style)FindResource("Rows.Item"),
         };
         var row = new Grid();
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });

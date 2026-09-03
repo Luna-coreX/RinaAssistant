@@ -405,12 +405,18 @@
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
           <StackPanel Orientation="Horizontal">
-            <Border x:Name="Track" Width="40" Height="22" CornerRadius="11"
+            <!-- Тумблер, а не пилюля. Радиус 11 делал из него кнопку
+                 телефона; у приборов углы тугие, и предел радиуса — 3
+                 (DIRECTION §2). Заодно так он честнее: это переключатель
+                 на панели, а не мягкий значок в списке. -->
+            <Border x:Name="Track" Width="40" Height="22"
+                    CornerRadius="{StaticResource Radius.Max}"
                     Background="{DynamicResource C.FaceSunk}"
                     VerticalAlignment="Center">
-              <Ellipse x:Name="Knob" Width="14" Height="14"
-                       HorizontalAlignment="Left" Margin="4,0,0,0"
-                       Fill="{DynamicResource C.InkFaint}" />
+              <Border x:Name="Knob" Width="14" Height="14"
+                      CornerRadius="{StaticResource Radius.Tight}"
+                      HorizontalAlignment="Left" Margin="4,0,0,0"
+                      Background="{DynamicResource C.InkFaint}" />
             </Border>
             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
           </StackPanel>
@@ -421,7 +427,7 @@
               <Setter TargetName="Knob" Property="HorizontalAlignment"
                       Value="Right" />
               <Setter TargetName="Knob" Property="Margin" Value="0,0,4,0" />
-              <Setter TargetName="Knob" Property="Fill"
+              <Setter TargetName="Knob" Property="Background"
                       Value="{DynamicResource C.FaceHigh}" />
             </Trigger>
           </ControlTemplate.Triggers>
@@ -488,6 +494,30 @@
   </Style>
 
   <!-- Карточка: приподнята ступенью значения, без рамки и без тени. -->
+  <!--
+    Блок списка: одна приподнятая ступень на весь список.
+
+    Не стопка карточек: «окно — это лицевая панель, а не набор карточек на
+    фоне» (DIRECTION §3). Строки списка — части одного предмета, и зазор
+    между ними превращал бы их в пять предметов.
+  -->
+  <Style x:Key="Rows" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="0" />
+  </Style>
+
+  <!--
+    Строка внутри блока. Отделена от соседней волосяным швом — тем же
+    средством, что и области панели, и никогда тенью.
+  -->
+  <Style x:Key="Rows.Item" TargetType="Border">
+    <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="MinHeight" Value="{StaticResource Size.Row}" />
+  </Style>
+
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />

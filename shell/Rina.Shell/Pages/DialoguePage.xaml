@@ -26,6 +26,11 @@
     </Grid>
 
     <Border Grid.Row="1" Style="{StaticResource Glass}">
+      <Grid>
+      <!-- Пустое стекло тоже объясняет себя: разговор, которого ещё не
+           было, — это не поломка и не «загрузка». -->
+      <ContentControl x:Name="Empty" Visibility="Collapsed" />
+
       <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto">
         <ItemsControl x:Name="Turns">
           <ItemsControl.ItemTemplate>
@@ -45,6 +50,7 @@
           </ItemsControl.ItemTemplate>
         </ItemsControl>
       </ScrollViewer>
+      </Grid>
     </Border>
 
     <Grid Grid.Row="2" Margin="0,16,0,0">

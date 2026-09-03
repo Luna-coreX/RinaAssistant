@@ -310,8 +310,7 @@ public partial class App
                           + $"поток окна значка {owner}");
         Check("нажатие придёт на поток окна, а не на чужой",
               owner == ui,
-              owner == ui ? "" : "| значит, обработчик обязан переходить "
-                                 + "на поток окна сам");
+              owner == ui ? "" : "| значит, обработчик обязан переходить на поток окна сам");
 
         window.MinimiseToTray = true;
         window.OnCloseButton();

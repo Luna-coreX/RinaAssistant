@@ -22,8 +22,18 @@
 
       <TextBlock Text="{loc:S 'ИЗ ЧЕГО СОБРАНА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+      <Border Style="{StaticResource Rows}" Margin="0,0,0,16">
         <StackPanel x:Name="Parts" />
+      </Border>
+
+      <!-- То, что спрашивают первым делом при разборе неполадки: где
+           лежат настройки, журналы и плагины. Без этого человек ищет их
+           по проводнику вслепую, а мы — просим прислать то, чего он не
+           может найти. -->
+      <TextBlock Text="{loc:S 'ГДЕ ЧТО ЛЕЖИТ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Rows}" Margin="0,0,0,16">
+        <StackPanel x:Name="Places" />
       </Border>
 
       <TextBlock Text="{loc:S 'ССЫЛКИ'}"

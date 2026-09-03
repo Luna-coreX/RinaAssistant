@@ -120,6 +120,30 @@ mockups = read(MOCKUPS) if os.path.isfile(MOCKUPS) else ""
 check("радиус не больше 3",
       max(tokens["radius"].values()) <= 3, f"| {tokens['radius']}")
 
+# ...и не только в токенах. Первая редакция смотрела сюда и была зелёной,
+# пока в разметке стоял тумблер радиусом 11: правило сторожили в
+# источнике, а нарушали у потребителя.
+LIMIT = max(tokens["radius"].values())
+SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
+too_round = []
+for base, dirs, files in os.walk(SHELL):
+    dirs[:] = [d for d in dirs if d not in ("obj", "bin", "Generated")]
+    for name in files:
+        if not name.endswith((".xaml", ".cs")):
+            continue
+        path = os.path.join(base, name)
+        text = read(path)
+        for number, line in enumerate(text.split("\n"), 1):
+            for found in re.findall(r'CornerRadius="([0-9]+)"', line):
+                if int(found) > LIMIT:
+                    too_round.append(f"{name}:{number} = {found}")
+            for found in re.findall(r"CornerRadius\((\d+)", line):
+                if int(found) > LIMIT:
+                    too_round.append(f"{name}:{number} = {found}")
+
+check("и в разметке с кодом тоже", not too_round,
+      f"| {too_round}" if too_round else f"| предел {LIMIT}")
+
 # один акцент
 for key, finish in tokens["finishes"].items():
     colors = finish["color"]
