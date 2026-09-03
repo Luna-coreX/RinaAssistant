@@ -182,6 +182,26 @@ public static class SettingsLayout
     ];
 
     /// <summary>
+    /// Что показать в пустом поле настройки.
+    /// </summary>
+    /// <remarks>
+    /// Не пояснение, а **пример**: пояснение говорит, зачем настройка, а
+    /// подсказка — в каком виде туда пишут. «Адрес модели» и
+    /// «http://localhost:11434» отвечают на разные вопросы, и второй ответ
+    /// нужен ровно в тот момент, когда поле пустое.
+    /// </remarks>
+    public static string HintInField(string key) => key switch
+    {
+        "llm_url" => S("http://localhost:11434"),
+        "llm_model" => S("например, llama3"),
+        "llm_persona" => S("например, отвечай коротко и по делу"),
+        "vosk_model" => S("папка с моделью"),
+        "piper_model" => S("файл .onnx"),
+        "wake_word" => S("Рина"),
+        _ => "",
+    };
+
+    /// <summary>
     /// Как называется «стереть всё» для конкретного ключа.
     /// </summary>
     /// <remarks>

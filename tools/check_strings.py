@@ -97,9 +97,16 @@ def main() -> int:
 
         for number, line in enumerate(text.split("\n"), 1):
             stripped = line.lstrip()
-            if stripped.startswith(("//", "///", "*")) or not RUS.search(line):
+            if stripped.startswith(("//", "///", "*")):
                 continue
+
+            # Вызовы собираются **до** отсева по кириллице: переводимая
+            # строка бывает и без русских букв — адрес, время, имя. Такая
+            # раньше не попадала в «использованные» и выглядела лишней в
+            # таблице, хотя стояла в коде.
             used.update(CALL.findall(line))
+            if not RUS.search(line):
+                continue
             if NOT_UI in line:
                 continue
 

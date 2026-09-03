@@ -19,6 +19,11 @@ public static partial class Loc
                 {
                     ["English"] = " — irreversible",
                 },
+            ["19:30"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "19:30",
+                },
             ["[слишком глубокая вложенность]"] =
                 new Dictionary<string, string>
                 {
@@ -28,6 +33,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Enter — send, Esc — hide",
+                },
+            ["http://localhost:11434"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "http://localhost:11434",
                 },
             ["Portable-программы ищутся здесь"] =
                 new Dictionary<string, string>
@@ -591,10 +601,20 @@ public static partial class Loc
                 {
                     ["English"] = "for example, github.com",
                 },
+            ["например, llama3"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, llama3",
+                },
             ["например, «открой почту»"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "for example, “open mail”",
+                },
+            ["например, отвечай коротко и по делу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, answer briefly and to the point",
                 },
             ["Насколько громко Рина говорит"] =
                 new Dictionary<string, string>
@@ -675,6 +695,11 @@ public static partial class Loc
                 {
                     ["English"] = "NEW REMINDER",
                 },
+            ["новое слово"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "new word",
+                },
             ["Новый шаг"] =
                 new Dictionary<string, string>
                 {
@@ -704,6 +729,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "about",
+                },
+            ["о чём напомнить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "what to remind about",
                 },
             ["О чём напомнить?"] =
                 new Dictionary<string, string>
@@ -796,6 +826,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Clear",
+                },
+            ["папка с моделью"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "folder with the model",
                 },
             ["Папка с распакованной моделью Vosk"] =
                 new Dictionary<string, string>
@@ -1029,6 +1064,11 @@ public static partial class Loc
                 {
                     ["English"] = "Synthesis engine",
                 },
+            ["Скажите или напишите: «запусти браузер»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say or type: “open the browser”",
+                },
             ["Сколько ждать ответа, прежде чем сдаться"] =
                 new Dictionary<string, string>
                 {
@@ -1152,6 +1192,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Default device",
+                },
+            ["файл .onnx"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the .onnx file",
                 },
             ["Файл модели .onnx"] =
                 new Dictionary<string, string>

@@ -2,6 +2,9 @@
   " — необратимо": {
     "English": " — irreversible"
   },
+  "19:30": {
+    "English": "19:30"
+  },
   "Enter — отправить, Esc — скрыть": {
     "English": "Enter — send, Esc — hide"
   },
@@ -10,6 +13,9 @@
   },
   "[слишком глубокая вложенность]": {
     "English": "[nesting too deep]"
+  },
+  "http://localhost:11434": {
+    "English": "http://localhost:11434"
   },
   "{0} — сейчас недоступно": {
     "English": "{0} — unavailable right now"
@@ -584,6 +590,9 @@
   "Система синтеза": {
     "English": "Synthesis engine"
   },
+  "Скажите или напишите: «запусти браузер»": {
+    "English": "Say or type: “open the browser”"
+  },
   "Сколько ждать ответа, прежде чем сдаться": {
     "English": "How long to wait for an answer before giving up"
   },
@@ -785,8 +794,14 @@
   "например, github.com": {
     "English": "for example, github.com"
   },
+  "например, llama3": {
+    "English": "for example, llama3"
+  },
   "например, «открой почту»": {
     "English": "for example, “open mail”"
+  },
+  "например, отвечай коротко и по делу": {
+    "English": "for example, answer briefly and to the point"
   },
   "не назначено": {
     "English": "not set"
@@ -794,14 +809,23 @@
   "не разобрал сочетание «{0}»": {
     "English": "couldn’t parse the shortcut “{0}”"
   },
+  "новое слово": {
+    "English": "new word"
+  },
   "нужен Ctrl, Alt, Shift или Win": {
     "English": "needs Ctrl, Alt, Shift or Win"
   },
   "о программе": {
     "English": "about"
   },
+  "о чём напомнить": {
+    "English": "what to remind about"
+  },
   "оболочка не знает такого элемента страницы": {
     "English": "the shell doesn’t know this page element"
+  },
+  "папка с моделью": {
+    "English": "folder with the model"
   },
   "плагин не загрузился": {
     "English": "the plugin didn’t load"
@@ -817,6 +841,9 @@
   },
   "такое сочетание не подойдёт": {
     "English": "that combination won’t work"
+  },
+  "файл .onnx": {
+    "English": "the .onnx file"
   },
   "через 15 минут": {
     "English": "in 15 minutes"

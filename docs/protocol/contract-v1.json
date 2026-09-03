@@ -434,6 +434,7 @@
     "history.clear": "history",
     "history.export": "history",
     "history.list": "history",
+    "hotkeys.actions": null,
     "permission.request": "permissions",
     "ping": null,
     "plugins.action": "plugins",

@@ -68,6 +68,8 @@ public static class Methods
     public const string HistoryExport = "history.export";
     /// <summary>Возможность: history.</summary>
     public const string HistoryList = "history.list";
+    /// <summary>Базовый метод.</summary>
+    public const string HotkeysActions = "hotkeys.actions";
     /// <summary>Возможность: permissions.</summary>
     public const string PermissionRequest = "permission.request";
     /// <summary>Базовый метод.</summary>
@@ -146,6 +148,7 @@ public static class Methods
             ["history.clear"] = "history",
             ["history.export"] = "history",
             ["history.list"] = "history",
+            ["hotkeys.actions"] = null,
             ["permission.request"] = "permissions",
             ["ping"] = null,
             ["plugins.action"] = "plugins",

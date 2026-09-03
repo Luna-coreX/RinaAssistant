@@ -276,6 +276,7 @@ class ProtocolServer:
             "commands.list": self._commands_list,
             "commands.kinds": self._commands_kinds,
             "commands.builtin": self._commands_builtin,
+            "hotkeys.actions": self._hotkey_actions,
             "commands.save": self._commands_save,
             "commands.delete": self._commands_delete,
             "commands.set_enabled": self._commands_set_enabled,
@@ -519,6 +520,21 @@ class ProtocolServer:
 
     def _commands_list(self, message: Envelope) -> dict:
         return {"items": [dict(c) for c in self._commands().all()]}
+
+    def _hotkey_actions(self, message: Envelope) -> dict:
+        """
+        Чему можно назначить сочетание.
+
+        Отдаёт ядро: исполняет действия оно, и список у него. Оболочка,
+        знающая его наизусть, предложила бы назначить сочетание тому, чего
+        ядро уже не делает, — и человек узнал бы об этом, нажав клавиши.
+        """
+        from voice.hotkey_actions import HOTKEY_ACTIONS
+
+        return {"items": [{"value": key, "title": title, "what": what,
+                           "icon": icon}
+                          for key, (title, what, icon)
+                          in HOTKEY_ACTIONS.items()]}
 
     def _commands_builtin(self, message: Envelope) -> dict:
         """

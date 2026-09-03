@@ -137,6 +137,22 @@ public partial class SettingsPage : UserControl
             _options[key] = listed;
         }
 
+        // Чему можно назначить сочетание — у ядра: исполняет действия оно,
+        // и список у него. Без этого словарь падал в общий редактор и
+        // показывал «записей: 0» вместо перечня действий.
+        if (_schema.ContainsKey("action_hotkeys"))
+        {
+            var listed = await Ask(Methods.HotkeysActions);
+            var actions = (listed?["items"]?.AsArray().OfType<JsonObject>()
+                           ?? [])
+                .Select(a => (a["value"]?.GetValue<string>() ?? "",
+                              a["title"]?.GetValue<string>() ?? "",
+                              true))
+                .Where(a => a.Item1.Length > 0)
+                .ToList();
+            if (actions.Count > 0) _options["action_hotkeys"] = actions;
+        }
+
         var dynamic = _schema.Where(pair => pair.Value["dynamic"] is not null)
                              .Select(pair => pair.Key).ToArray();
         if (dynamic.Length == 0) return;
@@ -235,7 +251,26 @@ public partial class SettingsPage : UserControl
 
         var editor = BuildEditor(key, spec);
         _editors[key] = editor;
-        Grid.SetColumn(editor, 1);
+
+        // Редактор-список встаёт под подписью во всю ширину. Рядом ему
+        // тесно: подпись сжимается в столбик из букв, а сам он всё равно
+        // не помещается. Признак — устройство значения, а не имя ключа:
+        // новая настройка того же рода получит это сама.
+        var type = spec["type"]?.GetValue<string>() ?? "string";
+        if (type is "array" or "object")
+        {
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(editor, 1);
+            Grid.SetColumn(editor, 0);
+            Grid.SetColumnSpan(editor, 2);
+            editor.HorizontalAlignment = HorizontalAlignment.Left;
+            editor.Margin = new Thickness(0, 8, 0, 0);
+        }
+        else
+        {
+            Grid.SetColumn(editor, 1);
+        }
         row.Children.Add(editor);
 
         ApplyDependency(key, spec, row);
@@ -337,6 +372,7 @@ public partial class SettingsPage : UserControl
             Width = 260,
             Text = Show(value),
         };
+        Styles.Ui.SetHint(field, SettingsLayout.HintInField(key));
         field.LostFocus += async (_, _) => await SaveAsync(key, Parse(field.Text, type));
         return field;
     }
@@ -500,6 +536,7 @@ public partial class SettingsPage : UserControl
             IsReadOnly = true,
             ToolTip = current,
         };
+        Styles.Ui.SetHint(field, SettingsLayout.HintInField(key));
         var browse = new Button
         {
             Style = (Style)FindResource("Btn"),
@@ -550,7 +587,7 @@ public partial class SettingsPage : UserControl
     {
         var items = (current ?? []).Select(v => v?.GetValue<string>() ?? "")
                                    .Where(v => v.Length > 0).ToList();
-        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        var stack = new StackPanel();
 
         foreach (var item in items)
         {
@@ -622,6 +659,7 @@ public partial class SettingsPage : UserControl
                 Width = 150,
                 Margin = new Thickness(0, 0, 8, 0),
             };
+            Styles.Ui.SetHint(typed, S("новое слово"));
             var add = new Button
             {
                 Style = (Style)FindResource("Btn"),
@@ -648,15 +686,18 @@ public partial class SettingsPage : UserControl
     /// узнает ни какие действия бывают, ни как к ним привязаться, — а
     /// список действий у ядра есть, и он его прислал.
     ///
-    /// Сочетание набирают, а не «нажимают для записи»: перехват нажатия
-    /// ради записи означал бы, что окно слушает клавиатуру целиком — то
-    /// самое, чего <c>Hotkeys</c> избегает нарочно.
+    /// Сочетание <b>записывают нажатием</b>. Первая редакция набирала его
+    /// строкой, и рядом стояло объяснение: перехват нажатия означал бы,
+    /// что окно слушает клавиатуру целиком. Объяснение было неверным.
+    /// <c>Hotkeys</c> избегает <b>глобального перехватчика</b> — того, что
+    /// видит набранное в чужих окнах; поле, читающее нажатие, пока на нём
+    /// фокус, получает те же события, которые окну и так приходят.
     /// </remarks>
     private FrameworkElement BuildAssignments(string key,
         List<(string Value, string Title, bool Available)> actions,
         JsonObject? current)
     {
-        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        var stack = new StackPanel();
         var assigned = new JsonObject();
         foreach (var (name, _t, _a) in actions)
         {
@@ -669,7 +710,6 @@ public partial class SettingsPage : UserControl
             var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 0, 0, 4),
             };
             row.Children.Add(new TextBlock
@@ -678,27 +718,23 @@ public partial class SettingsPage : UserControl
                 Style = (Style)FindResource("Text.Meta"),
                 VerticalAlignment = VerticalAlignment.Center,
                 Width = 190,
-                TextAlignment = TextAlignment.Right,
                 Margin = new Thickness(0, 0, 8, 0),
             });
 
-            var field = new TextBox
+            var box = new HotkeyBox(current?[name]?.GetValue<string>() ?? "");
+            var action = name;
+            box.Changed += async written =>
             {
-                Style = (Style)FindResource("Field"),
-                Width = 150,
-                Text = current?[name]?.GetValue<string>() ?? "",
-            };
-            field.LostFocus += async (_, _) =>
-            {
-                var typed = field.Text.Trim();
                 var next = new JsonObject();
                 foreach (var (existing, node) in assigned)
-                    if (existing != name && node is not null)
+                    if (existing != action && node is not null)
                         next[existing] = node.DeepClone();
-                if (typed.Length > 0) next[name] = typed;
+                // Пустое — это «снять», а не «назначить пустоту»: ключ
+                // убирается, а не остаётся с пустой строкой.
+                if (written.Length > 0) next[action] = written;
                 await SaveAsync(key, next);
             };
-            row.Children.Add(field);
+            row.Children.Add(box);
             stack.Children.Add(row);
         }
         return stack;
@@ -722,17 +758,13 @@ public partial class SettingsPage : UserControl
     /// </remarks>
     private FrameworkElement BuildMap(string key, JsonObject? current)
     {
-        var stack = new StackPanel
-        {
-            HorizontalAlignment = HorizontalAlignment.Right,
-        };
+        var stack = new StackPanel();
 
         foreach (var (word, bound) in current ?? [])
         {
             var line = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
                 Margin = new Thickness(0, 0, 0, 2),
             };
             line.Children.Add(new TextBlock
