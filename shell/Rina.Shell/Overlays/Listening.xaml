@@ -1,0 +1,24 @@
+<Window x:Class="Rina.Shell.Overlays.Listening"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Rina.Shell.Strings"
+        SizeToContent="WidthAndHeight"
+        WindowStyle="None" ResizeMode="NoResize" AllowsTransparency="True"
+        Background="Transparent" ShowInTaskbar="False" Topmost="True"
+        ShowActivated="False" Focusable="False">
+  <Border x:Name="Card" Background="{DynamicResource C.Face}"
+          BorderBrush="{DynamicResource C.Seam}" BorderThickness="1"
+          CornerRadius="{StaticResource Radius.Max}"
+          Padding="18,10,20,10" Opacity="0">
+    <StackPanel Orientation="Horizontal">
+      <!-- Точка дышит, пока Рина слушает: неподвижная плашка не отличима
+           от забытой на экране. -->
+      <Ellipse x:Name="Dot" Width="10" Height="10"
+               Fill="{DynamicResource C.Signal}"
+               VerticalAlignment="Center" Margin="0,0,12,0" />
+      <TextBlock x:Name="Label" Text="{loc:S 'Слушаю…'}"
+                 Style="{StaticResource Text.Body}"
+                 VerticalAlignment="Center" />
+    </StackPanel>
+  </Border>
+</Window>

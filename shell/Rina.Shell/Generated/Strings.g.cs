@@ -153,6 +153,11 @@ public static partial class Loc
                     ["Español"] = "Escuchar siempre",
                     ["Українська"] = "Завжди слухати",
                 },
+            ["Всегда слушаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Always listening",
+                },
             ["Вся поверхность целиком: цвета проверены парами"] =
                 new Dictionary<string, string>
                 {
@@ -1104,6 +1109,11 @@ public static partial class Loc
                     ["English"] = "Wake words",
                     ["Español"] = "Palabras de activación",
                     ["Українська"] = "Слова активації",
+                },
+            ["Слушаю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening…",
                 },
             ["Сохранить"] =
                 new Dictionary<string, string>

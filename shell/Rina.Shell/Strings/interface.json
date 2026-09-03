@@ -77,6 +77,9 @@
     "Español": "Escuchar siempre",
     "Deutsch": "Immer zuhören"
   },
+  "Всегда слушаю": {
+    "English": "Always listening"
+  },
   "Вся поверхность целиком: цвета проверены парами": {
     "English": "The whole surface: colours verified in pairs"
   },
@@ -616,6 +619,9 @@
     "Українська": "Слова активації",
     "Español": "Palabras de activación",
     "Deutsch": "Aktivierungswörter"
+  },
+  "Слушаю…": {
+    "English": "Listening…"
   },
   "Сохранить": {
     "English": "Save",

@@ -73,6 +73,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-overlays"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckOverlaysAsync(window, Value(args, "--shot"));
+            return;
+        }
+
         if (args.Contains("--check-platform"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -149,6 +156,12 @@ public partial class App
             // обязаны работать, даже если ядро не поднялось. Помощник,
             // которого нельзя вызвать с клавиатуры, потому что упал чужой
             // процесс, — не помощник.
+            // Окна поверх экрана: реплика и плашка «слушаю». Заводятся до
+            // ядра — они принадлежат оболочке, и плашка обязана появиться,
+            // даже если ядро отвечает медленно.
+            window.Toast = new Overlays.Toast();
+            window.Plaque = new Overlays.Listening();
+
             _tray = new Tray(window);
             _tray.ExitRequested += () => Shutdown();
             window.Tray = _tray;
@@ -589,6 +602,123 @@ public partial class App
         }
 
         await link.DisposeAsync();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// Реплика и плашка «слушаю» поверх экрана.
+    /// </summary>
+    /// <remarks>
+    /// Проверяется поведение, а не картинка: реплика не показывается при
+    /// открытом окне, плашка не гаснет от `listening.stopped`, пока включён
+    /// режим «всегда слушаю». Оба правила легко нарушить правкой и
+    /// невозможно заметить глазами — плашка гаснет через час работы, а
+    /// лишняя реплика видна только тому, у кого окно открыто.
+    /// </remarks>
+    private async Task CheckOverlaysAsync(MainWindow window, string? shot)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== Поверх экрана: реплика и плашка ===");
+
+        window.Toast = new Overlays.Toast();
+        window.Plaque = new Overlays.Listening();
+        window.ShowToasts = true;
+
+        static Rina.Protocol.Envelope Event(string method,
+            System.Text.Json.Nodes.JsonObject payload)
+            => new()
+            {
+                Type = "event",
+                Id = "chk-1",
+                Method = method,
+                Payload = payload,
+                TraceId = "t-check",
+                Version = 1,
+            };
+
+        // Окно спрятано: реплику человек иначе не увидит.
+        window.Hide();
+        window.OnCoreEvent(Event("assistant.response",
+            new System.Text.Json.Nodes.JsonObject { ["text"] = "Сейчас 14:30." }));
+        await Task.Delay(300);
+        Check("реплика показана, когда окна не видно",
+              window.Toast.Shown == "Сейчас 14:30.",
+              $"| {window.Toast.Shown}");
+
+        // Окно открыто: ответ уже перед человеком.
+        window.Show();
+        await Task.Delay(200);
+        window.Toast.Dismiss();
+        await Task.Delay(300);
+        window.OnCoreEvent(Event("assistant.response",
+            new System.Text.Json.Nodes.JsonObject { ["text"] = "Второй ответ" }));
+        await Task.Delay(300);
+        Check("при открытом окне реплика не дублируется",
+              window.Toast.Shown != "Второй ответ",
+              $"| {window.Toast.Shown}");
+        window.Hide();
+
+        // Плашка: разовое слушание.
+        window.OnCoreEvent(Event("listening.started",
+            new System.Text.Json.Nodes.JsonObject()));
+        await Task.Delay(300);
+        Check("плашка появилась на разовом слушании", window.Plaque.Visible);
+        Check("и сказано, что это разовое",
+              window.Plaque.Caption.Contains("Слушаю"),
+              $"| {window.Plaque.Caption}");
+
+        window.OnCoreEvent(Event("listening.stopped",
+            new System.Text.Json.Nodes.JsonObject()));
+        await Task.Delay(400);
+        Check("и ушла, когда слушать перестали", !window.Plaque.Visible);
+
+        // Плашка: режим.
+        window.OnCoreEvent(Event("listening.always",
+            new System.Text.Json.Nodes.JsonObject { ["enabled"] = true }));
+        await Task.Delay(300);
+        Check("в режиме «всегда» плашка тоже появляется",
+              window.Plaque.Visible);
+        Check("и говорит, что это режим",
+              window.Plaque.Caption.Contains("Всегда"),
+              $"| {window.Plaque.Caption}");
+
+        // Вот это и есть главное: распознанная фраза не гасит режим.
+        window.OnCoreEvent(Event("listening.stopped",
+            new System.Text.Json.Nodes.JsonObject()));
+        await Task.Delay(400);
+        Check("распознанная фраза не гасит режим", window.Plaque.Visible,
+              "| иначе человек перестал бы видеть, что микрофон работает");
+
+        window.OnCoreEvent(Event("listening.always",
+            new System.Text.Json.Nodes.JsonObject { ["enabled"] = false }));
+        await Task.Delay(400);
+        Check("отмена режима убирает плашку", !window.Plaque.Visible);
+
+        // Снимок, если попросили: реплика и плашка вместе.
+        if (shot is not null)
+        {
+            window.Toast.Say("Запускаю Visual Studio Code.");
+            window.Plaque.Appear(always: true);
+            await Task.Delay(500);
+            Save(window.Toast, shot);
+            Save(window.Plaque, shot.Replace(".png", "-plaque.png"));
+        }
+
+        window.Toast.Close();
+        window.Plaque.Close();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
@@ -1108,6 +1238,7 @@ public partial class App
             BindActions(window, bound);
 
         _notify = values["notifications"]?.GetValue<bool>() ?? true;
+        window.ShowToasts = _notify;
         if (values["floating_command_bar"]?.GetValue<bool>() == true)
             ShowFloatingBar(window);
 
@@ -1196,6 +1327,7 @@ public partial class App
         {
             case "notifications":
                 _notify = value.GetValue<bool>();
+                if (window is not null) window.ShowToasts = _notify;
                 break;
             case "minimize_to_tray":
                 if (window is not null)
@@ -1229,24 +1361,29 @@ public partial class App
     }
 
     /// <summary>
-    /// Показать уведомление, если окна не видно.
+    /// Показать то, чего человек не видит в окне.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Всплывающее сообщение о том, что и так написано в открытом окне, —
     /// шум, и человек учится его не читать. Поэтому условие не «пришёл
     /// ответ», а «пришёл ответ, которого он не видит».
+    /// </para>
+    /// <para>
+    /// <b>Реплика и напоминание расходятся по разным путям, и это не
+    /// украшение.</b> Реплика живёт секунды и принадлежит разговору: её
+    /// показывает своё окно, которое само уйдёт. Напоминание живёт, пока
+    /// его не увидят, и может застать человека отошедшим — его место в
+    /// центре уведомлений, где оно дождётся. Раньше и то и другое уходило
+    /// в трей, и «который час» ложился в почту рядом с письмами.
+    /// </para>
     /// </remarks>
     private void OnCoreEventForTray(MainWindow window,
                                     Rina.Protocol.Envelope message)
     {
         if (!_notify || window.IsVisible) return;
 
-        if (message.Method == "assistant.response")
-        {
-            var text = message.Payload["text"]?.GetValue<string>() ?? "";
-            if (text.Length > 0) _tray?.Notify("Рина", text);
-        }
-        else if (message.Method == "reminder.fired")
+        if (message.Method == "reminder.fired")
         {
             var text = message.Payload["item"]?["text"]?.GetValue<string>() ?? "";
             _tray?.Notify("Напоминание", text.Length > 0 ? text : "Пора.");

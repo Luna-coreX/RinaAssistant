@@ -180,10 +180,69 @@ public partial class MainWindow : Window
     public void OnCoreEvent(Envelope message)
     {
         // Разбор событий по разделам — 4.0-F04. Здесь остаётся то, что
-        // принадлежит прибору целиком, а не разделу: полоса уровня.
+        // принадлежит прибору целиком, а не разделу: полоса уровня и то,
+        // что видно поверх экрана.
         if (message.Method is "listening.capturing")
             Level.Width = message.Payload["active"]?.GetValue<bool>() == true
                 ? ActualWidth * 0.4 : 0;
+
+        Overlay(message);
+    }
+
+    /// <summary>Что видно поверх экрана: реплика и плашка «слушаю».</summary>
+    public Overlays.Toast? Toast { get; set; }
+
+    /// <summary>Плашка слушания.</summary>
+    public Overlays.Listening? Plaque { get; set; }
+
+    /// <summary>Показывать ли реплики поверх экрана (настройка).</summary>
+    public bool ShowToasts { get; set; } = true;
+
+    /// <summary>
+    /// Событие ядра — в окна поверх экрана.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Реплика показывается, когда окна не видно.</b> Если человек
+    /// смотрит на диалог, ответ уже перед ним, и дублировать его карточкой
+    /// в углу — значит показывать одно и то же дважды.
+    /// </para>
+    /// <para>
+    /// <b>Плашка «слушаю» показывается всегда.</b> Здесь наоборот: право
+    /// знать, что микрофон работает, не зависит от того, открыто ли окно, —
+    /// именно при закрытом окне это и важно.
+    /// </para>
+    /// </remarks>
+    private void Overlay(Envelope message)
+    {
+        switch (message.Method)
+        {
+            case "listening.started":
+                Plaque?.Appear(always: false);
+                break;
+
+            case "listening.stopped":
+                if (Plaque is { } stopping && !stopping.Always)
+                    stopping.Vanish();
+                break;
+
+            case "listening.always":
+                var on = message.Payload["enabled"]?.GetValue<bool>() == true;
+                if (on) Plaque?.Appear(always: true);
+                else Plaque?.Vanish();
+                break;
+
+            case "assistant.response":
+                if (ShowToasts && !IsVisible)
+                    Toast?.Say(message.Payload["text"]?.GetValue<string>() ?? "");
+                break;
+
+            case "assistant.error":
+                if (ShowToasts && !IsVisible)
+                    Toast?.Say(message.Payload["text"]?.GetValue<string>() ?? "",
+                               Overlays.Toast.Short);
+                break;
+        }
     }
 
     /// <summary>Отделка, которую показывает окно.</summary>
