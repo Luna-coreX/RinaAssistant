@@ -50,7 +50,7 @@ public partial class MainWindow : Window
             ["dialog"] = () => new Pages.DialoguePage(Link),
             ["commands"] = () => new Pages.CommandsPage(Link),
             ["reminders"] = () => new Pages.RemindersPage(Link),
-            ["plugins"] = () => Pages.Placeholder.For("Плагины"),
+            ["plugins"] = () => new Pages.PluginsPage(Link),
             ["settings"] = () => new Pages.SettingsPage(Link),
         };
 

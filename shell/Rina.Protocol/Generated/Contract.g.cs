@@ -263,6 +263,8 @@ public static class ErrorCodes
     /// <summary>user, неповторяемая.</summary>
     public const string PermissionRequired = "permission.required";
     /// <summary>protocol, неповторяемая.</summary>
+    public const string PluginNotFound = "plugin.not_found";
+    /// <summary>protocol, неповторяемая.</summary>
     public const string ProtocolFrameTooLarge = "protocol.frame_too_large";
     /// <summary>protocol, неповторяемая.</summary>
     public const string ProtocolIncompatible = "protocol.incompatible";
@@ -308,6 +310,7 @@ public static class ErrorCodes
             ["llm.unavailable"] = new(ErrorCategory.System, true),
             ["permission.denied"] = new(ErrorCategory.User, false),
             ["permission.required"] = new(ErrorCategory.User, false),
+            ["plugin.not_found"] = new(ErrorCategory.Protocol, false),
             ["protocol.frame_too_large"] = new(ErrorCategory.Protocol, false),
             ["protocol.incompatible"] = new(ErrorCategory.Protocol, false),
             ["protocol.invalid_envelope"] = new(ErrorCategory.Protocol, false),

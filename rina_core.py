@@ -138,7 +138,19 @@ def main(argv=None):
     settings_store.load()
     log.info("Настройки прочитаны: %s", settings_store.path)
 
-    engine = RinaEngine(event_bus=EventBus())
+    # Плагины принадлежат ядру: они отвечают на команды, а команды
+    # обрабатывает ядро. Менеджер обходится без Qt с 4.0-F04 — до этого он
+    # был написан под окно и в разделённой программе просто не заводился.
+    from plugins.manager import PluginManager
+    plugins = PluginManager()
+    try:
+        plugins.discover()
+        log.info("Плагинов найдено: %d", len(plugins.plugins))
+    except Exception:                                    # noqa: BLE001
+        # Битый каталог плагинов не повод не запускать помощника.
+        log.exception("Плагины не собрались")
+
+    engine = RinaEngine(plugin_manager=plugins, event_bus=EventBus())
     server = ProtocolServer(engine, channels, app_version=APP_VERSION)
 
     # Таймеры живут в ядре (4.0-E05). Раньше планировщик запускало окно; в

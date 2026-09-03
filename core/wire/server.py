@@ -275,6 +275,10 @@ class ProtocolServer:
             "history.clear": self._history_clear,
             "history.export": self._history_export,
             "task.cancel": self._task_cancel,
+            "plugins.list": self._plugins_list,
+            "plugins.set_enabled": self._plugins_set_enabled,
+            "plugins.page": self._plugins_page,
+            "plugins.action": self._plugins_action,
             "plugins.install": self._plugins_install,
             "stream.open": self._stream_open,
             "stream.close": self._stream_close,
@@ -542,6 +546,102 @@ class ProtocolServer:
         return {"items": [dict(i) for i in self._history().all()]}
 
     # -- плагины --------------------------------------------------------------
+
+    def _plugin_manager(self):
+        return getattr(self.engine, "_plugins", None)
+
+    @staticmethod
+    def _plugin_state(plugin_id: str, loaded) -> dict:
+        """
+        Что оболочка знает о плагине.
+
+        Сбойный плагин показывается вместе с причиной, а не исчезает из
+        списка: человек поставил его сам и должен увидеть, почему он не
+        работает. Исчезнувший плагин выглядит как «я его не ставил».
+        """
+        manifest = loaded.manifest
+        return {
+            "plugin_id": plugin_id,
+            "name": manifest.name,
+            "version": manifest.version,
+            "author": manifest.author,
+            "description": manifest.description,
+            "icon": manifest.icon,
+            "enabled": bool(loaded.enabled),
+            "broken": bool(loaded.error),
+            "error": loaded.error or "",
+            "has_page": bool(loaded.instance is not None
+                             and loaded.error is None),
+        }
+
+    def _plugins_list(self, message: Envelope) -> dict:
+        manager = self._plugin_manager()
+        if manager is None:
+            return {"items": []}
+        pages = {pid for pid, _ in manager.page_plugins()}
+        items = []
+        for plugin_id, loaded in manager.plugins.items():
+            state = self._plugin_state(plugin_id, loaded)
+            state["has_page"] = plugin_id in pages
+            items.append(state)
+        return {"items": items}
+
+    def _plugins_set_enabled(self, message: Envelope) -> dict:
+        """
+        Включить или выключить плагин.
+
+        Возвращается **состояние после** изменения, а не «принято»: плагин
+        может отказаться загружаться, и тогда «включено» будет неправдой.
+        Оболочка рисует то, что есть, а не то, что просили.
+        """
+        manager = self._plugin_manager()
+        plugin_id = str(message.payload.get("plugin_id", ""))
+        if manager is None or plugin_id not in manager.plugins:
+            raise fault("plugin.not_found", f"Плагин «{plugin_id}» не найден.")
+
+        manager.toggle(plugin_id, bool(message.payload.get("enabled", False)))
+        loaded = manager.plugins[plugin_id]
+        return {"plugin": self._plugin_state(plugin_id, loaded)}
+
+    def _plugins_page(self, message: Envelope) -> dict:
+        """
+        Декларативное описание страницы плагина.
+
+        Плагин описывает страницу списком элементов, а рисует их оболочка.
+        Так было решено ещё в 3.1.0 (`plugins/page_spec.py`), когда плагин
+        перестал возвращать готовый виджет, — и ровно поэтому страница
+        плагина рисуется в другом процессе на другом языке без единой
+        правки в самом плагине.
+        """
+        manager = self._plugin_manager()
+        plugin_id = str(message.payload.get("plugin_id", ""))
+        if manager is None or plugin_id not in manager.plugins:
+            raise fault("plugin.not_found", f"Плагин «{plugin_id}» не найден.")
+
+        spec = manager.get_plugin_page_spec(plugin_id)
+        return {"plugin_id": plugin_id,
+                "elements": [element.to_dict() for element in spec]}
+
+    def _plugins_action(self, message: Envelope) -> dict:
+        """
+        Нажата кнопка на странице плагина; в ответ — новая страница.
+
+        Новое описание возвращается тем же ответом, а не событием: кнопка
+        меняет то, что нарисовано рядом с ней, и заставлять оболочку
+        спрашивать страницу второй раз значило бы показать её устаревшей
+        ровно на один круг.
+        """
+        manager = self._plugin_manager()
+        plugin_id = str(message.payload.get("plugin_id", ""))
+        if manager is None or plugin_id not in manager.plugins:
+            raise fault("plugin.not_found", f"Плагин «{plugin_id}» не найден.")
+
+        manager.dispatch_action(plugin_id,
+                                str(message.payload.get("action", "")),
+                                message.payload.get("value"))
+        spec = manager.get_plugin_page_spec(plugin_id)
+        return {"plugin_id": plugin_id,
+                "elements": [element.to_dict() for element in spec]}
 
     def _plugins_install(self, message: Envelope) -> dict:
         """

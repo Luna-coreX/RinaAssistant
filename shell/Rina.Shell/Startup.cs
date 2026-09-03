@@ -22,6 +22,7 @@ public partial class App
     private Hotkeys? _hotkeys;
     private string? _shotPath;
     private double _shotScroll;
+    private string _shotSection = "settings";
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,6 +43,7 @@ public partial class App
             _shotPath = Value(args, "--shot");
             _shotScroll = double.TryParse(Value(args, "--scroll"), out var down)
                 ? down : 0;
+            _shotSection = Value(args, "--section") ?? "settings";
             // Без окна WPF завершается сам, едва OnStartup вернёт управление:
             // по умолчанию приложение живёт, пока живо хотя бы одно окно.
             // Самопроверке окно показывать незачем, поэтому закрываемся мы
@@ -364,12 +366,39 @@ public partial class App
         else Check("список раскрывается своим шаблоном", false,
                    "| ни одного списка на странице");
 
+        window.ShowSectionFor("commands");
+        await Task.Delay(1500);
+        Check("страница команд открылась",
+              window.CurrentPage is Pages.CommandsPage);
+
+        // Плагины: последняя страница, остававшаяся заглушкой. Проверяется
+        // весь круг — список, включение, своя страница плагина и действие
+        // на ней, — потому что каждое звено здесь пересекает границу
+        // процессов, и «список пришёл» ещё ничего не значит.
+        window.ShowSectionFor("plugins");
+        await Task.Delay(1500);
+        if (window.CurrentPage is Pages.PluginsPage plugins)
+        {
+            for (var i = 0; i < 60 && plugins.PluginCount == 0; i++)
+                await Task.Delay(100);
+            Check("плагины пришли из ядра", plugins.PluginCount > 0,
+                  $"| {plugins.PluginCount}");
+
+            var drawn = await plugins.OpenFirstPageAsync();
+            Check("плагин включился и отдал свою страницу", drawn > 0,
+                  $"| элементов {drawn}");
+            Check("проверка вернула плагины как было",
+                  plugins.PageElementCount == 0,
+                  "| включённое ею выключено обратно");
+        }
+        else Check("страница плагинов открылась", false);
+
         // Снимок живого окна, если попросили: настройки с настоящими
         // значениями от настоящего ядра — единственный способ увидеть, как
         // это выглядит на самом деле, а не как выглядит пустая страница.
         if (_shotPath is { } shot)
         {
-            window.ShowSectionFor("settings");
+            window.ShowSectionFor(_shotSection);
             await Task.Delay(800);
             if (_shotScroll > 0 && window.CurrentPage is Pages.SettingsPage page)
             {
@@ -378,11 +407,6 @@ public partial class App
             }
             Save(window, shot);
         }
-
-        window.ShowSectionFor("commands");
-        await Task.Delay(1500);
-        Check("страница команд открылась",
-              window.CurrentPage is Pages.CommandsPage);
 
         window.Hide();
 

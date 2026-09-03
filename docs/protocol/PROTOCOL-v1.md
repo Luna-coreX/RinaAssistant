@@ -216,6 +216,7 @@
 | `settings.unknown_key` | protocol | нет | такой настройки нет |
 | `settings.invalid_value` | user | нет | значение не проходит ограничения ключа |
 | `llm.remote_address` | user | да | адрес модели не локальный: значение принято, человека предупреждают |
+| `plugin.not_found` | protocol | нет | плагина с таким номером нет: список устарел или его удалили |
 | `app.not_found` | user | нет | программа не найдена в индексе |
 | `app.launch_failed` | system | да | запуск сорвался |
 | `stt.unavailable` | system | нет | распознавания нет |

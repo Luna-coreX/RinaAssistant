@@ -609,5 +609,73 @@ os.environ.pop("RINA_SANDBOX_DIR", None)
 shutil.rmtree(shared_dir, ignore_errors=True)
 
 print()
+print("=== F04: плагины по проводу ===")
+
+# Менеджер плагинов был написан под окно и тянул Qt. Проверка идёт через
+# настоящий процесс ядра ровно поэтому: импорт PySide6 в ядре запрещён, и
+# узнать об этом надо здесь, а не на машине, где Qt не установлен.
+plug = Core()
+plug.handshake()
+
+plug.ask("plugins.list")
+listed = plug.read(1)[0].payload["items"]
+check("ядро видит плагины", len(listed) > 0, f"| {len(listed)}")
+check("у каждого есть имя и номер",
+      all(p.get("plugin_id") and p.get("name") for p in listed))
+by_id = {p["plugin_id"]: p for p in listed}
+
+# Включение возвращает состояние ПОСЛЕ, а не «принято»: плагин может
+# отказаться загружаться, и «включено» было бы неправдой.
+first = sorted(by_id)[0]
+plug.ask("plugins.set_enabled", {"plugin_id": first, "enabled": True})
+state = plug.read(1)[0].payload["plugin"]
+check("плагин включился", state["enabled"] is True, f"| {first}")
+
+plug.ask("plugins.list")
+after = {p["plugin_id"]: p for p in plug.read(1)[0].payload["items"]}
+with_page = [pid for pid, p in after.items() if p["has_page"]]
+
+# У выключенного страницы нет: он не загружен, и спрашивать его не о чем.
+for pid in sorted(by_id):
+    if pid == first:
+        continue
+    plug.ask("plugins.set_enabled", {"plugin_id": pid, "enabled": True})
+    plug.read(1)
+plug.ask("plugins.list")
+loaded = {p["plugin_id"]: p for p in plug.read(1)[0].payload["items"]}
+with_page = [pid for pid, p in loaded.items() if p["has_page"]]
+check("хотя бы у одного плагина есть своя страница", bool(with_page),
+      f"| {with_page}")
+
+if with_page:
+    target = with_page[0]
+    plug.ask("plugins.page", {"plugin_id": target})
+    page = plug.read(1)[0].payload
+    check("страница описана элементами, а не виджетом",
+          isinstance(page.get("elements"), list) and page["elements"],
+          f"| {[e.get('kind') for e in page.get('elements', [])]}")
+    check("у каждого элемента есть вид",
+          all(e.get("kind") for e in page["elements"]))
+
+    # Действие возвращает новую страницу тем же ответом: кнопка меняет то,
+    # что нарисовано рядом с ней.
+    plug.ask("plugins.action", {"plugin_id": target, "action": "clear"})
+    again = plug.read(1)[0].payload
+    check("действие вернуло новую страницу",
+          isinstance(again.get("elements"), list),
+          f"| элементов {len(again.get('elements', []))}")
+
+plug.ask("plugins.page", {"plugin_id": "такого-нет"})
+missing = plug.read(1)[0]
+check("несуществующий плагин — ошибка каталога, а не пустая страница",
+      missing.type == MessageType.ERROR
+      and missing.payload.get("code") == "plugin.not_found",
+      f"| {missing.payload.get('code')}")
+
+plug.ask("core.shutdown")
+plug.read(1)
+plug.wait()
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

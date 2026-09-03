@@ -143,6 +143,10 @@
       "category": "user",
       "retryable": false
     },
+    "plugin.not_found": {
+      "category": "protocol",
+      "retryable": false
+    },
     "protocol.frame_too_large": {
       "category": "protocol",
       "retryable": false

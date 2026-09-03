@@ -14,8 +14,6 @@ import importlib.util
 import inspect
 import traceback
 
-from PySide6.QtCore import QObject, Signal
-
 from core.i18n import t as tr
 from core.logging_setup import get_logger, security_log
 from plugins.api import Plugin, PluginManifest, PluginContext, API_VERSION
@@ -158,17 +156,59 @@ class LoadedPlugin:
         self.logs = []            # последние строки лога
 
 
-class PluginManager(QObject):
-    # сигналы для UI
-    changed = Signal()                    # список/состояние изменились
-    log_added = Signal(str, str)          # (plugin_id, message)
-    response = Signal(str, str)           # (plugin_id, text) — плагин что-то ответил
-    pages_changed = Signal()              # набор вкладок плагинов изменился
-    window_requested = Signal(str, object, str, int, int)  # (pid, widget, title, w, h)
-    notify_requested = Signal(str, str, str)   # (pid, title, message)
+class Signal:
+    """
+    Оповещение подписчиков. Подмена `PySide6.QtCore.Signal`.
 
+    Менеджер плагинов жил в приложении с окном и оповещал его сигналами Qt.
+    В 4.0 плагины принадлежат **ядру**, а ядро обязано работать там, где
+    интерфейсной библиотеки нет вовсе (`rina_core.check_headless`): один
+    транзитивный импорт Qt — и разделение нарушено.
+
+    Поверхность сохранена нарочно — `connect` и `emit`, — чтобы приложение
+    3.1.0 продолжало работать без правок на своей стороне. Разница в том,
+    что вызов происходит **в том же потоке**, а не через очередь событий
+    окна: у ядра очереди окна нет, а подписчику важнее получить
+    оповещение, чем получить его в чужом потоке.
+    """
+
+    def __init__(self, *types):
+        self._types = types
+        self._listeners = []
+
+    def connect(self, listener):
+        if listener not in self._listeners:
+            self._listeners.append(listener)
+        return listener
+
+    def disconnect(self, listener=None):
+        if listener is None:
+            self._listeners.clear()
+        elif listener in self._listeners:
+            self._listeners.remove(listener)
+
+    def emit(self, *args):
+        # Подписчик, уронивший обработчик, не должен обрывать оповещение
+        # остальным: плагин уже показал, что бывает ненадёжным, и хоронить
+        # вместе с ним половину подписчиков — не то, чего мы хотим.
+        for listener in list(self._listeners):
+            try:
+                listener(*args)
+            except Exception:                            # noqa: BLE001
+                log.exception("Подписчик сигнала уронил обработчик")
+
+
+class PluginManager:
     def __init__(self, parent=None):
-        super().__init__(parent)
+        # Сигналы — свои у каждого менеджера, а не общие на класс: у Qt они
+        # объявлялись в теле класса, но связывались с экземпляром. Оставить
+        # их в теле здесь значило бы, что два менеджера делят подписчиков.
+        self.changed = Signal()               # список/состояние изменились
+        self.log_added = Signal(str, str)     # (plugin_id, message)
+        self.response = Signal(str, str)      # плагин что-то ответил
+        self.pages_changed = Signal()         # набор вкладок изменился
+        self.window_requested = Signal(str, object, str, int, int)
+        self.notify_requested = Signal(str, str, str)
         self.plugins = {}   # id -> LoadedPlugin
 
     # ---------- обнаружение ----------

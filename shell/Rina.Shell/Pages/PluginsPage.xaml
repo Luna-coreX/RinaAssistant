@@ -1,0 +1,40 @@
+<UserControl x:Class="Rina.Shell.Pages.PluginsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="Плагины" Style="{StaticResource Text.Title}"
+               Margin="0,0,0,16" />
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+        <TextBlock x:Name="Legend" Text="УСТАНОВЛЕННЫЕ"
+                   Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+
+        <TextBlock x:Name="Empty" Text="Плагинов пока нет."
+                   Style="{StaticResource Text.Body}"
+                   Foreground="{DynamicResource C.InkSoft}"
+                   Visibility="Collapsed" Margin="0,0,0,12" />
+
+        <StackPanel x:Name="Items" />
+
+        <!-- Страница плагина: то, что он сам о себе рассказал. -->
+        <StackPanel x:Name="PageBox" Margin="0,24,0,0" Visibility="Collapsed">
+          <TextBlock x:Name="PageLegend" Style="{StaticResource Text.Section}"
+                     Margin="0,0,0,12" />
+          <Border Style="{StaticResource Card}">
+            <StackPanel x:Name="PageBody" />
+          </Border>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+
+    <TextBlock x:Name="Note" Grid.Row="2" Style="{StaticResource Text.Meta}"
+               Margin="0,12,0,0" TextWrapping="Wrap" />
+  </Grid>
+</UserControl>
