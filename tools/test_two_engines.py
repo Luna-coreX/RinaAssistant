@@ -48,6 +48,13 @@ def make():
     engine.say = lambda text, sound="response": said.append(text)
     events = []
     engine.bus.on("window.action", lambda d: events.append(d.get("action")))
+
+    # Оболочка-заглушка: с 4.0-G01 ядро просит её сделать системное
+    # действие, а не делает само (ADR 0009). Своя у каждого ядра — в этом
+    # весь смысл проверки: просьба не должна уйти чужой.
+    done = []
+    engine.system_out = lambda action: (done.append(action), (True, ""))[1]
+    engine.did = done
     return engine, said, events
 
 
@@ -58,8 +65,15 @@ on_global = []
 global_bus.on("window.action", lambda d: on_global.append(d.get("action")))
 
 print("=== события не растекаются ===")
-A.handle_command("сделай скриншот")
-check("событие дошло до своего ядра", events_a == ["screenshot"],
+# Действие окна приходит своей командой: «свернись» — это `window.action`,
+# и оно осталось событием. Снимок экрана для этого больше не годится — с
+# 4.0-G03 его делает оболочка системным вызовом, и события у него нет.
+settings.set("custom_commands", [{
+    "id": "cmd_win", "enabled": True, "type": "system", "target": "minimize",
+    "triggers": ["свернись"], "match": "contains", "response": "", "steps": [],
+}])
+A.handle_command("свернись")
+check("событие дошло до своего ядра", events_a == ["minimize"],
       f"| {events_a}")
 check("чужое ядро его не увидело", events_b == [], f"| {events_b}")
 check("в глобальную шину ничего не ушло", on_global == [],

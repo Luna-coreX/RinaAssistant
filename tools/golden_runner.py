@@ -169,6 +169,25 @@ class InProcessDriver(Driver):
 
         engine = RinaEngine(event_bus=EventBus())
         engine._speak_blocking = lambda text: None
+
+        # Оболочка, которой здесь нет. Ядро с 4.0-G01 просит её сделать
+        # системное действие и запустить программу (ADR 0009), и подменять
+        # надо именно это — функции `system_control.RUNNERS` ядро больше не
+        # зовёт вовсе. Записываем просьбу и отвечаем «получилось»: набор
+        # проверяет, что ядро **решило** правильно, а не что Windows умеет
+        # прибавлять громкость.
+        def as_shell_do(action):
+            obs.actions.append(action)
+            return True, ""
+
+        def as_shell_launch(launch, kind="file"):
+            entry = next((e for e in app_index.cached_index()
+                          if e.launch == launch), None)
+            obs.launched.append(entry.name if entry else launch)
+            return True, ""
+
+        engine.system_out = as_shell_do
+        engine.launch_out = as_shell_launch
         real_say = engine.say
         engine.say = lambda text, sound="response": (
             obs.said.append(text), real_say(text, sound=sound))[0]

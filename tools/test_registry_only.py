@@ -43,12 +43,21 @@ def make_runner():
     from voice.user_commands import UserCommandStore
 
     settings = MemorySettings()
+    # Оболочка, которой здесь нет: ядро просит сделать системное действие
+    # (ADR 0009), а не делает само. Записываем просьбу и отвечаем
+    # «получилось» — проверяется, что ворота подтверждений на месте, а не
+    # что Windows умеет прибавлять громкость.
     return ToolRunner(ToolContext(
         settings=settings,
         reminders=ReminderStore(settings),
         commands=UserCommandStore(settings),
         emit=lambda name, **data: None,
+        system_out=lambda action: (DONE.append(action), (True, ""))[1],
     ))
+
+
+#: Что «оболочка» сделала по просьбе ядра.
+DONE = []
 
 
 print("=== C03: обходных путей нет ===")
@@ -125,7 +134,9 @@ confirmation = runner.request_confirmation(
 result = runner.call("power_action", {"action": "shutdown"},
                      confirmation_id=confirmation.id)
 check("с подтверждением выполняется", result.ok, f"| {result.message}")
-check("действие произошло", box.actions == ["shutdown"], f"| {box.actions}")
+# Смотрим на просьбу к оболочке, а не на песочницу: ядро больше не
+# трогает машину само, и `box.actions` теперь пуст по существу (ADR 0009).
+check("действие произошло", DONE == ["shutdown"], f"| {DONE}")
 
 box.actions.clear()
 result = runner.call("power_action", {"action": "shutdown"},
@@ -133,7 +144,9 @@ result = runner.call("power_action", {"action": "shutdown"},
 check("повторное предъявление отклонено",
       not result.ok and result.error_code == "confirmation.invalid",
       f"| {result.error_code}")
-check("второй раз не выключилось", not box.actions, f"| {box.actions}")
+# Просьба к оболочке была ровно одна: второе предъявление отклонили до
+# того, как инструмент дошёл до системного слоя.
+check("второй раз не выключилось", DONE == ["shutdown"], f"| {DONE}")
 
 print()
 print("=== подтверждение привязано к аргументам ===")

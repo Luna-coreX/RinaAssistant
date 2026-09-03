@@ -143,9 +143,11 @@ from voice.user_commands import UserCommandStore
 
 settings = MemorySettings()
 audit = AuditLog(path=":memory:")
+# Оболочка-заглушка: системное действие с 4.0-G01 делает она.
 runner = ToolRunner(ToolContext(
     settings=settings, reminders=ReminderStore(settings),
-    commands=UserCommandStore(settings), emit=lambda n, **d: None),
+    commands=UserCommandStore(settings), emit=lambda n, **d: None,
+    system_out=lambda action: (True, "")),
     audit=audit)
 
 before = audit.count()
