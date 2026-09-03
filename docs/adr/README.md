@@ -12,6 +12,8 @@ A decision belongs here when undoing it would mean rewriting rather than editing
 | [0004](0004-versioning-and-compatibility.md) | Versioning — four independent versions; the protocol decides compatibility | accepted | `4.0-U01` |
 | [0005](0005-control-library.md) | Control library — none; own styles over standard WPF | accepted | `4.0-F01b` |
 | [0006](0006-settings-ownership.md) | Settings — the core owns meaning, the shell owns presentation | accepted | `4.0-E06a` |
+| [0007](0007-localisation.md) | Localisation — interface words in the shell, Rina's replies in the core | accepted | `4.0-F08` |
+| [0008](0008-ui-framework.md) | Shell UI framework — WPF, Windows only | accepted | `4.0-F01` |
 
 ## Decided but not yet written up
 
@@ -19,7 +21,6 @@ These were settled in discussion and are recorded in [`../ROADMAP.md`](../ROADMA
 
 | Decision | Plan item |
 |---|---|
-| Shell UI framework — WPF | `4.0-F01` |
 | Plugins run in their own process, in 4.0 | `4.0-H07` |
 | 4.0 split into a frozen port and a feature-bearing beta | `4.0-S03` |
 
