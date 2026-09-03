@@ -44,17 +44,24 @@ public partial class CommandsPage : UserControl
 
     private async Task ReloadAsync()
     {
+        // Виды спрашиваются до списка: иначе первая отрисовка успевает
+        // показать «app» вместо «Программа». Так и было — и увидел это не
+        // прогон проверки, а снимок: проверка щёлкала конструктор раньше и
+        // получала виды заодно, а человек просто открывает страницу.
+        await KindsAsync();
         var told = await Ask(Methods.CommandsList);
         _items.Clear();
         if (told?["items"] is JsonArray items)
         {
             foreach (var item in items)
             {
+                if (item is not JsonObject command) continue;
+                _raw[command["id"]?.GetValue<string>() ?? ""] = command;
                 _items.Add(new UserCommand(
-                    item?["id"]?.GetValue<string>() ?? "",
-                    item?["name"]?.GetValue<string>() ?? S("без имени"),
-                    Describe(item),
-                    item?["enabled"]?.GetValue<bool>() ?? true));
+                    command["id"]?.GetValue<string>() ?? "",
+                    NameOf(command),
+                    Describe(command),
+                    command["enabled"]?.GetValue<bool>() ?? true));
             }
         }
 
@@ -63,21 +70,130 @@ public partial class CommandsPage : UserControl
                                              : Visibility.Collapsed;
     }
 
-    /// <summary>Из чего команда состоит — словами, а не полями.</summary>
-    private static string Describe(JsonNode? item)
+    /// <summary>
+    /// Как назвать команду в списке.
+    /// </summary>
+    /// <remarks>
+    /// Имени у команды нет: есть фразы, по которым она срабатывает, — и
+    /// первая из них и есть то, чем человек её называет. Поле «имя»
+    /// оболочка сначала спрашивала у ядра и получала пустоту: ядро хранит
+    /// `triggers`, и имени в нём никогда не было.
+    /// </remarks>
+    private static string NameOf(JsonObject command)
     {
-        var kind = item?["kind"]?.GetValue<string>() ?? "";
+        var first = command["triggers"]?.AsArray().FirstOrDefault()
+                    ?.GetValue<string>();
+        return string.IsNullOrWhiteSpace(first) ? S("без имени") : first;
+    }
+
+    /// <summary>Из чего команда состоит — словами, а не полями.</summary>
+    /// <remarks>
+    /// Виды называются так же, как их называет ядро (`commands.kinds`):
+    /// оболочка знала свои — `url`, `path` — и не узнавала ни одного
+    /// настоящего. Незнакомый вид показывается как есть, а не прячется.
+    /// </remarks>
+    private string Describe(JsonNode? item)
+    {
+        var kind = item?["type"]?.GetValue<string>() ?? "";
         var target = item?["target"]?.GetValue<string>() ?? "";
         var steps = item?["steps"] as JsonArray;
-        return kind switch
+        if (kind == "sequence")
+            return S("Последовательность · шагов {0}", steps?.Count ?? 0);
+
+        var title = _kinds is null ? kind
+            : _kinds["kinds"]?.AsArray().OfType<JsonObject>()
+                .FirstOrDefault(k => k["value"]?.GetValue<string>() == kind)
+                ?["title"]?.GetValue<string>() ?? kind;
+        return target.Length > 0 ? $"{title} · {target}" : title;
+    }
+
+    /// <summary>Как описана первая команда — для сквозной проверки.</summary>
+    public string FirstDescription() =>
+        _items.Count > 0 ? _items[0].What : "";
+
+    /// <summary>
+    /// Завести команду так же, как её заводит человек.
+    /// </summary>
+    /// <remarks>
+    /// Проверка не умеет печатать в поля и нажимать кнопки, но обязана
+    /// пройти тот же путь: конструктор собирает карточку, ядро назначает
+    /// номер, список перечитывается. Обход этого пути проверял бы
+    /// протокол, а не страницу.
+    /// </remarks>
+    public async Task<bool> CreateForCheckAsync(string phrase, string kind,
+                                                string target)
+    {
+        var kinds = await KindsAsync();
+        if (kinds is null) return false;
+
+        var saved = await Ask(Methods.CommandsSave, new JsonObject
         {
-            "app" => S("Программа · {0}", target),
-            "url" => S("Ссылка · {0}", target),
-            "path" => S("Папка или файл · {0}", target),
-            "sequence" => S("Последовательность · шагов {0}",
-                            steps?.Count ?? 0),
-            _ => target.Length > 0 ? target : kind,
+            ["command"] = new JsonObject
+            {
+                ["enabled"] = true,
+                ["type"] = kind,
+                ["triggers"] = new JsonArray(phrase),
+                ["match"] = "contains",
+                ["target"] = target,
+                ["response"] = "",
+            },
+        });
+        if (saved is null) return false;
+        EditorBox.Content = null;
+        await ReloadAsync();
+        return true;
+    }
+
+    private readonly Dictionary<string, JsonObject> _raw = [];
+    private JsonObject? _kinds;
+
+    /// <summary>Показан ли сейчас конструктор — для сквозной проверки.</summary>
+    public bool EditorOpen => EditorBox.Content is not null;
+
+    /// <summary>Сколько команд в списке — для сквозной проверки.</summary>
+    public int CommandCount => _items.Count;
+
+    private async Task<JsonObject?> KindsAsync()
+        => _kinds ??= await Ask(Methods.CommandsKinds);
+
+    private async void OnCreate(object sender, RoutedEventArgs e)
+        => await OpenEditorAsync(null);
+
+    private async void OnEdit(object sender, RoutedEventArgs e)
+    {
+        if ((sender as Button)?.Tag is not string id) return;
+        await OpenEditorAsync(_raw.GetValueOrDefault(id));
+    }
+
+    /// <summary>
+    /// Открыть конструктор — на пустом месте или над существующей.
+    /// </summary>
+    /// <remarks>
+    /// Создание и правка — одно окно и один метод у ядра
+    /// (`commands.save`): для человека это одно действие, он правит
+    /// карточку и сохраняет. Разделять их значит заставить его помнить,
+    /// заведена команда или ещё нет.
+    /// </remarks>
+    public async Task<bool> OpenEditorAsync(JsonObject? existing)
+    {
+        var kinds = await KindsAsync();
+        if (kinds is null) return false;
+
+        var editor = new CommandEditor(kinds, existing);
+        editor.Cancelled += () => EditorBox.Content = null;
+        editor.Saved += async command =>
+        {
+            var saved = await Ask(Methods.CommandsSave, new JsonObject
+            {
+                ["command"] = command,
+            });
+            if (saved is null) return;
+            EditorBox.Content = null;
+            Note.Text = S("Команда сохранена.");
+            await ReloadAsync();
         };
+        EditorBox.Content = editor;
+        return true;
     }
 
     private async void OnToggle(object sender, RoutedEventArgs e)

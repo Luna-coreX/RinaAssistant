@@ -1,4 +1,10 @@
 {
+  " — необратимо": {
+    "English": " — irreversible"
+  },
+  "Enter — отправить, Esc — скрыть": {
+    "English": "Enter — send, Esc — hide"
+  },
   "Portable-программы ищутся здесь": {
     "English": "Portable apps are looked for here"
   },
@@ -40,6 +46,9 @@
     "Українська": "Зовнішній вигляд",
     "Español": "Apariencia",
     "Deutsch": "Darstellung"
+  },
+  "Время пишется как 19:30.": {
+    "English": "Time is written like 19:30."
   },
   "Всегда слушать": {
     "English": "Always listen",
@@ -107,6 +116,9 @@
     "Español": "Añadir carpeta…",
     "Deutsch": "Ordner hinzufügen…"
   },
+  "Добавить фразу": {
+    "English": "Add a phrase"
+  },
   "Добавленные папки": {
     "English": "Added folders"
   },
@@ -161,6 +173,21 @@
   "Искать нераспознанное": {
     "English": "Search unrecognized commands"
   },
+  "Какое действие": {
+    "English": "Which action"
+  },
+  "Какой адрес открыть": {
+    "English": "Which address to open"
+  },
+  "Какую папку открыть": {
+    "English": "Which folder to open"
+  },
+  "Какую программу открыть": {
+    "English": "Which program to open"
+  },
+  "Команда сохранена.": {
+    "English": "Command saved."
+  },
   "Команды": {
     "English": "Commands",
     "Українська": "Команди",
@@ -200,6 +227,12 @@
   "Модель Whisper": {
     "English": "Whisper model"
   },
+  "НОВАЯ КОМАНДА": {
+    "English": "NEW COMMAND"
+  },
+  "НОВОЕ НАПОМИНАНИЕ": {
+    "English": "NEW REMINDER"
+  },
   "Название модели": {
     "English": "Model name"
   },
@@ -214,6 +247,12 @@
     "Українська": "Нагадування",
     "Español": "Recordatorios",
     "Deutsch": "Erinnerungen"
+  },
+  "Напомнить": {
+    "English": "Remind me"
+  },
+  "Напомню {0}": {
+    "English": "I’ll remind you {0}"
   },
   "Настройки": {
     "English": "Settings",
@@ -232,6 +271,21 @@
     "Українська": "Нічого не заплановано.",
     "Español": "No hay nada programado.",
     "Deutsch": "Es ist nichts geplant."
+  },
+  "Новая команда": {
+    "English": "New command",
+    "Українська": "Нова команда",
+    "Español": "Nuevo comando",
+    "Deutsch": "Neuer Befehl"
+  },
+  "Нужна хотя бы одна фраза.": {
+    "English": "At least one phrase is needed."
+  },
+  "Нужно указать, что делать.": {
+    "English": "You need to say what to do."
+  },
+  "О чём напомнить?": {
+    "English": "What should I remind you about?"
   },
   "Обзор…": {
     "English": "Browse…",
@@ -278,11 +332,14 @@
   "Отправить": {
     "English": "Send"
   },
+  "Отправлено": {
+    "English": "Sent"
+  },
   "Очистить": {
     "English": "Clear"
   },
-  "Папка или файл · {0}": {
-    "English": "Folder or file · {0}"
+  "ПРАВКА КОМАНДЫ": {
+    "English": "EDITING A COMMAND"
   },
   "Плавающая строка команд": {
     "English": "Floating command bar",
@@ -305,6 +362,9 @@
     "Español": "Comportamiento",
     "Deutsch": "Verhalten"
   },
+  "Поверх окон; вызывается сочетанием клавиш": {
+    "English": "On top of other windows; opened by a shortcut"
+  },
   "Подробность журнала": {
     "English": "Log detail",
     "Українська": "Докладність журналу",
@@ -323,8 +383,20 @@
   "Показать": {
     "English": "Show"
   },
+  "Показывать ответы, когда окно скрыто": {
+    "English": "Show answers when the window is hidden"
+  },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
+  },
+  "Последовательность собирается импортом, а не здесь.": {
+    "English": "A sequence is built by importing, not here."
+  },
+  "Появится вместе с обновлениями": {
+    "English": "Arrives together with updates"
+  },
+  "Править": {
+    "English": "Edit"
   },
   "Приватность": {
     "English": "Privacy",
@@ -338,14 +410,14 @@
     "Español": "Buscar actualizaciones",
     "Deutsch": "Nach Updates suchen"
   },
-  "Программа · {0}": {
-    "English": "Program · {0}"
-  },
   "Программы": {
     "English": "Programs",
     "Українська": "Програми",
     "Español": "Programas",
     "Deutsch": "Programme"
+  },
+  "Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*": {
+    "English": "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*"
   },
   "Прочее": {
     "English": "Other"
@@ -407,14 +479,17 @@
     "Español": "Palabras de activación",
     "Deutsch": "Aktivierungswörter"
   },
+  "Сохранить": {
+    "English": "Save",
+    "Українська": "Зберегти",
+    "Español": "Guardar",
+    "Deutsch": "Speichern"
+  },
   "Сохранять историю": {
     "English": "Save history",
     "Українська": "Зберігати історію",
     "Español": "Guardar historial",
     "Deutsch": "Verlauf speichern"
-  },
-  "Ссылка · {0}": {
-    "English": "Link · {0}"
   },
   "Таймер": {
     "English": "Timer",
@@ -452,8 +527,23 @@
   "Устройство по умолчанию": {
     "English": "Default device"
   },
+  "Фразы, по которым сработает": {
+    "English": "Phrases that trigger it"
+  },
   "Характер": {
     "English": "Persona"
+  },
+  "Что ответить (необязательно)": {
+    "English": "What to answer (optional)"
+  },
+  "Что открыть": {
+    "English": "What to open"
+  },
+  "Что произнести": {
+    "English": "What to say out loud"
+  },
+  "Что сделать": {
+    "English": "What to do"
   },
   "Чувствительность активации": {
     "English": "Wake word sensitivity",
@@ -466,6 +556,9 @@
     "Українська": "Експорт",
     "Español": "Exportar",
     "Deutsch": "Exportieren"
+  },
+  "Это действие необратимо — Рина спросит подтверждение.": {
+    "English": "This action is irreversible — Rina will ask for confirmation."
   },
   "Ядро не на связи — команды недоступны.": {
     "English": "The core is offline — commands are unavailable."
@@ -500,8 +593,14 @@
   "выбирать не из чего": {
     "English": "nothing to choose from"
   },
+  "завтра в это же время": {
+    "English": "tomorrow at this time"
+  },
   "записей: {0}": {
     "English": "entries: {0}"
+  },
+  "или ко времени": {
+    "English": "or at a time"
   },
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
@@ -526,6 +625,21 @@
   },
   "сейчас": {
     "English": "now"
+  },
+  "через 15 минут": {
+    "English": "in 15 minutes"
+  },
+  "через 3 часа": {
+    "English": "in 3 hours"
+  },
+  "через 30 минут": {
+    "English": "in 30 minutes"
+  },
+  "через 5 минут": {
+    "English": "in 5 minutes"
+  },
+  "через час": {
+    "English": "in an hour"
   },
   "ядро запускается": {
     "English": "the core is starting"

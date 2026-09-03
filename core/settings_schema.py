@@ -86,6 +86,11 @@ CONSTRAINTS: dict[str, Constraint] = {
 
     # Пути к моделям. Чем выбирать — дело оболочки; ядро говорит лишь,
     # что это путь, а не имя.
+    # Какие действия вообще бывают, знает ядро (`voice/hotkey_actions.py`):
+    # часть из них — его собственные умения. Сочетания к ним назначает
+    # оболочка, потому что клавиатура — система, а система в 4.0 её.
+    "action_hotkeys": Constraint(dynamic=True),
+
     "vosk_model": Constraint(format="folder"),
     # Список папок состоит из путей: оболочке этого хватит, чтобы предложить
     # выбор папки, а не поле, куда путь набирают руками с опечаткой.
@@ -208,6 +213,12 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
         return [{"value": i, "title": t, "available": True}
                 for i, t in engine.voices()]
+    if key == "action_hotkeys":
+        # Здесь «значения» — это то, чему можно назначить сочетание, а не
+        # сами сочетания: их придумывает человек, и перечислить их нельзя.
+        from voice.hotkey_actions import HOTKEY_ACTIONS
+        return [{"value": action, "title": title, "available": True}
+                for action, (title, _hint, _icon) in HOTKEY_ACTIONS.items()]
     if key == "ui_language":
         # Доля перевода не называется числом нарочно: ядро знает только
         # свою половину — реплики Рины, — а слова интерфейса переводит
@@ -258,8 +269,10 @@ def validate(key: str, value: Any, settings=None) -> tuple[bool, str, str]:
             f"«{key}» ожидает {expected}, получено {actual}."
 
     # Динамический набор проверяется по тому, что есть сейчас: список
-    # «какие голоса установлены» вчерашним быть не может.
-    if rule.dynamic:
+    # «какие голоса установлены» вчерашним быть не может. Словарь из-под
+    # этого правила выведен: перечисление говорит, какие у него **ключи**,
+    # а не какое целиком значение допустимо.
+    if rule.dynamic and not isinstance(value, dict):
         allowed = {o["value"] for o in options_for(key, settings or {})}
         if allowed and value not in allowed:
             return False, "settings.invalid_value", \

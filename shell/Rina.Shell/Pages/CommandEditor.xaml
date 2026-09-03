@@ -1,0 +1,67 @@
+<UserControl x:Class="Rina.Shell.Pages.CommandEditor"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+    <StackPanel>
+      <TextBlock x:Name="Legend" Text="{loc:S 'НОВАЯ КОМАНДА'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+
+      <!-- Что сказать. Фраз бывает несколько: «запусти дискорд» и
+           «открой discord» — одно намерение, сказанное по-разному. -->
+      <TextBlock Text="{loc:S 'Фразы, по которым сработает'}"
+                 Style="{StaticResource Text.Body}" />
+      <StackPanel x:Name="Phrases" Margin="0,6,0,0" />
+      <StackPanel Orientation="Horizontal" Margin="0,6,0,12">
+        <TextBox x:Name="NewTrigger" Style="{StaticResource Field}" Width="260" />
+        <Button Style="{StaticResource Btn}" Content="{loc:S 'Добавить фразу'}"
+                Margin="8,0,0,0" Click="OnAddTrigger" />
+      </StackPanel>
+
+      <Grid Margin="0,0,0,12">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <TextBlock Grid.Column="0" Text="{loc:S 'Что сделать'}"
+                   Style="{StaticResource Text.Body}"
+                   VerticalAlignment="Center" Margin="0,0,12,0" />
+        <ComboBox x:Name="Kind" Grid.Column="1" Style="{StaticResource Choice}"
+                  HorizontalAlignment="Left" Width="280"
+                  SelectionChanged="OnKindChanged" />
+      </Grid>
+
+      <StackPanel x:Name="TargetRow" Margin="0,0,0,12">
+        <TextBlock x:Name="TargetLabel" Text="{loc:S 'Что открыть'}"
+                   Style="{StaticResource Text.Body}" Margin="0,0,0,6" />
+        <StackPanel Orientation="Horizontal">
+          <TextBox x:Name="Target" Style="{StaticResource Field}" Width="260" />
+          <Button x:Name="Browse" Style="{StaticResource Btn}"
+                  Content="{loc:S 'Обзор…'}" Margin="8,0,0,0"
+                  Click="OnBrowse" />
+        </StackPanel>
+        <ComboBox x:Name="Action" Style="{StaticResource Choice}" Width="280"
+                  HorizontalAlignment="Left" Visibility="Collapsed" />
+      </StackPanel>
+
+      <TextBlock x:Name="Warning" Style="{StaticResource Text.Meta}"
+                 Foreground="{DynamicResource C.Signal}" TextWrapping="Wrap"
+                 Visibility="Collapsed" Margin="0,0,0,12" />
+
+      <TextBlock Text="{loc:S 'Что ответить (необязательно)'}"
+                 Style="{StaticResource Text.Body}" Margin="0,0,0,6" />
+      <TextBox x:Name="Response" Style="{StaticResource Field}" Width="380"
+               HorizontalAlignment="Left" Margin="0,0,0,12" />
+
+      <StackPanel Orientation="Horizontal">
+        <Button Style="{StaticResource Btn.Primary}"
+                Content="{loc:S 'Сохранить'}" Click="OnSave" />
+        <Button Style="{StaticResource Btn}" Content="{loc:S 'Отмена'}"
+                Margin="8,0,0,0" Click="OnCancel" />
+        <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                   VerticalAlignment="Center" Margin="16,0,0,0"
+                   TextWrapping="Wrap" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

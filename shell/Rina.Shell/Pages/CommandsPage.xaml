@@ -24,6 +24,8 @@
     </StackPanel>
 
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+      <StackPanel>
+      <ContentControl x:Name="EditorBox" />
       <ItemsControl x:Name="Items">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -31,6 +33,7 @@
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
                   <ColumnDefinition Width="Auto" />
@@ -48,6 +51,9 @@
                           VerticalAlignment="Center" Margin="0,0,16,0" />
                 <Button Grid.Column="2" Style="{StaticResource Btn}"
                         Content="{loc:S 'Выполнить'}" Tag="{Binding Id}" Click="OnRun" />
+                <Button Grid.Column="4" Style="{StaticResource Btn}"
+                        Content="{loc:S 'Править'}" Tag="{Binding Id}"
+                        Click="OnEdit" />
                 <Button Grid.Column="3" Style="{StaticResource Btn}"
                         Content="{loc:S 'Удалить'}" Tag="{Binding Id}" Click="OnDelete" />
               </Grid>
@@ -55,9 +61,12 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </StackPanel>
     </ScrollViewer>
 
     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
+      <Button Style="{StaticResource Btn.Primary}"
+              Content="{loc:S 'Новая команда'}" Click="OnCreate" />
       <Button Style="{StaticResource Btn}" Content="{loc:S 'Импорт'}" Click="OnImport" />
       <Button Style="{StaticResource Btn}" Content="{loc:S 'Экспорт'}" Click="OnExport" />
       <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"

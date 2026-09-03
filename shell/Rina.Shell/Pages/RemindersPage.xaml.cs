@@ -39,6 +39,7 @@ public partial class RemindersPage : UserControl
         }
 
         _link.CoreEvent += OnCoreEvent;
+        FillDelays();
         Loaded += async (_, _) => await ReloadAsync();
     }
 
@@ -73,6 +74,105 @@ public partial class RemindersPage : UserControl
         Legend.Text = S("ЗАПЛАНИРОВАНО · {0}", _items.Count);
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
+    }
+
+    /// <summary>Готовые отсрочки: минуты от «сейчас».</summary>
+    /// <remarks>
+    /// Список короткий нарочно. Напоминание «через сколько-то» человек
+    /// ставит на бегу, и выбор из пяти строк быстрее, чем поле, куда надо
+    /// вписать число и выбрать единицу.
+    /// </remarks>
+    private static readonly (int Minutes, string Title)[] Delays =
+    [
+        (5, Word("через 5 минут")),
+        (15, Word("через 15 минут")),
+        (30, Word("через 30 минут")),
+        (60, Word("через час")),
+        (180, Word("через 3 часа")),
+        (1440, Word("завтра в это же время")),
+    ];
+
+    private void FillDelays()
+    {
+        foreach (var (minutes, title) in Delays)
+            When.Items.Add(new ComboBoxItem
+            {
+                Content = S(title),
+                Tag = minutes,
+            });
+        When.SelectedIndex = 1;
+    }
+
+    /// <summary>
+    /// Завести напоминание.
+    /// </summary>
+    /// <remarks>
+    /// Время уходит в ядро **меткой**, а не словами: у окна есть часы, и
+    /// составлять фразу «напомни через пятнадцать минут» ради того, чтобы
+    /// ядро разобрало её обратно, значило бы проверять разбор вместо
+    /// намерения. Разбор остаётся там, где он нужен, — в голосе.
+    /// </remarks>
+    private async void OnCreate(object sender, RoutedEventArgs e)
+    {
+        var text = What.Text.Trim();
+        if (text.Length == 0)
+        {
+            Note.Text = S("О чём напомнить?");
+            return;
+        }
+
+        var when = DateTime.Now;
+        var typed = AtTime.Text.Trim();
+        if (typed.Length > 0)
+        {
+            // «19:30» — сегодня, а если время уже прошло, то завтра:
+            // человек, ставящий напоминание на утро вечером, имеет в виду
+            // завтрашнее утро, а не прошедшее.
+            if (!TimeSpan.TryParse(typed, out var at))
+            {
+                Note.Text = S("Время пишется как 19:30.");
+                return;
+            }
+            when = DateTime.Today + at;
+            if (when <= DateTime.Now) when = when.AddDays(1);
+        }
+        else
+        {
+            var minutes = (When.SelectedItem as ComboBoxItem)?.Tag as int? ?? 15;
+            when = when.AddMinutes(minutes);
+        }
+
+        var answer = await Ask(Methods.RemindersCreate, new JsonObject
+        {
+            ["text"] = text,
+            ["fire_at"] = new DateTimeOffset(when).ToUnixTimeMilliseconds()
+                          / 1000.0,
+        });
+        if (answer is null) return;
+
+        What.Clear();
+        AtTime.Clear();
+        Note.Text = S("Напомню {0}", when.ToString("dd.MM HH:mm"));
+        await ReloadAsync();
+    }
+
+    /// <summary>Сколько напоминаний показано — для сквозной проверки.</summary>
+    public int PlannedCount => _items.Count;
+
+    /// <summary>
+    /// Завести напоминание снаружи — для сквозной проверки.
+    /// </summary>
+    public async Task<bool> CreateAsync(string text, int minutes)
+    {
+        What.Text = text;
+        AtTime.Text = "";
+        When.SelectedItem = When.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (int?)item.Tag == minutes)
+            ?? When.SelectedItem;
+        OnCreate(this, new RoutedEventArgs());
+        for (var i = 0; i < 50 && What.Text.Length > 0; i++)
+            await Task.Delay(100);
+        return What.Text.Length == 0;
     }
 
     /// <summary>

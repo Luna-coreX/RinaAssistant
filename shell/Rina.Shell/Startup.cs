@@ -73,6 +73,14 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-pages"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _shotSection = Value(args, "--section") ?? "commands";
+            _ = CheckPagesAsync(window);
+            return;
+        }
+
         if (args.Contains("--check-voice"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -84,6 +92,22 @@ public partial class App
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = CheckAudioAsync();
+            return;
+        }
+
+        // Снимок плавающей строки: она живёт поверх чужих окон, и в снимок
+        // главного окна не попадает вовсе.
+        if (Value(args, "--shot-bar") is { } barShot)
+        {
+            var bar = new FloatingBar(null);
+            bar.Left = -4000;
+            bar.Top = -4000;
+            bar.Show();
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                Save(bar, barShot);
+                Shutdown();
+            }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             return;
         }
 
@@ -128,6 +152,12 @@ public partial class App
 
             _link = new CoreLink(window, CoreLink.FindCore());
             window.Link = _link;
+
+            // Уведомления: то, чего человек не видит, ему говорят. Событие
+            // берётся то же, что рисует окно, — второго источника ответов
+            // Рины быть не должно.
+            _link.CoreEvent += message => OnCoreEventForTray(window, message);
+
             _ = _link.StartAsync();
             _ = ApplySystemSettingsAsync(window);
 
@@ -535,6 +565,103 @@ public partial class App
     }
 
     /// <summary>
+    /// F04: команду и напоминание заводят из окна.
+    /// </summary>
+    /// <remarks>
+    /// Ядро под песочницей: проверка заводит настоящие записи, и хранилище
+    /// человека для этого не трогают. Именно поэтому проверка и возможна —
+    /// «завести» иначе означало бы оставить след в чужих данных.
+    /// </remarks>
+    private async Task CheckPagesAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== F04: страницы заводят записи ===");
+        var real = CoreLink.FindCore();
+        var link = new CoreLink(window, new Rina.Protocol.CoreLaunch(
+            real.Python,
+            Path.Combine(real.WorkingDirectory, "tools", "_core_sandboxed.py"),
+            real.WorkingDirectory));
+        window.Link = link;
+        window.Show();
+        await link.StartAsync();
+        for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
+            await Task.Delay(100);
+        Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
+              $"| {link.State}");
+
+        // --- команды ---
+        window.ShowSectionFor("commands");
+        await Task.Delay(1200);
+        if (window.CurrentPage is Pages.CommandsPage commands)
+        {
+            var before = commands.CommandCount;
+            var opened = await commands.OpenEditorAsync(null);
+            Check("конструктор открылся", opened && commands.EditorOpen);
+
+            var saved = await commands.CreateForCheckAsync(
+                "открой блокнот", "app", @"C:\Windows\System32\notepad.exe");
+            Check("команда заведена из окна", saved,
+                  $"| было {before}, стало {commands.CommandCount}");
+            Check("и появилась в списке",
+                  commands.CommandCount == before + 1,
+                  $"| {commands.CommandCount}");
+            // Страница строится заново: описание обязано быть человеческим
+            // на первой же отрисовке, а не после того, как что-то успело
+            // подгрузить виды по дороге.
+            window.ShowSectionFor("dialog");
+            await Task.Delay(300);
+            window.ShowSectionFor("commands");
+            await Task.Delay(1200);
+            var fresh = window.CurrentPage as Pages.CommandsPage;
+            Check("список показывает её словами, а не полями",
+                  fresh?.FirstDescription().Contains("Программа") == true,
+                  $"| «{fresh?.FirstDescription()}»");
+        }
+        else Check("страница команд открылась", false);
+
+        // --- напоминания ---
+        window.ShowSectionFor("reminders");
+        await Task.Delay(1200);
+        if (window.CurrentPage is Pages.RemindersPage reminders)
+        {
+            var before = reminders.PlannedCount;
+            var made = await reminders.CreateAsync("проверить почту", 15);
+            Check("напоминание заведено из окна", made);
+            await Task.Delay(400);
+            Check("и появилось в списке",
+                  reminders.PlannedCount == before + 1,
+                  $"| было {before}, стало {reminders.PlannedCount}");
+        }
+        else Check("страница напоминаний открылась", false);
+
+        // Снимок с настоящими записями: пустая страница и страница с одной
+        // командой выглядят по-разному, и проверять стоит вторую.
+        if (Value(Environment.GetCommandLineArgs(), "--shot") is { } shot)
+        {
+            window.ShowSectionFor(_shotSection);
+            await Task.Delay(800);
+            Save(window, shot);
+        }
+
+        window.Hide();
+        await link.DisposeAsync();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
     /// E04 + F10: ядро синтезирует, оболочка воспроизводит.
     /// </summary>
     /// <remarks>
@@ -767,7 +894,8 @@ public partial class App
         if (_link is null) return;
         var values = await _link.GetAsync("autostart", "minimize_to_tray",
                                           "start_minimized", "hotkey",
-                                          "action_hotkeys");
+                                          "action_hotkeys", "notifications",
+                                          "floating_command_bar");
         if (values is null) return;
 
         var wanted = values["autostart"]?.GetValue<bool>() ?? false;
@@ -781,14 +909,163 @@ public partial class App
         if (values["hotkey"]?.GetValue<string>() is { Length: > 0 } main)
             _hotkeys?.Bind("main", main, () => window.OnMainHotkey());
 
+        // Сочетания действий. Список действий прислало ядро — оно знает,
+        // что бывает; исполняет их оболочка, потому что клавиатура,
+        // окно и трей принадлежат ей.
+        if (values["action_hotkeys"] is JsonObject bound)
+            BindActions(window, bound);
+
+        _notify = values["notifications"]?.GetValue<bool>() ?? true;
+        if (values["floating_command_bar"]?.GetValue<bool>() == true)
+            ShowFloatingBar(window);
+
         if (values["start_minimized"]?.GetValue<bool>() == true)
             window.Hide();
+    }
+
+    private bool _notify = true;
+    private FloatingBar? _bar;
+
+    /// <summary>
+    /// Привязать сочетания к действиям.
+    /// </summary>
+    /// <remarks>
+    /// Занятое чужой программой сочетание — обычное дело, и человек узнаёт
+    /// об этом строкой в подвале, а не молчанием: сочетание, которое просто
+    /// не работает, выглядит поломкой Рины.
+    /// </remarks>
+    private void BindActions(MainWindow window, JsonObject bound)
+    {
+        foreach (var (action, node) in bound)
+        {
+            if (node?.GetValue<string>() is not { Length: > 0 } combination)
+                continue;
+            var act = action;
+            _hotkeys?.Bind(act, combination, () => RunAction(window, act));
+        }
+    }
+
+    private void RunAction(MainWindow window, string action)
+    {
+        switch (action)
+        {
+            case "listen":
+                _ = _link?.ListenOnceAsync();
+                break;
+            case "toggle_always":
+                _ = ToggleAlwaysAsync();
+                break;
+            case "show_hide":
+                if (window.IsVisible) _tray?.Hide();
+                else _tray?.Show();
+                break;
+            case "mute":
+                _ = ToggleVoiceAsync();
+                break;
+            case "focus_command":
+                _tray?.Show();
+                window.ShowSectionFor("dialog");
+                break;
+            case "floating_bar":
+                if (_bar is { IsVisible: true }) _bar.Hide();
+                else ShowFloatingBar(window);
+                break;
+        }
+    }
+
+    private async Task ToggleAlwaysAsync()
+    {
+        if (_link is null) return;
+        var now = await _link.GetAsync("always_listen");
+        var on = now?["always_listen"]?.GetValue<bool>() ?? false;
+        await _link.SetAsync("always_listen", !on);
+    }
+
+    private async Task ToggleVoiceAsync()
+    {
+        if (_link is null) return;
+        var now = await _link.GetAsync("voice_reply");
+        var on = now?["voice_reply"]?.GetValue<bool>() ?? true;
+        await _link.SetAsync("voice_reply", !on);
+    }
+
+    /// <summary>
+    /// Применить настройку, которой распоряжается оболочка.
+    /// </summary>
+    /// <remarks>
+    /// Ядро хранит намерение и уже его записало; здесь оболочка приводит
+    /// себя в соответствие. Тот же порядок, что у отделки и языка: одна
+    /// настройка, две стороны, каждая делает своё.
+    /// </remarks>
+    public void ApplyShellSetting(string key, System.Text.Json.Nodes.JsonNode value)
+    {
+        var window = MainWindow as MainWindow;
+        switch (key)
+        {
+            case "notifications":
+                _notify = value.GetValue<bool>();
+                break;
+            case "minimize_to_tray":
+                if (window is not null)
+                    window.MinimiseToTray = value.GetValue<bool>();
+                break;
+            case "floating_command_bar":
+                if (value.GetValue<bool>()) ShowFloatingBar(window!);
+                else _bar?.Hide();
+                break;
+            case "action_hotkeys":
+                if (window is not null && value is JsonObject bound)
+                {
+                    // Перепривязка целиком: снятое сочетание должно
+                    // перестать работать, а не остаться висеть до
+                    // перезапуска.
+                    _hotkeys?.Dispose();
+                    _hotkeys = new Hotkeys();
+                    _hotkeys.Attach(window);
+                    _hotkeys.Refused += (name, why) => window.ShowNote($"{name}: {why}");
+                    BindActions(window, bound);
+                }
+                break;
+        }
+    }
+
+    /// <summary>Показать плавающую строку, заведя её при надобности.</summary>
+    private void ShowFloatingBar(MainWindow window)
+    {
+        _bar ??= new FloatingBar(_link);
+        _bar.Summon();
+    }
+
+    /// <summary>
+    /// Показать уведомление, если окна не видно.
+    /// </summary>
+    /// <remarks>
+    /// Всплывающее сообщение о том, что и так написано в открытом окне, —
+    /// шум, и человек учится его не читать. Поэтому условие не «пришёл
+    /// ответ», а «пришёл ответ, которого он не видит».
+    /// </remarks>
+    private void OnCoreEventForTray(MainWindow window,
+                                    Rina.Protocol.Envelope message)
+    {
+        if (!_notify || window.IsVisible) return;
+
+        if (message.Method == "assistant.response")
+        {
+            var text = message.Payload["text"]?.GetValue<string>() ?? "";
+            if (text.Length > 0) _tray?.Notify("Рина", text);
+        }
+        else if (message.Method == "reminder.fired")
+        {
+            var text = message.Payload["item"]?["text"]?.GetValue<string>() ?? "";
+            _tray?.Notify("Напоминание", text.Length > 0 ? text : "Пора.");
+        }
     }
 
     protected override void OnExit(ExitEventArgs e)
     {
         // Ядро завершается само, увидев обрыв (§13), но попрощаться вежливо
         // дешевле, чем полагаться на это: у него есть что закрыть.
+        _bar?.Close();
         _hotkeys?.Dispose();
         _tray?.Dispose();
         _link?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(6));

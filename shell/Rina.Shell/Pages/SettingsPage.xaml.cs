@@ -236,21 +236,31 @@ public partial class SettingsPage : UserControl
         var type = spec["type"]?.GetValue<string>() ?? "string";
         var value = _values.GetValueOrDefault(key);
 
+        // Порядок разбора — от устройства значения к его набору, а не
+        // наоборот. Список и словарь правят по-своему, что бы ядро о них
+        // ни перечислило: у «сочетаний действий» перечислены **ключи**
+        // словаря, и прочитать его как строку значит уронить страницу —
+        // ровно это и случилось при первом же живом прогоне.
+        if (type == "array")
+            // У списка папок есть и тип «массив», и формат «путь». Массив
+            // решает, чем правят; формат — чем добавляют.
+            return BuildList(key, value as JsonArray,
+                             spec["format"]?.GetValue<string>() ?? "");
+
+        // Словарь, у которого ядро перечислило ключи, — это не «счётчик и
+        // забыть все», а список: каждому известному действию своя строка.
+        if (type == "object")
+            return _options.TryGetValue(key, out var actions)
+                   && actions.Count > 0
+                ? BuildAssignments(key, actions, value as JsonObject)
+                : BuildMap(key, value as JsonObject);
+
         // Список известных значений — выпадающий список, а не строка.
         // Набор пришёл от того, кто его знает: от ядра или от оболочки.
         if (_options.TryGetValue(key, out var known))
             return known.Count > 0
                 ? BuildChoice(key, known, value?.GetValue<string>() ?? "")
                 : Nothing();
-
-        // Путь: строка плюс «Обзор…». Каким окном выбирать — решает
-        // оболочка, ядро сказало лишь, что это путь.
-        // Порядок важен: у списка папок есть и тип «массив», и формат
-        // «путь». Массив решает, чем правят; формат — чем добавляют.
-        if (type == "array")
-            return BuildList(key, value as JsonArray,
-                             spec["format"]?.GetValue<string>() ?? "");
-        if (type == "object") return BuildMap(key, value as JsonObject);
 
         if (spec["format"]?.GetValue<string>() is { } format)
             return BuildPath(key, format, Show(value));
@@ -516,6 +526,71 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
+    /// Назначения: строка на каждое известное действие.
+    /// </summary>
+    /// <remarks>
+    /// «Записей: 0 · сбросить все» было честно ровно до тех пор, пока
+    /// назначить сочетание было негде. Человек, увидевший счётчик, не
+    /// узнает ни какие действия бывают, ни как к ним привязаться, — а
+    /// список действий у ядра есть, и он его прислал.
+    ///
+    /// Сочетание набирают, а не «нажимают для записи»: перехват нажатия
+    /// ради записи означал бы, что окно слушает клавиатуру целиком — то
+    /// самое, чего <c>Hotkeys</c> избегает нарочно.
+    /// </remarks>
+    private FrameworkElement BuildAssignments(string key,
+        List<(string Value, string Title, bool Available)> actions,
+        JsonObject? current)
+    {
+        var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Right };
+        var assigned = new JsonObject();
+        foreach (var (name, _t, _a) in actions)
+        {
+            var combination = current?[name]?.GetValue<string>() ?? "";
+            if (combination.Length > 0) assigned[name] = combination;
+        }
+
+        foreach (var (name, title, _) in actions)
+        {
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 4),
+            };
+            row.Children.Add(new TextBlock
+            {
+                Text = title,
+                Style = (Style)FindResource("Text.Meta"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Width = 190,
+                TextAlignment = TextAlignment.Right,
+                Margin = new Thickness(0, 0, 8, 0),
+            });
+
+            var field = new TextBox
+            {
+                Style = (Style)FindResource("Field"),
+                Width = 150,
+                Text = current?[name]?.GetValue<string>() ?? "",
+            };
+            field.LostFocus += async (_, _) =>
+            {
+                var typed = field.Text.Trim();
+                var next = new JsonObject();
+                foreach (var (existing, node) in assigned)
+                    if (existing != name && node is not null)
+                        next[existing] = node.DeepClone();
+                if (typed.Length > 0) next[name] = typed;
+                await SaveAsync(key, next);
+            };
+            row.Children.Add(field);
+            stack.Children.Add(row);
+        }
+        return stack;
+    }
+
+    /// <summary>
     /// Словарь: сколько записей и как забыть их все.
     /// </summary>
     /// <remarks>
@@ -616,6 +691,13 @@ public partial class SettingsPage : UserControl
             // сказать ей об этом больше некому (ADR 0007).
             if (key == "ui_language")
                 Strings.Loc.Use(value.GetValue<string>());
+
+            // Переключатели оболочки применяются на месте: настройка,
+            // ждущая перезапуска, читается как сломанная.
+            if (key is "floating_command_bar" or "notifications"
+                    or "minimize_to_tray" or "action_hotkeys"
+                && System.Windows.Application.Current is App app)
+                app.ApplyShellSetting(key, value);
             // Смена движка меняет набор голосов: списки перечитываются, а не
             // остаются от прошлого движка.
             if (key is "tts_engine" or "stt_engine") await LoadOptionsAsync();

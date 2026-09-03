@@ -33,6 +33,7 @@
         "commands.delete",
         "commands.export",
         "commands.import",
+        "commands.kinds",
         "commands.list",
         "commands.save",
         "commands.set_enabled"
@@ -70,6 +71,7 @@
     "reminders": {
       "methods": [
         "reminders.cancel",
+        "reminders.create",
         "reminders.list"
       ],
       "side": "core"
@@ -415,6 +417,7 @@
     "commands.delete": "commands",
     "commands.export": "commands",
     "commands.import": "commands",
+    "commands.kinds": "commands",
     "commands.list": "commands",
     "commands.save": "commands",
     "commands.set_enabled": "commands",
@@ -432,6 +435,7 @@
     "plugins.set_enabled": "plugins",
     "pong": null,
     "reminders.cancel": "reminders",
+    "reminders.create": "reminders",
     "reminders.list": "reminders",
     "settings.describe": null,
     "settings.get": null,

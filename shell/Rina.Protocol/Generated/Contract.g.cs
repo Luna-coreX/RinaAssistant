@@ -49,6 +49,8 @@ public static class Methods
     /// <summary>Возможность: commands.</summary>
     public const string CommandsImport = "commands.import";
     /// <summary>Возможность: commands.</summary>
+    public const string CommandsKinds = "commands.kinds";
+    /// <summary>Возможность: commands.</summary>
     public const string CommandsList = "commands.list";
     /// <summary>Возможность: commands.</summary>
     public const string CommandsSave = "commands.save";
@@ -82,6 +84,8 @@ public static class Methods
     public const string Pong = "pong";
     /// <summary>Возможность: reminders.</summary>
     public const string RemindersCancel = "reminders.cancel";
+    /// <summary>Возможность: reminders.</summary>
+    public const string RemindersCreate = "reminders.create";
     /// <summary>Возможность: reminders.</summary>
     public const string RemindersList = "reminders.list";
     /// <summary>Базовый метод.</summary>
@@ -128,6 +132,7 @@ public static class Methods
             ["commands.delete"] = "commands",
             ["commands.export"] = "commands",
             ["commands.import"] = "commands",
+            ["commands.kinds"] = "commands",
             ["commands.list"] = "commands",
             ["commands.save"] = "commands",
             ["commands.set_enabled"] = "commands",
@@ -145,6 +150,7 @@ public static class Methods
             ["plugins.set_enabled"] = "plugins",
             ["pong"] = null,
             ["reminders.cancel"] = "reminders",
+            ["reminders.create"] = "reminders",
             ["reminders.list"] = "reminders",
             ["settings.describe"] = null,
             ["settings.get"] = null,

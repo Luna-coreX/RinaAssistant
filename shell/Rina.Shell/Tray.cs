@@ -128,6 +128,29 @@ public sealed class Tray : IDisposable
 
     public void Hide() => _window.Hide();
 
+    /// <summary>
+    /// Сказать человеку то, чего он не видит.
+    /// </summary>
+    /// <remarks>
+    /// Уведомление показывается, только когда окно не на виду: всплывающее
+    /// сообщение о том, что и так написано в открытом окне, — это шум, и
+    /// человек учится его не читать. Настройка `notifications` при этом
+    /// главнее: выключил — значит не показывать вовсе.
+    /// </remarks>
+    public void Notify(string title, string message)
+    {
+        if (!Created) return;
+        try
+        {
+            _icon.ShowNotification(title, message);
+        }
+        catch
+        {
+            // Windows вправе не показать: тихий час, политика, переполненная
+            // очередь. Это не повод падать — уведомление не обязательство.
+        }
+    }
+
     public void Dispose()
     {
         _icon.Dispose();

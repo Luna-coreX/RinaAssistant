@@ -28,11 +28,11 @@ public partial class MainWindow : Window
     /// <summary>Разделы в том порядке, в каком они стоят в колонке.</summary>
     private static readonly (string Name, string Title)[] SectionList =
     [
-        ("dialog", "Диалог"),
-        ("commands", "Команды"),
-        ("reminders", "Напоминания"),
-        ("plugins", "Плагины"),
-        ("settings", "Настройки"),
+        ("dialog", Word("Диалог")),
+        ("commands", Word("Команды")),
+        ("reminders", Word("Напоминания")),
+        ("plugins", Word("Плагины")),
+        ("settings", Word("Настройки")),
     ];
 
     private readonly Dictionary<string, Func<UIElement>> _pages;

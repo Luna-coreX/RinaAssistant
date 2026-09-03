@@ -300,6 +300,42 @@ public sealed class CoreLink : IAsyncDisposable
 
     private Pages.ConfirmWindow? _asking;
 
+    /// <summary>Сказать Рине то, что набрано.</summary>
+    /// <remarks>
+    /// Ответ придёт событием, а не этим вызовом: команда может думать
+    /// секундами и сказать по дороге несколько вещей.
+    /// </remarks>
+    public async Task HandleAsync(string text, string source = "typed")
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        try
+        {
+            await connection.CallAsync(Methods.CommandHandle, new JsonObject
+            {
+                ["text"] = text,
+                ["source"] = source,
+                ["require_wake"] = false,
+            }, TimeSpan.FromSeconds(15));
+        }
+        catch { /* ядро занято или ушло */ }
+    }
+
+    /// <summary>Переключить настройку, которой распоряжается человек.</summary>
+    public async Task<bool> SetAsync(string key, JsonNode value)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return false;
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsSet,
+                new JsonObject
+                {
+                    ["values"] = new JsonObject { [key] = value },
+                }, TimeSpan.FromSeconds(10));
+            return !answer.IsError;
+        }
+        catch { return false; }
+    }
+
     /// <summary>Послушать один раз — по сочетанию клавиш.</summary>
     public async Task ListenOnceAsync()
     {

@@ -67,6 +67,17 @@ public static partial class Loc
             ? translated : key;
     }
 
+    /// <summary>
+    /// Пометить строку как переводимую, не переводя её здесь.
+    /// </summary>
+    /// <remarks>
+    /// Для мест, где перевод обязан случиться позже: статическая таблица
+    /// застыла бы на языке, который был в момент загрузки типа. Возвращает
+    /// строку как есть — вся работа в том, что её видят сборщик таблицы
+    /// переводов и проверка.
+    /// </remarks>
+    public static string Word(string key) => key;
+
     /// <summary>Перевести и подставить: <c>S("Осталось {0}", n)</c>.</summary>
     public static string S(string key, params object?[] arguments)
     {

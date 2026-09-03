@@ -13,6 +13,33 @@
                Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
 
     <StackPanel Grid.Row="1" Margin="0,0,0,16">
+      <!-- Завести напоминание можно и голосом; здесь — руками, потому что
+           «через двадцать минут» проще выбрать, чем выговорить так, чтобы
+           разбор понял с первого раза. -->
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="{loc:S 'НОВОЕ НАПОМИНАНИЕ'}"
+                     Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+          <StackPanel Orientation="Horizontal">
+            <TextBox x:Name="What" Style="{StaticResource Field}" Width="320" />
+            <ComboBox x:Name="When" Style="{StaticResource Choice}" Width="200"
+                      Margin="8,0,0,0" />
+            <Button Style="{StaticResource Btn.Primary}"
+                    Content="{loc:S 'Напомнить'}" Margin="8,0,0,0"
+                    Click="OnCreate" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+            <TextBlock Text="{loc:S 'или ко времени'}"
+                       Style="{StaticResource Text.Meta}"
+                       VerticalAlignment="Center" Margin="0,0,8,0" />
+            <TextBox x:Name="AtTime" Style="{StaticResource Field}" Width="90" />
+            <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                       VerticalAlignment="Center" Margin="16,0,0,0"
+                       TextWrapping="Wrap" />
+          </StackPanel>
+        </StackPanel>
+      </Border>
+
       <TextBlock x:Name="Legend" Text="{loc:S 'ЗАПЛАНИРОВАНО'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <TextBlock x:Name="Empty" Text="{loc:S 'Ничего не запланировано.'}"

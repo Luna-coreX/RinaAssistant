@@ -265,7 +265,9 @@ class ProtocolServer:
             "settings.options": self._settings_options,
             "reminders.list": self._reminders_list,
             "reminders.cancel": self._reminders_cancel,
+            "reminders.create": self._reminders_create,
             "commands.list": self._commands_list,
+            "commands.kinds": self._commands_kinds,
             "commands.save": self._commands_save,
             "commands.delete": self._commands_delete,
             "commands.set_enabled": self._commands_set_enabled,
@@ -456,6 +458,45 @@ class ProtocolServer:
         store = self._reminders()
         return {"items": [dict(item) for item in store.active()]}
 
+    def _reminders_create(self, message: Envelope) -> dict:
+        """
+        Завести напоминание из окна.
+
+        Голосом это делается разбором фразы («напомни в семь про хлеб»), и
+        поначалу казалось, что окну хватит того же пути. Не хватает:
+        человек у экрана выбирает время в поле, а не проговаривает его
+        словами, и заставлять оболочку составлять русскую фразу ради
+        обратного разбора — значит проверять разбор вместо намерения.
+
+        Время приходит меткой, а не словами: у оболочки есть календарь, и
+        часовой пояс у неё тот же, что у ядра, — оба живут на одной машине.
+        """
+        store = self._reminders()
+        if store is None:
+            raise fault("internal", "Напоминания недоступны.")
+
+        text = str(message.payload.get("text", "")).strip()
+        if not text:
+            raise fault("protocol.invalid_payload",
+                        "Напоминание без текста не о чем.")
+        try:
+            fire_at = float(message.payload.get("fire_at", 0))
+        except (TypeError, ValueError):
+            fire_at = 0.0
+        if fire_at <= 0:
+            raise fault("protocol.invalid_payload",
+                        "Нужно время, когда напомнить.")
+
+        # Вид влияет только на то, как напоминание назовут человеку
+        # («Будильник», «Таймер», «Напоминание»), и оболочка вправе его не
+        # знать: заведённому из окна подходит обычное напоминание.
+        kind = str(message.payload.get("kind", "reminder") or "reminder")
+        # События о заведении нет намеренно: список запросит тот, кто
+        # завёл, и он же его показывает. Событие понадобилось бы, если бы
+        # напоминания заводились помимо оболочки, — но голосом их заводит
+        # та же оболочка тем же соединением.
+        return {"item": dict(store.add(kind, fire_at, text))}
+
     def _reminders_cancel(self, message: Envelope) -> dict:
         store = self._reminders()
         if message.payload.get("all"):
@@ -470,6 +511,33 @@ class ProtocolServer:
 
     def _commands_list(self, message: Envelope) -> dict:
         return {"items": [dict(c) for c in self._commands().all()]}
+
+    def _commands_kinds(self, message: Envelope) -> dict:
+        """
+        Из чего команда бывает сделана.
+
+        Имена вещей приходят оттуда, где вещи живут (то же правило, что у
+        `settings.options`): виды команд и системные действия перечисляет
+        ядро, потому что выполнять их ему. Оболочка, знающая этот список
+        наизусть, разошлась бы с ядром молча — и показала бы человеку
+        действие, которого больше нет, или спрятала бы новое.
+
+        Здесь же сказано, какое действие **необратимо**: подтверждение
+        спрашивает ядро (§11), но человек должен видеть это ещё в
+        конструкторе, а не узнать при первом срабатывании.
+        """
+        from voice import user_commands
+
+        return {
+            "kinds": [{"value": kind, "title": title, "icon": icon}
+                      for kind, title, icon in user_commands.COMMAND_TYPES],
+            "actions": [{"value": action, "title": title,
+                         "destructive": action
+                         in user_commands.DESTRUCTIVE_ACTIONS}
+                        for action, title in user_commands.SYSTEM_ACTIONS],
+            "matches": [{"value": "contains", "title": "Фраза встречается"},
+                        {"value": "exact", "title": "Фраза целиком"}],
+        }
 
     def _commands_save(self, message: Envelope) -> dict:
         """
