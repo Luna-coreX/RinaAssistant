@@ -201,6 +201,17 @@ check("у записей есть разрешения инструмента",
 
 print()
 print("=== инвариант: журнал не превращается в стенограмму ===")
+
+# Условие задаётся здесь, а не берётся из настроек машины: инвариант верен
+# при выключенной записи текстов, и проверка обязана это сказать, а не
+# унаследовать. Первая редакция краснела на машине, где `log_texts`
+# включён, — то есть проверяла оператора, а не программу.
+from core.settings_store import settings as real_settings
+
+real_settings.load()
+was_verbatim = bool(real_settings.get("log_texts", False))
+real_settings._data["log_texts"] = False        # только в памяти: не пишем
+
 runner.call("web_search", {"query": "как приготовить борщ"}, source="typed")
 row = audit.recent(1)[0]
 check("свободный текст не записан дословно",
@@ -218,6 +229,17 @@ row = audit.recent(1)[0]
 check("текст напоминания скрыт, а срок виден",
       row["args"]["text"].startswith("<") and row["args"]["seconds"] == 600,
       f"| {row['args']}")
+
+# И обратное: включённая запись текстов действительно пишет их. Настройка,
+# которая ничего не меняет, — худшее, что может случиться с настройкой
+# приватности: человек думает, что разрешил, а журнал пуст.
+real_settings._data["log_texts"] = True
+runner.call("web_search", {"query": "как приготовить борщ"}, source="typed")
+verbatim_row = audit.recent(1)[0]
+check("при включённой записи текст виден целиком",
+      verbatim_row["args"].get("query") == "как приготовить борщ",
+      f"| {verbatim_row['args']}")
+real_settings._data["log_texts"] = was_verbatim
 
 print()
 print("ИТОГО ошибок:", fails)

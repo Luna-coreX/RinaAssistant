@@ -63,6 +63,13 @@ class ToolContext:
     #: причине: между намерением и созданием процесса должен стоять кто-то
     #: ещё, и этот кто-то — не тот, кто слушает микрофон.
     launch_app: Callable = None
+    #: Откуда брать индекс программ.
+    #:
+    #: Появилось потому, что без этого инструменты искали в **другом**
+    #: списке, чем роутер: роутер спрашивал оболочку (4.0-G06), а они —
+    #: кэш сканера, который в 4.0 никто не наполняет. Рина предлагала
+    #: выбрать из трёх и отвечала, что не нашла ни одной.
+    apps: Callable = None
 
 
 class ToolResult:
@@ -92,12 +99,28 @@ class ToolResult:
 # ---------------------------------------------------------------------------
 # Реализации. Достижимы только через ToolRunner.call.
 # ---------------------------------------------------------------------------
+def _index(ctx):
+    """
+    Индекс программ — тот же, что видит роутер.
+
+    Ровно один источник: два списка, отвечающие на один вопрос, однажды
+    ответят по-разному, и это уже случилось.
+    """
+    source = getattr(ctx, "apps", None)
+    if source is not None:
+        return source() or []
+
+    from voice import app_index
+
+    return app_index.cached_index() or []
+
+
 def _launch_app(ctx, args):
     from voice import app_index
 
     name = args["name"]
     entry = None
-    for candidate in app_index.cached_index() or []:
+    for candidate in _index(ctx):
         if candidate.name == name:
             entry = candidate
             break
@@ -133,9 +156,7 @@ def _launch_app(ctx, args):
 
 
 def _list_apps(ctx, args):
-    from voice import app_index
-
-    entries = app_index.cached_index() or []
+    entries = _index(ctx)
     query = (args.get("query") or "").strip().lower()
     if query:
         entries = [e for e in entries if query in e.name.lower()]

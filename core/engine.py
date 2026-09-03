@@ -130,6 +130,8 @@ class RinaEngine:
                 launch_app=lambda launch, kind: (
                     self.launch_out(launch, kind) if self.launch_out
                     else (False, "нет связи с оболочкой")),
+                # Тот же список, что у роутера: см. `_apps`.
+                apps=self._apps,
             ),
             features=self._features,
         )
@@ -140,6 +142,13 @@ class RinaEngine:
         if plugin_manager is not None:
             plugin_manager.changed.connect(self._sync_plugin_tools)
             self._sync_plugin_tools()
+
+            # Плагин говорит через ядро, а не сам: у него нет ни голоса, ни
+            # окна. В 3.1.0 его реплику слушало окно приложения; окна
+            # больше нет, и без этой подписки плагин записывал заметку и
+            # молчал о ней.
+            plugin_manager.response.connect(
+                lambda plugin_id, text: self.say(text))
         self._executor = Executor(
             say=lambda text, sound="response": self.say(text, sound=sound),
             tools=self._tools,
