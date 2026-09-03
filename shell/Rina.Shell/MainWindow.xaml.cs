@@ -37,6 +37,15 @@ public partial class MainWindow : Window
 
     private readonly Dictionary<string, Func<UIElement>> _pages;
 
+    //: Разделы включённых плагинов: `plugin:<id>` → как назвать.
+    //:
+    //: Замечание человека: в 3.1.0 плагин со своей вкладкой получал место
+    //: в колонке, после переезда его страница жила внутри списка плагинов.
+    //: Разница существенная: раздел — это «я этим пользуюсь», карточка в
+    //: списке — «я это установил». Заметки открывают каждый день, список
+    //: плагинов — раз в месяц.
+    private readonly List<(string Name, string Title)> _pluginSections = [];
+
     public MainWindow()
     {
         InitializeComponent();
@@ -84,11 +93,13 @@ public partial class MainWindow : Window
     private void BuildSections()
     {
         Sections.Children.Clear();
-        foreach (var (name, title) in SectionList)
+        foreach (var (name, title) in SectionList.Select(
+                     s => (s.Name, S(s.Title)))
+                 .Concat(_pluginSections))
         {
             var item = new RadioButton
             {
-                Content = S(title),
+                Content = title,
                 Tag = name,
                 GroupName = "sections",
                 Style = (Style)FindResource("Nav.Item"),
@@ -244,6 +255,53 @@ public partial class MainWindow : Window
                 break;
         }
     }
+
+    /// <summary>
+    /// Обновить разделы плагинов.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Раздел получает только <b>включённый</b> плагин со своей страницей:
+    /// выключенный не загружен, и спрашивать его страницу не у кого.
+    /// </para>
+    /// <para>
+    /// Открытый раздел сохраняется, если он ещё существует. Иначе
+    /// выключение одного плагина выбрасывало бы человека из другого.
+    /// </para>
+    /// </remarks>
+    public void ShowPluginSections(
+        IEnumerable<(string Id, string Title, string Icon)> plugins)
+    {
+        var wanted = plugins
+            .Select(p => ($"plugin:{p.Id}",
+                          p.Icon.Length > 0 ? $"{p.Icon}  {p.Title}" : p.Title))
+            .ToList();
+
+        if (wanted.Select(w => w.Item1).SequenceEqual(
+                _pluginSections.Select(p => p.Name)))
+            return;                                  // ничего не изменилось
+
+        foreach (var (name, _) in _pluginSections) _pages.Remove(name);
+        _pluginSections.Clear();
+
+        foreach (var (name, title) in wanted)
+        {
+            var id = name["plugin:".Length..];
+            _pluginSections.Add((name, title));
+            _pages[name] = () => new Pages.PluginView(Link, id);
+        }
+
+        var open = _section;
+        BuildSections();
+        _section = "";
+        ShowSection(_pages.ContainsKey(open) ? open : "dialog");
+    }
+
+    /// <summary>Какие разделы есть сейчас — для сквозной проверки.</summary>
+    public string[] SectionNames() => Sections.Children
+        .OfType<System.Windows.Controls.RadioButton>()
+        .Select(item => (string)item.Tag)
+        .ToArray();
 
     /// <summary>Отделка, которую показывает окно.</summary>
     public void ShowFinish(string finish) => _finish = finish;

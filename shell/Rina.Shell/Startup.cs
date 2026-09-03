@@ -450,6 +450,15 @@ public partial class App
                   $"| элементов {drawn}");
 
             var after = await plugins.EnabledAsync();
+            // Раздел плагина в колонке (замечание человека): «я этим
+            // пользуюсь» — это место слева, а не карточка в списке
+            // установленного.
+            await link.RefreshPluginSectionsAsync();
+            await Task.Delay(400);
+            Check("у плагина со страницей есть свой раздел",
+                  window.SectionNames().Any(n => n.StartsWith("plugin:")),
+                  $"| {string.Join(", ", window.SectionNames())}");
+
             Check("проверка вернула плагины как было",
                   before.SequenceEqual(after),
                   $"| было [{string.Join(", ", before)}], "

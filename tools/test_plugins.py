@@ -92,7 +92,12 @@ check("глубина ограничена", MAX_DEPTH > 0 and MAX_DEPTH <= 8,
       f"| {MAX_DEPTH}")
 
 # Рендерер обязан знать все виды словаря: список сверяется с C#.
-renderer = io.open("shell/Rina.Shell/Pages/PluginsPage.xaml.cs",
+#
+# Смотрим в `PluginView`: рендерер вынут туда, когда у плагина появился
+# свой раздел в колонке. Один на обе стороны — два рендерера одной схемы
+# разъехались бы на первой правке, и эта проверка ровно на переезд и
+# сработала.
+renderer = io.open("shell/Rina.Shell/Pages/PluginView.xaml.cs",
                    encoding="utf-8").read()
 unknown = [kind for kind in KINDS if f'case "{kind}"' not in renderer]
 check("рендерер знает каждый вид словаря", not unknown, f"| {unknown}")

@@ -257,6 +257,15 @@ class Host:
                 },
                 "has_page": (self.plugin is not None
                              and type(self.plugin).page is not Plugin.page),
+                # Как назвать раздел плагина в колонке. Плагин вправе
+                # назваться иначе, чем в списке установленного: «Заметки»
+                # короче, чем «Быстрые заметки», а в колонке место дорого.
+                "page_title": str(getattr(self.plugin, "page_title", "")
+                                  or (self.manifest.name if self.manifest
+                                      else "")),
+                "page_icon": str(getattr(self.plugin, "page_icon", "")
+                                 or (self.manifest.icon if self.manifest
+                                     else "🧩")),
                 "tools": self._tools(),
             }
 

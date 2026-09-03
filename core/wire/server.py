@@ -691,6 +691,11 @@ class ProtocolServer:
             "error": loaded.error or "",
             "has_page": bool(loaded.instance is not None
                              and loaded.error is None),
+            # Как назвать раздел плагина в колонке оболочки (`4.0-F04`).
+            "page_title": str(getattr(loaded, "page_title", "")
+                              or manifest.name),
+            "page_icon": str(getattr(loaded, "page_icon", "")
+                             or manifest.icon),
         }
 
     def _plugins_list(self, message: Envelope) -> dict:

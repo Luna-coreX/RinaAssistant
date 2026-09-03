@@ -102,6 +102,8 @@ class HostedPlugin:
         self.error = None
         self.logs = []
         self.has_page = False
+        self.page_title = ""
+        self.page_icon = "🧩"
         self.tools = []
 
         self._owner = owner
@@ -147,6 +149,8 @@ class HostedPlugin:
         self.manifest = Manifest(answer.get("manifest") or {}, self.folder)
         self.manifest.api_version = int(answer.get("api_version", 0) or 0)
         self.has_page = bool(answer.get("has_page"))
+        self.page_title = str(answer.get("page_title") or self.manifest.name)
+        self.page_icon = str(answer.get("page_icon") or self.manifest.icon)
         self.tools = list(answer.get("tools") or [])
 
         if not answer.get("ok"):

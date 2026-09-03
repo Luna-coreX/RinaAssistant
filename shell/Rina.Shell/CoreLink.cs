@@ -71,6 +71,51 @@ public sealed class CoreLink : IAsyncDisposable
         // речь в канал данных, который никто не читал, — Рина отвечала
         // текстом и молчала.
         _boss.Connected += connection => OnUi(() => StartVoice(connection));
+
+        // Разделы плагинов появляются, когда ядро на связи: до этого
+        // спрашивать не у кого.
+        _boss.Connected += connection => OnUi(
+            () => { _ = RefreshPluginSectionsAsync(); });
+    }
+
+    /// <summary>
+    /// Спросить, у каких плагинов есть своя страница, и дать им раздел.
+    /// </summary>
+    /// <remarks>
+    /// Зовётся и после включения плагина: раздел обязан появиться сразу,
+    /// а не после перезапуска. Список приходит от ядра целиком, и оболочка
+    /// сверяет его со своим — так выключение уносит раздел без отдельного
+    /// сообщения об этом.
+    /// </remarks>
+    public async Task RefreshPluginSectionsAsync()
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        if (!connection.MayCall(Methods.PluginsList)) return;
+
+        try
+        {
+            var answer = await connection.CallAsync(Methods.PluginsList, null,
+                                                    TimeSpan.FromSeconds(15));
+            if (answer.IsError) return;
+
+            var listed = (answer.Payload["items"]?.AsArray() ?? [])
+                .OfType<JsonObject>()
+                .Where(p => p["enabled"]?.GetValue<bool>() == true
+                            && p["has_page"]?.GetValue<bool>() == true)
+                .Select(p => (p["plugin_id"]?.GetValue<string>() ?? "",
+                              p["page_title"]?.GetValue<string>()
+                              ?? p["name"]?.GetValue<string>() ?? "",
+                              p["page_icon"]?.GetValue<string>() ?? ""))
+                .Where(p => p.Item1.Length > 0)
+                .ToList();
+
+            OnUi(() => _window.ShowPluginSections(listed));
+        }
+        catch
+        {
+            // Не спросили — колонка осталась как была. Раздел плагина не то,
+            // ради чего стоит показывать человеку ошибку.
+        }
     }
 
     private Audio.Speaker? _speaker;
