@@ -788,6 +788,25 @@ public partial class App
             Check("и появилась в списке",
                   commands.CommandCount == before + 1,
                   $"| {commands.CommandCount}");
+
+            // Последовательность — то, что раньше можно было только
+            // импортировать. Проверяется весь путь: вид, шаги, порядок,
+            // сохранение.
+            var was = commands.CommandCount;
+            await commands.OpenEditorAsync(null);
+            var built = commands.Editor?.BuildSequenceForCheck(
+                "утренний режим",
+                [("app", @"C:\Windows\System32\notepad.exe"),
+                 ("system", "sys_volume_up"),
+                 ("speak", "Доброе утро")]) ?? false;
+            Check("последовательность собралась в окне", built);
+            await Task.Delay(400);
+            Check("и сохранилась со своими шагами",
+                  commands.CommandCount == was + 1,
+                  $"| было {was}, стало {commands.CommandCount}");
+            Check("шаги дошли до ядра в том же порядке",
+                  commands.StepsOfLastSaved() == "app, system, speak",
+                  $"| {commands.StepsOfLastSaved()}");
             // Страница строится заново: описание обязано быть человеческим
             // на первой же отрисовке, а не после того, как что-то успело
             // подгрузить виды по дороге.

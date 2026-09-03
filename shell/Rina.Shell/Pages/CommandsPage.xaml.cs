@@ -39,7 +39,13 @@ public partial class CommandsPage : UserControl
             Empty.Visibility = Visibility.Visible;
             return;
         }
-        Loaded += async (_, _) => await ReloadAsync();
+        Loaded += async (_, _) =>
+        {
+            await ReloadAsync();
+            // Встроенное перечитывается один раз: оно не меняется от того,
+            // что человек завёл свою команду.
+            await ShowBuiltinAsync();
+        };
     }
 
     private async Task ReloadAsync()
@@ -144,14 +150,80 @@ public partial class CommandsPage : UserControl
         return true;
     }
 
+    /// <summary>Виды шагов последней последовательности — для проверки.</summary>
+    public string StepsOfLastSaved()
+    {
+        var sequence = _raw.Values.LastOrDefault(
+            c => c["type"]?.GetValue<string>() == "sequence");
+        var steps = sequence?["steps"]?.AsArray().OfType<JsonObject>() ?? [];
+        return string.Join(", ", steps.Select(
+            s => s["type"]?.GetValue<string>() ?? "?"));
+    }
+
     private readonly Dictionary<string, JsonObject> _raw = [];
     private JsonObject? _kinds;
+
+    /// <summary>Открытый конструктор — для сквозной проверки.</summary>
+    public CommandEditor? Editor => EditorBox.Content as CommandEditor;
 
     /// <summary>Показан ли сейчас конструктор — для сквозной проверки.</summary>
     public bool EditorOpen => EditorBox.Content is not null;
 
     /// <summary>Сколько команд в списке — для сквозной проверки.</summary>
     public int CommandCount => _items.Count;
+
+    /// <summary>
+    /// Встроенные умения и сколько программ нашлось.
+    /// </summary>
+    /// <remarks>
+    /// Перечень приходит от ядра: это фразы, которые ей говорят, то есть
+    /// её словарь (`4.0-F08`). А число программ оболочка считает сама —
+    /// индекс живёт у неё (ADR 0009), и спрашивать его у ядра, которое
+    /// само спрашивало у оболочки, значит гонять по проводу число.
+    /// </remarks>
+    private async Task ShowBuiltinAsync()
+    {
+        // Счёт программ — первым делом: он читается из кэша и приходит
+        // мгновенно, а список встроенного ждёт ответа ядра. Обратный
+        // порядок оставлял бы заголовок без числа на всё время ожидания.
+        var found = await Task.Run(() => Platform.AppIndex.Get().Count);
+        BuiltinLegend.Text = found > 0
+            ? S("УМЕЕТ СРАЗУ · программ найдено: {0}", found)
+            : S("УМЕЕТ СРАЗУ");
+
+        var got = await Ask(Methods.CommandsBuiltin);
+        Builtin.Children.Clear();
+
+        foreach (var item in got?["items"]?.AsArray().OfType<JsonObject>()
+                             ?? [])
+        {
+            var card = new Border
+            {
+                Style = (Style)FindResource("Card"),
+                Margin = new Thickness(0, 0, 0, 6),
+            };
+            var about = new StackPanel();
+            about.Children.Add(new TextBlock
+            {
+                Text = "«" + (item["phrase"]?.GetValue<string>() ?? "") + "»",
+                Style = (Style)FindResource("Text.Body"),
+            });
+            about.Children.Add(new TextBlock
+            {
+                Text = item["what"]?.GetValue<string>() ?? "",
+                Style = (Style)FindResource("Text.Meta"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+            card.Child = about;
+            Builtin.Children.Add(card);
+        }
+
+        BuiltinCount = Builtin.Children.Count;
+    }
+
+    /// <summary>Сколько встроенных умений показано — для проверки.</summary>
+    public int BuiltinCount { get; private set; }
 
     private async Task<JsonObject?> KindsAsync()
         => _kinds ??= await Ask(Methods.CommandsKinds);

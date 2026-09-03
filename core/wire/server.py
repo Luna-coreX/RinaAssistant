@@ -275,6 +275,7 @@ class ProtocolServer:
             "reminders.create": self._reminders_create,
             "commands.list": self._commands_list,
             "commands.kinds": self._commands_kinds,
+            "commands.builtin": self._commands_builtin,
             "commands.save": self._commands_save,
             "commands.delete": self._commands_delete,
             "commands.set_enabled": self._commands_set_enabled,
@@ -518,6 +519,20 @@ class ProtocolServer:
 
     def _commands_list(self, message: Envelope) -> dict:
         return {"items": [dict(c) for c in self._commands().all()]}
+
+    def _commands_builtin(self, message: Envelope) -> dict:
+        """
+        Что Рина умеет без всяких настроек.
+
+        Отдаёт ядро, потому что это **фразы, которые ей говорят**, — часть
+        её словаря, а не подписи интерфейса (`4.0-F08`). Оболочка, знающая
+        их наизусть, показала бы то, чего ядро уже не понимает, и человек
+        сказал бы это вслух впустую.
+        """
+        from voice.commands import known_commands
+
+        return {"items": [{"phrase": phrase, "what": what}
+                          for phrase, what in known_commands()]}
 
     def _commands_kinds(self, message: Envelope) -> dict:
         """

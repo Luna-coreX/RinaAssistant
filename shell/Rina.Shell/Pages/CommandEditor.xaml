@@ -44,6 +44,40 @@
                   HorizontalAlignment="Left" Visibility="Collapsed" />
       </StackPanel>
 
+      <!-- Последовательность: шаги списком. Порядок важен — «открой
+           браузер, потом папку» и наоборот это разные команды, поэтому
+           шаги двигаются, а не только добавляются и убираются. -->
+      <StackPanel x:Name="StepsBox" Margin="0,0,0,12" Visibility="Collapsed">
+        <TextBlock Text="{loc:S 'Шаги по порядку'}"
+                   Style="{StaticResource Text.Body}" Margin="0,0,0,6" />
+        <TextBlock x:Name="StepsEmpty" Style="{StaticResource Text.Meta}"
+                   Text="{loc:S 'Пока ни одного шага. Добавьте первый — он выполнится первым.'}"
+                   TextWrapping="Wrap" Margin="0,0,0,8" />
+        <StackPanel x:Name="Steps" Margin="0,0,0,8" />
+
+        <Border Style="{StaticResource Card}" Margin="0,0,0,0">
+          <StackPanel>
+            <TextBlock Text="{loc:S 'Новый шаг'}"
+                       Style="{StaticResource Text.Section}"
+                       Margin="0,0,0,8" />
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+              <ComboBox x:Name="StepKind" Style="{StaticResource Choice}"
+                        Width="220" SelectionChanged="OnStepKindChanged" />
+              <TextBox x:Name="StepTarget" Style="{StaticResource Field}"
+                       Width="240" Margin="8,0,0,0" />
+              <ComboBox x:Name="StepAction" Style="{StaticResource Choice}"
+                        Width="240" Margin="8,0,0,0"
+                        Visibility="Collapsed" />
+              <Button x:Name="StepBrowse" Style="{StaticResource Btn}"
+                      Content="{loc:S 'Обзор…'}" Margin="8,0,0,0"
+                      Click="OnStepBrowse" />
+            </StackPanel>
+            <Button Style="{StaticResource Btn}" HorizontalAlignment="Left"
+                    Content="{loc:S 'Добавить шаг'}" Click="OnAddStep" />
+          </StackPanel>
+        </Border>
+      </StackPanel>
+
       <TextBlock x:Name="Warning" Style="{StaticResource Text.Meta}"
                  Foreground="{DynamicResource C.Signal}" TextWrapping="Wrap"
                  Visibility="Collapsed" Margin="0,0,0,12" />

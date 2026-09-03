@@ -114,7 +114,8 @@ _CAPABILITY_LIST = (
     # ни показать список команд, ни очистить историю. Правило рубежа
     # запрещает терять возможности, и без этих методов терялись бы шесть.
     Capability("commands", Side.CORE,
-               ("commands.list", "commands.kinds", "commands.save", "commands.delete",
+               ("commands.list", "commands.kinds", "commands.builtin",
+                "commands.save", "commands.delete",
                 "commands.set_enabled", "commands.export",
                 "commands.import"),
                "свои команды пользователя"),

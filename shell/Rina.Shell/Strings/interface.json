@@ -35,6 +35,9 @@
   "Адрес модели": {
     "English": "Model address"
   },
+  "Акцент": {
+    "English": "Accent"
+  },
   "Будильник": {
     "English": "Alarm",
     "Українська": "Будильник",
@@ -127,6 +130,12 @@
   },
   "Добавить фразу": {
     "English": "Add a phrase"
+  },
+  "Добавить шаг": {
+    "English": "Add step",
+    "Українська": "Додати крок",
+    "Español": "Añadir paso",
+    "Deutsch": "Schritt hinzufügen"
   },
   "Добавленные папки": {
     "English": "Added folders"
@@ -302,6 +311,12 @@
     "Español": "Nuevo comando",
     "Deutsch": "Neuer Befehl"
   },
+  "Новый шаг": {
+    "English": "New step"
+  },
+  "Нужен хотя бы один шаг.": {
+    "English": "At least one step is needed."
+  },
   "Нужна хотя бы одна фраза.": {
     "English": "At least one phrase is needed."
   },
@@ -404,6 +419,9 @@
   "Поисковая система": {
     "English": "Search engine"
   },
+  "Пока ни одного шага. Добавьте первый — он выполнится первым.": {
+    "English": "No steps yet. Add the first one — it runs first."
+  },
   "Показать": {
     "English": "Show"
   },
@@ -412,9 +430,6 @@
   },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
-  },
-  "Последовательность собирается импортом, а не здесь.": {
-    "English": "A sequence is built by importing, not here."
   },
   "Появится вместе с обновлениями": {
     "English": "Arrives together with updates"
@@ -524,6 +539,12 @@
   "Точно выполнить?": {
     "English": "Run it — are you sure?"
   },
+  "УМЕЕТ СРАЗУ": {
+    "English": "WORKS OUT OF THE BOX"
+  },
+  "УМЕЕТ СРАЗУ · программ найдено: {0}": {
+    "English": "WORKS OUT OF THE BOX · programs found: {0}"
+  },
   "УСТАНОВЛЕННЫЕ": {
     "English": "INSTALLED"
   },
@@ -557,6 +578,9 @@
   "Характер": {
     "English": "Persona"
   },
+  "Цвет, которым Рина выделяет важное": {
+    "English": "The colour Rina highlights with"
+  },
   "Что ответить (необязательно)": {
     "English": "What to answer (optional)"
   },
@@ -574,6 +598,12 @@
     "Українська": "Чутливість активації",
     "Español": "Sensibilidad de activación",
     "Deutsch": "Aktivierungsempfindlichkeit"
+  },
+  "Шаги по порядку": {
+    "English": "Steps in order"
+  },
+  "Шагу нужно указать, что делать.": {
+    "English": "The step needs something to do."
   },
   "Экспорт": {
     "English": "Export",

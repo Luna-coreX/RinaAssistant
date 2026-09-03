@@ -43,6 +43,8 @@ public static class Methods
     /// <summary>Базовый метод.</summary>
     public const string CommandRunById = "command.run_by_id";
     /// <summary>Возможность: commands.</summary>
+    public const string CommandsBuiltin = "commands.builtin";
+    /// <summary>Возможность: commands.</summary>
     public const string CommandsDelete = "commands.delete";
     /// <summary>Возможность: commands.</summary>
     public const string CommandsExport = "commands.export";
@@ -131,6 +133,7 @@ public static class Methods
             ["apps.launch"] = "apps",
             ["command.handle"] = null,
             ["command.run_by_id"] = null,
+            ["commands.builtin"] = "commands",
             ["commands.delete"] = "commands",
             ["commands.export"] = "commands",
             ["commands.import"] = "commands",

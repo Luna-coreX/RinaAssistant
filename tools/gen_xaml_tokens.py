@@ -140,10 +140,50 @@ def common_xaml(tokens: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def accents_xaml(tokens) -> str:
+    """
+    Наборы акцентов — словарём ресурсов на каждую отделку.
+
+    Кисти, а не строки: оболочка подменяет `C.Signal` и `C.SignalSunk`
+    целиком, и хранить рядом два представления одного цвета значило бы
+    однажды подменить одно, забыв другое.
+    """
+    lines = [HEADER, "<ResourceDictionary "
+             'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"',
+             '                    '
+             'xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"',
+             '                    '
+             'xmlns:sys="clr-namespace:System;assembly=System.Runtime">', ""]
+
+    lines.append("  <!-- Имена акцентов: их показывает оболочка. -->")
+    for name, title in (tokens.get("accent_titles") or {}).items():
+        lines.append(f'  <sys:String x:Key="Accent.Title.{name}">{title}'
+                     f"</sys:String>")
+    lines.append("")
+    lines.append('  <sys:String x:Key="Accent.Default">'
+                 f'{tokens.get("default_accent", "amber")}</sys:String>')
+    lines.append("")
+
+    for finish, data in tokens["finishes"].items():
+        lines.append(f"  <!-- {finish} -->")
+        for name, accent in (data.get("accents") or {}).items():
+            key = f"{finish}.{name}"
+            lines.append(f'  <Color x:Key="Accent.{key}.Signal">'
+                         f'{accent["signal"]}</Color>')
+            lines.append(f'  <Color x:Key="Accent.{key}.SignalSunk">'
+                         f'{accent["signal_sunk"]}</Color>')
+        lines.append("")
+
+    lines.append("</ResourceDictionary>")
+    return "\n".join(lines) + "\n"
+
+
 def files(tokens: dict) -> dict[str, str]:
     out = {"Tokens.g.xaml": common_xaml(tokens)}
     for name, finish in tokens["finishes"].items():
         out[f"Finish.{name.capitalize()}.g.xaml"] = finish_xaml(name, finish)
+    if any(f.get("accents") for f in tokens["finishes"].values()):
+        out["Accents.g.xaml"] = accents_xaml(tokens)
     return out
 
 

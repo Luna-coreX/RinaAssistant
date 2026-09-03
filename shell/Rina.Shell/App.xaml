@@ -6,6 +6,7 @@
       <ResourceDictionary.MergedDictionaries>
         <!-- Порождено из tokens.json; см. tools/gen_xaml_tokens.py -->
         <ResourceDictionary Source="Generated/Tokens.g.xaml" />
+        <ResourceDictionary Source="Generated/Accents.g.xaml" />
         <!-- Отделка подставляется на старте: две равноправные (4.0-R08) -->
         <ResourceDictionary Source="Generated/Finish.Silver.g.xaml" />
         <ResourceDictionary Source="Styles/Text.xaml" />

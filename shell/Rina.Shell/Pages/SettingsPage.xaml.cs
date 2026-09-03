@@ -115,6 +115,17 @@ public partial class SettingsPage : UserControl
         foreach (var key in SettingsLayout.ShellKnows)
         {
             if (!_schema.ContainsKey(key)) continue;
+
+            if (key == "accent")
+            {
+                // Варианты — те, что есть у выбранной сейчас отделки.
+                var finish = _values.GetValueOrDefault("finish")
+                                 ?.GetValue<string>() ?? "black";
+                _options[key] = App.Accents(finish)
+                    .Select(a => (a.Value, a.Title, true)).ToList();
+                continue;
+            }
+
             var devices = key == "input_device"
                 ? Audio.Microphone.Devices()
                 : Audio.Speaker.Devices();
@@ -685,7 +696,21 @@ public partial class SettingsPage : UserControl
         {
             _values[key] = value;
             if (key == "finish" && _link is not null)
-                await _link.SetFinishAsync(value.GetValue<string>());
+            {
+                var finish = value.GetValue<string>();
+                await _link.SetFinishAsync(finish);
+                // Отделка сменилась — акцент перевыбирается вместе с ней:
+                // набор у каждой свой, и прежнее имя может в нём не
+                // значиться. Имя при этом сохраняется, если значится.
+                App.ApplyAccent(finish,
+                    _values.GetValueOrDefault("accent")?.GetValue<string>()
+                    ?? App.DefaultAccent);
+                await LoadOptionsAsync();
+            }
+            if (key == "accent")
+                App.ApplyAccent(
+                    _values.GetValueOrDefault("finish")?.GetValue<string>()
+                    ?? "black", value.GetValue<string>());
 
             // Язык хранится в ядре, но слова интерфейса переводит оболочка:
             // сказать ей об этом больше некому (ADR 0007).

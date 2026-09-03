@@ -1,0 +1,52 @@
+<!--
+    Порождено из docs/design/tokens.json.
+    Не править руками: правьте токены и перезапустите
+    python tools/gen_xaml_tokens.py
+
+    Здесь только значения. Стили — решения о том, как выглядит контрол, —
+    пишутся и читаются человеком и живут в Styles/.
+-->
+
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <!-- Имена акцентов: их показывает оболочка. -->
+  <sys:String x:Key="Accent.Title.amber">Янтарь</sys:String>
+  <sys:String x:Key="Accent.Title.ember">Уголь</sys:String>
+  <sys:String x:Key="Accent.Title.brass">Латунь</sys:String>
+  <sys:String x:Key="Accent.Title.moss">Мох</sys:String>
+  <sys:String x:Key="Accent.Title.steel">Сталь</sys:String>
+  <sys:String x:Key="Accent.Title.orchid">Орхидея</sys:String>
+
+  <sys:String x:Key="Accent.Default">amber</sys:String>
+
+  <!-- silver -->
+  <Color x:Key="Accent.silver.amber.Signal">#b03e16</Color>
+  <Color x:Key="Accent.silver.amber.SignalSunk">#8f3010</Color>
+  <Color x:Key="Accent.silver.ember.Signal">#a33227</Color>
+  <Color x:Key="Accent.silver.ember.SignalSunk">#87281f</Color>
+  <Color x:Key="Accent.silver.brass.Signal">#78570e</Color>
+  <Color x:Key="Accent.silver.brass.SignalSunk">#634809</Color>
+  <Color x:Key="Accent.silver.moss.Signal">#4a6b2a</Color>
+  <Color x:Key="Accent.silver.moss.SignalSunk">#3b5620</Color>
+  <Color x:Key="Accent.silver.steel.Signal">#2a6285</Color>
+  <Color x:Key="Accent.silver.steel.SignalSunk">#22506d</Color>
+  <Color x:Key="Accent.silver.orchid.Signal">#7d5478</Color>
+  <Color x:Key="Accent.silver.orchid.SignalSunk">#664360</Color>
+
+  <!-- black -->
+  <Color x:Key="Accent.black.amber.Signal">#f2731c</Color>
+  <Color x:Key="Accent.black.amber.SignalSunk">#cf5c12</Color>
+  <Color x:Key="Accent.black.ember.Signal">#e2564a</Color>
+  <Color x:Key="Accent.black.ember.SignalSunk">#c04338</Color>
+  <Color x:Key="Accent.black.brass.Signal">#d99b2b</Color>
+  <Color x:Key="Accent.black.brass.SignalSunk">#b8801f</Color>
+  <Color x:Key="Accent.black.moss.Signal">#7bab52</Color>
+  <Color x:Key="Accent.black.moss.SignalSunk">#658f42</Color>
+  <Color x:Key="Accent.black.steel.Signal">#5fa8d3</Color>
+  <Color x:Key="Accent.black.steel.SignalSunk">#4a8cb5</Color>
+  <Color x:Key="Accent.black.orchid.Signal">#b48ead</Color>
+  <Color x:Key="Accent.black.orchid.SignalSunk">#997593</Color>
+
+</ResourceDictionary>

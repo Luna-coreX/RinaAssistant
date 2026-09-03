@@ -72,6 +72,28 @@ PAIRS = (
 )
 
 
+def check_accents(tokens, report):
+    """
+    Каждый акцент проверяется там же, где проверялся исходный.
+
+    Выбор цвета не должен быть способом сделать признак ошибки нечитаемым.
+    Поэтому непроверенный акцент в набор не попадает: у акцента ровно две
+    обязанности — читаться на панели и читаться на приподнятом, — и обе
+    проверяются для **каждого** варианта, а не для того, что стоит сейчас.
+    """
+    failures = 0
+    for key, finish in tokens["finishes"].items():
+        colors = finish["color"]
+        for name, accent in (finish.get("accents") or {}).items():
+            for surface, need in (("FACE", 4.5), ("FACE_HIGH", 3.0)):
+                value = contrast(accent["signal"], colors[surface])
+                ok = value >= need
+                failures += 0 if ok else 1
+                report(f"{key}/{name}: акцент на {surface.lower()}",
+                       ok, f"{value:.2f} (нужно {need})")
+    return failures
+
+
 def main():
     tokens = json.load(open(TOKENS, encoding="utf-8"))
     failures = 0
@@ -88,7 +110,18 @@ def main():
             print(f"  {mark} {ratio:5.2f} (нужно {threshold:.1f})  "
                   f"{text} на {surface:<10} — {what}")
 
-    print(f"\nПар проверено: {len(PAIRS) * len(tokens['finishes'])}, "
+    def report(label, ok, detail):
+        print(f"  {'OK  ' if ok else 'МАЛО'} {detail:>22}  {label}")
+
+    accents = sum(len(f.get("accents") or {})
+                  for f in tokens["finishes"].values())
+    if accents:
+        print()
+        print(f"Акценты ({accents} шт.):")
+        failures += check_accents(tokens, report)
+
+    print(f"\nПар проверено: {len(PAIRS) * len(tokens['finishes'])} "
+          f"+ акцентов {accents * 2}, "
           f"недостаточных: {failures}")
     return 1 if failures else 0
 

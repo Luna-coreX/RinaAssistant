@@ -31,6 +31,9 @@ namespace Rina.Shell.Pages;
 public partial class CommandEditor : UserControl
 {
     private readonly List<string> _triggers = [];
+    //: Шаги последовательности, по порядку. Порядок и есть смысл: «открой
+    //: браузер, потом папку» и наоборот — разные команды.
+    private readonly List<JsonObject> _steps = [];
     private readonly List<(string Value, string Title, bool Destructive)>
         _actions = [];
     private string _id = "";
@@ -91,6 +94,11 @@ public partial class CommandEditor : UserControl
         Action.SelectedItem = Action.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => (string?)item.Tag == target);
         Response.Text = command["response"]?.GetValue<string>() ?? "";
+
+        foreach (var step in command["steps"]?.AsArray().OfType<JsonObject>()
+                             ?? [])
+            _steps.Add((JsonObject)step.DeepClone());
+        DrawSteps();
     }
 
     private string SelectedKind =>
@@ -127,12 +135,10 @@ public partial class CommandEditor : UserControl
             _ => S("Что открыть"),
         };
 
-        // Последовательность из нескольких шагов конструктором пока не
-        // собирается: у неё своё устройство, и делать её половину — значит
-        // показать человеку поле, которое ничего не соберёт. Такие команды
-        // приходят импортом и правятся как есть.
-        Note.Text = kind == "sequence"
-            ? S("Последовательность собирается импортом, а не здесь.") : "";
+        StepsBox.Visibility = kind == "sequence" ? Visibility.Visible
+                                                 : Visibility.Collapsed;
+        if (kind == "sequence" && StepKind.Items.Count == 0) FillStepKinds();
+        Note.Text = "";
         ShowWarning();
     }
 
@@ -185,6 +191,202 @@ public partial class CommandEditor : UserControl
         }
     }
 
+    /// <summary>
+    /// Виды шага — те же, что у команды, кроме самой последовательности.
+    /// </summary>
+    /// <remarks>
+    /// Последовательность внутри последовательности не запрещена ядром, но
+    /// в конструкторе её нет: «шаг, который сам список шагов» превращает
+    /// понятную цепочку в дерево, а человек, собирающий «открой браузер и
+    /// сверни окно», дерева не имел в виду.
+    /// </remarks>
+    private void FillStepKinds()
+    {
+        foreach (var item in Kind.Items.OfType<ComboBoxItem>())
+        {
+            if ((string?)item.Tag == "sequence") continue;
+            StepKind.Items.Add(new ComboBoxItem
+            {
+                Content = item.Content,
+                Tag = item.Tag,
+            });
+        }
+        foreach (var (value, title, destructive) in _actions)
+            StepAction.Items.Add(new ComboBoxItem
+            {
+                Content = destructive ? title + S(" — необратимо") : title,
+                Tag = value,
+            });
+        if (StepKind.Items.Count > 0) StepKind.SelectedIndex = 0;
+    }
+
+    private string StepSelectedKind =>
+        (StepKind.SelectedItem as ComboBoxItem)?.Tag as string ?? "app";
+
+    private void OnStepKindChanged(object sender, SelectionChangedEventArgs e)
+    {
+        var kind = StepSelectedKind;
+        var system = kind == "system";
+        StepAction.Visibility = system ? Visibility.Visible
+                                       : Visibility.Collapsed;
+        StepTarget.Visibility = system ? Visibility.Collapsed
+                                       : Visibility.Visible;
+        StepBrowse.Visibility = kind is "app" or "folder"
+            ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void OnStepBrowse(object sender, RoutedEventArgs e)
+    {
+        if (StepSelectedKind == "folder")
+        {
+            var folder = new Microsoft.Win32.OpenFolderDialog();
+            if (folder.ShowDialog() == true) StepTarget.Text = folder.FolderName;
+            return;
+        }
+        var file = new Microsoft.Win32.OpenFileDialog
+        {
+            Filter = S("Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*"),
+        };
+        if (file.ShowDialog() == true) StepTarget.Text = file.FileName;
+    }
+
+    private void OnAddStep(object sender, RoutedEventArgs e)
+    {
+        var kind = StepSelectedKind;
+        var target = kind == "system"
+            ? (StepAction.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
+            : StepTarget.Text.Trim();
+        if (target.Length == 0)
+        {
+            Note.Text = S("Шагу нужно указать, что делать.");
+            return;
+        }
+
+        // У шага нет ни фраз, ни своего ответа: срабатывает и отвечает
+        // команда целиком, а шаг — то, что она делает по дороге.
+        _steps.Add(new JsonObject
+        {
+            ["type"] = kind,
+            ["target"] = target,
+            ["enabled"] = true,
+            ["triggers"] = new JsonArray(),
+            ["match"] = "contains",
+            ["response"] = "",
+            ["steps"] = new JsonArray(),
+        });
+        StepTarget.Clear();
+        Note.Text = "";
+        DrawSteps();
+    }
+
+    /// <summary>Показать шаги с их порядком и кнопками.</summary>
+    private void DrawSteps()
+    {
+        Steps.Children.Clear();
+        StepsEmpty.Visibility = _steps.Count == 0 ? Visibility.Visible
+                                                  : Visibility.Collapsed;
+
+        for (var at = 0; at < _steps.Count; at++)
+        {
+            var index = at;
+            var step = _steps[at];
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+            });
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(1, GridUnitType.Star),
+            });
+            for (var i = 0; i < 3; i++)
+                row.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = GridLength.Auto,
+                });
+
+            // Номер, а не маркер: человек читает «сначала первый, потом
+            // второй», и порядок должен быть виден, а не подразумеваться.
+            var number = new TextBlock
+            {
+                Text = $"{index + 1}.",
+                Style = (Style)FindResource("Text.Meta"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 8, 0),
+            };
+            Grid.SetColumn(number, 0);
+            row.Children.Add(number);
+
+            var what = new TextBlock
+            {
+                Text = DescribeStep(step),
+                Style = (Style)FindResource("Text.Body"),
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+            };
+            Grid.SetColumn(what, 1);
+            row.Children.Add(what);
+
+            var up = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = "↑",
+                IsEnabled = index > 0,
+            };
+            up.Click += (_, _) => Move(index, -1);
+            Grid.SetColumn(up, 2);
+            row.Children.Add(up);
+
+            var down = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = "↓",
+                IsEnabled = index < _steps.Count - 1,
+            };
+            down.Click += (_, _) => Move(index, +1);
+            Grid.SetColumn(down, 3);
+            row.Children.Add(down);
+
+            var drop = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = S("Убрать"),
+            };
+            drop.Click += (_, _) => { _steps.RemoveAt(index); DrawSteps(); };
+            Grid.SetColumn(drop, 4);
+            row.Children.Add(drop);
+
+            Steps.Children.Add(row);
+        }
+    }
+
+    private void Move(int index, int delta)
+    {
+        var to = index + delta;
+        if (to < 0 || to >= _steps.Count) return;
+        (_steps[index], _steps[to]) = (_steps[to], _steps[index]);
+        DrawSteps();
+    }
+
+    /// <summary>Шаг человеческими словами: вид и что именно.</summary>
+    private string DescribeStep(JsonObject step)
+    {
+        var kind = step["type"]?.GetValue<string>() ?? "";
+        var target = step["target"]?.GetValue<string>() ?? "";
+        var title = Kind.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string?)item.Tag == kind)
+            ?.Content?.ToString() ?? kind;
+
+        // У системного действия цель — код из перечня, и показывать его
+        // человеку незачем: у действия есть название.
+        if (kind == "system")
+        {
+            var named = _actions.FirstOrDefault(a => a.Value == target);
+            return $"{title} · {(named.Title.Length > 0 ? named.Title : target)}";
+        }
+        return target.Length > 0 ? $"{title} · {target}" : title;
+    }
+
     private void OnBrowse(object sender, RoutedEventArgs e)
     {
         if (SelectedKind == "folder")
@@ -217,6 +419,11 @@ public partial class CommandEditor : UserControl
             Note.Text = S("Нужно указать, что делать.");
             return;
         }
+        if (kind == "sequence" && _steps.Count == 0)
+        {
+            Note.Text = S("Нужен хотя бы один шаг.");
+            return;
+        }
 
         var command = new JsonObject
         {
@@ -227,6 +434,8 @@ public partial class CommandEditor : UserControl
             ["match"] = "contains",
             ["target"] = target,
             ["response"] = Response.Text.Trim(),
+            ["steps"] = new JsonArray(
+                _steps.Select(step => step.DeepClone()).ToArray()),
         };
         // Номер назначает ядро; свой посылаем только когда правим уже
         // заведённую — иначе правка превратилась бы в создание двойника.
@@ -236,4 +445,55 @@ public partial class CommandEditor : UserControl
     }
 
     private void OnCancel(object sender, RoutedEventArgs e) => Cancelled?.Invoke();
+
+    /// <summary>
+    /// Собрать последовательность из шагов — для сквозной проверки.
+    /// </summary>
+    /// <remarks>
+    /// Проверка не умеет щёлкать по кнопкам, а собранная руками команда
+    /// проверяла бы не конструктор, а `JsonObject`. Здесь проходит тот же
+    /// путь: выбрать вид, добавить шаги, сохранить.
+    /// </remarks>
+    public bool BuildSequenceForCheck(string phrase,
+                                      IEnumerable<(string Kind, string Target)> steps)
+    {
+        _triggers.Clear();
+        _triggers.Add(phrase);
+        DrawTriggers();
+
+        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string?)item.Tag == "sequence");
+        if (SelectedKind != "sequence") return false;
+
+        foreach (var (kind, target) in steps)
+        {
+            StepKind.SelectedItem = StepKind.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(item => (string?)item.Tag == kind);
+
+            // У системного шага цель выбирают из списка, а не набирают:
+            // первая редакция проверки набирала — и системный шаг молча не
+            // добавлялся, потому что список оставался пустым.
+            if (kind == "system")
+                StepAction.SelectedItem = StepAction.Items
+                    .OfType<ComboBoxItem>()
+                    .FirstOrDefault(item => (string?)item.Tag == target);
+            else
+                StepTarget.Text = target;
+
+            OnAddStep(this, new RoutedEventArgs());
+        }
+        if (_steps.Count == 0) return false;
+
+        // И порядок: последний шаг поднимаем наверх и опускаем обратно.
+        var wasFirst = _steps[0]["target"]?.GetValue<string>();
+        Move(_steps.Count - 1, -1);
+        Move(_steps.Count - 2, +1);
+        if (_steps[0]["target"]?.GetValue<string>() != wasFirst) return false;
+
+        OnSave(this, new RoutedEventArgs());
+        return true;
+    }
+
+    /// <summary>Сколько шагов собрано — для проверки.</summary>
+    public int StepCount => _steps.Count;
 }

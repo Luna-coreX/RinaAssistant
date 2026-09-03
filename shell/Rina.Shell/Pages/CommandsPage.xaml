@@ -61,6 +61,15 @@
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+
+      <!-- Что Рина умеет без всяких настроек. У нового человека своих
+           команд нет, и без этого раздела страница отвечала бы «пусто» на
+           вопрос «а что она вообще умеет». -->
+      <StackPanel x:Name="BuiltinBox" Margin="0,24,0,0">
+        <TextBlock x:Name="BuiltinLegend" Text="{loc:S 'УМЕЕТ СРАЗУ'}"
+                   Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+        <StackPanel x:Name="Builtin" />
+      </StackPanel>
       </StackPanel>
     </ScrollViewer>
 

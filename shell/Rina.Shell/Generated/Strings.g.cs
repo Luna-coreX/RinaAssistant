@@ -74,6 +74,11 @@ public static partial class Loc
                 {
                     ["English"] = "Model address",
                 },
+            ["Акцент"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Accent",
+                },
             ["без имени"] =
                 new Dictionary<string, string>
                 {
@@ -230,6 +235,14 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Add a phrase",
+                },
+            ["Добавить шаг"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Schritt hinzufügen",
+                    ["English"] = "Add step",
+                    ["Español"] = "Añadir paso",
+                    ["Українська"] = "Додати крок",
                 },
             ["Добавленные папки"] =
                 new Dictionary<string, string>
@@ -524,6 +537,16 @@ public static partial class Loc
                 {
                     ["English"] = "NEW REMINDER",
                 },
+            ["Новый шаг"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "New step",
+                },
+            ["Нужен хотя бы один шаг."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "At least one step is needed.",
+                },
             ["Нужна хотя бы одна фраза."] =
                 new Dictionary<string, string>
                 {
@@ -688,6 +711,11 @@ public static partial class Loc
                 {
                     ["English"] = "Search engine",
                 },
+            ["Пока ни одного шага. Добавьте первый — он выполнится первым."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No steps yet. Add the first one — it runs first.",
+                },
             ["Показать"] =
                 new Dictionary<string, string>
                 {
@@ -702,11 +730,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Sequence · {0} steps",
-                },
-            ["Последовательность собирается импортом, а не здесь."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "A sequence is built by importing, not here.",
                 },
             ["Появится вместе с обновлениями"] =
                 new Dictionary<string, string>
@@ -912,6 +935,16 @@ public static partial class Loc
                     ["Español"] = "Eliminar",
                     ["Українська"] = "Видалити",
                 },
+            ["УМЕЕТ СРАЗУ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WORKS OUT OF THE BOX",
+                },
+            ["УМЕЕТ СРАЗУ · программ найдено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WORKS OUT OF THE BOX · programs found: {0}",
+                },
             ["УСТАНОВЛЕННЫЕ"] =
                 new Dictionary<string, string>
                 {
@@ -936,6 +969,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Persona",
+                },
+            ["Цвет, которым Рина выделяет важное"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The colour Rina highlights with",
                 },
             ["через 15 минут"] =
                 new Dictionary<string, string>
@@ -989,6 +1027,16 @@ public static partial class Loc
                     ["English"] = "Wake word sensitivity",
                     ["Español"] = "Sensibilidad de activación",
                     ["Українська"] = "Чутливість активації",
+                },
+            ["Шаги по порядку"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Steps in order",
+                },
+            ["Шагу нужно указать, что делать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The step needs something to do.",
                 },
             ["Экспорт"] =
                 new Dictionary<string, string>

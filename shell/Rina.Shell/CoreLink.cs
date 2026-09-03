@@ -148,12 +148,18 @@ public sealed class CoreLink : IAsyncDisposable
         try
         {
             var answer = await connection.CallAsync(Methods.SettingsGet,
-                new JsonObject { ["keys"] = new JsonArray(FinishKey) },
-                TimeSpan.FromSeconds(10));
+                new JsonObject
+                {
+                    ["keys"] = new JsonArray(FinishKey, "accent"),
+                }, TimeSpan.FromSeconds(10));
             var finish = answer.Payload["values"]?[FinishKey]?.GetValue<string>();
+            var accent = answer.Payload["values"]?["accent"]?.GetValue<string>();
             if (finish is not null) OnUi(() =>
             {
                 App.ApplyFinish(finish);
+                // Акцент — после отделки: он подменяет её цвета, и
+                // обратный порядок вернул бы исходный на первый же кадр.
+                App.ApplyAccent(finish, accent ?? App.DefaultAccent);
                 _window.ShowFinish(finish);
             });
         }

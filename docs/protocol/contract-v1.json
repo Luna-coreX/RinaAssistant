@@ -30,6 +30,7 @@
     },
     "commands": {
       "methods": [
+        "commands.builtin",
         "commands.delete",
         "commands.export",
         "commands.import",
@@ -420,6 +421,7 @@
     "apps.launch": "apps",
     "command.handle": null,
     "command.run_by_id": null,
+    "commands.builtin": "commands",
     "commands.delete": "commands",
     "commands.export": "commands",
     "commands.import": "commands",

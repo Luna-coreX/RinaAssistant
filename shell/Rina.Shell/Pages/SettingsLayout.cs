@@ -102,6 +102,8 @@ public static class SettingsLayout
         new(S("Внешний вид"),
         [
             new("finish", S("Отделка")),
+            new("accent", S("Акцент"),
+                S("Цвет, которым Рина выделяет важное")),
             new("ui_language", S("Язык интерфейса")),
         ]),
         new(S("Приватность"),
@@ -142,6 +144,9 @@ public static class SettingsLayout
     [
         "input_device",
         "output_device",
+        // Набор акцентов зависит от отделки, а отделка — дело оболочки:
+        // одна и та же краска на светлом и на тёмном читается по-разному.
+        "accent",
     ];
 
     /// <summary>
