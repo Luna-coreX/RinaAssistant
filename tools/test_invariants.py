@@ -48,6 +48,18 @@ FORBIDDEN_CALLS = {
 #: Модуль ядра, которому побочные эффекты разрешены. Ровно один.
 ALLOWED = "toolrunner.py"
 
+#: Второй — и с оговоркой, которая проверяется ниже.
+#:
+#: `plugin_host.py` поднимает процессы плагинов (`4.0-H07`). Инвариант
+#: сторожит, чтобы **умения Рины** не проходили мимо реестра: запуск
+#: программы, открытие браузера, вопрос модели. Загрузка плагина — не
+#: умение, а способ его загрузить; решает это человек, включая плагин.
+#:
+#: Послабление без проверки — способ размыть инвариант, поэтому ниже
+#: отдельно утверждается: запускается только наш собственный launcher, без
+#: путей от человека, без строк от плагина и без оболочки системы.
+LAUNCHER_ONLY = "plugin_host.py"
+
 
 def calls_in(path):
     """Все вызовы вида `модуль.функция` в файле."""
@@ -71,7 +83,7 @@ core_files = sorted(
 
 offenders = []
 for path in core_files:
-    if os.path.basename(path) == ALLOWED:
+    if os.path.basename(path) in (ALLOWED, LAUNCHER_ONLY):
         continue
     for (owner, attr), line in calls_in(path):
         if (owner, attr) in FORBIDDEN_CALLS or (owner, None) in FORBIDDEN_CALLS:
@@ -81,6 +93,25 @@ check("ядро не делает побочных эффектов мимо р�
       f"| {offenders}")
 print(f"     проверено файлов ядра: {len(core_files)}, "
       f"разрешён только {ALLOWED}")
+
+# Оговорка про plugin_host: запускается только свой launcher.
+host_source = io.open(os.path.join("core", LAUNCHER_ONLY),
+                      encoding="utf-8").read()
+host_tree = ast.parse(host_source)
+spawns = [node for node in ast.walk(host_tree)
+          if isinstance(node, ast.Call)
+          and isinstance(node.func, ast.Attribute)
+          and node.func.attr in ("Popen", "run", "call", "check_output")]
+check("процесс плагина поднимается ровно в одном месте", len(spawns) == 1,
+      f"| найдено {len(spawns)}")
+
+launch_args = ast.dump(spawns[0]) if spawns else ""
+check("запускается свой launcher, а не что попало",
+      "attr='executable'" in launch_args and "host.py" in host_source,
+      "| ни пути от человека, ни строки от плагина")
+check("и без оболочки системы",
+      "shell=True" not in host_source,
+      "| shell=True превратил бы имя папки плагина в команду")
 
 print()
 print("=== инвариант: у каждого вызова назван инициатор ===")

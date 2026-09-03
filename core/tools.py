@@ -278,6 +278,15 @@ class ToolRegistry:
                 details={"known": sorted(self._tools)})
         return tool
 
+    def forget(self, name):
+        """
+        Убрать инструмент. Нужно выключению плагина (`4.0-H03`).
+
+        Выключенный плагин обязан унести свои инструменты с собой: реестр,
+        помнящий инструмент выключенного плагина, однажды его вызовет.
+        """
+        return self._tools.pop(name, None)
+
     def has(self, name):
         return name in self._tools
 

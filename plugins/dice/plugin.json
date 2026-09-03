@@ -5,5 +5,6 @@
   "author": "NeuroSync Foundry Team",
   "description": "Бросает игральный кубик или монетку по команде («брось кубик», «подбрось монету»).",
   "icon": "🎲",
-  "entry": "DicePlugin"
+  "entry": "DicePlugin",
+  "api_version": 4
 }

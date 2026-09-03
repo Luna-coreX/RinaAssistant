@@ -19,6 +19,11 @@ public static partial class Loc
                 {
                     ["English"] = " — irreversible",
                 },
+            ["[слишком глубокая вложенность]"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "[nesting too deep]",
+                },
             ["Enter — отправить, Esc — скрыть"] =
                 new Dictionary<string, string>
                 {
@@ -173,6 +178,11 @@ public static partial class Loc
                     ["English"] = "Voice",
                     ["Español"] = "Voz",
                     ["Українська"] = "Голос",
+                },
+            ["Готово"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Done",
                 },
             ["Громкость"] =
                 new Dictionary<string, string>

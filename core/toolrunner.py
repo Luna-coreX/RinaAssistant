@@ -367,10 +367,38 @@ class ToolRunner:
         # инструмент, аргументы, инициатор, разрешения и результат.
         self._audit = audit if audit is not None else AuditLog()
 
+        #: Реализации инструментов плагинов (`4.0-H03`). У экземпляра, а
+        #: не в модульном словаре: два ядра в одном процессе не должны
+        #: делить инструменты чужих плагинов (`4.0-B05`), и снятый плагин
+        #: обязан уносить свои инструменты с собой.
+        self._added = {}
+
         missing = set(self._registry.names()) - set(IMPLEMENTATIONS)
         if missing:
             raise RuntimeError(
                 f"объявлены, но не реализованы: {sorted(missing)}")
+
+    def add_tool(self, tool, run):
+        """
+        Добавить инструмент плагина в реестр.
+
+        Плагин объявляет, а не делает (ADR 0010): объявленный инструмент
+        проходит тот же путь, что встроенный, — проверку разрешений,
+        подтверждение необратимого, запись в журнал с указанием, кто это
+        затеял. Плагин, зовущий `subprocess` сам, обошёл бы всё это, и
+        тогда согласие человека на «запуск программ» было бы самообманом.
+        """
+        self._registry.register(tool)
+        self._added[tool.name] = run
+        return tool
+
+    def drop_tools(self, prefix):
+        """Снять инструменты выключенного плагина."""
+        gone = [name for name in self._added if name.startswith(prefix)]
+        for name in gone:
+            self._added.pop(name, None)
+            self._registry.forget(name)
+        return gone
 
     @property
     def registry(self):
@@ -452,7 +480,8 @@ class ToolRunner:
 
         log.debug("Вызов %s(%s) из %s", tool.name, checked, source)
         try:
-            result = IMPLEMENTATIONS[tool.name](self._ctx, checked)
+            run = self._added.get(tool.name) or IMPLEMENTATIONS[tool.name]
+            result = run(self._ctx, checked)
         except Exception as e:
             log.exception("Инструмент %s упал", tool.name)
             self._write(tool, checked, source, tool.permissions, False,

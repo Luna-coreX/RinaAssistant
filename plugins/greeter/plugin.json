@@ -5,5 +5,6 @@
   "author": "NeuroSync Foundry Team",
   "description": "Отвечает на приветствия. Скажите «привет» — и Рина ответит.",
   "icon": "👋",
-  "entry": "GreeterPlugin"
+  "entry": "GreeterPlugin",
+  "api_version": 4
 }

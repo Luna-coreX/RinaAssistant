@@ -133,6 +133,13 @@ class RinaEngine:
             ),
             features=self._features,
         )
+
+        # Инструменты плагинов заводятся и снимаются вместе с плагинами
+        # (`4.0-H03`). Подписка, а не разовый обход: плагин включают и
+        # выключают в любой момент, и реестр обязан следовать за этим.
+        if plugin_manager is not None:
+            plugin_manager.changed.connect(self._sync_plugin_tools)
+            self._sync_plugin_tools()
         self._executor = Executor(
             say=lambda text, sound="response": self.say(text, sound=sound),
             tools=self._tools,
@@ -403,6 +410,43 @@ class RinaEngine:
     # Помнит незакрытый вопрос — диалог (core/dialog.py).
     # Делает — исполнитель (core/executor.py).
     # Ядру остаётся связать их и вести историю.
+
+    def _sync_plugin_tools(self, *_):
+        """
+        Привести реестр в соответствие с включёнными плагинами (`4.0-H03`).
+
+        Вызывается на каждое изменение состава: включили — инструменты
+        появились, выключили — исчезли. Реестр, помнящий инструмент
+        выключенного плагина, однажды его вызовет, а плагин к этому
+        времени уже не загружен.
+
+        Отдельного «обновить» здесь нет нарочно: единственный способ
+        узнать, что реестр разошёлся с действительностью, — сверять его с
+        ней каждый раз.
+        """
+        if self._plugins is None:
+            return
+
+        for plugin_id, loaded in self._plugins.plugins.items():
+            prefix = self._plugins.tool_prefix(plugin_id)
+            already = [n for n in self._tools.registry.names()
+                       if n.startswith(prefix)]
+
+            if not loaded.enabled or loaded.error:
+                if already:
+                    self._tools.drop_tools(prefix)
+                continue
+
+            if already:
+                continue                # уже заведены
+
+            for tool, run in self._plugins.declared_tools(plugin_id):
+                try:
+                    self._tools.add_tool(tool, run)
+                except ValueError:
+                    # Имя занято: плагин объявил два инструмента с одним
+                    # именем. Его дефект, и он уже записан в его журнал.
+                    pass
 
     def _apps(self):
         """

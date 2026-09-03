@@ -242,9 +242,10 @@ class PluginManager:
             lp = LoadedPlugin(manifest)
             # проверка совместимости API
             if not manifest.api_compatible():
-                lp.error = (f"Плагину нужна версия API {manifest.api_version}, "
-                            f"а приложение поддерживает до {API_VERSION}. "
-                            f"Обновите приложение.")
+                # Причина, версия и что делать — одним предложением
+                # (4.0-H05). Молчаливое «не работает» выглядит как поломка
+                # Рины, а не как устаревший плагин.
+                lp.error = manifest.why_incompatible()
             self.plugins[manifest.id] = lp
 
         broken = [p.manifest.id for p in self.plugins.values() if p.error]
@@ -403,8 +404,8 @@ class PluginManager:
     # ---------- доступ к вкладкам плагинов ----------
     def page_plugins(self):
         """
-        Список (plugin_id, LoadedPlugin) включённых плагинов, у которых есть
-        своя вкладка (create_page вернул виджет). Порядок стабильный.
+        Список (plugin_id, LoadedPlugin) включённых плагинов со страницей.
+        Порядок стабильный.
         """
         result = []
         for pid, lp in self.plugins.items():
@@ -417,11 +418,99 @@ class PluginManager:
         return result
 
     def _has_page(self, lp):
-        # вкладка есть, если переопределён page() (API v2) или create_page() (v1).
-        # Проверяем «дёшево»: отличается ли метод от базового.
-        cls = type(lp.instance)
-        return (cls.page is not Plugin.page
-                or cls.create_page is not Plugin.create_page)
+        # Страница есть, если переопределён `page()`. Проверяем «дёшево»:
+        # отличается ли метод от базового. `create_page` больше не
+        # рассматривается вовсе — плагин, отдающий виджет, не загружается
+        # (4.0-H05).
+        return type(lp.instance).page is not Plugin.page
+
+    # ---------- объявленные инструменты (4.0-H03) ----------
+    def tool_prefix(self, plugin_id):
+        """
+        Под каким именем инструменты плагина живут в реестре.
+
+        Префикс обязателен: два плагина с инструментом `roll` иначе
+        спорили бы за одно имя, и победил бы тот, кто включился позже.
+        """
+        return f"plugin.{plugin_id}."
+
+    def declared_tools(self, plugin_id):
+        """
+        Что плагин объявил — уже с проверенными разрешениями.
+
+        Возвращает список `(Tool, run)`: первое — описание для реестра
+        ядра, второе — что вызвать. Инструмент, просящий недоступное
+        плагину (ADR 0010), **не заводится вовсе**: он всё равно отказал бы,
+        но уже после того, как человек его увидел и позвал.
+        """
+        from core.permissions import plugin_allowed
+        from core.tools import Tool
+
+        lp = self.plugins.get(plugin_id)
+        if not lp or lp.instance is None:
+            return []
+
+        declared = []
+        try:
+            declared = list(lp.instance.tools() or [])
+        except Exception:                                # noqa: BLE001
+            self.log(plugin_id,
+                     tr("Ошибка tools:\n") + traceback.format_exc(limit=2))
+            return []
+
+        allowed_by_manifest, refused = plugin_allowed(lp.manifest.permissions)
+        if refused:
+            self.log(plugin_id,
+                     "Не выдано разрешений: " + ", ".join(refused))
+
+        made = []
+        for one in declared:
+            wanted = set(str(p) for p in (one.permissions or ()))
+            if not wanted.issubset(set(allowed_by_manifest)):
+                self.log(plugin_id,
+                         f"Инструмент «{one.name}» не заведён: просит "
+                         f"{sorted(wanted - set(allowed_by_manifest))}")
+                continue
+            try:
+                tool = Tool(
+                    name=self.tool_prefix(plugin_id) + str(one.name),
+                    summary=str(one.summary),
+                    params=tuple(one.params or ()),
+                    permissions=frozenset(wanted),
+                    confirm_required=bool(one.confirm_required),
+                )
+            except Exception:                            # noqa: BLE001
+                self.log(plugin_id,
+                         tr("Ошибка tools:\n") + traceback.format_exc(limit=2))
+                continue
+            made.append((tool, self._wrap(plugin_id, one)))
+        return made
+
+    def _wrap(self, plugin_id, declared):
+        """
+        Обёртка вокруг вызова плагина.
+
+        Плагин ненадёжен по определению — он чужой код, — поэтому его
+        исключение превращается в неуспех инструмента, а не в падение
+        ядра. И записывается в журнал плагина: автору нужно узнать, что
+        сломалось, а человеку — что не вышло.
+        """
+        from core.toolrunner import ToolResult
+
+        def run(ctx, args):
+            try:
+                answer = declared.run(args) if declared.run else None
+            except Exception:                            # noqa: BLE001
+                self.log(plugin_id,
+                         tr("Ошибка инструмента:\n")
+                         + traceback.format_exc(limit=3))
+                return ToolResult.failed(
+                    tr("Плагин не справился."), "internal")
+            if isinstance(answer, ToolResult):
+                return answer
+            return ToolResult.done(str(answer) if answer is not None else "")
+
+        return run
 
     def get_plugin_page_spec(self, plugin_id):
         """Декларативное описание вкладки (список элементов) или []."""
@@ -441,29 +530,6 @@ class PluginManager:
         if not lp or lp.instance is None:
             return
         self._safe_call(lp, "on_action", action, value)
-
-    def build_plugin_page(self, plugin_id):
-        """Создать виджет вкладки плагина (или None)."""
-        lp = self.plugins.get(plugin_id)
-        if not lp or lp.instance is None:
-            return None
-
-        # API v2: плагин описывает страницу, рисуем её сами
-        if type(lp.instance).page is not Plugin.page:
-            try:
-                from plugins.page_view import PluginPageView
-                return PluginPageView(plugin_id, self)
-            except Exception:
-                self.log(plugin_id,
-                         tr("Ошибка page:\n") + traceback.format_exc(limit=2))
-                return None
-
-        # API v1: устаревший путь с готовым QWidget
-        try:
-            return lp.instance.create_page()
-        except Exception:
-            self.log(plugin_id, tr("Ошибка create_page:\n") + traceback.format_exc(limit=2))
-            return None
 
     def plugin_page_meta(self, plugin_id):
         """(title, icon) для вкладки плагина."""

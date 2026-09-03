@@ -67,6 +67,20 @@ def parse_args(argv):
     return parser.parse_args(argv)
 
 
+def stop_plugins(plugins):
+    """
+    Остановить процессы плагинов.
+
+    Плагин — наш дочерний процесс, и оставить его после себя значит
+    оставить в системе python, который ничего не делает и никому не
+    подчиняется. То же правило, по которому ядро не переживает оболочку.
+    """
+    try:
+        plugins.stop_all()
+    except Exception:                                    # noqa: BLE001
+        log.exception("Плагины не остановились")
+
+
 def check_headless():
     """
     Убедиться, что интерфейсная библиотека не затянулась.
@@ -147,13 +161,17 @@ def main(argv=None):
     log.info("Язык реплик: %s", i18n.get_language())
 
     # Плагины принадлежат ядру: они отвечают на команды, а команды
-    # обрабатывает ядро. Менеджер обходится без Qt с 4.0-F04 — до этого он
-    # был написан под окно и в разделённой программе просто не заводился.
-    from plugins.manager import PluginManager
-    plugins = PluginManager()
+    # обрабатывает ядро. Но живут они **в своих процессах** (4.0-H07):
+    # плагин, ушедший в бесконечный цикл, иначе забирал бы поток ядра, и
+    # Рина замолкала бы целиком из-за чужого кода. Поверхность у
+    # `HostedPlugins` та же, что у менеджера в процессе, — ядру не нужно
+    # знать, где живёт плагин.
+    from core.plugin_host import HostedPlugins
+    from core.settings_store import settings as core_settings
+
+    plugins = HostedPlugins(settings=core_settings)
     try:
         plugins.discover()
-        log.info("Плагинов найдено: %d", len(plugins.plugins))
     except Exception:                                    # noqa: BLE001
         # Битый каталог плагинов не повод не запускать помощника.
         log.exception("Плагины не собрались")
@@ -198,6 +216,10 @@ def main(argv=None):
             engine.shutdown()
         except Exception:                                  # noqa: BLE001
             log.exception("Ядро завершилось с ошибкой")
+        # Процессы плагинов — наши дочерние: оставить их после себя значит
+        # оставить в системе python, который ничего не делает и никому не
+        # подчиняется (4.0-H07).
+        stop_plugins(plugins)
         channels.close()
 
     log.info("Ядро остановлено: %s. Сброшено при обрыве: %s", why, dropped)

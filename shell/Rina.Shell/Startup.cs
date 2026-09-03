@@ -427,12 +427,20 @@ public partial class App
             Check("плагины пришли из ядра", plugins.PluginCount > 0,
                   $"| {plugins.PluginCount}");
 
+            // Что было включено до нас. Проверка идёт на настоящем ядре,
+            // то есть на настройках человека, и оставить после себя
+            // включённый плагин права не имеет.
+            var before = await plugins.EnabledAsync();
+
             var drawn = await plugins.OpenFirstPageAsync();
             Check("плагин включился и отдал свою страницу", drawn > 0,
                   $"| элементов {drawn}");
+
+            var after = await plugins.EnabledAsync();
             Check("проверка вернула плагины как было",
-                  plugins.PageElementCount == 0,
-                  "| включённое ею выключено обратно");
+                  before.SequenceEqual(after),
+                  $"| было [{string.Join(", ", before)}], "
+                  + $"стало [{string.Join(", ", after)}]");
         }
         else Check("страница плагинов открылась", false);
 
@@ -443,12 +451,28 @@ public partial class App
         {
             window.ShowSectionFor(_shotSection);
             await Task.Delay(800);
+            // Страница плагина рисуется по описанию из другого процесса, и
+            // увидеть её глазами можно только раскрыв: снимок пустого
+            // списка не показывает ни карточек, ни рядов.
+            Pages.PluginsPage? shown = null;
+            if (_shotSection == "plugins"
+                && window.CurrentPage is Pages.PluginsPage opened)
+            {
+                shown = opened;
+                await shown.OpenFirstPageAsync(keepOpen: true);
+                await Task.Delay(300);
+            }
             if (_shotScroll > 0 && window.CurrentPage is Pages.SettingsPage page)
             {
                 page.ScrollTo(_shotScroll);
                 await Task.Delay(200);
             }
             Save(window, shot);
+
+            // И вернуть как было. Снимок — наблюдение, а не действие:
+            // оставить после себя включённый плагин он права не имеет,
+            // потому что настройки под ним настоящие, человеческие.
+            if (shown is not null) await shown.RestoreAsync();
         }
 
         window.Hide();

@@ -8,6 +8,9 @@
   "Portable-программы ищутся здесь": {
     "English": "Portable apps are looked for here"
   },
+  "[слишком глубокая вложенность]": {
+    "English": "[nesting too deep]"
+  },
   "{0} — сейчас недоступно": {
     "English": "{0} — unavailable right now"
   },
@@ -88,6 +91,9 @@
     "Українська": "Голос",
     "Español": "Voz",
     "Deutsch": "Stimme"
+  },
+  "Готово": {
+    "English": "Done"
   },
   "Громкость": {
     "English": "Volume",
