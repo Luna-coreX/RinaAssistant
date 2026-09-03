@@ -56,6 +56,13 @@ class ToolContext:
     host: Any = None
     #: Запомнить выбор программы под сказанное слово.
     on_alias: Callable = None
+    #: Кто трогает машину: громкость, медиа, питание, снимок.
+    #: В 4.0 это оболочка (ADR 0009); в 3.1.0 было пусто и ядро делало само.
+    system_out: Callable = None
+    #: Кто запускает программы. Там же, где системный слой, и по той же
+    #: причине: между намерением и созданием процесса должен стоять кто-то
+    #: ещё, и этот кто-то — не тот, кто слушает микрофон.
+    launch_app: Callable = None
 
 
 class ToolResult:
@@ -98,7 +105,23 @@ def _launch_app(ctx, args):
         return ToolResult.failed(
             tr("Не нашла программу «{name}».", name=name), "app.not_found")
 
-    if not app_index.launch(entry):
+    # Запускает оболочка (ADR 0009): она же проверит канонический путь,
+    # запрещённый каталог и подпись, и она же спросит человека, если файл
+    # неподписанный (4.0-G10). Ядро сюда доходит, уже **решив**, что
+    # запускать; «можно ли» — не его вопрос.
+    launch = getattr(ctx, "launch_app", None)
+    if launch is None:
+        started, why = app_index.launch(entry), ""
+    else:
+        started, why = launch(entry.launch, entry.kind)
+
+    if not started:
+        # «Человек отказался» — не поломка: он ответил, и ответил «нет».
+        # Код тот же, что у отказа в разрешении: для ядра это одно и то же
+        # событие — человек сказал «нет», и повторять вопрос не надо.
+        if "отказал" in why:
+            return ToolResult.failed(tr("Не стала запускать."),
+                                     "permission.denied")
         return ToolResult.failed(
             tr("Не получилось запустить {app} — программу удалили "
                "или перенесли.", app=entry.name), "app.launch_failed")
@@ -125,42 +148,60 @@ _MEDIA = {"next": "media_next", "previous": "media_prev",
           "play_pause": "media_play_pause"}
 
 
-def _run_system(action_id):
+def _run_system(ctx, action_id):
+    """
+    Сделать системное действие — руками оболочки (ADR 0009).
+
+    Ядро решает **что** сделать и **как об этом сказать**; трогает машину
+    оболочка. Слово остаётся здесь не из упрямства: «Прибавила громкость» —
+    реплика Рины, и её язык задаёт ядро (`4.0-F08`); оболочка отвечает
+    фактом «получилось».
+
+    Своего пути в обход нет и в запасе: ядро, умеющее выключить компьютер
+    само, тем и опасно, что умеет. Без оболочки действие не делается — и
+    это верно, потому что без неё его и попросить некому.
+    """
     from voice import system_control
 
-    message = system_control.run(action_id)
-    if message is None:
+    do = getattr(ctx, "system_out", None)
+    if do is None:
+        return ToolResult.failed(
+            tr("Системные действия делает оболочка, а связи с ней нет."),
+            "internal")
+
+    ok, detail = do(action_id)
+    if not ok:
         return ToolResult.failed(tr("Не получилось выполнить действие."),
                                  "internal")
-    if message == tr("Не получилось выполнить действие."):
-        return ToolResult.failed(message, "internal")
-    return ToolResult.done(message)
+    if action_id == "screenshot" and detail:
+        return ToolResult.done(tr("Снимок сохранён: ") + detail)
+    return ToolResult.done(tr(system_control.DONE_MESSAGES.get(action_id)
+                              or "Готово."))
 
 
 def _set_volume(ctx, args):
-    return _run_system(_VOLUME[args["action"]])
+    return _run_system(ctx, _VOLUME[args["action"]])
 
 
 def _media_control(ctx, args):
-    return _run_system(_MEDIA[args["action"]])
+    return _run_system(ctx, _MEDIA[args["action"]])
 
 
 def _lock_screen(ctx, args):
-    return _run_system("lock")
+    return _run_system(ctx, "lock")
 
 
 def _power_action(ctx, args):
-    return _run_system(args["action"])
+    return _run_system(ctx, args["action"])
 
 
 def _take_screenshot(ctx, args):
-    from core.protocol import Events
-    from voice import system_control
-
-    # Снимок делает оболочка: из фонового потока захват экрана не работает.
-    if ctx.emit:
-        ctx.emit(Events.WINDOW_ACTION, action="screenshot")
-    return ToolResult.done(system_control.run("screenshot"))
+    # Раньше снимок просили событием `window.action`: захват экрана был
+    # операцией Qt и работал только из потока интерфейса. Теперь это
+    # обычное системное действие — оболочка снимает экран сама и отвечает
+    # путём к файлу, а событие «сделай что-нибудь с окном» осталось для
+    # того, чем оно и было, — для окна.
+    return _run_system(ctx, "screenshot")
 
 
 def _create_reminder(ctx, args):

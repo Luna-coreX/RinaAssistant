@@ -83,6 +83,12 @@
       ],
       "side": "core"
     },
+    "system": {
+      "methods": [
+        "system.do"
+      ],
+      "side": "shell"
+    },
     "tasks": {
       "methods": [
         "task.cancel"
@@ -447,6 +453,7 @@
     "stream.close": null,
     "stream.credit": null,
     "stream.open": null,
+    "system.do": "system",
     "task.cancel": "tasks",
     "window.focus": "actuation",
     "window.list": "actuation"

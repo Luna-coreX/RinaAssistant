@@ -56,6 +56,9 @@ class Core:
         self.decoder = FrameDecoder()
         self.ids = IdGenerator("s-")
         self.session = Session(side=Side.SHELL)
+        self.apps = []          # индекс, который отдаём ядру
+        self.did = []           # системные действия, о которых просили
+        self.launched = []      # что просили запустить
 
     def send(self, envelope):
         self.proc.stdin.write(encode_frame(envelope))
@@ -88,6 +91,33 @@ class Core:
                 break
         return seen
 
+    #: Что ядро просило сделать с машиной и что запустить.
+    #: Проверки смотрят сюда: своих системных вызовов у ядра больше нет.
+    def serve(self, message):
+        """
+        Ответить на встречный запрос ядра, как ответила бы оболочка.
+
+        Возвращает True, если сообщение было запросом и на него ответили, —
+        такие сообщения не считаются «пришедшими»: это наша половина
+        разговора, а не ответ ядра.
+        """
+        if message.type != MessageType.REQUEST:
+            return False
+
+        if message.method == "apps.index":
+            payload = {"entries": list(self.apps)}
+        elif message.method == "apps.launch":
+            self.launched.append(message.payload.get("launch", ""))
+            payload = {"ok": True, "reason": ""}
+        elif message.method == "system.do":
+            self.did.append(message.payload.get("action", ""))
+            payload = {"ok": True, "detail": ""}
+        else:
+            return False
+
+        self.send(message.reply(payload, id=self.ids.next()))
+        return True
+
     def read(self, count=1, timeout=15.0):
         """Дождаться указанного числа сообщений."""
         got, deadline = [], time.monotonic() + timeout
@@ -102,7 +132,12 @@ class Core:
                 if not piece:
                     break
                 body += piece
-            got.extend(self.decoder.feed(header + body))
+            for message in self.decoder.feed(header + body):
+                # Запрос ядра — наша забота, а не «пришедшее сообщение»:
+                # отдать его наружу значило бы заставить каждую проверку
+                # знать, что ядро иногда спрашивает.
+                if not self.serve(message):
+                    got.append(message)
         return got
 
     def handshake(self):

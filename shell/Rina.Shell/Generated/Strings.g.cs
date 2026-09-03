@@ -110,6 +110,11 @@ public static partial class Loc
                 {
                     ["English"] = "Time is written like 19:30.",
                 },
+            ["Всегда доверять"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Always trust",
+                },
             ["Всегда слушать"] =
                 new Dictionary<string, string>
                 {
@@ -272,10 +277,20 @@ public static partial class Loc
                 {
                     ["English"] = "SCHEDULED · {0}",
                 },
+            ["Запуск без подписи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Launching without a signature",
+                },
             ["Запускать при входе в систему"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Start when you sign in",
+                },
+            ["Запустить один раз"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Run once",
                 },
             ["Звук"] =
                 new Dictionary<string, string>
@@ -312,6 +327,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Search unrecognized commands",
+                },
+            ["Источник неизвестен"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source unknown",
+                },
+            ["Источник: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source: {0}",
                 },
             ["Какое действие"] =
                 new Dictionary<string, string>
@@ -457,6 +482,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "couldn’t parse the shortcut “{0}”",
+                },
+            ["Никто не подтвердил, кто её выпустил и что её не подменяли."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nobody has confirmed who released it or that it wasn’t tampered with.",
                 },
             ["Ничего не запланировано."] =
                 new Dictionary<string, string>
@@ -957,6 +987,11 @@ public static partial class Loc
                     ["English"] = "Export",
                     ["Español"] = "Exportar",
                     ["Українська"] = "Експорт",
+                },
+            ["Эта программа не подписана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This program isn’t signed",
                 },
             ["Это действие необратимо — Рина спросит подтверждение."] =
                 new Dictionary<string, string>

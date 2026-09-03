@@ -96,6 +96,8 @@ _CAPABILITY_LIST = (
                "оболочка исполняет window.action; событие, а не метод"),
     Capability("apps", Side.SHELL, ("apps.index", "apps.launch"),
                "индекс программ и запуск живут в оболочке (4.0-G06)"),
+    Capability("system", Side.SHELL, ("system.do",),
+               "громкость, медиа, питание, снимок экрана (4.0-G01..G03)"),
     # --- объявляет ядро ---
     Capability("stt", Side.CORE,
                ("speech.listen_once", "speech.set_always_listen"),

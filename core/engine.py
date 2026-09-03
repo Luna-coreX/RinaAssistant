@@ -69,6 +69,17 @@ class RinaEngine:
         #: протокола (4.0-E04); пока не поставлен, ядро говорит само, как в
         #: 3.1.0 — приложение с окном на Qt этим и пользуется.
         self.voice_out = None
+        #: Кто трогает машину вместо самого ядра (4.0-G01, ADR 0009).
+        #: Пока не поставлен, ядро действует само, как в 3.1.0.
+        self.system_out = None
+        #: Откуда брать индекс программ. В 4.0 это оболочка (4.0-G06):
+        #: реестр и меню «Пуск» — данные Windows, и читать их из процесса,
+        #: который обязан работать без Windows, значит поселить в ядре
+        #: половину win32.
+        self.apps_source = None
+        self._apps_cache = None
+        #: Кто создаёт процесс. Тоже оболочка (4.0-G05).
+        self.launch_out = None
         #: Кому сообщать о заданном вопросе (4.0-F11). Ставит серверная
         #: сторона: спросить человека умеет только оболочка.
         self.on_question = None
@@ -111,6 +122,14 @@ class RinaEngine:
                 emit=lambda name, **data: self._emit(name, **data),
                 host=None,
                 on_alias=self._remember_choice,
+                # Через лямбду по той же причине, что и озвучка: оболочка
+                # появляется позже, чем собираются инструменты.
+                system_out=lambda action: (self.system_out(action)
+                                           if self.system_out else
+                                           (False, "нет связи с оболочкой")),
+                launch_app=lambda launch, kind: (
+                    self.launch_out(launch, kind) if self.launch_out
+                    else (False, "нет связи с оболочкой")),
             ),
             features=self._features,
         )
@@ -385,6 +404,26 @@ class RinaEngine:
     # Делает — исполнитель (core/executor.py).
     # Ядру остаётся связать их и вести историю.
 
+    def _apps(self):
+        """
+        Список программ: у оболочки, если она есть, иначе свой.
+
+        Свой путь остаётся ради приложения 3.1.0, которое живёт в одном
+        процессе и никакой оболочки не имеет. Как только 3.1.0 будет снят,
+        уйдёт и он — вместе с половиной `voice/app_index.py`.
+        """
+        if self.apps_source is None:
+            from voice import app_index
+
+            return app_index.cached_index() or []
+
+        if self._apps_cache is None:
+            from voice.app_index import AppEntry
+
+            self._apps_cache = [AppEntry.from_dict(item)
+                                for item in self.apps_source()]
+        return self._apps_cache
+
     def _router_context(self, source, require_wake):
         """Всё, что роутер должен знать о мире, — снимок на этот момент."""
         from voice import app_index, app_launcher
@@ -392,7 +431,7 @@ class RinaEngine:
 
         question = self._dialog.current()
         return router_mod.RouterContext(
-            apps=app_index.cached_index() or [],
+            apps=self._apps(),
             aliases=dict(self._settings.get("app_aliases", {}) or {}),
             pending=question.to_dict() if question else None,
             wake_words=tuple(get_wake_words(self._settings)),

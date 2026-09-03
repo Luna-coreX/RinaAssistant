@@ -114,6 +114,13 @@ class ProtocolServer:
 
         # Голос ядра уходит в оболочку, а не в местный динамик (4.0-E04).
         engine.voice_out = self._speak
+        # Машину трогает оболочка (ADR 0009). Ядро решает, что сделать, и
+        # просит; своих системных вызовов у него больше нет.
+        engine.system_out = self.do_system
+        # Индекс программ — данные операционной системы, и живут они в
+        # оболочке (ADR 0009). Ядро спрашивает и сопоставляет.
+        engine.apps_source = self.fetch_apps
+        engine.launch_out = self.launch_app
         # Опасное подтверждается окном, а не только словами (4.0-F11).
         engine.on_question = self._on_question
 
@@ -841,6 +848,83 @@ class ProtocolServer:
         request = Envelope.request(method, payload, id=self.ids.next())
         self._awaiting[request.id] = on_answer
         return self.send(request)
+
+    def ask_shell_sync(self, method: str, payload: dict,
+                       timeout: float = 10.0) -> dict:
+        """
+        Спросить оболочку и дождаться ответа.
+
+        Нужен потому, что системное действие выполняется **внутри** разбора
+        команды: инструмент «прибавь громкость» обязан вернуть исход, а не
+        «я попросил». Асинхронный `ask_shell` для этого не годится — он
+        оставляет вызывающего без ответа.
+
+        Ждём в том потоке, который обрабатывает команду, а не в приёмном:
+        приёмный поток здесь и отвечает, и заблокировать его значило бы
+        ждать ответа тем самым потоком, который его принесёт.
+        """
+        done = threading.Event()
+        got: dict = {}
+
+        def answered(reply: Envelope) -> None:
+            got["reply"] = reply
+            done.set()
+
+        # Проверка на своей стороне: оболочка без Windows не объявит
+        # `system`, и узнать об этом лучше здесь, чем по молчанию.
+        self.session.check_outgoing(method)
+        request_id = self.ask_shell(method, payload, answered).id
+        if not done.wait(timeout):
+            self._awaiting.pop(request_id, None)
+            raise fault("internal", "Оболочка не ответила вовремя.")
+
+        reply = got["reply"]
+        if reply.type == "error":
+            raise ProtocolFault(reply.payload.get("code", "internal"),
+                                reply.payload.get("message", ""))
+        return dict(reply.payload)
+
+    def fetch_apps(self, refresh: bool = False) -> list:
+        """
+        Спросить у оболочки индекс установленных программ.
+
+        Сопоставление имени с записью остаётся здесь: «телеграм» → Telegram
+        это транслитерация и нечёткое совпадение, то есть язык, а язык —
+        предмет ядра. Оболочка отдаёт факты о системе, ядро решает, что
+        человек имел в виду (ADR 0009).
+        """
+        try:
+            answer = self.ask_shell_sync("apps.index", {"refresh": refresh},
+                                         timeout=60.0)
+        except ProtocolFault:
+            # Оболочка без индекса — не повод падать: команда «открой
+            # телеграм» ответит «не нашла», а остальное будет работать.
+            return []
+        return list(answer.get("entries") or [])
+
+    def launch_app(self, launch: str, kind: str = "file") -> tuple[bool, str]:
+        """Попросить оболочку запустить найденное."""
+        try:
+            answer = self.ask_shell_sync("apps.launch",
+                                         {"launch": launch, "kind": kind},
+                                         timeout=30.0)
+        except ProtocolFault as exc:
+            return False, str(exc)
+        return bool(answer.get("ok")), str(answer.get("reason", ""))
+
+    def do_system(self, action: str) -> tuple[bool, str]:
+        """
+        Попросить оболочку сделать системное действие.
+
+        Слова остаются здесь: «Прибавила громкость» — реплика Рины
+        (ADR 0007), а оболочка отвечает фактом. Поэтому наружу уходит пара
+        «получилось, подробность», а не готовое предложение.
+        """
+        try:
+            answer = self.ask_shell_sync("system.do", {"action": action})
+        except ProtocolFault as exc:
+            return False, str(exc)
+        return bool(answer.get("ok")), str(answer.get("detail", ""))
 
     def _on_question(self, question) -> None:
         """

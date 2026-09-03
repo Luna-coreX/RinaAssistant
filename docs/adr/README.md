@@ -14,6 +14,7 @@ A decision belongs here when undoing it would mean rewriting rather than editing
 | [0006](0006-settings-ownership.md) | Settings — the core owns meaning, the shell owns presentation | accepted | `4.0-E06a` |
 | [0007](0007-localisation.md) | Localisation — interface words in the shell, Rina's replies in the core | accepted | `4.0-F08` |
 | [0008](0008-ui-framework.md) | Shell UI framework — WPF, Windows only | accepted | `4.0-F01` |
+| [0009](0009-system-layer.md) | System layer — the shell touches the machine, the core decides what to do | accepted | `4.0-G06` |
 
 ## Decided but not yet written up
 

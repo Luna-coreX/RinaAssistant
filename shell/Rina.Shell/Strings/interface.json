@@ -50,6 +50,9 @@
   "Время пишется как 19:30.": {
     "English": "Time is written like 19:30."
   },
+  "Всегда доверять": {
+    "English": "Always trust"
+  },
   "Всегда слушать": {
     "English": "Always listen",
     "Українська": "Завжди слухати",
@@ -149,8 +152,14 @@
     "Español": "Registrar el texto de los mensajes",
     "Deutsch": "Nachrichtentexte protokollieren"
   },
+  "Запуск без подписи": {
+    "English": "Launching without a signature"
+  },
   "Запускать при входе в систему": {
     "English": "Start when you sign in"
+  },
+  "Запустить один раз": {
+    "English": "Run once"
   },
   "Звук": {
     "English": "Audio"
@@ -172,6 +181,12 @@
   },
   "Искать нераспознанное": {
     "English": "Search unrecognized commands"
+  },
+  "Источник неизвестен": {
+    "English": "Source unknown"
+  },
+  "Источник: {0}": {
+    "English": "Source: {0}"
   },
   "Какое действие": {
     "English": "Which action"
@@ -265,6 +280,9 @@
   },
   "Не прочиталось: {0}": {
     "English": "Couldn’t read it: {0}"
+  },
+  "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
+    "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
   },
   "Ничего не запланировано.": {
     "English": "Nothing is scheduled.",
@@ -556,6 +574,9 @@
     "Українська": "Експорт",
     "Español": "Exportar",
     "Deutsch": "Exportieren"
+  },
+  "Эта программа не подписана": {
+    "English": "This program isn’t signed"
   },
   "Это действие необратимо — Рина спросит подтверждение.": {
     "English": "This action is irreversible — Rina will ask for confirmation."

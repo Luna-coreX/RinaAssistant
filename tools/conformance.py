@@ -153,11 +153,17 @@ class ReferenceCore:
         # проверяемый на другой.
         clock = clock or time.time
         ledger = ConfirmationLedger(clock=clock)
+        #: Кого просить о системном действии. Ставится тестом после того,
+        #: как заведена оболочка: ядро без собеседника машину не трогает
+        #: вовсе (ADR 0009), и это его свойство, а не недоделка.
+        self.peer = None
         self.runner = ToolRunner(ToolContext(
             settings=settings,
             reminders=ReminderStore(settings),
             commands=UserCommandStore(settings),
             emit=lambda name, **data: None,
+            system_out=self._ask_shell_do,
+            launch_app=self._ask_shell_launch,
         ), confirmations=ledger)
         self.permissions = PermissionChannel(ledger=ledger, clock=clock)
         self.tasks = Registry(self.endpoint.ids)
@@ -171,6 +177,43 @@ class ReferenceCore:
     @property
     def session(self):
         return self.endpoint.session
+
+    def _round_trip(self, method, payload):
+        """
+        Спросить оболочку и дождаться ответа — через провод.
+
+        Круг синхронный, потому что оба конца здесь в одном потоке: запрос
+        кладётся в буфер, доставляется, обслуживается, ответ доставляется
+        обратно. Настоящее ядро делает то же самое рабочим потоком
+        (`ask_shell_sync`), но проверяется здесь не многопоточность, а то,
+        что просьба **ушла и вернулась**.
+        """
+        if self.peer is None:
+            return {}
+        self.session.check_outgoing(method)
+        request = self.endpoint.send(Envelope.request(
+            method, dict(payload), id=self.endpoint.ids.next()))
+
+        for message in deliver(self.endpoint, self.peer.endpoint):
+            if message.id != request.id:
+                continue
+            reply = self.peer.serve(message)
+            if reply is None:
+                return {}
+            self.peer.endpoint.send(reply)
+            for back in deliver(self.peer.endpoint, self.endpoint):
+                if back.correlation_id == request.id:
+                    return dict(back.payload)
+        return {}
+
+    def _ask_shell_do(self, action):
+        answer = self._round_trip("system.do", {"action": action})
+        return bool(answer.get("ok")), str(answer.get("detail", ""))
+
+    def _ask_shell_launch(self, launch, kind="file"):
+        answer = self._round_trip("apps.launch",
+                                  {"launch": launch, "kind": kind})
+        return bool(answer.get("ok")), str(answer.get("reason", ""))
 
     def handle(self, raw_or_envelope):
         """Обработать одно пришедшее сообщение, вернуть ответы (список)."""
@@ -254,6 +297,8 @@ class ReferenceShell:
         self.endpoint = Endpoint(Side.SHELL, "s-", versions, capabilities)
         self.events = Router()
         self.heard = []
+        self.done = []          # системные действия, о которых просило ядро
+        self.launched = []      # что просили запустить
         for name in ("assistant.response", "task.progress", "task.partial",
                      "task.done", "task.failed", "task.cancelled"):
             self.events.on(name, lambda p, n=name: self.heard.append(n))
@@ -266,6 +311,25 @@ class ReferenceShell:
         return self.endpoint.send(Envelope.request(
             method, dict(payload or {}), id=self.endpoint.ids.next(),
             trace_id=trace_id))
+
+    #: Что оболочку просили сделать с машиной (`4.0-G01`, ADR 0009).
+    #: Ядро больше не трогает систему само, и проверка «дошло до
+    #: системного слоя» теперь смотрит именно сюда.
+    def serve(self, request):
+        """Ответить на запрос ядра так, как ответила бы настоящая оболочка."""
+        if request.method == "system.do":
+            action = request.payload.get("action", "")
+            self.done.append(action)
+            return request.reply({"ok": True, "detail": ""},
+                                 id=self.endpoint.ids.next())
+        if request.method == "apps.index":
+            return request.reply({"entries": []},
+                                 id=self.endpoint.ids.next())
+        if request.method == "apps.launch":
+            self.launched.append(request.payload.get("launch", ""))
+            return request.reply({"ok": True, "reason": ""},
+                                 id=self.endpoint.ids.next())
+        return None
 
 
 def handshake(shell, core):
@@ -282,10 +346,17 @@ def handshake(shell, core):
 
 
 def talk(shell, core, method, payload=None, trace_id=None):
-    """Запрос оболочки → обработка ядром → всё, что вернулось."""
+    """
+    Запрос оболочки → обработка ядром → всё, что вернулось.
+
+    Встречные запросы ядра (`system.do`, `apps.launch`) обслуживаются
+    внутри обработки: с `4.0-G01` системное действие делается не в ядре, а
+    по ту сторону провода, и исход нужен инструменту немедленно.
+    """
     shell.ask(method, payload, trace_id=trace_id)
     for message in deliver(shell.endpoint, core.endpoint):
         core.handle(message)
+
     return deliver(core.endpoint, shell.endpoint)
 
 
@@ -297,6 +368,7 @@ print("транспорт внутри процесса, обе стороны �
 requirement(1, "полный конверт на каждом сообщении")
 
 shell, core = ReferenceShell(), ReferenceCore()
+core.peer = shell
 handshake(shell, core)
 check("рукопожатие прошло", shell.session.ready and core.session.ready)
 
@@ -533,7 +605,10 @@ ok = [m for m in answers if m.type == MessageType.RESPONSE]
 check("с подтверждением действие исполнено", len(ok) == 1,
       f"| {[m.type for m in answers]}")
 check("и оно действительно дошло до системного слоя",
-      box.actions == ["sleep"], f"| {box.actions}")
+      shell.done == ["sleep"], f"| {shell.done}")
+check("а ядро само машину не трогало",
+      box.actions == [],
+      "| системный вызов из ядра — то, чего ADR 0009 не допускает")
 
 # --- 10 --------------------------------------------------------------------
 requirement(10, "просроченное подтверждение отклоняется")

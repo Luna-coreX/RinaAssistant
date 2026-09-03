@@ -222,6 +222,47 @@ public sealed class CoreLink : IAsyncDisposable
     private async Task OnCoreRequestAsync(CoreConnection connection,
                                           Envelope request)
     {
+        // --- системный слой (ADR 0009) ---------------------------------
+        // Ядро решило, что сделать; трогает машину оболочка. Ответ —
+        // факт, а не предложение: слова говорит ядро.
+        if (request.Method == "system.do")
+        {
+            var action = request.Payload["action"]?.GetValue<string>() ?? "";
+            var (ok, detail) = Platform.Machine.Do(action);
+            Platform.Journal.Action(action, ok);
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = ok,
+                ["detail"] = detail,
+            });
+            return;
+        }
+
+        if (request.Method == "apps.index")
+        {
+            await ReplyIndexAsync(connection, request);
+            return;
+        }
+
+        if (request.Method == "apps.launch")
+        {
+            var launch = request.Payload["launch"]?.GetValue<string>() ?? "";
+            var kind = request.Payload["kind"]?.GetValue<string>() ?? "file";
+            var outcome = Platform.Launcher.Start(launch, kind, trusted: false);
+
+            // Неподписанное при первом запуске требует согласия. Спрашивает
+            // оболочка, а не ядро: у неё окно, и она же видит подпись.
+            if (outcome.NeedsTrust)
+                outcome = await AskTrustAsync(launch, kind);
+
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = outcome.Ok,
+                ["reason"] = outcome.Reason,
+            });
+            return;
+        }
+
         // Ядро открывает поток речи своим запросом: у звука есть формат, и
         // частоту объявляют, а не угадывают. Ответить обязательно — иначе
         // ядро ждёт и молчит.
@@ -347,6 +388,88 @@ public sealed class CoreLink : IAsyncDisposable
                                        TimeSpan.FromSeconds(10));
         }
         catch { /* ядро занято или ушло */ }
+    }
+
+    /// <summary>
+    /// Отдать ядру индекс программ.
+    /// </summary>
+    /// <remarks>
+    /// Собирается в фоновом потоке: обход меню «Пуск» и проверка подписей
+    /// занимают секунды, и делать это в потоке окна значит подвесить окно
+    /// ровно там, где человек ждёт ответа.
+    /// </remarks>
+    private async Task ReplyIndexAsync(CoreConnection connection,
+                                       Envelope request)
+    {
+        var refresh = request.Payload["refresh"]?.GetValue<bool>() ?? false;
+        var folders = (await GetAsync("program_folders"))?["program_folders"]
+                      ?.AsArray().Select(f => f?.GetValue<string>() ?? "")
+                      .Where(f => f.Length > 0).ToArray() ?? [];
+
+        var entries = await Task.Run(
+            () => Platform.AppIndex.Get(folders, refresh));
+
+        var listed = new JsonArray();
+        foreach (var entry in entries)
+            listed.Add(new JsonObject
+            {
+                ["name"] = entry.Name,
+                ["launch"] = entry.Launch,
+                ["kind"] = entry.Kind,
+                ["source"] = entry.Source,
+                ["signed"] = entry.Signed,
+                ["aliases"] = new JsonArray(
+                    entry.Aliases.Select(a => (JsonNode)a!).ToArray()),
+                ["checked_at"] = entry.CheckedAt
+                    .ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            });
+
+        await connection.ReplyAsync(request, new JsonObject
+        {
+            ["entries"] = listed,
+        });
+    }
+
+    /// <summary>
+    /// Спросить про неподписанное и запустить, если разрешили.
+    /// </summary>
+    /// <remarks>
+    /// Показывается всё, чем можно решать: имя, полный путь, отсутствие
+    /// подписи. «Всегда доверять» запоминается и снимается в настройках
+    /// (<c>4.0-G10</c>).
+    /// </remarks>
+    private async Task<Platform.Launcher.Outcome> AskTrustAsync(string launch,
+                                                                string kind)
+    {
+        var path = Platform.AppIndex.Canonical(launch);
+        var answer = await OnUiAsync(() =>
+        {
+            var source = Platform.AppIndex.Get()
+                .FirstOrDefault(e => string.Equals(
+                    e.Launch, path, StringComparison.OrdinalIgnoreCase))
+                ?.Source ?? "";
+            var ask = new Pages.TrustWindow(path, source);
+            ask.ShowDialog();
+            return ask.Answer;
+        });
+
+        if (answer == Pages.TrustWindow.Reply.Never)
+            // Причина уходит ядру, а не человеку: словами ответит Рина.
+            return new Platform.Launcher.Outcome(false,
+                                                 "человек отказался"); // не интерфейс
+
+        if (answer == Pages.TrustWindow.Reply.Always)
+            Platform.Trust.Remember(path);
+
+        return Platform.Launcher.Start(launch, kind, trusted: true);
+    }
+
+    private static Task<T> OnUiAsync<T>(Func<T> work)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            return Task.FromResult(work());
+        return dispatcher.InvokeAsync(work).Task;
     }
 
     private static void OnUi(Action work)

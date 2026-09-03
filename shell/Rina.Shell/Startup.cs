@@ -73,6 +73,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-platform"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckPlatformAsync();
+            return;
+        }
+
         if (args.Contains("--check-pages"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -562,6 +569,148 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>
+    /// G01..G12: системный слой оболочки.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Проверяется то, что <b>не</b> должно случиться, наравне с тем, что
+    /// должно: «Загрузки» не попадают в индекс, junction наружу не проходит
+    /// проверку доверия, неподписанное не запускается молча. Правило, за
+    /// которым никто не следит, держится ровно до первой правки.
+    /// </para>
+    /// <para>
+    /// Ничего необратимого проверка не делает: питание и блокировка есть в
+    /// таблице действий, но здесь не вызываются — проверка, выключающая
+    /// компьютер, запускается один раз.
+    /// </para>
+    /// </remarks>
+    private Task CheckPlatformAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== G: системный слой оболочки ===");
+
+        // --- запреты (G08) ---
+        var downloads = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            "Downloads", "что-нибудь.exe");
+        Check("«Загрузки» запрещены к индексации",
+              Platform.AppIndex.Forbidden(downloads));
+        Check("рабочий стол запрещён",
+              Platform.AppIndex.Forbidden(Path.Combine(
+                  Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                  "любое.exe")));
+        Check("временный каталог запрещён",
+              Platform.AppIndex.Forbidden(
+                  Path.Combine(Path.GetTempPath(), "любое.exe")));
+        Check("а системный каталог — нет",
+              !Platform.AppIndex.Forbidden(
+                  @"C:\Windows\System32\notepad.exe"));
+
+        // --- канонический путь (G11) ---
+        var link = Path.Combine(Path.GetTempPath(), "rina-check-link");
+        var outside = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile);
+        try
+        {
+            if (Directory.Exists(link)) Directory.Delete(link);
+            // Junction, а не symlink: symlink требует прав, а junction —
+            // нет, и в G11 назван именно он. Создаётся тем же `mklink`,
+            // которым его создал бы человек.
+            var made = global::System.Diagnostics.Process.Start(
+                new global::System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c mklink /J \"{link}\" \"{outside}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                });
+            made?.WaitForExit(5000);
+
+            var resolved = Platform.AppIndex.Canonical(link);
+            Check("junction разворачивается в настоящий путь",
+                  string.Equals(resolved, outside,
+                                StringComparison.OrdinalIgnoreCase),
+                  $"| {resolved}");
+            Check("и по развёрнутому пути видно, что он вне доверенного",
+                  !string.Equals(resolved, link,
+                                 StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine($"     junction не создан: {error.GetType().Name}");
+        }
+        finally
+        {
+            try { if (Directory.Exists(link)) Directory.Delete(link); }
+            catch { }
+        }
+
+        Check("непонятный путь — это «нельзя», а не «наверное можно»",
+              Platform.AppIndex.Canonical("").Length == 0
+              && Platform.AppIndex.Forbidden(""));
+
+        // --- подпись (G09) ---
+        var signed = @"C:\Windows\System32\notepad.exe";
+        Check("системная программа подписана",
+              Platform.AppEntry.HasSignature(signed),
+              $"| {Platform.AppEntry.CatalogTrace(signed)}");
+        var unsigned = Path.Combine(Path.GetTempPath(), "rina-unsigned.exe");
+        try
+        {
+            File.WriteAllBytes(unsigned, new byte[] { 0x4D, 0x5A, 0, 0 });
+            Check("подделка под программу — не подписана",
+                  !Platform.AppEntry.HasSignature(unsigned));
+            Check("и без согласия человека не запускается",
+                  Platform.Launcher.Start(unsigned, "file", trusted: false)
+                      is { Ok: false });
+        }
+        finally
+        {
+            try { File.Delete(unsigned); } catch { }
+        }
+
+        // --- индекс (G04) ---
+        var index = Platform.AppIndex.Get(refresh: true);
+        Check("индекс собрался", index.Count > 0, $"| записей {index.Count}");
+        Check("у каждой записи есть источник",
+              index.All(e => e.Source.Length > 0));
+        Check("ни одна запись не из запрещённого каталога",
+              index.All(e => e.Kind == "uwp"
+                             || !Platform.AppIndex.Forbidden(e.Launch)));
+        Check("источники известны",
+              index.All(e => Platform.AppIndex.SourceOrder.Contains(e.Source)),
+              $"| {string.Join(", ", index.Select(e => e.Source).Distinct())}");
+        Check("подпись проверена у файлов, а не у пакетов",
+              index.Any(e => e.Kind == "file" && e.Signed));
+
+        // --- действия (G01) ---
+        Check("таблица действий закрыта и названа",
+              Platform.Machine.Actions.Length >= 10
+              && Platform.Machine.Do("сделай-что-нибудь") is { Ok: false },
+              "| неизвестное имя — отказ, а не исключение");
+        Check("необратимое помечено",
+              Platform.Machine.Irreversible.Contains("shutdown")
+              && !Platform.Machine.Irreversible.Contains("volume_up"));
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+        return Task.CompletedTask;
     }
 
     /// <summary>
