@@ -53,6 +53,12 @@
   "Акцент": {
     "English": "Accent"
   },
+  "Архив с плагином": {
+    "English": "Plugin archive"
+  },
+  "Архивы (*.zip)|*.zip|Все файлы|*.*": {
+    "English": "Archives (*.zip)|*.zip|All files|*.*"
+  },
   "Будильник": {
     "English": "Alarm",
     "Українська": "Будильник",
@@ -76,6 +82,9 @@
   },
   "Время пишется как 19:30.": {
     "English": "Time is written like 19:30."
+  },
+  "Все настройки вернутся к значениям по умолчанию: голос, устройства, сочетания клавиш, отделка, приватность.": {
+    "English": "All settings return to their defaults: voice, devices, shortcuts, finish, privacy."
   },
   "Всегда доверять": {
     "English": "Always trust"
@@ -218,6 +227,9 @@
   "Закрыть": {
     "English": "Close"
   },
+  "Заменён: {0}. Он выключен — включите, если доверяете.": {
+    "English": "Replaced: {0}. It is off — turn it on if you trust it."
+  },
   "Записать": {
     "English": "Record"
   },
@@ -259,6 +271,12 @@
   },
   "ИИ": {
     "English": "AI"
+  },
+  "Из архива": {
+    "English": "From archive"
+  },
+  "Из папки": {
+    "English": "From folder"
   },
   "Импорт": {
     "English": "Import",
@@ -313,6 +331,9 @@
   },
   "Команды живут в ядре, а связи с ним сейчас нет.": {
     "English": "Commands live in the core, and there’s no connection to it."
+  },
+  "Команды, история и плагины останутся на месте.": {
+    "English": "Commands, history and plugins stay where they are."
   },
   "Комбинации действий": {
     "English": "Action shortcuts"
@@ -398,6 +419,9 @@
     "Español": "Ajustes",
     "Deutsch": "Einstellungen"
   },
+  "Настройки сброшены.": {
+    "English": "Settings have been reset."
+  },
   "Настройки, история, команды": {
     "English": "Settings, history, commands"
   },
@@ -455,6 +479,12 @@
     "Español": "Examinar…",
     "Deutsch": "Durchsuchen…"
   },
+  "Обновить": {
+    "English": "Refresh",
+    "Українська": "Оновити",
+    "Español": "Actualizar",
+    "Deutsch": "Aktualisieren"
+  },
   "Обновления": {
     "English": "Updates"
   },
@@ -509,8 +539,14 @@
   "ПРАВКА КОМАНДЫ": {
     "English": "EDITING A COMMAND"
   },
+  "Папка с плагином": {
+    "English": "Plugin folder"
+  },
   "Папка с распакованной моделью Vosk": {
     "English": "Folder with the unpacked Vosk model"
+  },
+  "Перечитываю…": {
+    "English": "Rereading…"
   },
   "Плавающая строка команд": {
     "English": "Floating command bar",
@@ -574,6 +610,9 @@
   },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
+  },
+  "Поставлен: {0}. Включите его, чтобы начал работать.": {
+    "English": "Installed: {0}. Turn it on to make it work."
   },
   "Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.": {
     "English": "Almost silent: {0}%. Check that the right microphone is selected."
@@ -659,6 +698,9 @@
   "Сбросить все": {
     "English": "Reset all"
   },
+  "Сбросить настройки": {
+    "English": "Reset settings"
+  },
   "Свернуть": {
     "English": "Minimise"
   },
@@ -742,6 +784,12 @@
   },
   "Список напоминаний живёт в ядре, а связи с ним сейчас нет.": {
     "English": "The reminder list lives in the core, and there’s no connection to it."
+  },
+  "Список обновлён.": {
+    "English": "List refreshed."
+  },
+  "Ставлю…": {
+    "English": "Installing…"
   },
   "Таймер": {
     "English": "Timer",
@@ -985,6 +1033,9 @@
   },
   "что произнести": {
     "English": "what to say"
+  },
+  "ядро {0}": {
+    "English": "core {0}"
   },
   "ядро запускается": {
     "English": "the core is starting"

@@ -71,6 +71,7 @@ BASE_METHODS = (
     "command.run_by_id",
     "settings.describe",
     "settings.options",
+    "settings.reset",
     "hotkeys.actions",
     "settings.get",
     "settings.set",

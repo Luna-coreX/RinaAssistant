@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Markup;
 
 namespace Rina.Shell.Strings;
@@ -47,6 +48,9 @@ public static partial class Loc
     {
         if (string.IsNullOrWhiteSpace(language) || language == _language) return;
         _language = language;
+        // Сначала привязки, потом подписчики: строка в разметке обновится
+        // сама, а тот, кто пересобирает страницы, увидит уже новый язык.
+        Live.Refresh();
         Changed?.Invoke();
     }
 
@@ -77,6 +81,29 @@ public static partial class Loc
     /// переводов и проверка.
     /// </remarks>
     public static string Word(string key) => key;
+
+    /// <summary>
+    /// Указатель переводов для привязок из разметки.
+    /// </summary>
+    /// <remarks>
+    /// Один на всё приложение. Смена языка объявляет, что изменились
+    /// **все** его значения (`Item[]`), и каждая привязка перечитывает
+    /// свой ключ. Дешевле, чем пересобирать окна, и надёжнее, чем помнить,
+    /// какие из них надо пересобрать.
+    /// </remarks>
+    public sealed class Lookup : System.ComponentModel.INotifyPropertyChanged
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler?
+            PropertyChanged;
+
+        public string this[string key] => S(key);
+
+        internal void Refresh() => PropertyChanged?.Invoke(
+            this, new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
+    }
+
+    /// <summary>Указатель переводов; источник привязок `{loc:S …}`.</summary>
+    public static Lookup Live { get; } = new();
 
     /// <summary>Перевести и подставить: <c>S("Осталось {0}", n)</c>.</summary>
     public static string S(string key, params object?[] arguments)
@@ -122,6 +149,37 @@ public sealed class SExtension : MarkupExtension
     [ConstructorArgument("key")]
     public string Key { get; set; } = "";
 
+    /// <summary>
+    /// Привязка к переводу, а не разовая подстановка.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Разметка разбирается один раз. Возвращая здесь строку, мы получали
+    /// перевод, который дальше не менялся никогда: страницы это скрывали —
+    /// они пересобираются при смене языка, — а окно нет, и подвал колонки
+    /// оставался на прежнем языке.
+    /// </para>
+    /// <para>
+    /// Привязка к <see cref="Loc.Live"/> обновляется сама, где бы строка
+    /// ни стояла, и не требует помнить, что именно надо пересобрать.
+    /// </para>
+    /// </remarks>
     public override object ProvideValue(IServiceProvider provider)
-        => Loc.S(Key);
+    {
+        var binding = new System.Windows.Data.Binding($"[{Key}]")
+        {
+            Source = Loc.Live,
+            Mode = System.Windows.Data.BindingMode.OneWay,
+        };
+
+        // Не всякая цель — свойство зависимости: `ToolTip` в атрибуте,
+        // например, приходит объектом. Там, где привязка невозможна,
+        // возвращаем строку, как раньше.
+        if (provider?.GetService(typeof(IProvideValueTarget))
+            is IProvideValueTarget target
+            && target.TargetProperty is not DependencyProperty)
+            return Loc.S(Key);
+
+        return binding.ProvideValue(provider!);
+    }
 }

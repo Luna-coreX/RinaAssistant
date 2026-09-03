@@ -450,6 +450,7 @@
     "settings.describe": null,
     "settings.get": null,
     "settings.options": null,
+    "settings.reset": null,
     "settings.set": null,
     "speech.listen_once": "stt",
     "speech.say": "tts",

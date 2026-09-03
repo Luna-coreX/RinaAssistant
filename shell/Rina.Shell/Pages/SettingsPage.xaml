@@ -22,7 +22,13 @@
       <StackPanel x:Name="Body" />
     </ScrollViewer>
 
-    <TextBlock x:Name="Note" Grid.Row="2" Style="{StaticResource Text.Meta}"
-               Margin="0,12,0,0" TextWrapping="Wrap" />
+    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+      <!-- Сброс отделён пустотой, а не цветом: между необратимым и
+           соседями просвет вдвое больше обычного (DIRECTION §3). -->
+      <Button Style="{StaticResource Btn.Danger}" Margin="0,0,64,0"
+              Content="{loc:S 'Сбросить настройки'}" Click="OnReset" />
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 VerticalAlignment="Center" TextWrapping="Wrap" />
+    </StackPanel>
   </Grid>
 </UserControl>

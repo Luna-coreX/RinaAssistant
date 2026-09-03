@@ -292,6 +292,7 @@ class ProtocolServer:
             "plugins.page": self._plugins_page,
             "plugins.action": self._plugins_action,
             "plugins.install": self._plugins_install,
+            "settings.reset": self._settings_reset,
             "stream.open": self._stream_open,
             "stream.close": self._stream_close,
             "stream.credit": self._stream_credit,
@@ -569,9 +570,10 @@ class ProtocolServer:
         знающая его наизусть, предложила бы назначить сочетание тому, чего
         ядро уже не делает, — и человек узнал бы об этом, нажав клавиши.
         """
+        from core.i18n import t as tr
         from voice.hotkey_actions import HOTKEY_ACTIONS
 
-        return {"items": [{"value": key, "title": title, "what": what,
+        return {"items": [{"value": key, "title": tr(title), "what": tr(what),
                            "icon": icon}
                           for key, (title, what, icon)
                           in HOTKEY_ACTIONS.items()]}
@@ -604,17 +606,23 @@ class ProtocolServer:
         спрашивает ядро (§11), но человек должен видеть это ещё в
         конструкторе, а не узнать при первом срабатывании.
         """
+        from core.i18n import t as tr
         from voice import user_commands
 
+        # Переводим **на выходе**: таблицы `voice/user_commands.py` — это
+        # ключи, и хранить их переведёнными значит хранить их на одном
+        # языке. Переводы в ядре есть с 3.1.0, их просто никто не
+        # спрашивал, и при английском интерфейсе конструктор говорил
+        # «Программа».
         return {
-            "kinds": [{"value": kind, "title": title, "icon": icon}
+            "kinds": [{"value": kind, "title": tr(title), "icon": icon}
                       for kind, title, icon in user_commands.COMMAND_TYPES],
-            "actions": [{"value": action, "title": title,
+            "actions": [{"value": action, "title": tr(title),
                          "destructive": action
                          in user_commands.DESTRUCTIVE_ACTIONS}
                         for action, title in user_commands.SYSTEM_ACTIONS],
-            "matches": [{"value": "contains", "title": "Фраза встречается"},
-                        {"value": "exact", "title": "Фраза целиком"}],
+            "matches": [{"value": "contains", "title": tr("Фраза встречается")},
+                        {"value": "exact", "title": tr("Фраза целиком")}],
         }
 
     def _commands_save(self, message: Envelope) -> dict:
@@ -809,16 +817,65 @@ class ProtocolServer:
 
     def _plugins_install(self, message: Envelope) -> dict:
         """
-        Установка плагина: пока отвечает честным отказом.
+        Поставить плагин из папки или архива.
 
-        Плагин в 4.0 живёт в отдельном процессе (`4.0-H07`), и установка —
-        работа блока H целиком. Метод объявлен здесь, чтобы страница плагинов
-        писалась под настоящий контракт, а не под будущий: отвечать «ещё нет»
-        честнее, чем не иметь метода и делать вид, что возможность не
-        терялась.
+        Проверка содержимого — до копирования (`plugins/manager.py`):
+        манифест и `main.py` обязательны, иначе в каталоге появится мусор,
+        который каждый запуск будет показываться сбойным плагином.
+
+        **Ставит ядро, а окно выбора показывает оболочка.** Путь приходит
+        уже выбранным: диалог выбора файла — интерфейс, а распаковка и
+        проверка — работа с данными.
         """
-        raise fault("internal",
-                    "Установка плагинов появится вместе с блоком H (4.0-H).")
+        from plugins.manager import PluginInstallError, install_plugin
+
+        source = str(message.payload.get("source", "")).strip()
+        if not source:
+            raise fault("protocol.invalid_payload", "Нечего устанавливать.")
+
+        try:
+            # Возвращается пара: имя и был ли под этим именем плагин. Замена
+            # и установка — разные ответы человеку, и второе значение здесь
+            # не формальность: заменённый плагин принудительно выключается,
+            # чтобы подсунутый архив с чужим именем не запускался сам.
+            plugin_id, replaced = install_plugin(source)
+        except PluginInstallError as exc:
+            raise fault("plugin.not_found", str(exc)) from exc
+        except Exception as exc:                     # noqa: BLE001
+            raise fault("internal", str(exc)) from exc
+
+        # Список пересобирается сразу: поставленный плагин должен появиться
+        # в окне без перезапуска.
+        manager = self._plugin_manager()
+        if manager is not None:
+            try:
+                manager.discover()
+            except Exception:                        # noqa: BLE001
+                log.exception("Плагины не пересобрались после установки")
+
+        return {"plugin_id": plugin_id, "replaced": bool(replaced)}
+
+    def _settings_reset(self, message: Envelope) -> dict:
+        """
+        Сбросить настройки к умолчаниям.
+
+        Сбрасывается **только группа настроек**: команды, история и плагины
+        остаются. Их удаление — отдельное осознанное действие, а не
+        побочный эффект «вернуть как было»; это правило пришло из 3.1.0
+        вместе с самим хранилищем.
+        """
+        store = self._settings()
+        if store is None:
+            raise fault("internal", "Хранилище недоступно.")
+
+        from core.logging_setup import security_log
+
+        store.reset(groups=("settings",))
+        # В журнал безопасности: сброс настроек стирает и приватность —
+        # выключенную запись текстов, выбранный язык, разрешения окна.
+        security_log().warning("Настройки сброшены к умолчаниям")
+        return {"ok": True,
+                "values": {k: store.get(k) for k in settings_schema.SETTABLE}}
 
     # -- задачи --------------------------------------------------------------
 

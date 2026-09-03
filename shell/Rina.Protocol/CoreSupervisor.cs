@@ -123,7 +123,9 @@ public sealed class CoreSupervisor : IAsyncDisposable
                 connection.Broken += OnBroken;
                 Connection = connection;
 
-                Move(CoreState.Ready, $"ядро {connection.CoreVersion}");
+                // Причина — версия, а не фраза о ней: `Rina.Protocol` не
+                // знает языка интерфейса и не должен; собирает подпись окно.
+                Move(CoreState.Ready, connection.CoreVersion);
                 Connected?.Invoke(connection);
                 return;
             }

@@ -104,6 +104,16 @@ public static partial class Loc
                 {
                     ["English"] = "Accent",
                 },
+            ["Архив с плагином"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugin archive",
+                },
+            ["Архивы (*.zip)|*.zip|Все файлы|*.*"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Archives (*.zip)|*.zip|All files|*.*",
+                },
             ["без имени"] =
                 new Dictionary<string, string>
                 {
@@ -154,6 +164,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Time is written like 19:30.",
+                },
+            ["Все настройки вернутся к значениям по умолчанию: голос, устройства, сочетания клавиш, отделка, приватность."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All settings return to their defaults: voice, devices, shortcuts, finish, privacy.",
                 },
             ["Всегда доверять"] =
                 new Dictionary<string, string>
@@ -370,6 +385,11 @@ public static partial class Loc
                 {
                     ["English"] = "Close",
                 },
+            ["Заменён: {0}. Он выключен — включите, если доверяете."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Replaced: {0}. It is off — turn it on if you trust it.",
+                },
             ["Записать"] =
                 new Dictionary<string, string>
                 {
@@ -440,6 +460,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Everything you ask to be reminded of lands here — from the field above or by voice.",
+                },
+            ["Из архива"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "From archive",
+                },
+            ["Из папки"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "From folder",
                 },
             ["ИЗ ЧЕГО СОБРАНА"] =
                 new Dictionary<string, string>
@@ -546,6 +576,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Rina commands (*.json)|*.json",
+                },
+            ["Команды, история и плагины останутся на месте."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Commands, history and plugins stay where they are.",
                 },
             ["Комбинации действий"] =
                 new Dictionary<string, string>
@@ -709,6 +744,11 @@ public static partial class Loc
                     ["Español"] = "Ajustes",
                     ["Українська"] = "Налаштування",
                 },
+            ["Настройки сброшены."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings have been reset.",
+                },
             ["Настройки, история, команды"] =
                 new Dictionary<string, string>
                 {
@@ -843,6 +883,14 @@ public static partial class Loc
                     ["Español"] = "Examinar…",
                     ["Українська"] = "Огляд…",
                 },
+            ["Обновить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Aktualisieren",
+                    ["English"] = "Refresh",
+                    ["Español"] = "Actualizar",
+                    ["Українська"] = "Оновити",
+                },
             ["Обновления"] =
                 new Dictionary<string, string>
                 {
@@ -937,10 +985,20 @@ public static partial class Loc
                 {
                     ["English"] = "folder with the model",
                 },
+            ["Папка с плагином"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugin folder",
+                },
             ["Папка с распакованной моделью Vosk"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Folder with the unpacked Vosk model",
+                },
+            ["Перечитываю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rereading…",
                 },
             ["Плавающая строка команд"] =
                 new Dictionary<string, string>
@@ -1043,6 +1101,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Sequence · {0} steps",
+                },
+            ["Поставлен: {0}. Включите его, чтобы начал работать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installed: {0}. Turn it on to make it work.",
                 },
             ["Почти тихо: {0}%. Проверьте, тот ли микрофон выбран."] =
                 new Dictionary<string, string>
@@ -1186,6 +1249,11 @@ public static partial class Loc
                 {
                     ["English"] = "Reset all",
                 },
+            ["Сбросить настройки"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Reset settings",
+                },
             ["Свернуть"] =
                 new Dictionary<string, string>
                 {
@@ -1326,10 +1394,20 @@ public static partial class Loc
                 {
                     ["English"] = "The reminder list lives in the core, and there’s no connection to it.",
                 },
+            ["Список обновлён."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "List refreshed.",
+                },
             ["ССЫЛКИ"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "LINKS",
+                },
+            ["Ставлю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installing…",
                 },
             ["Таймер"] =
                 new Dictionary<string, string>
@@ -1543,6 +1621,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Core",
+                },
+            ["ядро {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "core {0}",
                 },
             ["ядро запускается"] =
                 new Dictionary<string, string>

@@ -89,6 +89,11 @@ public partial class MainWindow : Window
         BuildSections();
         _section = "";
         ShowSection(open);
+
+        // И подвал: он переводит при вызове, но после смены языка его никто
+        // не звал заново — строка оставалась той, что написали в прошлый
+        // раз. Перевод, случающийся один раз, — это не перевод.
+        ShowCoreState(_coreState, _coreReason);
     }
 
     private void BuildSections()
@@ -170,6 +175,9 @@ public partial class MainWindow : Window
     /// «осторожно». «Ядро не отвечает» — это ошибка, а не опасность.
     /// </para>
     /// </remarks>
+    private CoreState _coreState = CoreState.Stopped;
+    private string _coreReason = "";
+
     public void ShowCoreState(CoreState state, string reason)
     {
         var text = state switch
@@ -180,7 +188,19 @@ public partial class MainWindow : Window
             CoreState.Failed => S("ядро не отвечает"),
             _ => S("ядро не запускалось"),
         };
-        CoreStateText.Text = reason.Length > 0 ? $"{text} · {reason}" : text;
+        // Запоминаем: после смены языка подвал надо переписать, а
+        // состояние к тому времени уже никто не пришлёт заново.
+        _coreState = state;
+        _coreReason = reason;
+        // Причина приходит из `Rina.Protocol` — библиотеки без переводов, и
+        // это правильно: её дело провод, а не язык. Самую частую фразу окно
+        // собирает само; остальное показывает как есть — техническая
+        // подробность на языке журнала честнее её кривого перевода.
+        var about = state == CoreState.Ready && reason.Length > 0
+            ? S("ядро {0}", reason)   // причина здесь — версия ядра
+            : reason;
+
+        CoreStateText.Text = about.Length > 0 ? $"{text} · {about}" : text;
         CoreStateText.SetResourceReference(
             ForegroundProperty,
             state is CoreState.Ready or CoreState.Stopped ? "C.InkFaint"

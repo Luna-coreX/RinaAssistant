@@ -208,7 +208,8 @@ public partial class SettingsPage : UserControl
         var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
         stack.Children.Add(new TextBlock
         {
-            Text = title.ToUpperInvariant(),
+            // Переводим здесь: в раскладке лежит ключ (см. SettingsLayout).
+            Text = S(title).ToUpperInvariant(),
             Style = (Style)FindResource("Text.Section"),
             Margin = new Thickness(0, 0, 0, 12),
         });
@@ -1087,6 +1088,37 @@ public partial class SettingsPage : UserControl
             if (key is "tts_engine" or "stt_engine") await LoadOptionsAsync();
             Build();          // зависимости могли измениться
         }
+    }
+
+    /// <summary>
+    /// Сбросить настройки к умолчаниям — с подтверждением.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Спрашиваем, потому что отменить нельзя: прежние значения нигде не
+    /// хранятся, и «ой, не то нажал» стоит человеку всех его настроек.
+    /// </para>
+    /// <para>
+    /// В окне сказано, чего сброс <b>не</b> касается. Человек, нажимающий
+    /// «сбросить настройки», боится потерять команды и историю — и должен
+    /// увидеть, что они остаются, до нажатия, а не после.
+    /// </para>
+    /// </remarks>
+    private async void OnReset(object sender, RoutedEventArgs e)
+    {
+        var ask = new ConfirmWindow(
+            S("Все настройки вернутся к значениям по умолчанию: голос, устройства, сочетания клавиш, отделка, приватность."),
+            S("Команды, история и плагины останутся на месте."),
+            0);
+        ask.ShowDialog();
+        if (ask.Result != Consent.Granted) return;
+
+        var answer = await Ask(Methods.SettingsReset);
+        if (answer is null) return;
+
+        Note.Text = S("Настройки сброшены.");
+        Note.SetResourceReference(ForegroundProperty, "C.InkFaint");
+        await LoadAsync();
     }
 
     private async Task<JsonObject?> Ask(string method, JsonObject? payload = null)

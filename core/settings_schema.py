@@ -205,17 +205,28 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
     активации»; она по-прежнему в оболочке (`4.0-F08`). Граница проходит
     между именами вещей и словами интерфейса, а не между процессами.
     """
+    from core.i18n import t as tr
     from voice import stt, tts
 
+    def named(title):
+        """
+        Название движка — на языке человека.
+
+        Таблицы `voice/tts.py` написаны литералами; переводятся они здесь,
+        на выходе, по той же причине, что и виды команд: таблица — это
+        ключи, а язык выбирается в настройках.
+        """
+        return tr(str(title))
+
     if key == "tts_engine":
-        return [{"value": i, "title": t, "available": bool(a)}
+        return [{"value": i, "title": named(t), "available": bool(a)}
                 for i, t, a in tts.engine_choices()]
     if key == "stt_engine":
-        return [{"value": i, "title": t, "available": bool(a)}
+        return [{"value": i, "title": named(t), "available": bool(a)}
                 for i, t, a in stt.engine_choices()]
     if key == "voice":
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
-        return [{"value": i, "title": t, "available": True}
+        return [{"value": i, "title": named(t), "available": True}
                 for i, t in engine.voices()]
     if key == "action_hotkeys":
         # Здесь «значения» — это то, чему можно назначить сочетание, а не
@@ -237,7 +248,7 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
     if key == "whisper_model":
         # Перечень моделей Whisper фиксирован и известен без установки:
         # это имена, а не найденные файлы.
-        return [{"value": name, "title": title, "available": True}
+        return [{"value": name, "title": named(title), "available": True}
                 for name, title in (("tiny", "tiny — самая быстрая"),
                                     ("base", "base — по умолчанию"),
                                     ("small", "small"),

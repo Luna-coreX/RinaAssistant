@@ -147,7 +147,7 @@
 | `tasks` | ядро | `task.cancel` |
 | `actuation` | ядро | §12; **в 4.0 не объявляется никем** |
 
-**Базовые методы**, доступные без объявленной возможности, — те, без которых сессия бессмысленна: `command.handle`, `command.run_by_id`, `settings.describe`, `settings.options`, `settings.get`, `settings.set`, `hotkeys.actions`, `core.shutdown`, `ping`, `pong`.
+**Базовые методы**, доступные без объявленной возможности, — те, без которых сессия бессмысленна: `command.handle`, `command.run_by_id`, `settings.describe`, `settings.options`, `settings.get`, `settings.set`, `settings.reset`, `hotkeys.actions`, `core.shutdown`, `ping`, `pong`.
 
 **Возможность бывает без методов.** `llm` не отпирает ничего: отдельного метода у языковой модели нет, но по её наличию оболочка решает, показывать ли соответствующие настройки. `window.actions` относится к событию, а событие не «вызывают». Такая возможность сообщает, а не отпирает, и это законная форма.
 
@@ -250,6 +250,7 @@
 | `settings.describe` | — | описание настроек, см. `4.0-E06a` |
 | `settings.options` | `keys` | какие значения ключ принимает **сейчас** |
 | `settings.get` | `keys` | значения |
+| `settings.reset` | — | сброс **группы настроек**; команды, история и плагины не трогаются |
 | `settings.set` | `values` | применённые значения |
 | `reminders.list` | — | список |
 | `reminders.create` | `text`, `fire_at`, `kind` | заведённое напоминание |

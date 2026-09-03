@@ -14,6 +14,8 @@ E01 + E02: ядро отдельным процессом, и с ним разг
     python tools/test_service.py
 """
 
+import io
+import json
 import os
 import shutil
 import subprocess
@@ -33,6 +35,18 @@ from core.wire import (Envelope, FrameDecoder, IdGenerator, MessageType,
                        Session, Side, encode_frame, new_trace_id)
 
 fails = 0
+
+#: Простейший плагин для проверки установки.
+#:
+#: Переводы строки склеиваются из `chr(10)`, а не пишутся `\n`:
+#: константа правилась скриптом, и экранированный перенос дважды
+#: превратился в настоящий, ломая файл.
+PLUGIN_SOURCE = (
+    "from plugins.api import Plugin" + chr(10) * 3
+    + "class Fresh(Plugin):" + chr(10)
+    + "    def on_command(self, text):" + chr(10)
+    + "        return False" + chr(10)
+)
 
 
 def check(label, cond, detail=""):
@@ -454,12 +468,65 @@ check("история стирается по просьбе человека",
       cleared > 0 and work.read(1)[0].payload["total"] == 0,
       f"| стёрто {cleared}")
 
-# Установка плагина честно отвечает «ещё нет», а не молчит.
+# Установка плагина: раньше здесь стоял честный отказ «появится вместе с
+# блоком H». Блок H закрыт, отказ снят, и проверка проверяет установку.
 work.ask("plugins.install", {"source": "C:/nowhere"})
 answer = work.read(1)[0]
-check("установка плагина отвечает честным отказом",
-      answer.type == MessageType.ERROR and "H" in answer.payload["message"],
+check("несуществующий источник отклонён с причиной",
+      answer.type == MessageType.ERROR
+      and "не найден" in answer.payload["message"],
       f"| {answer.payload.get('message')}")
+
+# И настоящая установка — из папки, собранной здесь же.
+
+with tempfile.TemporaryDirectory() as staging:
+    folder = os.path.join(staging, "probe_install")
+    os.makedirs(folder)
+    io.open(os.path.join(folder, "plugin.json"), "w",
+            encoding="utf-8").write(json.dumps(
+                {"id": "probe_install", "name": "Поставленный",
+                 "api_version": 4}, ensure_ascii=False))
+    io.open(os.path.join(folder, "main.py"), "w",
+            encoding="utf-8").write(PLUGIN_SOURCE)
+
+    # Ставим в настоящий каталог плагинов — другого установка не знает, —
+    # поэтому убираем за собой и до, и после: проверка, оставившая плагин,
+    # на втором прогоне проверяет замену вместо установки. Так и вышло.
+    installed = os.path.join(ROOT, "plugins", "probe_install")
+    shutil.rmtree(installed, ignore_errors=True)
+
+    work.ask("plugins.install", {"source": folder})
+    put = work.read(1)[0]
+    check("плагин ставится из папки",
+          put.type == MessageType.RESPONSE
+          and put.payload.get("plugin_id") == "probe_install"
+          and put.payload.get("replaced") is False,
+          f"| {put.payload}")
+
+    work.ask("plugins.list")
+    listed = work.read(1)[0].payload.get("items") or []
+    check("и сразу виден в списке, без перезапуска",
+          any(p.get("plugin_id") == "probe_install" for p in listed),
+          f"| {[p.get('plugin_id') for p in listed]}")
+
+shutil.rmtree(os.path.join(ROOT, "plugins", "probe_install"),
+              ignore_errors=True)
+
+# Сброс настроек: возвращает умолчания и не трогает команды.
+work.ask("settings.set", {"values": {"volume": 11}})
+work.read(1)
+work.ask("commands.save", {"command": {"type": "speak", "target": "тест",
+                                       "triggers": ["скажи тест"],
+                                       "enabled": True, "match": "contains"}})
+work.read(1)
+work.ask("settings.reset")
+after = work.read(1)[0].payload
+check("сброс вернул умолчание", after["values"]["volume"] == 75,
+      f"| {after['values']['volume']}")
+work.ask("commands.list")
+kept = work.read(1)[0].payload.get("items") or []
+check("а команды остались", len(kept) > 0,
+      "| их удаление — отдельное осознанное действие, а не побочный эффект")
 
 work.ask("core.shutdown")
 work.read(1)

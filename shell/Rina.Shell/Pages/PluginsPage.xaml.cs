@@ -175,6 +175,70 @@ public partial class PluginsPage : UserControl
         }
     }
 
+    /// <summary>
+    /// Поставить плагин из распакованной папки.
+    /// </summary>
+    /// <remarks>
+    /// Окно выбора показывает оболочка, ставит ядро: диалог — интерфейс, а
+    /// распаковка и проверка манифеста — работа с данными. Она же и
+    /// откажет, если в папке нет `plugin.json` или `main.py`.
+    /// </remarks>
+    private async void OnInstallFolder(object sender, RoutedEventArgs e)
+    {
+        var folder = new Microsoft.Win32.OpenFolderDialog
+        {
+            Title = S("Папка с плагином"),
+        };
+        if (folder.ShowDialog() == true) await InstallAsync(folder.FolderName);
+    }
+
+    private async void OnInstallArchive(object sender, RoutedEventArgs e)
+    {
+        var file = new Microsoft.Win32.OpenFileDialog
+        {
+            Title = S("Архив с плагином"),
+            Filter = S("Архивы (*.zip)|*.zip|Все файлы|*.*"),
+        };
+        if (file.ShowDialog() == true) await InstallAsync(file.FileName);
+    }
+
+    private async Task InstallAsync(string source)
+    {
+        Note.Text = S("Ставлю…");
+        Note.SetResourceReference(ForegroundProperty, "C.InkFaint");
+
+        var answer = await Ask(Methods.PluginsInstall, new JsonObject
+        {
+            ["source"] = source,
+        });
+        if (answer is null) return;          // причину уже сказали в Note
+
+        var id = answer["plugin_id"]?.GetValue<string>() ?? "";
+        // Заменённый плагин ядро принудительно выключает: код нового
+        // плагина выполняется при включении, и наследовать чужое «включено»
+        // значит запустить подсунутый архив без ведома человека.
+        Note.Text = answer["replaced"]?.GetValue<bool>() == true
+            ? S("Заменён: {0}. Он выключен — включите, если доверяете.", id)
+            : S("Поставлен: {0}. Включите его, чтобы начал работать.", id);
+        await LoadAsync();
+    }
+
+    /// <summary>
+    /// Перечитать каталог плагинов.
+    /// </summary>
+    /// <remarks>
+    /// Папку кладут руками, и Рина об этом не узнаёт: следить за каталогом
+    /// постоянно значит держать наблюдателя ради события, которое случается
+    /// раз в месяц. Кнопка честнее.
+    /// </remarks>
+    private async void OnRefresh(object sender, RoutedEventArgs e)
+    {
+        Note.Text = S("Перечитываю…");
+        await LoadAsync();
+        if (_link is not null) await _link.RefreshPluginSectionsAsync();
+        Note.Text = S("Список обновлён.");
+    }
+
     private async Task LoadAsync()
     {
         var got = await Ask(Methods.PluginsList);
