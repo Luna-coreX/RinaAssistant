@@ -106,6 +106,8 @@ public static class Methods
     public const string SpeechSay = "speech.say";
     /// <summary>Возможность: stt.</summary>
     public const string SpeechSetAlwaysListen = "speech.set_always_listen";
+    /// <summary>Возможность: tts.</summary>
+    public const string SpeechTest = "speech.test";
     /// <summary>Базовый метод.</summary>
     public const string StreamClose = "stream.close";
     /// <summary>Базовый метод.</summary>
@@ -167,6 +169,7 @@ public static class Methods
             ["speech.listen_once"] = "stt",
             ["speech.say"] = "tts",
             ["speech.set_always_listen"] = "stt",
+            ["speech.test"] = "tts",
             ["stream.close"] = null,
             ["stream.credit"] = null,
             ["stream.open"] = null,

@@ -67,7 +67,10 @@
                        MouseLeftButtonUp="OnSwitchFinish"
                        ToolTip="{loc:S 'Серебро или чёрное'}" />
             <TextBlock Style="{StaticResource Text.Meta}" Text=" · " />
-            <TextBlock Style="{StaticResource Text.Meta}" Text="{loc:S 'о программе'}" />
+            <TextBlock Style="{StaticResource Text.Meta}" Cursor="Hand"
+                       Text="{loc:S 'о программе'}"
+                       MouseLeftButtonUp="OnAbout"
+                       ToolTip="{loc:S 'Версии, ссылки, из чего собрана'}" />
           </StackPanel>
           <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
                      Text="4.0.0" Margin="0,2,0,0" />

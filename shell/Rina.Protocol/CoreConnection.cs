@@ -53,6 +53,16 @@ public sealed class CoreConnection : IAsyncDisposable
     public int NegotiatedVersion { get; private set; }
     public IReadOnlyList<string> CoreCapabilities { get; private set; } = [];
     public string CoreVersion { get; private set; } = "";
+
+    /// <summary>
+    /// Версия формата данных на диске (ADR 0004).
+    /// </summary>
+    /// <remarks>
+    /// Четвёртая независимая версия. Приходит в рукопожатии, а не
+    /// настройкой: `config_version` — состояние хранилища, и наружу как
+    /// настройка не отдаётся. Но откат ограничен именно ею.
+    /// </remarks>
+    public int DataVersion { get; private set; }
     public string SessionId { get; private set; } = "";
     public bool Ready { get; private set; }
 
@@ -211,6 +221,7 @@ public sealed class CoreConnection : IAsyncDisposable
         CoreCapabilities = answer.Payload["capabilities"]?.AsArray()
             .Select(n => n!.GetValue<string>()).ToArray() ?? [];
         CoreVersion = answer.Payload["core_version"]?.GetValue<string>() ?? "";
+        DataVersion = answer.Payload["data_version"]?.GetValue<int>() ?? 0;
         SessionId = answer.Payload["session_id"]?.GetValue<string>() ?? "";
         Ready = true;
     }

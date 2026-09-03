@@ -117,6 +117,11 @@ public static partial class Loc
                 {
                     ["English"] = "The file isn’t a list of commands.",
                 },
+            ["Версии, ссылки, из чего собрана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Versions, links, what it’s made of",
+                },
             ["версия {0}"] =
                 new Dictionary<string, string>
                 {
@@ -211,6 +216,11 @@ public static partial class Loc
                 {
                     ["English"] = "Where the model lives",
                 },
+            ["Говорю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Speaking…",
+                },
             ["Голос"] =
                 new Dictionary<string, string>
                 {
@@ -224,6 +234,11 @@ public static partial class Loc
                 {
                     ["English"] = "Voices depend on the chosen synthesis engine",
                 },
+            ["Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A voice assistant living on your computer: it hears, answers, launches programs and reminds.",
+                },
             ["Готово"] =
                 new Dictionary<string, string>
                 {
@@ -236,6 +251,11 @@ public static partial class Loc
                     ["English"] = "Volume",
                     ["Español"] = "Volumen",
                     ["Українська"] = "Гучність",
+                },
+            ["Данные на диске"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Data on disk",
                 },
             ["Диалог"] =
                 new Dictionary<string, string>
@@ -396,6 +416,11 @@ public static partial class Loc
                     ["Español"] = "Efectos de sonido",
                     ["Українська"] = "Звукові ефекти",
                 },
+            ["ИЗ ЧЕГО СОБРАНА"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WHAT IT'S MADE OF",
+                },
             ["ИИ"] =
                 new Dictionary<string, string>
                 {
@@ -433,6 +458,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Source: {0}",
+                },
+            ["Исходники"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source",
                 },
             ["Каким характером модель отвечает"] =
                 new Dictionary<string, string>
@@ -520,6 +550,11 @@ public static partial class Loc
                     ["Español"] = "Micrófono",
                     ["Українська"] = "Мікрофон",
                 },
+            ["Микрофон не отозвался: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The microphone didn’t respond: {0}",
+                },
             ["Модели"] =
                 new Dictionary<string, string>
                 {
@@ -554,6 +589,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "MY COMMANDS · {0}",
+                },
+            ["на чём они разговаривают"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "what they talk over",
                 },
             ["нажмите сочетание…"] =
                 new Dictionary<string, string>
@@ -644,6 +684,16 @@ public static partial class Loc
                 {
                     ["English"] = "Start minimised",
                 },
+            ["Не вышло открыть ссылку: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Couldn’t open the link: {0}",
+                },
+            ["Не вышло: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Didn’t work: {0}",
+                },
             ["не назначено"] =
                 new Dictionary<string, string>
                 {
@@ -663,6 +713,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What isn’t understood goes to search instead of nowhere",
+                },
+            ["нет связи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "no connection",
                 },
             ["Ниже — откликается чаще, но и на чужое тоже"] =
                 new Dictionary<string, string>
@@ -730,6 +785,14 @@ public static partial class Loc
                 {
                     ["English"] = "You need to say what to do.",
                 },
+            ["О программе"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Über",
+                    ["English"] = "About",
+                    ["Español"] = "Acerca de",
+                    ["Українська"] = "Про програму",
+                },
             ["о программе"] =
                 new Dictionary<string, string>
                 {
@@ -758,10 +821,20 @@ public static partial class Loc
                 {
                     ["English"] = "Updates",
                 },
+            ["Оболочка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Shell",
+                },
             ["оболочка не знает такого элемента страницы"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "the shell doesn’t know this page element",
+                },
+            ["окно, звук, системный слой"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "window, audio, system layer",
                 },
             ["Основная комбинация"] =
                 new Dictionary<string, string>
@@ -929,6 +1002,11 @@ public static partial class Loc
                 {
                     ["English"] = "Sequence · {0} steps",
                 },
+            ["Почти тихо: {0}%. Проверьте, тот ли микрофон выбран."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Almost silent: {0}%. Check that the right microphone is selected.",
+                },
             ["Появится вместе с обновлениями"] =
                 new Dictionary<string, string>
                 {
@@ -957,6 +1035,16 @@ public static partial class Loc
                 {
                     ["English"] = "applies after a restart",
                 },
+            ["Проверить голос"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Test voice",
+                },
+            ["Проверить микрофон"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Test microphone",
+                },
             ["Проверять обновления"] =
                 new Dictionary<string, string>
                 {
@@ -978,10 +1066,20 @@ public static partial class Loc
                 {
                     ["English"] = "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*",
                 },
+            ["Протокол"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Protocol",
+                },
             ["Прочее"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Other",
+                },
+            ["разбор команд, память, речь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "command parsing, memory, speech",
                 },
             ["Развернуть"] =
                 new Dictionary<string, string>
@@ -1025,6 +1123,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Words that start an address to Rina",
+                },
+            ["Сайт"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Website",
                 },
             ["Сбросить все"] =
                 new Dictionary<string, string>
@@ -1074,6 +1177,11 @@ public static partial class Loc
                 {
                     ["English"] = "Say or type: “open the browser”",
                 },
+            ["Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Said “{0}” — {1}s. Can’t hear it? Check the speaker.",
+                },
             ["Сколько ждать ответа, прежде чем сдаться"] =
                 new Dictionary<string, string>
                 {
@@ -1110,10 +1218,25 @@ public static partial class Loc
                     ["Español"] = "Palabras de activación",
                     ["Українська"] = "Слова активації",
                 },
+            ["Слушаю две секунды — скажите что-нибудь…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening for two seconds — say something…",
+                },
             ["Слушаю…"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Listening…",
+                },
+            ["Слышно: {0}%. Микрофон работает."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Heard: {0}%. The microphone works.",
+                },
+            ["Сообщить о неполадке"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Report a problem",
                 },
             ["Сохранить"] =
                 new Dictionary<string, string>
@@ -1135,6 +1258,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Combinations assigned to individual actions",
+                },
+            ["ССЫЛКИ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "LINKS",
                 },
             ["Таймер"] =
                 new Dictionary<string, string>
@@ -1212,6 +1340,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The .onnx model file",
+                },
+            ["формат настроек и истории"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "format of settings and history",
                 },
             ["Фразы, по которым сработает"] =
                 new Dictionary<string, string>
@@ -1338,6 +1471,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "This action is irreversible — Rina will ask for confirmation.",
+                },
+            ["Ядро"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Core",
                 },
             ["ядро запускается"] =
                 new Dictionary<string, string>

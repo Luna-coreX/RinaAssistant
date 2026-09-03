@@ -277,6 +277,7 @@ class ProtocolServer:
             "commands.kinds": self._commands_kinds,
             "commands.builtin": self._commands_builtin,
             "hotkeys.actions": self._hotkey_actions,
+            "speech.test": self._speech_test,
             "commands.save": self._commands_save,
             "commands.delete": self._commands_delete,
             "commands.set_enabled": self._commands_set_enabled,
@@ -297,6 +298,14 @@ class ProtocolServer:
         }
 
     def _hello(self, message: Envelope) -> dict:
+        # Версия данных берётся из хранилища в момент ответа: миграция
+        # могла случиться при загрузке, и число из константы соврало бы.
+        store = self._settings()
+        if store is not None:
+            from core.settings_store import CONFIG_VERSION
+
+            self.session.data_version = int(
+                store.get("config_version", CONFIG_VERSION) or CONFIG_VERSION)
         return self.session.handle_hello(message.payload)
 
     def _shutdown(self, message: Envelope) -> dict:
@@ -520,6 +529,37 @@ class ProtocolServer:
 
     def _commands_list(self, message: Envelope) -> dict:
         return {"items": [dict(c) for c in self._commands().all()]}
+
+    def _speech_test(self, message: Envelope) -> dict:
+        """
+        Произнести пробную фразу текущим голосом.
+
+        Отдельный метод, а не `speech.say`: сказанное на проверке не должно
+        попадать в историю разговора — человек проверял звук, а не
+        разговаривал. И фразу выбирает ядро: это её реплика, а слова Рины
+        живут здесь (`4.0-F08`).
+        """
+        self._voice_follows_settings()
+        if not self.synthesiser.available():
+            return {"ok": False,
+                    "reason": str(getattr(self.synthesiser, "last_error", "")
+                                  or "синтез недоступен")}
+
+        store = self._settings()
+        text = "Проверка связи. Меня слышно и я говорю этим голосом."
+        pcm = self.synthesiser.synthesize(
+            text,
+            voice=str(store.get("voice", "") if store else ""),
+            rate=int((store.get("speed", 100) if store else 100) or 100))
+        if not pcm:
+            return {"ok": False,
+                    "reason": str(getattr(self.synthesiser, "last_error", "")
+                                  or "синтез ничего не вернул")}
+
+        self.send_speech(pcm, self.synthesiser.sample_rate)
+        return {"ok": True, "text": text,
+                "seconds": round(len(pcm) / 2 / max(
+                    self.synthesiser.sample_rate, 1), 2)}
 
     def _hotkey_actions(self, message: Envelope) -> dict:
         """

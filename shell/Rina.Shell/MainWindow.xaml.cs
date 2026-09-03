@@ -63,6 +63,7 @@ public partial class MainWindow : Window
             ["reminders"] = () => new Pages.RemindersPage(Link),
             ["plugins"] = () => new Pages.PluginsPage(Link),
             ["settings"] = () => new Pages.SettingsPage(Link),
+            ["about"] = () => new Pages.AboutPage(Link),
         };
 
         BuildSections();
@@ -314,6 +315,18 @@ public partial class MainWindow : Window
         if (Link is not null) await Link.SetFinishAsync(_finish);
         else App.ApplyFinish(_finish);
     }
+
+    /// <summary>
+    /// «О программе» — раздел, а не всплывающее окно.
+    /// </summary>
+    /// <remarks>
+    /// В колонке его нет: туда ходят редко, и постоянное место он не
+    /// заслуживает. Но и модальное окно ему не годится — там ссылки, по
+    /// которым ходят, и версии, которые переписывают в сообщение о
+    /// неполадке.
+    /// </remarks>
+    private void OnAbout(object sender, MouseButtonEventArgs e)
+        => ShowSection("about");
 
     private void OnMinimise(object sender, RoutedEventArgs e) =>
         WindowState = WindowState.Minimized;

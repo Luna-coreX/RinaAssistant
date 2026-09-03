@@ -103,7 +103,8 @@ _CAPABILITY_LIST = (
     Capability("stt", Side.CORE,
                ("speech.listen_once", "speech.set_always_listen"),
                "распознавание речи"),
-    Capability("tts", Side.CORE, ("speech.say",), "синтез речи"),
+    Capability("tts", Side.CORE, ("speech.say", "speech.test"),
+               "синтез речи"),
     Capability("reminders", Side.CORE, ("reminders.list", "reminders.cancel", "reminders.create"),
                "таймеры и будильники живут в ядре (4.0-E05)"),
     Capability("plugins", Side.CORE,
@@ -207,11 +208,16 @@ class Session:
     versions: list[int] = field(default_factory=lambda: [1])
     capabilities: tuple[str, ...] = ()
     app_version: str = "4.0.0"
+    #: Версия формата данных на диске (ADR 0004). Ядро берёт её из
+    #: хранилища; оболочка получает в рукопожатии и показывает.
+    data_version: int = 0
     locale: str = "ru"
 
     state: str = SessionState.NOT_READY
     version: int | None = None
     peer_capabilities: tuple[str, ...] = ()
+    #: Что о своих данных сказал собеседник.
+    peer_data_version: int = 0
     peer_version: str = ""
     session_id: str = ""
 
@@ -264,6 +270,11 @@ class Session:
             "protocol_versions": sorted(self.versions),
             "protocol_version": self.version,
             "core_version": self.app_version,
+            # Четвёртая версия из ADR 0004: схема данных на диске. Здесь, а
+            # не в `settings.get`: `config_version` секретен — это состояние
+            # хранилища, а не настройка. Но откат ограничен именно ею, и
+            # назвать её человеку надо.
+            "data_version": self.data_version,
             "capabilities": list(self.capabilities),
             "session_id": self.session_id,
         }
@@ -284,6 +295,7 @@ class Session:
         self.version = chosen
         self.peer_capabilities = tuple(payload.get("capabilities") or ())
         self.peer_version = str(payload.get("core_version") or "")
+        self.peer_data_version = int(payload.get("data_version") or 0)
         self.session_id = str(payload.get("session_id") or "")
         self.state = SessionState.READY
         return chosen

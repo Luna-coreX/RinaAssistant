@@ -1,0 +1,37 @@
+<UserControl x:Class="Rina.Shell.Pages.AboutPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <StackPanel>
+      <TextBlock Text="{loc:S 'О программе'}"
+                 Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+
+      <!-- Кто это. Имя, версия и одна строка о том, что она делает: без
+           неё «Рина 4.0.0» ничего не сообщает тому, кто открыл впервые. -->
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+        <StackPanel>
+          <TextBlock Text="Rina Assistant"
+                     Style="{StaticResource Text.Body}" />
+          <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
+                     Margin="0,4,0,8" />
+          <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                     Text="{loc:S 'Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.'}" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Text="{loc:S 'ИЗ ЧЕГО СОБРАНА'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+        <StackPanel x:Name="Parts" />
+      </Border>
+
+      <TextBlock Text="{loc:S 'ССЫЛКИ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel x:Name="Links" Orientation="Horizontal" Margin="0,0,0,16" />
+
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

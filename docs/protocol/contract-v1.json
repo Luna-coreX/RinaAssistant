@@ -98,7 +98,8 @@
     },
     "tts": {
       "methods": [
-        "speech.say"
+        "speech.say",
+        "speech.test"
       ],
       "side": "core"
     },
@@ -453,6 +454,7 @@
     "speech.listen_once": "stt",
     "speech.say": "tts",
     "speech.set_always_listen": "stt",
+    "speech.test": "tts",
     "stream.close": null,
     "stream.credit": null,
     "stream.open": null,

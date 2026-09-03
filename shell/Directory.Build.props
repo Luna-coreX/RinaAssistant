@@ -14,5 +14,9 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <InvariantGlobalization>false</InvariantGlobalization>
     <NeutralLanguage>ru</NeutralLanguage>
+    <!-- Версия оболочки. Одна из четырёх независимых (ADR 0004) и живёт
+         здесь, а не строкой в коде: «О программе» читает её из сборки, и
+         второй источник разошёлся бы с первым на первом же выпуске. -->
+    <Version>4.0.0</Version>
   </PropertyGroup>
 </Project>

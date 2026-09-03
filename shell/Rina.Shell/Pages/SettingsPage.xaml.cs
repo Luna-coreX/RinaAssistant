@@ -249,7 +249,11 @@ public partial class SettingsPage : UserControl
         Grid.SetColumn(label, 0);
         row.Children.Add(label);
 
-        var editor = BuildEditor(key, spec);
+        var made = BuildEditor(key, spec);
+        // Проверка встраивается **вокруг** редактора, а не вместо него:
+        // построить редактор дважды значило бы завести два поля, из
+        // которых сохраняет одно.
+        var editor = BuildProbe(key, made) ?? made;
         _editors[key] = editor;
 
         // Редактор-список встаёт под подписью во всю ширину. Рядом ему
@@ -275,6 +279,115 @@ public partial class SettingsPage : UserControl
 
         ApplyDependency(key, spec, row);
         return row;
+    }
+
+    /// <summary>
+    /// Проверка рядом с настройкой, которую она проверяет.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Настройка звука без проверки — выбор вслепую: человек ставит движок,
+    /// голос и устройство, а узнаёт, работает ли, при следующем обращении к
+    /// Рине. Поэтому кнопка стоит здесь, а не в отдельной «диагностике»,
+    /// куда никто не ходит.
+    /// </para>
+    /// <para>
+    /// Голос проверяет ядро — синтезирует оно; микрофон оболочка — устройства
+    /// у неё. Та же граница, что и везде (ADR 0009).
+    /// </para>
+    /// </remarks>
+    private FrameworkElement? BuildProbe(string key, FrameworkElement editor)
+    {
+        if (key is not ("voice" or "input_device")) return null;
+
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        row.Children.Add(editor);
+
+        var probe = new Button
+        {
+            Style = (Style)FindResource("Btn"),
+            Content = key == "voice" ? S("Проверить голос")
+                                     : S("Проверить микрофон"),
+            Margin = new Thickness(8, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        probe.Click += async (_, _) =>
+        {
+            probe.IsEnabled = false;
+            try
+            {
+                if (key == "voice") await TestVoiceAsync();
+                else await TestMicrophoneAsync();
+            }
+            finally { probe.IsEnabled = true; }
+        };
+        row.Children.Add(probe);
+        return row;
+    }
+
+    /// <summary>Сказать пробную фразу и услышать её.</summary>
+    private async Task TestVoiceAsync()
+    {
+        Note.Text = S("Говорю…");
+        Note.SetResourceReference(ForegroundProperty, "C.InkFaint");
+
+        var answer = await Ask(Methods.SpeechTest);
+        if (answer is null) return;
+
+        var ok = answer["ok"]?.GetValue<bool>() ?? false;
+        // Сказать «получилось» мало: человек мог не услышать, и тогда дело
+        // не в синтезе, а в устройстве вывода. Поэтому и длительность.
+        Note.Text = ok
+            ? S("Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик.",
+                answer["text"]?.GetValue<string>() ?? "",
+                answer["seconds"]?.GetValue<double>() ?? 0)
+            : S("Не вышло: {0}", answer["reason"]?.GetValue<string>() ?? "");
+        Note.SetResourceReference(ForegroundProperty,
+                                  ok ? "C.InkFaint" : "C.Signal");
+    }
+
+    /// <summary>
+    /// Послушать микрофон пару секунд и сказать, что слышно.
+    /// </summary>
+    /// <remarks>
+    /// Проверяется <b>уровень</b>, а не распознавание: «слышно ли вас
+    /// вообще» и «понимает ли она слова» — разные вопросы, и первый
+    /// отвечает на большинство жалоб. Заодно проверка работает и там, где
+    /// распознавание выключено.
+    /// </remarks>
+    private async Task TestMicrophoneAsync()
+    {
+        var device = _values.GetValueOrDefault("input_device")
+                         ?.GetValue<string>() ?? "default";
+        Note.Text = S("Слушаю две секунды — скажите что-нибудь…");
+        Note.SetResourceReference(ForegroundProperty, "C.InkFaint");
+
+        var (ok, loudest, reason) = await Audio.Microphone.ProbeAsync(
+            device, TimeSpan.FromSeconds(2));
+
+        if (!ok)
+        {
+            Note.Text = S("Микрофон не отозвался: {0}", reason);
+            Note.SetResourceReference(ForegroundProperty, "C.Signal");
+            return;
+        }
+
+        // Порог из опыта: ниже пяти процентов — это тишина комнаты, а не
+        // голос. Точное число тут менее важно, чем то, что человеку
+        // сказано, что делать дальше.
+        var heard = loudest >= 0.05f;
+        Note.Text = heard
+            ? S("Слышно: {0}%. Микрофон работает.", (int)(loudest * 100))
+            // Одной строкой, а не склейкой: склеенная переводится по
+            // кускам, и в таблице оказываются два обрывка вместо фразы.
+            : S("Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.",
+                (int)(loudest * 100));
+        Note.SetResourceReference(ForegroundProperty,
+                                  heard ? "C.InkFaint" : "C.Signal");
     }
 
     private FrameworkElement BuildEditor(string key, JsonObject spec)

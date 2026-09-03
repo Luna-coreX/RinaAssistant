@@ -81,6 +81,46 @@ public sealed class Microphone : IDisposable
     public static int IndexOf(string name) => Devices()
         .FirstOrDefault(d => d.Name == name)?.Index ?? 0;
 
+    /// <summary>
+    /// Послушать устройство и вернуть самый громкий кусок.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Для проверки микрофона из настроек. Отвечает на вопрос «слышно ли
+    /// вас вообще» — не на «понимает ли она слова»: это разные вопросы, и
+    /// первый закрывает большинство жалоб. Заодно работает и там, где
+    /// распознавание выключено вовсе.
+    /// </para>
+    /// <para>
+    /// Устройство открывается своё, а не то, что уже слушает Рина:
+    /// проверять надо выбранное в настройках, даже если сейчас слушается
+    /// другое.
+    /// </para>
+    /// </remarks>
+    public static async Task<(bool Ok, float Loudest, string Reason)>
+        ProbeAsync(string deviceName, TimeSpan howLong)
+    {
+        var index = deviceName is "default" or "" ? 0 : IndexOf(deviceName);
+        var loudest = 0f;
+
+        try
+        {
+            using var probe = new Microphone();
+            probe.Level += level =>
+            {
+                if (level > loudest) loudest = level;
+            };
+            probe.Start(index);
+            await Task.Delay(howLong);
+            probe.Stop();
+        }
+        catch (Exception error)
+        {
+            return (false, 0f, error.Message);
+        }
+        return (true, loudest, "");
+    }
+
     public void Start(int deviceIndex = 0, int chunkMilliseconds = 100)
     {
         if (Running) return;

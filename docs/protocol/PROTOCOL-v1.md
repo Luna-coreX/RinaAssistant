@@ -246,6 +246,7 @@
 | `speech.listen_once` | — | принято |
 | `speech.set_always_listen` | `enabled` | фактическое состояние |
 | `speech.say` | `text` | принято |
+| `speech.test` | — | произнести пробную фразу: получилось ли и какую |
 | `settings.describe` | — | описание настроек, см. `4.0-E06a` |
 | `settings.options` | `keys` | какие значения ключ принимает **сейчас** |
 | `settings.get` | `keys` | значения |

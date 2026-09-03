@@ -59,6 +59,9 @@
   "В файле не список команд.": {
     "English": "The file isn’t a list of commands."
   },
+  "Версии, ссылки, из чего собрана": {
+    "English": "Versions, links, what it’s made of"
+  },
   "Внешний вид": {
     "English": "Appearance",
     "Українська": "Зовнішній вигляд",
@@ -110,6 +113,9 @@
   "Где лежит модель": {
     "English": "Where the model lives"
   },
+  "Говорю…": {
+    "English": "Speaking…"
+  },
   "Голос": {
     "English": "Voice",
     "Українська": "Голос",
@@ -119,6 +125,9 @@
   "Голоса зависят от выбранной системы синтеза": {
     "English": "Voices depend on the chosen synthesis engine"
   },
+  "Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.": {
+    "English": "A voice assistant living on your computer: it hears, answers, launches programs and reminds."
+  },
   "Готово": {
     "English": "Done"
   },
@@ -127,6 +136,9 @@
     "Українська": "Гучність",
     "Español": "Volumen",
     "Deutsch": "Lautstärke"
+  },
+  "Данные на диске": {
+    "English": "Data on disk"
   },
   "Диалог": {
     "English": "Dialogue"
@@ -227,6 +239,9 @@
     "Español": "Efectos de sonido",
     "Deutsch": "Soundeffekte"
   },
+  "ИЗ ЧЕГО СОБРАНА": {
+    "English": "WHAT IT'S MADE OF"
+  },
   "ИИ": {
     "English": "AI"
   },
@@ -247,6 +262,9 @@
   },
   "Источник: {0}": {
     "English": "Source: {0}"
+  },
+  "Исходники": {
+    "English": "Source"
   },
   "Каким характером модель отвечает": {
     "English": "What character the model answers with"
@@ -305,6 +323,9 @@
     "Español": "Micrófono",
     "Deutsch": "Mikrofon"
   },
+  "Микрофон не отозвался: {0}": {
+    "English": "The microphone didn’t respond: {0}"
+  },
   "Модели": {
     "English": "Models"
   },
@@ -362,6 +383,12 @@
   "Начинать свёрнутой": {
     "English": "Start minimised"
   },
+  "Не вышло открыть ссылку: {0}": {
+    "English": "Couldn’t open the link: {0}"
+  },
+  "Не вышло: {0}": {
+    "English": "Didn’t work: {0}"
+  },
   "Не прочиталось: {0}": {
     "English": "Couldn’t read it: {0}"
   },
@@ -398,6 +425,12 @@
   "Нужно указать, что делать.": {
     "English": "You need to say what to do."
   },
+  "О программе": {
+    "English": "About",
+    "Українська": "Про програму",
+    "Español": "Acerca de",
+    "Deutsch": "Über"
+  },
   "О чём напомнить?": {
     "English": "What should I remind you about?"
   },
@@ -409,6 +442,9 @@
   },
   "Обновления": {
     "English": "Updates"
+  },
+  "Оболочка": {
+    "English": "Shell"
   },
   "Основная комбинация": {
     "English": "Main shortcut"
@@ -515,6 +551,9 @@
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
   },
+  "Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.": {
+    "English": "Almost silent: {0}%. Check that the right microphone is selected."
+  },
   "Появится вместе с обновлениями": {
     "English": "Arrives together with updates"
   },
@@ -526,6 +565,12 @@
     "Українська": "Приватність",
     "Español": "Privacidad",
     "Deutsch": "Datenschutz"
+  },
+  "Проверить голос": {
+    "English": "Test voice"
+  },
+  "Проверить микрофон": {
+    "English": "Test microphone"
   },
   "Проверять обновления": {
     "English": "Check for updates",
@@ -541,6 +586,9 @@
   },
   "Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*": {
     "English": "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*"
+  },
+  "Протокол": {
+    "English": "Protocol"
   },
   "Прочее": {
     "English": "Other"
@@ -572,6 +620,12 @@
   "С этих слов начинается обращение к Рине": {
     "English": "Words that start an address to Rina"
   },
+  "ССЫЛКИ": {
+    "English": "LINKS"
+  },
+  "Сайт": {
+    "English": "Website"
+  },
   "Сбросить все": {
     "English": "Reset all"
   },
@@ -595,6 +649,9 @@
   },
   "Скажите или напишите: «запусти браузер»": {
     "English": "Say or type: “open the browser”"
+  },
+  "Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик.": {
+    "English": "Said “{0}” — {1}s. Can’t hear it? Check the speaker."
   },
   "Сколько ждать ответа, прежде чем сдаться": {
     "English": "How long to wait for an answer before giving up"
@@ -620,8 +677,17 @@
     "Español": "Palabras de activación",
     "Deutsch": "Aktivierungswörter"
   },
+  "Слушаю две секунды — скажите что-нибудь…": {
+    "English": "Listening for two seconds — say something…"
+  },
   "Слушаю…": {
     "English": "Listening…"
+  },
+  "Слышно: {0}%. Микрофон работает.": {
+    "English": "Heard: {0}%. The microphone works."
+  },
+  "Сообщить о неполадке": {
+    "English": "Report a problem"
   },
   "Сохранить": {
     "English": "Save",
@@ -740,6 +806,9 @@
   "Это действие необратимо — Рина спросит подтверждение.": {
     "English": "This action is irreversible — Rina will ask for confirmation."
   },
+  "Ядро": {
+    "English": "Core"
+  },
   "Ядро не на связи — команды недоступны.": {
     "English": "The core is offline — commands are unavailable."
   },
@@ -788,6 +857,9 @@
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
   },
+  "на чём они разговаривают": {
+    "English": "what they talk over"
+  },
   "нажмите сочетание…": {
     "English": "press a combination…"
   },
@@ -815,6 +887,9 @@
   "не разобрал сочетание «{0}»": {
     "English": "couldn’t parse the shortcut “{0}”"
   },
+  "нет связи": {
+    "English": "no connection"
+  },
   "новое слово": {
     "English": "new word"
   },
@@ -830,6 +905,9 @@
   "оболочка не знает такого элемента страницы": {
     "English": "the shell doesn’t know this page element"
   },
+  "окно, звук, системный слой": {
+    "English": "window, audio, system layer"
+  },
   "папка с моделью": {
     "English": "folder with the model"
   },
@@ -838,6 +916,9 @@
   },
   "применится после перезапуска": {
     "English": "applies after a restart"
+  },
+  "разбор команд, память, речь": {
+    "English": "command parsing, memory, speech"
   },
   "связь потеряна, поднимаем": {
     "English": "connection lost, bringing it back"
@@ -850,6 +931,9 @@
   },
   "файл .onnx": {
     "English": "the .onnx file"
+  },
+  "формат настроек и истории": {
+    "English": "format of settings and history"
   },
   "через 15 минут": {
     "English": "in 15 minutes"
