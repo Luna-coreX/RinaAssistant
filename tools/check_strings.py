@@ -23,6 +23,10 @@ import os
 import re
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
 TABLE = os.path.join(SHELL, "Strings", "interface.json")

@@ -27,6 +27,10 @@ import json
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

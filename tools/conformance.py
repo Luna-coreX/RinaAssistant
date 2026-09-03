@@ -31,6 +31,10 @@ Conformance-тесты протокола: двенадцать требован
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))

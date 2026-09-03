@@ -21,6 +21,10 @@ import sys
 import tempfile
 import time
 
+from console import child_env, use_utf8
+
+use_utf8()
+
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
@@ -48,7 +52,7 @@ class Core:
         self.proc = subprocess.Popen(
             [sys.executable, "-u", LAUNCHER, "--transport", "stdio", *extra],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, cwd=ROOT)
+            stderr=subprocess.PIPE, cwd=ROOT, env=child_env())
         self.decoder = FrameDecoder()
         self.ids = IdGenerator("s-")
         self.session = Session(side=Side.SHELL)
@@ -127,7 +131,8 @@ print("=== E01: ядро запускается как процесс ===")
 probe = subprocess.run(
     [sys.executable, "-u", os.path.join(ROOT, "rina_core.py"),
      "--print-capabilities"],
-    capture_output=True, text=True, cwd=ROOT, encoding="utf-8")
+    capture_output=True, text=True, cwd=ROOT, encoding="utf-8",
+    env=child_env())
 check("ядро отвечает о себе и выходит с нулём", probe.returncode == 0)
 check("объявляет версию протокола", "protocol_versions: 1" in probe.stdout)
 check("объявляет возможности",
@@ -137,7 +142,8 @@ check("объявляет возможности",
 bad = subprocess.run(
     [sys.executable, "-u", os.path.join(ROOT, "rina_core.py"),
      "--transport", "pipe"],
-    capture_output=True, text=True, cwd=ROOT, encoding="utf-8")
+    capture_output=True, text=True, cwd=ROOT, encoding="utf-8",
+    env=child_env())
 check("без сессии режим pipe отклонён с кодом 2", bad.returncode == 2,
       f"| код {bad.returncode}")
 
@@ -147,7 +153,8 @@ headless = subprocess.run(
      "import sys; sys.path.insert(0, r'%s');"
      "import rina_core, core.engine, core.wire.server;"
      "print('PySide6' in sys.modules)" % ROOT],
-    capture_output=True, text=True, cwd=ROOT, encoding="utf-8")
+    capture_output=True, text=True, cwd=ROOT, encoding="utf-8",
+    env=child_env())
 check("ни ядро, ни провод не тянут Qt",
       headless.stdout.strip() == "False", f"| {headless.stdout.strip()}")
 

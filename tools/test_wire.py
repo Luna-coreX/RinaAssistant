@@ -9,6 +9,10 @@ D03, D04: рукопожатие и конверт сообщения.
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)

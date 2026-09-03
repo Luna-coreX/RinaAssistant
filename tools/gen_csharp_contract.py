@@ -28,6 +28,10 @@ import json
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SNAPSHOT = os.path.join(ROOT, "docs", "protocol", "contract-v1.json")
 OUT = os.path.join(ROOT, "shell", "Rina.Protocol", "Generated", "Contract.g.cs")

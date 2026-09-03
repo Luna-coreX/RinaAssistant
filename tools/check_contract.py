@@ -39,6 +39,10 @@ import json
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 

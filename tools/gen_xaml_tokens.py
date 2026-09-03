@@ -31,6 +31,10 @@ import json
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOKENS = os.path.join(ROOT, "docs", "design", "tokens.json")
 OUT_DIR = os.path.join(ROOT, "shell", "Rina.Shell", "Generated")

@@ -17,6 +17,10 @@ E03, E04: распознавание и синтез в ядре, звук — �
 import os
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))

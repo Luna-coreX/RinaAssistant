@@ -26,6 +26,10 @@ import os
 import re
 import sys
 
+from console import use_utf8
+
+use_utf8()
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SURFACE = os.path.join(ROOT, "docs", "SURFACE-3.1.0.md")
 IA = os.path.join(ROOT, "docs", "design", "IA.md")
