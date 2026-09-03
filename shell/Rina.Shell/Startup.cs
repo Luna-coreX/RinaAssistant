@@ -29,6 +29,12 @@ public partial class App
         base.OnStartup(e);
 
         var args = e.Args;
+
+        // Язык можно задать снаружи: снимок на чужом языке — единственный
+        // способ увидеть перевод целиком, а не по строчке (4.0-F08).
+        if (Value(args, "--language") is { } language)
+            Strings.Loc.Use(language);
+
         var finish = Value(args, "--finish") ?? "silver";
         ApplyFinish(finish);
 

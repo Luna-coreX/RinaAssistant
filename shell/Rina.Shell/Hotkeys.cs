@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell;
 
 /// <summary>
@@ -98,14 +100,14 @@ public sealed class Hotkeys : IDisposable
         Unbind(name);
         if (!TryParse(combination, out var modifiers, out var key))
         {
-            Refused?.Invoke(name, $"не разобрал сочетание «{combination}»");
+            Refused?.Invoke(name, S("не разобрал сочетание «{0}»", combination));
             return false;
         }
 
         var id = _next++;
         if (!RegisterHotKey(_handle, id, (uint)(modifiers | Mod.NoRepeat), key))
         {
-            Refused?.Invoke(name, $"«{combination}» занято другой программой");
+            Refused?.Invoke(name, S("«{0}» занято другой программой", combination));
             return false;
         }
         _bound[id] = action;

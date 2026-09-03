@@ -1,6 +1,7 @@
 <UserControl x:Class="Rina.Shell.Pages.SettingsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
   <!--
     Одна длинная панель с прокруткой, а не вложенные вкладки (4.0-R04):
     прибор — это лицевая панель с секциями, а не шкаф с ящиками. При сценарии
@@ -13,7 +14,7 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Text="Настройки"
+    <TextBlock Grid.Row="0" Text="{loc:S 'Настройки'}"
                Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
 
     <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"

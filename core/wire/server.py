@@ -369,6 +369,19 @@ class ProtocolServer:
                 for key, value in accepted.items():
                     store.set(key, value)
                 self._settle_voice(store, accepted, verdicts)
+                if "ui_language" in accepted:
+                    # Язык — не та настройка, ради которой перезапускают
+                    # программу. Реплики переключаются здесь, слова
+                    # интерфейса — в оболочке, каждый у себя.
+                    from core import i18n
+                    i18n.set_language(str(accepted["ui_language"]))
+                if "log_level" in accepted:
+                    # Уровень журнала умел применяться на лету (`apply_settings`),
+                    # но звал его тот, кто менял, — экран настроек 3.1.0.
+                    # Та же потеря, что и с сохранением: экран уехал,
+                    # вызов остался.
+                    from core import logging_setup
+                    logging_setup.apply_settings()
                 # Записать на диск. `set()` только помечает группу
                 # изменившейся, и в 3.1.0 сохранял тот, кто менял, — экран
                 # настроек. Экран уехал в другой процесс, а вызов остался

@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell;
 
 /// <summary>
@@ -49,6 +51,9 @@ public sealed class CoreLink : IAsyncDisposable
         // делает одна и та же простая функция.
         _boss.Connected += connection => OnUi(
             () => { _ = LoadFinishAsync(connection); });
+
+        _boss.Connected += connection => OnUi(
+            () => { _ = LoadLanguageAsync(connection); });
 
         _boss.EventReceived += message => OnUi(() =>
         {
@@ -110,6 +115,32 @@ public sealed class CoreLink : IAsyncDisposable
     public event Action<Envelope>? CoreEvent;
 
     public Task StartAsync() => _boss.StartAsync();
+
+    /// <summary>Спросить у ядра язык интерфейса и применить его.</summary>
+    /// <remarks>
+    /// Настройка одна на программу и живёт в ядре, а переводит себя каждая
+    /// сторона сама ([ADR 0007](../../docs/adr/0007-localisation.md)):
+    /// слова интерфейса — оболочка, реплики Рины — ядро.
+    /// </remarks>
+    private async Task LoadLanguageAsync(CoreConnection connection)
+    {
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject { ["keys"] = new JsonArray(LanguageKey) },
+                TimeSpan.FromSeconds(10));
+            var language = answer.Payload["values"]?[LanguageKey]
+                           ?.GetValue<string>();
+            if (language is not null) OnUi(() => Strings.Loc.Use(language));
+        }
+        catch
+        {
+            // Не спросили — остаёмся на языке оригинала. Программа на
+            // русском лучше, чем программа, не открывшаяся из-за языка.
+        }
+    }
+
+    private const string LanguageKey = "ui_language";
 
     /// <summary>Спросить у ядра выбранную отделку и применить её.</summary>
     private async Task LoadFinishAsync(CoreConnection connection)
@@ -229,13 +260,14 @@ public sealed class CoreLink : IAsyncDisposable
             await connection.ReplyAsync(request, new JsonObject
             {
                 ["granted"] = false,
-                ["reason"] = "оболочка не умеет этот запрос",
+                // Причина уезжает в ядро и в журнал, а не человеку.
+                ["reason"] = "оболочка не умеет этот запрос", // не интерфейс
             });
             return;
         }
 
         var preview = request.Payload["preview"]?.GetValue<string>()
-                      ?? "Точно выполнить?";
+                      ?? S("Точно выполнить?");
         var reason = request.Payload["reason"]?.GetValue<string>() ?? "";
         var ttl = request.Payload["ttl"]?.GetValue<int>() ?? 60;
 

@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell;
 
 /// <summary>
@@ -56,15 +58,37 @@ public partial class MainWindow : Window
 
         BuildSections();
         ShowSection("dialog");
+
+        Strings.Loc.Changed += OnLanguageChanged;
+        Closed += (_, _) => Strings.Loc.Changed -= OnLanguageChanged;
+    }
+
+    /// <summary>
+    /// Пересобрать интерфейс на новом языке.
+    /// </summary>
+    /// <remarks>
+    /// Страницы строятся заново, а не правятся по строчке: подписи живут в
+    /// разметке, в коде страниц и в раскладке настроек, и обойти их все
+    /// значило бы завести четвёртый список тех же строк. Открытый раздел
+    /// при этом остаётся открытым — человек менял язык, а не место, где
+    /// стоял.
+    /// </remarks>
+    private void OnLanguageChanged()
+    {
+        var open = _section;
+        BuildSections();
+        _section = "";
+        ShowSection(open);
     }
 
     private void BuildSections()
     {
+        Sections.Children.Clear();
         foreach (var (name, title) in SectionList)
         {
             var item = new RadioButton
             {
-                Content = title,
+                Content = S(title),
                 Tag = name,
                 GroupName = "sections",
                 Style = (Style)FindResource("Nav.Item"),
@@ -138,11 +162,11 @@ public partial class MainWindow : Window
     {
         var text = state switch
         {
-            CoreState.Ready => "ядро на связи",
-            CoreState.Starting => "ядро запускается",
-            CoreState.Reconnecting => "связь потеряна, поднимаем",
-            CoreState.Failed => "ядро не отвечает",
-            _ => "ядро не запускалось",
+            CoreState.Ready => S("ядро на связи"),
+            CoreState.Starting => S("ядро запускается"),
+            CoreState.Reconnecting => S("связь потеряна, поднимаем"),
+            CoreState.Failed => S("ядро не отвечает"),
+            _ => S("ядро не запускалось"),
         };
         CoreStateText.Text = reason.Length > 0 ? $"{text} · {reason}" : text;
         CoreStateText.SetResourceReference(

@@ -2,6 +2,8 @@ using System.Drawing;
 using System.Windows;
 using H.NotifyIcon.Core;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell;
 
 /// <summary>
@@ -64,9 +66,9 @@ public sealed class Tray : IDisposable
             {
                 Items =
                 {
-                    new PopupMenuItem("Показать", (_, _) => Show()),
+                    new PopupMenuItem(S("Показать"), (_, _) => Show()),
                     new PopupMenuSeparator(),
-                    new PopupMenuItem("Выйти", (_, _) => ExitRequested?.Invoke()),
+                    new PopupMenuItem(S("Выйти"), (_, _) => ExitRequested?.Invoke()),
                 },
             },
         };

@@ -6,6 +6,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>Одна реплика на стекле.</summary>
@@ -43,7 +45,7 @@ public partial class DialoguePage : UserControl
 
         if (_link is null)
         {
-            _turns.Add(new Turn("", "Ядро не на связи — разговор недоступен."));
+            _turns.Add(new Turn("", S("Ядро не на связи — разговор недоступен.")));
             return;
         }
 
@@ -64,7 +66,7 @@ public partial class DialoguePage : UserControl
             var kind = item?["kind"]?.GetValue<string>() ?? "";
             var text = item?["text"]?.GetValue<string>() ?? "";
             var stamp = item?["ts"]?.GetValue<double>() ?? 0;
-            _turns.Add(new Turn(kind == "assistant" ? "Рина" : When(stamp), text));
+            _turns.Add(new Turn(kind == "assistant" ? S("Рина") : When(stamp), text));
         }
         ScrollToEnd();
 
@@ -92,7 +94,7 @@ public partial class DialoguePage : UserControl
                 break;
             case Events.AssistantResponse:
             case Events.AssistantError:
-                Add("Рина", message.Payload["text"]?.GetValue<string>() ?? "");
+                Add(S("Рина"), message.Payload["text"]?.GetValue<string>() ?? "");
                 break;
         }
     }
@@ -164,7 +166,7 @@ public partial class DialoguePage : UserControl
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             $"rina-history-{DateTime.Now:yyyy-MM-dd-HHmm}.json");
         await File.WriteAllTextAsync(path, items.ToJsonString());
-        Add("", $"Разговор выгружен: {path}");
+        Add("", S("Разговор выгружен: {0}", path));
     }
 
     private async Task<JsonObject?> Ask(string method, JsonObject? payload = null)

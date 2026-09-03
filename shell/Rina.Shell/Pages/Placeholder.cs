@@ -1,6 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>
@@ -24,7 +26,7 @@ public static class Placeholder
         });
         stack.Children.Add(new TextBlock
         {
-            Text = "Раздел появится в 4.0-F04.",
+            Text = S("Раздел появится в 4.0-F04."),
             Style = (Style)Application.Current.FindResource("Text.Body"),
             Margin = new Thickness(0, 16, 0, 0),
         });

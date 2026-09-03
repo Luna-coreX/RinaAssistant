@@ -1,3 +1,5 @@
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>Как настройка называется и в какой секции живёт.</summary>
@@ -31,76 +33,76 @@ public sealed record Section(string Title, Labelled[] Keys);
 public static class SettingsLayout
 {
     /// <summary>Куда девать то, чего оболочка не знает.</summary>
-    public const string Other = "Прочее";
+    public static string Other => S("Прочее");
 
     public static readonly Section[] Sections =
     [
-        new("Голос",
+        new(S("Голос"),
         [
-            new("tts_engine", "Система синтеза"),
-            new("stt_engine", "Распознавание"),
-            new("voice", "Голос"),
-            new("wake_words", "Слова активации"),
-            new("volume", "Громкость"),
-            new("speed", "Скорость речи"),
+            new("tts_engine", S("Система синтеза")),
+            new("stt_engine", S("Распознавание")),
+            new("voice", S("Голос")),
+            new("wake_words", S("Слова активации")),
+            new("volume", S("Громкость")),
+            new("speed", S("Скорость речи")),
         ]),
-        new("Модели",
+        new(S("Модели"),
         [
-            new("whisper_model", "Модель Whisper"),
-            new("vosk_model", "Модель Vosk"),
-            new("piper_model", "Модель Piper"),
-            new("wake_sensitivity", "Чувствительность активации"),
-            new("listen_seconds", "Длительность записи"),
+            new("whisper_model", S("Модель Whisper")),
+            new("vosk_model", S("Модель Vosk")),
+            new("piper_model", S("Модель Piper")),
+            new("wake_sensitivity", S("Чувствительность активации")),
+            new("listen_seconds", S("Длительность записи")),
         ]),
-        new("Звук",
+        new(S("Звук"),
         [
-            new("input_device", "Микрофон"),
-            new("output_device", "Динамик"),
-            new("sound_effects", "Звуковые эффекты"),
+            new("input_device", S("Микрофон")),
+            new("output_device", S("Динамик")),
+            new("sound_effects", S("Звуковые эффекты")),
         ]),
-        new("Программы",
+        new(S("Программы"),
         [
-            new("program_folders", "Добавленные папки",
-                "Portable-программы ищутся здесь"),
-            new("app_aliases", "Выученные соответствия"),
+            new("program_folders", S("Добавленные папки"),
+                S("Portable-программы ищутся здесь")),
+            new("app_aliases", S("Выученные соответствия")),
         ]),
-        new("Поведение",
+        new(S("Поведение"),
         [
-            new("autostart", "Запускать при входе в систему"),
-            new("minimize_to_tray", "Сворачивать в трей"),
-            new("start_minimized", "Начинать свёрнутой"),
-            new("floating_command_bar", "Плавающая строка команд"),
-            new("notifications", "Уведомления"),
-            new("hotkey", "Основная комбинация"),
-            new("action_hotkeys", "Комбинации действий"),
+            new("autostart", S("Запускать при входе в систему")),
+            new("minimize_to_tray", S("Сворачивать в трей")),
+            new("start_minimized", S("Начинать свёрнутой")),
+            new("floating_command_bar", S("Плавающая строка команд")),
+            new("notifications", S("Уведомления")),
+            new("hotkey", S("Основная комбинация")),
+            new("action_hotkeys", S("Комбинации действий")),
         ]),
-        new("Обновления",
+        new(S("Обновления"),
         [
-            new("check_updates", "Проверять обновления"),
+            new("check_updates", S("Проверять обновления")),
         ]),
-        new("ИИ",
+        new(S("ИИ"),
         [
-            new("llm_enabled", "Отвечать моделью"),
-            new("llm_url", "Адрес модели"),
-            new("llm_model", "Название модели"),
-            new("llm_persona", "Характер"),
-            new("llm_timeout", "Сколько ждать ответа, секунд"),
+            new("llm_enabled", S("Отвечать моделью")),
+            new("llm_url", S("Адрес модели")),
+            new("llm_model", S("Название модели")),
+            new("llm_persona", S("Характер")),
+            new("llm_timeout", S("Сколько ждать ответа, секунд")),
         ]),
-        new("Поиск",
+        new(S("Поиск"),
         [
-            new("search_engine", "Поисковая система"),
-            new("web_search_fallback", "Искать нераспознанное"),
+            new("search_engine", S("Поисковая система")),
+            new("web_search_fallback", S("Искать нераспознанное")),
         ]),
-        new("Внешний вид",
+        new(S("Внешний вид"),
         [
-            new("finish", "Отделка"),
-            new("ui_language", "Язык интерфейса"),
+            new("finish", S("Отделка")),
+            new("ui_language", S("Язык интерфейса")),
         ]),
-        new("Приватность",
+        new(S("Приватность"),
         [
-            new("save_history", "Сохранять историю"),
-            new("log_texts", "Записывать тексты реплик"),
-            new("log_level", "Подробность журнала"),
+            new("save_history", S("Сохранять историю")),
+            new("log_texts", S("Записывать тексты реплик")),
+            new("log_level", S("Подробность журнала")),
         ]),
     ];
 
@@ -147,9 +149,9 @@ public static class SettingsLayout
     /// </remarks>
     public static string ClearWordOf(string key) => key switch
     {
-        "app_aliases" => "Забыть все",
-        "action_hotkeys" => "Сбросить все",
-        _ => "Очистить",
+        "app_aliases" => S("Забыть все"),
+        "action_hotkeys" => S("Сбросить все"),
+        _ => S("Очистить"),
     };
 
     /// <summary>Все ключи, которые оболочка знает по имени.</summary>

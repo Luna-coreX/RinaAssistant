@@ -207,8 +207,14 @@ check("и диапазон", schema["volume"]["low"] == 0
 check("и перечисление", "DEBUG" in schema["log_level"]["choices"])
 check("и зависимость между полями",
       schema["llm_url"]["depends_on"] == "llm_enabled")
-check("и что перезапуск обязателен",
-      schema["ui_language"]["restart_required"] is True)
+# Ни одна настройка не требует перезапуска, и это утверждение, а не
+# совпадение: язык, движки речи и уровень журнала применяются на лету.
+# Признак в схеме остаётся — он понадобится тому, что вправду нельзя
+# применить живьём, — но появление такого ключа должно быть решением, а не
+# случайностью, поэтому проверка о нём и споткнётся.
+check("настройки применяются без перезапуска",
+      not any(spec.get("restart_required") for spec in schema.values()),
+      f"| {[k for k, v in schema.items() if v.get('restart_required')]}")
 check("и что ключ служебный", schema["first_run"]["secret"] is True)
 check("раскладку ядро не описывает намеренно",
       described.payload.get("layout") is None
@@ -675,6 +681,39 @@ check("несуществующий плагин — ошибка каталог
 plug.ask("core.shutdown")
 plug.read(1)
 plug.wait()
+
+print()
+print("=== F08: язык реплик Рины ===")
+
+# Слова интерфейса переводит оболочка, реплики Рины — ядро (ADR 0007).
+# Проверяется вторая половина: настройка одна, и ядро обязано применить её
+# к себе само — раньше это делало окно 3.1.0, единственный вход в
+# программу, а в разделённой программе входов два.
+speaker = Core()
+speaker.handshake()
+
+speaker.ask("settings.options", {"keys": ["ui_language"]})
+langs = speaker.read(1)[0].payload["options"]["ui_language"]
+check("ядро перечисляет языки", len(langs) > 1,
+      f"| {[o['value'] for o in langs]}")
+check("неполный перевод назван неполным, а не числом",
+      any("неполный" in o["title"] for o in langs),
+      "| ядро не знает про строки оболочки и доли не выдумывает")
+
+speaker.ask("settings.set", {"values": {"ui_language": "English"}})
+verdict = speaker.read(1)[0].payload["verdicts"]["ui_language"]
+check("язык принят", verdict["accepted"], f"| {verdict}")
+
+speaker.ask("settings.set", {"values": {"ui_language": "Klingon"}})
+refused = speaker.read(1)[0].payload["verdicts"]["ui_language"]
+check("несуществующий язык отклонён", not refused["accepted"],
+      f"| {refused['code']}")
+
+speaker.ask("settings.set", {"values": {"ui_language": "Русский"}})
+speaker.read(1)
+speaker.ask("core.shutdown")
+speaker.read(1)
+speaker.wait()
 
 print()
 print("ИТОГО ошибок:", fails)

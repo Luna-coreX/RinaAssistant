@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>Своя команда, как её видит человек.</summary>
@@ -33,7 +35,7 @@ public partial class CommandsPage : UserControl
 
         if (_link is null)
         {
-            Empty.Text = "Ядро не на связи — команды недоступны.";
+            Empty.Text = S("Ядро не на связи — команды недоступны.");
             Empty.Visibility = Visibility.Visible;
             return;
         }
@@ -50,13 +52,13 @@ public partial class CommandsPage : UserControl
             {
                 _items.Add(new UserCommand(
                     item?["id"]?.GetValue<string>() ?? "",
-                    item?["name"]?.GetValue<string>() ?? "без имени",
+                    item?["name"]?.GetValue<string>() ?? S("без имени"),
                     Describe(item),
                     item?["enabled"]?.GetValue<bool>() ?? true));
             }
         }
 
-        Legend.Text = $"МОИ КОМАНДЫ · {_items.Count}";
+        Legend.Text = S("МОИ КОМАНДЫ · {0}", _items.Count);
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
     }
@@ -69,10 +71,11 @@ public partial class CommandsPage : UserControl
         var steps = item?["steps"] as JsonArray;
         return kind switch
         {
-            "app" => $"Программа · {target}",
-            "url" => $"Ссылка · {target}",
-            "path" => $"Папка или файл · {target}",
-            "sequence" => $"Последовательность · шагов {steps?.Count ?? 0}",
+            "app" => S("Программа · {0}", target),
+            "url" => S("Ссылка · {0}", target),
+            "path" => S("Папка или файл · {0}", target),
+            "sequence" => S("Последовательность · шагов {0}",
+                            steps?.Count ?? 0),
             _ => target.Length > 0 ? target : kind,
         };
     }
@@ -95,7 +98,7 @@ public partial class CommandsPage : UserControl
         {
             ["command_id"] = id,
         });
-        Note.Text = "Выполняю…";
+        Note.Text = S("Выполняю…");
     }
 
     private async void OnDelete(object sender, RoutedEventArgs e)
@@ -114,15 +117,15 @@ public partial class CommandsPage : UserControl
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             $"rina-commands-{DateTime.Now:yyyy-MM-dd-HHmm}.json");
         await File.WriteAllTextAsync(path, commands.ToJsonString());
-        Note.Text = $"Выгружено: {path}";
+        Note.Text = S("Выгружено: {0}", path);
     }
 
     private async void OnImport(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Filter = "Команды Рины (*.json)|*.json",
-            Title = "Откуда взять команды",
+            Filter = S("Команды Рины (*.json)|*.json"),
+            Title = S("Откуда взять команды"),
         };
         if (dialog.ShowDialog() != true) return;
 
@@ -131,7 +134,7 @@ public partial class CommandsPage : UserControl
             var text = await File.ReadAllTextAsync(dialog.FileName);
             if (JsonNode.Parse(text) is not JsonArray commands)
             {
-                Note.Text = "В файле не список команд.";
+                Note.Text = S("В файле не список команд.");
                 return;
             }
             var done = await Ask(Methods.CommandsImport, new JsonObject
@@ -142,12 +145,13 @@ public partial class CommandsPage : UserControl
             var skipped = done?["skipped"]?.GetValue<int>() ?? 0;
             // «Пропущено» названо отдельно: человек должен понимать, что уже
             // настроенное не затёрли, а не гадать, куда делись команды.
-            Note.Text = $"Добавлено {added}, пропущено как уже известные {skipped}.";
+            Note.Text = S("Добавлено {0}, пропущено как уже известные {1}.",
+                          added, skipped);
             await ReloadAsync();
         }
         catch (Exception error)
         {
-            Note.Text = $"Не прочиталось: {error.Message}";
+            Note.Text = S("Не прочиталось: {0}", error.Message);
         }
     }
 

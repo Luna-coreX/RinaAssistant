@@ -1,0 +1,542 @@
+{
+  "Portable-программы ищутся здесь": {
+    "English": "Portable apps are looked for here"
+  },
+  "{0} — сейчас недоступно": {
+    "English": "{0} — unavailable right now"
+  },
+  "«{0}» включён.": {
+    "English": "“{0}” is on."
+  },
+  "«{0}» выключен.": {
+    "English": "“{0}” is off."
+  },
+  "«{0}» занято другой программой": {
+    "English": "“{0}” is taken by another program"
+  },
+  "«{0}» не включился: {1}": {
+    "English": "“{0}” didn’t start: {1}"
+  },
+  "«{0}» сохранено.": {
+    "English": "“{0}” saved."
+  },
+  "«{0}»: не понял значение.": {
+    "English": "“{0}”: didn’t understand the value."
+  },
+  "Адрес модели": {
+    "English": "Model address"
+  },
+  "Будильник": {
+    "English": "Alarm",
+    "Українська": "Будильник",
+    "Español": "Alarma",
+    "Deutsch": "Wecker"
+  },
+  "В файле не список команд.": {
+    "English": "The file isn’t a list of commands."
+  },
+  "Внешний вид": {
+    "English": "Appearance",
+    "Українська": "Зовнішній вигляд",
+    "Español": "Apariencia",
+    "Deutsch": "Darstellung"
+  },
+  "Всегда слушать": {
+    "English": "Always listen",
+    "Українська": "Завжди слухати",
+    "Español": "Escuchar siempre",
+    "Deutsch": "Immer zuhören"
+  },
+  "Выберите файл модели": {
+    "English": "Choose the model file"
+  },
+  "Выгружено: {0}": {
+    "English": "Exported: {0}"
+  },
+  "Выйти": {
+    "English": "Quit"
+  },
+  "Выполнить": {
+    "English": "Run",
+    "Українська": "Виконати",
+    "Español": "Ejecutar",
+    "Deutsch": "Ausführen"
+  },
+  "Выполняю…": {
+    "English": "Working…"
+  },
+  "Выученные соответствия": {
+    "English": "Learned matches"
+  },
+  "Где лежит модель": {
+    "English": "Where the model lives"
+  },
+  "Голос": {
+    "English": "Voice",
+    "Українська": "Голос",
+    "Español": "Voz",
+    "Deutsch": "Stimme"
+  },
+  "Громкость": {
+    "English": "Volume",
+    "Українська": "Гучність",
+    "Español": "Volumen",
+    "Deutsch": "Lautstärke"
+  },
+  "Диалог": {
+    "English": "Dialogue"
+  },
+  "Динамик": {
+    "English": "Speaker",
+    "Українська": "Динамік",
+    "Español": "Altavoz",
+    "Deutsch": "Lautsprecher"
+  },
+  "Длительность записи": {
+    "English": "Recording length",
+    "Українська": "Тривалість запису",
+    "Español": "Duración de la grabación",
+    "Deutsch": "Aufnahmedauer"
+  },
+  "Добавить": {
+    "English": "Add"
+  },
+  "Добавить папку…": {
+    "English": "Add folder…",
+    "Українська": "Додати теку…",
+    "Español": "Añadir carpeta…",
+    "Deutsch": "Ordner hinzufügen…"
+  },
+  "Добавленные папки": {
+    "English": "Added folders"
+  },
+  "Добавлено {0}, пропущено как уже известные {1}.": {
+    "English": "Added {0}, skipped {1} already known."
+  },
+  "Если не ответить, действие не выполнится.": {
+    "English": "If you don’t answer, nothing happens."
+  },
+  "ЗАПЛАНИРОВАНО": {
+    "English": "SCHEDULED"
+  },
+  "ЗАПЛАНИРОВАНО · {0}": {
+    "English": "SCHEDULED · {0}"
+  },
+  "Забыть все": {
+    "English": "Forget all",
+    "Українська": "Забути все",
+    "Español": "Olvidar todo",
+    "Deutsch": "Alle vergessen"
+  },
+  "Закрыть": {
+    "English": "Close"
+  },
+  "Записывать тексты реплик": {
+    "English": "Log message texts",
+    "Українська": "Записувати тексти реплік",
+    "Español": "Registrar el texto de los mensajes",
+    "Deutsch": "Nachrichtentexte protokollieren"
+  },
+  "Запускать при входе в систему": {
+    "English": "Start when you sign in"
+  },
+  "Звук": {
+    "English": "Audio"
+  },
+  "Звуковые эффекты": {
+    "English": "Sound effects",
+    "Українська": "Звукові ефекти",
+    "Español": "Efectos de sonido",
+    "Deutsch": "Soundeffekte"
+  },
+  "ИИ": {
+    "English": "AI"
+  },
+  "Импорт": {
+    "English": "Import",
+    "Українська": "Імпорт",
+    "Español": "Importar",
+    "Deutsch": "Importieren"
+  },
+  "Искать нераспознанное": {
+    "English": "Search unrecognized commands"
+  },
+  "Команды": {
+    "English": "Commands",
+    "Українська": "Команди",
+    "Español": "Comandos",
+    "Deutsch": "Befehle"
+  },
+  "Команды Рины (*.json)|*.json": {
+    "English": "Rina commands (*.json)|*.json"
+  },
+  "Комбинации действий": {
+    "English": "Action shortcuts"
+  },
+  "МОИ КОМАНДЫ": {
+    "English": "MY COMMANDS"
+  },
+  "МОИ КОМАНДЫ · {0}": {
+    "English": "MY COMMANDS · {0}"
+  },
+  "Микрофон": {
+    "English": "Microphone",
+    "Українська": "Мікрофон",
+    "Español": "Micrófono",
+    "Deutsch": "Mikrofon"
+  },
+  "Модели": {
+    "English": "Models"
+  },
+  "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*": {
+    "English": "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*"
+  },
+  "Модель Piper": {
+    "English": "Piper model"
+  },
+  "Модель Vosk": {
+    "English": "Vosk model"
+  },
+  "Модель Whisper": {
+    "English": "Whisper model"
+  },
+  "Название модели": {
+    "English": "Model name"
+  },
+  "Напоминание": {
+    "English": "Reminder",
+    "Українська": "Нагадування",
+    "Español": "Recordatorio",
+    "Deutsch": "Erinnerung"
+  },
+  "Напоминания": {
+    "English": "Reminders",
+    "Українська": "Нагадування",
+    "Español": "Recordatorios",
+    "Deutsch": "Erinnerungen"
+  },
+  "Настройки": {
+    "English": "Settings",
+    "Українська": "Налаштування",
+    "Español": "Ajustes",
+    "Deutsch": "Einstellungen"
+  },
+  "Начинать свёрнутой": {
+    "English": "Start minimised"
+  },
+  "Не прочиталось: {0}": {
+    "English": "Couldn’t read it: {0}"
+  },
+  "Ничего не запланировано.": {
+    "English": "Nothing is scheduled.",
+    "Українська": "Нічого не заплановано.",
+    "Español": "No hay nada programado.",
+    "Deutsch": "Es ist nichts geplant."
+  },
+  "Обзор…": {
+    "English": "Browse…",
+    "Українська": "Огляд…",
+    "Español": "Examinar…",
+    "Deutsch": "Durchsuchen…"
+  },
+  "Обновления": {
+    "English": "Updates"
+  },
+  "Основная комбинация": {
+    "English": "Main shortcut"
+  },
+  "Отвечать голосом": {
+    "English": "Reply with voice",
+    "Українська": "Відповідати голосом",
+    "Español": "Responder con voz",
+    "Deutsch": "Mit Stimme antworten"
+  },
+  "Отвечать моделью": {
+    "English": "Answer with a model"
+  },
+  "Отделка": {
+    "English": "Finish"
+  },
+  "Открыть": {
+    "English": "Open"
+  },
+  "Откуда взять команды": {
+    "English": "Where to take commands from"
+  },
+  "Отмена": {
+    "English": "Cancel",
+    "Українська": "Скасувати",
+    "Español": "Cancelar",
+    "Deutsch": "Abbrechen"
+  },
+  "Отменить": {
+    "English": "Cancel",
+    "Українська": "Скасувати",
+    "Español": "Cancelar",
+    "Deutsch": "Abbrechen"
+  },
+  "Отправить": {
+    "English": "Send"
+  },
+  "Очистить": {
+    "English": "Clear"
+  },
+  "Папка или файл · {0}": {
+    "English": "Folder or file · {0}"
+  },
+  "Плавающая строка команд": {
+    "English": "Floating command bar",
+    "Українська": "Плаваючий рядок команд",
+    "Español": "Barra de comandos flotante",
+    "Deutsch": "Schwebende Befehlszeile"
+  },
+  "Плагинов пока нет.": {
+    "English": "No plugins yet."
+  },
+  "Плагины": {
+    "English": "Plugins",
+    "Українська": "Плагіни",
+    "Español": "Complementos",
+    "Deutsch": "Plug-ins"
+  },
+  "Поведение": {
+    "English": "Behavior",
+    "Українська": "Поведінка",
+    "Español": "Comportamiento",
+    "Deutsch": "Verhalten"
+  },
+  "Подробность журнала": {
+    "English": "Log detail",
+    "Українська": "Докладність журналу",
+    "Español": "Detalle del registro",
+    "Deutsch": "Protokolldetails"
+  },
+  "Подтверждение": {
+    "English": "Confirmation"
+  },
+  "Поиск": {
+    "English": "Search"
+  },
+  "Поисковая система": {
+    "English": "Search engine"
+  },
+  "Показать": {
+    "English": "Show"
+  },
+  "Последовательность · шагов {0}": {
+    "English": "Sequence · {0} steps"
+  },
+  "Приватность": {
+    "English": "Privacy",
+    "Українська": "Приватність",
+    "Español": "Privacidad",
+    "Deutsch": "Datenschutz"
+  },
+  "Проверять обновления": {
+    "English": "Check for updates",
+    "Українська": "Перевіряти оновлення",
+    "Español": "Buscar actualizaciones",
+    "Deutsch": "Nach Updates suchen"
+  },
+  "Программа · {0}": {
+    "English": "Program · {0}"
+  },
+  "Программы": {
+    "English": "Programs",
+    "Українська": "Програми",
+    "Español": "Programas",
+    "Deutsch": "Programme"
+  },
+  "Прочее": {
+    "English": "Other"
+  },
+  "Развернуть": {
+    "English": "Maximise"
+  },
+  "Разговор выгружен: {0}": {
+    "English": "Conversation exported: {0}"
+  },
+  "Раздел появится в 4.0-F04.": {
+    "English": "This section arrives in 4.0-F04."
+  },
+  "Распознавание": {
+    "English": "Recognition"
+  },
+  "Рина": {
+    "English": "Rina",
+    "Українська": "Ріна",
+    "Español": "Rina",
+    "Deutsch": "Rina"
+  },
+  "Сбросить все": {
+    "English": "Reset all"
+  },
+  "Свернуть": {
+    "English": "Minimise"
+  },
+  "Своих команд пока нет.": {
+    "English": "No commands of your own yet."
+  },
+  "Сворачивать в трей": {
+    "English": "Minimize to tray",
+    "Українська": "Згортати в трей",
+    "Español": "Minimizar a la bandeja",
+    "Deutsch": "In den Infobereich minimieren"
+  },
+  "Серебро или чёрное": {
+    "English": "Silver or black"
+  },
+  "Система синтеза": {
+    "English": "Synthesis engine"
+  },
+  "Сколько ждать ответа, секунд": {
+    "English": "How long to wait for an answer, seconds"
+  },
+  "Скорость речи": {
+    "English": "Speech rate",
+    "Українська": "Швидкість мовлення",
+    "Español": "Velocidad del habla",
+    "Deutsch": "Sprechgeschwindigkeit"
+  },
+  "Скрыть": {
+    "English": "Hide"
+  },
+  "Слова активации": {
+    "English": "Wake words",
+    "Українська": "Слова активації",
+    "Español": "Palabras de activación",
+    "Deutsch": "Aktivierungswörter"
+  },
+  "Сохранять историю": {
+    "English": "Save history",
+    "Українська": "Зберігати історію",
+    "Español": "Guardar historial",
+    "Deutsch": "Verlauf speichern"
+  },
+  "Ссылка · {0}": {
+    "English": "Link · {0}"
+  },
+  "Таймер": {
+    "English": "Timer",
+    "Українська": "Таймер",
+    "Español": "Temporizador",
+    "Deutsch": "Timer"
+  },
+  "Точно выполнить?": {
+    "English": "Run it — are you sure?"
+  },
+  "УСТАНОВЛЕННЫЕ": {
+    "English": "INSTALLED"
+  },
+  "УСТАНОВЛЕННЫЕ · {0}": {
+    "English": "INSTALLED · {0}"
+  },
+  "Убрать": {
+    "English": "Remove",
+    "Українська": "Прибрати",
+    "Español": "Quitar",
+    "Deutsch": "Entfernen"
+  },
+  "Уведомления": {
+    "English": "Notifications",
+    "Українська": "Сповіщення",
+    "Español": "Notificaciones",
+    "Deutsch": "Benachrichtigungen"
+  },
+  "Удалить": {
+    "English": "Delete",
+    "Українська": "Видалити",
+    "Español": "Eliminar",
+    "Deutsch": "Löschen"
+  },
+  "Устройство по умолчанию": {
+    "English": "Default device"
+  },
+  "Характер": {
+    "English": "Persona"
+  },
+  "Чувствительность активации": {
+    "English": "Wake word sensitivity",
+    "Українська": "Чутливість активації",
+    "Español": "Sensibilidad de activación",
+    "Deutsch": "Aktivierungsempfindlichkeit"
+  },
+  "Экспорт": {
+    "English": "Export",
+    "Українська": "Експорт",
+    "Español": "Exportar",
+    "Deutsch": "Exportieren"
+  },
+  "Ядро не на связи — команды недоступны.": {
+    "English": "The core is offline — commands are unavailable."
+  },
+  "Ядро не на связи — настройки недоступны.": {
+    "English": "The core is offline — settings are unavailable."
+  },
+  "Ядро не на связи — плагины недоступны.": {
+    "English": "The core is offline — plugins are unavailable."
+  },
+  "Ядро не на связи — разговор недоступен.": {
+    "English": "The core is offline — the conversation is unavailable."
+  },
+  "Ядро не на связи — список недоступен.": {
+    "English": "The core is offline — the list is unavailable."
+  },
+  "Ядро не объявило возможность «плагины».": {
+    "English": "The core didn’t declare the “plugins” capability."
+  },
+  "Язык интерфейса": {
+    "English": "Interface language"
+  },
+  "без имени": {
+    "English": "unnamed"
+  },
+  "версия {0}": {
+    "English": "version {0}"
+  },
+  "вид": {
+    "English": "look"
+  },
+  "выбирать не из чего": {
+    "English": "nothing to choose from"
+  },
+  "записей: {0}": {
+    "English": "entries: {0}"
+  },
+  "ключ {0} оболочке незнаком": {
+    "English": "key {0} is unknown to the shell"
+  },
+  "не разобрал сочетание «{0}»": {
+    "English": "couldn’t parse the shortcut “{0}”"
+  },
+  "о программе": {
+    "English": "about"
+  },
+  "оболочка не знает такого элемента страницы": {
+    "English": "the shell doesn’t know this page element"
+  },
+  "плагин не загрузился": {
+    "English": "the plugin didn’t load"
+  },
+  "применится после перезапуска": {
+    "English": "applies after a restart"
+  },
+  "связь потеряна, поднимаем": {
+    "English": "connection lost, bringing it back"
+  },
+  "сейчас": {
+    "English": "now"
+  },
+  "ядро запускается": {
+    "English": "the core is starting"
+  },
+  "ядро на связи": {
+    "English": "the core is online"
+  },
+  "ядро не запускалось": {
+    "English": "the core hasn’t been started"
+  },
+  "ядро не отвечает": {
+    "English": "the core isn’t responding"
+  }
+}

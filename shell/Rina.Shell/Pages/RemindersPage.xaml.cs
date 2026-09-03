@@ -4,6 +4,8 @@ using System.Windows;
 using System.Windows.Controls;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>Запланированное, как его видит человек.</summary>
@@ -31,7 +33,7 @@ public partial class RemindersPage : UserControl
 
         if (_link is null)
         {
-            Empty.Text = "Ядро не на связи — список недоступен.";
+            Empty.Text = S("Ядро не на связи — список недоступен.");
             Empty.Visibility = Visibility.Visible;
             return;
         }
@@ -59,16 +61,16 @@ public partial class RemindersPage : UserControl
                     item?["id"]?.GetValue<string>() ?? "",
                     kind switch
                     {
-                        "timer" => "Таймер",
-                        "alarm" => "Будильник",
-                        _ => "Напоминание",
+                        "timer" => S("Таймер"),
+                        "alarm" => S("Будильник"),
+                        _ => S("Напоминание"),
                     },
                     item?["text"]?.GetValue<string>() ?? "",
                     Until(item?["fire_at"]?.GetValue<double>() ?? 0)));
             }
         }
 
-        Legend.Text = $"ЗАПЛАНИРОВАНО · {_items.Count}";
+        Legend.Text = S("ЗАПЛАНИРОВАНО · {0}", _items.Count);
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
     }
@@ -85,7 +87,7 @@ public partial class RemindersPage : UserControl
     {
         var left = DateTimeOffset.FromUnixTimeMilliseconds((long)(fireAt * 1000))
                    - DateTimeOffset.UtcNow;
-        if (left < TimeSpan.Zero) return "сейчас";
+        if (left < TimeSpan.Zero) return S("сейчас");
         return left.TotalHours >= 1
             ? $"{(int)left.TotalHours:00}:{left.Minutes:00}:{left.Seconds:00}"
             : $"{left.Minutes:00}:{left.Seconds:00}";

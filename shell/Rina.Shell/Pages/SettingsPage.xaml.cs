@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>
@@ -64,7 +66,7 @@ public partial class SettingsPage : UserControl
 
         if (_link is null)
         {
-            Note.Text = "Ядро не на связи — настройки недоступны.";
+            Note.Text = S("Ядро не на связи — настройки недоступны.");
             return;
         }
         Loaded += async (_, _) => await LoadAsync();
@@ -118,7 +120,7 @@ public partial class SettingsPage : UserControl
                 : Audio.Speaker.Devices();
             var listed = new List<(string, string, bool)>
             {
-                ("default", "Устройство по умолчанию", true),
+                ("default", S("Устройство по умолчанию"), true),
             };
             listed.AddRange(devices.Select(d => (d.Name, d.Name, true)));
             _options[key] = listed;
@@ -205,9 +207,9 @@ public partial class SettingsPage : UserControl
         if (SettingsLayout.HintOf(key).Length > 0)
             notes.Add(SettingsLayout.HintOf(key));
         if (spec["restart_required"] is not null)
-            notes.Add("применится после перезапуска");
+            notes.Add(S("применится после перезапуска"));
         if (!SettingsLayout.Known.Contains(key))
-            notes.Add($"ключ {key} оболочке незнаком");
+            notes.Add(S("ключ {0} оболочке незнаком", key));
         if (notes.Count > 0)
             label.Children.Add(new TextBlock
             {
@@ -328,7 +330,7 @@ public partial class SettingsPage : UserControl
         {
             var stale = new ComboBoxItem
             {
-                Content = $"{current} — сейчас недоступно",
+                Content = S("{0} — сейчас недоступно", current),
                 Tag = current,
             };
             box.Items.Insert(0, stale);
@@ -357,7 +359,7 @@ public partial class SettingsPage : UserControl
             Width = 280,
             IsEnabled = false,
         };
-        box.Items.Add(new ComboBoxItem { Content = "выбирать не из чего" });
+        box.Items.Add(new ComboBoxItem { Content = S("выбирать не из чего") });
         box.SelectedIndex = 0;
         return box;
     }
@@ -377,7 +379,7 @@ public partial class SettingsPage : UserControl
         var browse = new Button
         {
             Style = (Style)FindResource("Btn"),
-            Content = "Обзор…",
+            Content = S("Обзор…"),
             Margin = new Thickness(8, 0, 0, 0),
         };
         browse.Click += async (_, _) =>
@@ -397,7 +399,7 @@ public partial class SettingsPage : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Title = "Где лежит модель",
+            Title = S("Где лежит модель"),
         };
         return dialog.ShowDialog() == true ? dialog.FolderName : null;
     }
@@ -406,8 +408,8 @@ public partial class SettingsPage : UserControl
     {
         var dialog = new Microsoft.Win32.OpenFileDialog
         {
-            Title = "Выберите файл модели",
-            Filter = "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*",
+            Title = S("Выберите файл модели"),
+            Filter = S("Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*"),
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
     }
@@ -445,7 +447,7 @@ public partial class SettingsPage : UserControl
             var drop = new Button
             {
                 Style = (Style)FindResource("Btn"),
-                Content = "Убрать",
+                Content = S("Убрать"),
                 Tag = item,
             };
             drop.Click += async (_, _) =>
@@ -480,7 +482,7 @@ public partial class SettingsPage : UserControl
             var add = new Button
             {
                 Style = (Style)FindResource("Btn"),
-                Content = "Добавить папку…",
+                Content = S("Добавить папку…"),
             };
             add.Click += async (_, _) =>
             {
@@ -499,7 +501,7 @@ public partial class SettingsPage : UserControl
             var add = new Button
             {
                 Style = (Style)FindResource("Btn"),
-                Content = "Добавить",
+                Content = S("Добавить"),
             };
             add.Click += async (_, _) =>
             {
@@ -530,7 +532,7 @@ public partial class SettingsPage : UserControl
         };
         row.Children.Add(new TextBlock
         {
-            Text = $"записей: {current?.Count ?? 0}",
+            Text = S("записей: {0}", current?.Count ?? 0),
             Style = (Style)FindResource("Text.Meta"),
             VerticalAlignment = VerticalAlignment.Center,
             Margin = new Thickness(0, 0, 8, 0),
@@ -582,7 +584,9 @@ public partial class SettingsPage : UserControl
 
     private async Task SaveAsync(string key, JsonNode? value)
     {
-        if (value is null) { Note.Text = $"«{SettingsLayout.TitleOf(key)}»: не понял значение."; return; }
+        if (value is null) { Note.Text = S("«{0}»: не понял значение.",
+                          SettingsLayout.TitleOf(key));
+            return; }
 
         var answer = await Ask(Methods.SettingsSet, new JsonObject
         {
@@ -597,7 +601,7 @@ public partial class SettingsPage : UserControl
         // Предупреждение не отказ: значение записано, а человеку сказано,
         // чем это обернётся.
         Note.Text = accepted && message.Length == 0
-            ? $"«{SettingsLayout.TitleOf(key)}» сохранено."
+            ? S("«{0}» сохранено.", SettingsLayout.TitleOf(key))
             : message;
         Note.SetResourceReference(ForegroundProperty,
             accepted && code.Length == 0 ? "C.InkFaint" : "C.Signal");
@@ -607,6 +611,11 @@ public partial class SettingsPage : UserControl
             _values[key] = value;
             if (key == "finish" && _link is not null)
                 await _link.SetFinishAsync(value.GetValue<string>());
+
+            // Язык хранится в ядре, но слова интерфейса переводит оболочка:
+            // сказать ей об этом больше некому (ADR 0007).
+            if (key == "ui_language")
+                Strings.Loc.Use(value.GetValue<string>());
             // Смена движка меняет набор голосов: списки перечитываются, а не
             // остаются от прошлого движка.
             if (key is "tts_engine" or "stt_engine") await LoadOptionsAsync();

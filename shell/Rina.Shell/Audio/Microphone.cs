@@ -85,7 +85,9 @@ public sealed class Microphone : IDisposable
     {
         if (Running) return;
         if (WaveInEvent.DeviceCount == 0)
-            throw new InvalidOperationException("устройств записи не найдено");
+            // Текст исключения читает разработчик в журнале.
+            throw new InvalidOperationException(
+                "устройств записи не найдено");                // не интерфейс
 
         _device = new WaveInEvent
         {

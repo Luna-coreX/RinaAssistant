@@ -110,7 +110,11 @@ CONSTRAINTS: dict[str, Constraint] = {
     "finish": Constraint(choices=("silver", "black")),
 
     # Язык меняется редко и затрагивает окно целиком.
-    "ui_language": Constraint(restart_required=True),
+    # Языки перечисляет ядро: список знает `core.i18n`, и он же меняется
+    # от того, какие переводы собраны. Перезапуск больше не нужен — с
+    # 4.0-F08 язык применяется сразу обеими сторонами: ядро переключает
+    # реплики Рины, оболочка — слова интерфейса.
+    "ui_language": Constraint(dynamic=True),
 
     # Пять заимствованных палитр 3.1.0. Заменены двумя отделками (4.0-R08);
     # значения остаются в хранилище, но наружу не отдаются.
@@ -204,6 +208,17 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
         return [{"value": i, "title": t, "available": True}
                 for i, t in engine.voices()]
+    if key == "ui_language":
+        # Доля перевода не называется числом нарочно: ядро знает только
+        # свою половину — реплики Рины, — а слова интерфейса переводит
+        # оболочка и считает их сама (ADR 0007). Одно число на две
+        # половины было бы точностью, которой нет.
+        from core.i18n import LANGUAGES, coverage
+        return [{"value": name,
+                 "title": (name if coverage(name) >= 0.99
+                           else f"{name} — перевод неполный"),
+                 "available": True}
+                for name in LANGUAGES]
     if key == "whisper_model":
         # Перечень моделей Whisper фиксирован и известен без установки:
         # это имена, а не найденные файлы.

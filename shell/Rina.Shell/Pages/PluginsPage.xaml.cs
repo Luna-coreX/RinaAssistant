@@ -3,6 +3,8 @@ using System.Windows;
 using System.Windows.Controls;
 using Rina.Protocol;
 
+using static Rina.Shell.Strings.Loc;
+
 namespace Rina.Shell.Pages;
 
 /// <summary>
@@ -55,7 +57,7 @@ public partial class PluginsPage : UserControl
 
         if (_link is null)
         {
-            Note.Text = "Ядро не на связи — плагины недоступны.";
+            Note.Text = S("Ядро не на связи — плагины недоступны.");
             return;
         }
         Loaded += async (_, _) => await LoadAsync();
@@ -135,8 +137,8 @@ public partial class PluginsPage : UserControl
 
         Empty.Visibility = items.Count == 0 ? Visibility.Visible
                                             : Visibility.Collapsed;
-        Legend.Text = items.Count == 0 ? "УСТАНОВЛЕННЫЕ"
-                                       : $"УСТАНОВЛЕННЫЕ · {items.Count}";
+        Legend.Text = items.Count == 0 ? S("УСТАНОВЛЕННЫЕ")
+                                       : S("УСТАНОВЛЕННЫЕ · {0}", items.Count);
         Ready?.Invoke();
     }
 
@@ -178,7 +180,7 @@ public partial class PluginsPage : UserControl
         // Сбой — вместо описания, а не рядом с ним: причина важнее того,
         // что плагин о себе рассказывал, когда работал.
         var note = broken
-            ? plugin["error"]?.GetValue<string>() ?? "плагин не загрузился"
+            ? plugin["error"]?.GetValue<string>() ?? S("плагин не загрузился")
             : Describe(plugin);
         about.Children.Add(new TextBlock
         {
@@ -197,7 +199,7 @@ public partial class PluginsPage : UserControl
             var open = new Button
             {
                 Style = (Style)FindResource("Btn"),
-                Content = _open == id ? "Скрыть" : "Открыть",
+                Content = _open == id ? S("Скрыть") : S("Открыть"),
                 Margin = new Thickness(0, 0, 8, 0),
                 VerticalAlignment = VerticalAlignment.Center,
             };
@@ -234,7 +236,7 @@ public partial class PluginsPage : UserControl
         var description = plugin["description"]?.GetValue<string>() ?? "";
         if (description.Length > 0) parts.Add(description);
         var version = plugin["version"]?.GetValue<string>() ?? "";
-        if (version.Length > 0) parts.Add($"версия {version}");
+        if (version.Length > 0) parts.Add(S("версия {0}", version));
         var author = plugin["author"]?.GetValue<string>() ?? "";
         if (author.Length > 0 && author != "unknown") parts.Add(author);
         return string.Join(" · ", parts);
@@ -252,10 +254,11 @@ public partial class PluginsPage : UserControl
         // Ядро вернуло состояние **после** изменения: плагин мог отказаться
         // загружаться, и «включено» было бы неправдой.
         var now = plugin["enabled"]?.GetValue<bool>() ?? false;
+        var shown = plugin["name"]?.GetValue<string>() ?? id;
         Note.Text = now == enabled
-            ? $"«{plugin["name"]?.GetValue<string>() ?? id}» "
-              + (now ? "включён." : "выключен.")
-            : $"«{id}» не включился: {plugin["error"]?.GetValue<string>()}";
+            ? (now ? S("«{0}» включён.", shown) : S("«{0}» выключен.", shown))
+            : S("«{0}» не включился: {1}", shown,
+                plugin["error"]?.GetValue<string>() ?? "");
         Note.SetResourceReference(ForegroundProperty,
                                   now == enabled ? "C.InkFaint" : "C.Signal");
 
@@ -377,7 +380,7 @@ public partial class PluginsPage : UserControl
                     Text = $"[{kind}] {text}",
                     Style = (Style)FindResource("Text.Meta"),
                     TextWrapping = TextWrapping.Wrap,
-                    ToolTip = "оболочка не знает такого элемента страницы",
+                    ToolTip = S("оболочка не знает такого элемента страницы"),
                 };
         }
     }
@@ -400,7 +403,7 @@ public partial class PluginsPage : UserControl
         if (_link?.Connection is not { Ready: true } connection) return null;
         if (!connection.MayCall(method))
         {
-            Note.Text = "Ядро не объявило возможность «плагины».";
+            Note.Text = S("Ядро не объявило возможность «плагины».");
             return null;
         }
         try
