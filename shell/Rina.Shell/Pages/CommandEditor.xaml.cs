@@ -125,6 +125,18 @@ public partial class CommandEditor : UserControl
         Target.Visibility = system ? Visibility.Collapsed : Visibility.Visible;
         Browse.Visibility = picks ? Visibility.Visible : Visibility.Collapsed;
 
+        // Подсказка меняется вместе с видом: в одно и то же поле кладут
+        // то путь, то адрес, то фразу, и «Что открыть» на все случаи
+        // заставляло бы человека догадываться, в каком виде.
+        Styles.Ui.SetHint(Target, kind switch
+        {
+            "app" => S(@"например, C:\Program Files\App\app.exe"),
+            "folder" => S(@"например, D:\Проекты"),
+            "website" => S("например, github.com"),
+            "speak" => S("что произнести"),
+            _ => "",
+        });
+
         TargetLabel.Text = kind switch
         {
             "app" => S("Какую программу открыть"),

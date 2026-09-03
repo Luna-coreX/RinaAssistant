@@ -252,6 +252,31 @@ public partial class SettingsPage : UserControl
         // ни перечислило: у «сочетаний действий» перечислены **ключи**
         // словаря, и прочитать его как строку значит уронить страницу —
         // ровно это и случилось при первом же живом прогоне.
+        // Сочетание клавиш нажимают, а не набирают: набранное строкой —
+        // это просьба знать, как мы его пишем, и ошибку человек заметит
+        // только по тому, что клавиши не работают.
+        if (key == "hotkey")
+        {
+            var box = new HotkeyBox(value?.GetValue<string>() ?? "");
+            box.Changed += async written => await SaveAsync(key, written);
+            return box;
+        }
+
+        // Число, у которого ядро назвало обе границы, тянут, а не
+        // набирают. Правило общее, а не список ключей: настройка, у
+        // которой границы появятся, получит ползунок сама.
+        if (type is "integer" or "number"
+            && spec["low"] is not null && spec["high"] is not null)
+        {
+            var low = spec["low"]!.GetValue<double>();
+            var high = spec["high"]!.GetValue<double>();
+            // Слишком широкий диапазон мышью не выставить: секунду из
+            // шестисот придётся ловить. Такое остаётся полем.
+            if (high - low <= 200)
+                return BuildSlider(key, low, high, type == "integer",
+                                   value?.GetValue<double>() ?? low);
+        }
+
         if (type == "array")
             // У списка папок есть и тип «массив», и формат «путь». Массив
             // решает, чем правят; формат — чем добавляют.
@@ -383,6 +408,84 @@ public partial class SettingsPage : UserControl
         box.Items.Add(new ComboBoxItem { Content = S("выбирать не из чего") });
         box.SelectedIndex = 0;
         return box;
+    }
+
+    /// <summary>
+    /// Ползунок со значением рядом.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Число видно всегда: ползунок отвечает на «примерно сколько», а на
+    /// «ровно сколько» не отвечает, и человек, которому нужно ровно
+    /// восемьдесят, иначе обречён возить мышью.
+    /// </para>
+    /// <para>
+    /// <b>Сохраняем не на каждое движение, а когда отпустили.</b> Иначе
+    /// протаскивание от нуля до ста — это сто запросов к ядру и сто
+    /// записей на диск.
+    /// </para>
+    /// </remarks>
+    private FrameworkElement BuildSlider(string key, double low, double high,
+                                         bool whole, double current)
+    {
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        var slider = new Slider
+        {
+            Style = (Style)FindResource("Slide"),
+            Width = 220,
+            Minimum = low,
+            Maximum = high,
+            Value = Math.Clamp(current, low, high),
+            IsSnapToTickEnabled = whole,
+            TickFrequency = whole ? 1 : (high - low) / 20,
+            SmallChange = whole ? 1 : (high - low) / 20,
+            LargeChange = whole ? Math.Max(1, (high - low) / 10)
+                                : (high - low) / 10,
+        };
+
+        var shown = new TextBlock
+        {
+            Style = (Style)FindResource("Text.Body"),
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(12, 0, 0, 0),
+            MinWidth = 44,
+            TextAlignment = TextAlignment.Right,
+            Text = Format(slider.Value, whole),
+        };
+
+        slider.ValueChanged += (_, _) =>
+            shown.Text = Format(slider.Value, whole);
+
+        // Отпустили мышь или ушли с клавиатуры — тогда и сохраняем.
+        slider.PreviewMouseUp += async (_, _) => await SaveSliderAsync(
+            key, slider.Value, whole);
+        slider.LostKeyboardFocus += async (_, _) => await SaveSliderAsync(
+            key, slider.Value, whole);
+
+        row.Children.Add(slider);
+        row.Children.Add(shown);
+        return row;
+    }
+
+    private static string Format(double value, bool whole)
+        => whole ? ((int)Math.Round(value)).ToString()
+                 : value.ToString("0.00");
+
+    private async Task SaveSliderAsync(string key, double value, bool whole)
+    {
+        JsonNode node = whole ? (int)Math.Round(value)
+                              : Math.Round(value, 2);
+        // Не трогаем ядро, если значение то же: отпущенная без движения
+        // мышь не повод писать на диск.
+        if (_values.GetValueOrDefault(key)?.GetValue<double>() is { } was
+            && Math.Abs(was - node.GetValue<double>()) < 1e-9)
+            return;
+        await SaveAsync(key, node);
     }
 
     /// <summary>Путь: поле и «Обзор…».</summary>
@@ -602,19 +705,69 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Словарь: сколько записей и как забыть их все.
+    /// Словарь: что выучено, и как забыть одно или всё.
     /// </summary>
     /// <remarks>
-    /// Выученные соответствия правят не по одному: человек не помнит, какое
-    /// слово к какой программе привязалось, — он помнит, что Рина «путает».
-    /// Поэтому счётчик и «забыть все», как и было в 3.1.0.
+    /// <para>
+    /// Первая редакция показывала только счётчик и «забыть все» — с доводом,
+    /// что человек не помнит, какое слово к чему привязалось. Довод оказался
+    /// половинчатым: <b>не помнит — значит, надо показать</b>. Человек,
+    /// заметивший, что Рина открывает не тот «студио», хочет отвязать именно
+    /// его, а не забыть заодно шесть верных соответствий.
+    /// </para>
+    /// <para>
+    /// «Забыть все» остаётся: когда путаница общая, перебирать по одному —
+    /// работа без причины.
+    /// </para>
     /// </remarks>
     private FrameworkElement BuildMap(string key, JsonObject? current)
     {
+        var stack = new StackPanel
+        {
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+
+        foreach (var (word, bound) in current ?? [])
+        {
+            var line = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 0, 2),
+            };
+            line.Children.Add(new TextBlock
+            {
+                Text = DescribeBinding(word, bound),
+                Style = (Style)FindResource("Text.Meta"),
+                VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 300,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = DescribeBinding(word, bound),
+                Margin = new Thickness(0, 0, 8, 0),
+            });
+            var drop = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = S("Забыть"),
+            };
+            var forgotten = word;
+            drop.Click += async (_, _) =>
+            {
+                var left = new JsonObject();
+                foreach (var (other, value) in current ?? [])
+                    if (other != forgotten)
+                        left[other] = value?.DeepClone();
+                await SaveAsync(key, left);
+            };
+            line.Children.Add(drop);
+            stack.Children.Add(line);
+        }
+
         var row = new StackPanel
         {
             Orientation = Orientation.Horizontal,
             HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 4, 0, 0),
         };
         row.Children.Add(new TextBlock
         {
@@ -631,7 +784,30 @@ public partial class SettingsPage : UserControl
         };
         forget.Click += async (_, _) => await SaveAsync(key, new JsonObject());
         row.Children.Add(forget);
-        return row;
+        stack.Children.Add(row);
+        return stack;
+    }
+
+    /// <summary>
+    /// «слово → чему привязано» человеческими словами.
+    /// </summary>
+    /// <remarks>
+    /// У выученной программы хранится не только путь, но и имя — его и
+    /// показываем: путь длиной в сто знаков не отвечает на вопрос, что это
+    /// за программа. Сочетание действий хранит строку и показывается как
+    /// есть.
+    /// </remarks>
+    private static string DescribeBinding(string word, JsonNode? bound)
+    {
+        var named = bound switch
+        {
+            JsonObject entry =>
+                entry["name"]?.GetValue<string>()
+                ?? entry["path"]?.GetValue<string>() ?? "",
+            null => "",
+            _ => bound.ToString(),
+        };
+        return named.Length > 0 ? $"«{word}» → {named}" : $"«{word}»";
     }
 
     /// <summary>

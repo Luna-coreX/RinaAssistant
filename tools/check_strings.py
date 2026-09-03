@@ -51,7 +51,7 @@ NOT_UI = "// не интерфейс"
 RUS = re.compile(r"[А-Яа-яЁё]")
 #: `S(...)` переводит здесь, `Word(...)` помечает строку для перевода
 #: в другом месте — обе формы одинаково законны и обе дают ключ.
-CALL = re.compile(r'\b(?:S|Word)\(\s*"([^"]*)"')
+CALL = re.compile(r'\b(?:S|Word)\(\s*@?"([^"]*)"')
 XAML_CALL = re.compile(r"\{loc:S '([^']*)'\}")
 CS_LITERAL = re.compile(r'"([^"\n]*[А-Яа-яЁё][^"\n]*)"')
 XAML_ATTR = re.compile(r'\b(?:Text|Content|ToolTip|Title)="([^"{}]*[А-Яа-яЁё][^"{}]*)"')

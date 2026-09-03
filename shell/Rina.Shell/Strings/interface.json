@@ -35,6 +35,9 @@
   "Адрес модели": {
     "English": "Model address"
   },
+  "Адрес модели. Не локальный означает, что разговоры уйдут наружу": {
+    "English": "Model address. Non-local means conversations leave this machine"
+  },
   "Акцент": {
     "English": "Accent"
   },
@@ -43,6 +46,9 @@
     "Українська": "Будильник",
     "Español": "Alarma",
     "Deutsch": "Wecker"
+  },
+  "Быстрее ста — торопится, медленнее — растягивает": {
+    "English": "Above 100 she hurries, below she drawls"
   },
   "В файле не список команд.": {
     "English": "The file isn’t a list of commands."
@@ -65,6 +71,9 @@
     "Español": "Escuchar siempre",
     "Deutsch": "Immer zuhören"
   },
+  "Вся поверхность целиком: цвета проверены парами": {
+    "English": "The whole surface: colours verified in pairs"
+  },
   "Выберите файл модели": {
     "English": "Choose the model file"
   },
@@ -86,6 +95,9 @@
   "Выученные соответствия": {
     "English": "Learned matches"
   },
+  "Где искать, когда Рина не поняла команду": {
+    "English": "Where to search when Rina didn’t understand"
+  },
   "Где лежит модель": {
     "English": "Where the model lives"
   },
@@ -94,6 +106,9 @@
     "Українська": "Голос",
     "Español": "Voz",
     "Deutsch": "Stimme"
+  },
+  "Голоса зависят от выбранной системы синтеза": {
+    "English": "Voices depend on the chosen synthesis engine"
   },
   "Готово": {
     "English": "Done"
@@ -146,11 +161,20 @@
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
+  "Жду": {
+    "English": "Waiting"
+  },
   "ЗАПЛАНИРОВАНО": {
     "English": "SCHEDULED"
   },
   "ЗАПЛАНИРОВАНО · {0}": {
     "English": "SCHEDULED · {0}"
+  },
+  "Забыть": {
+    "English": "Forget",
+    "Українська": "Забути",
+    "Español": "Olvidar",
+    "Deutsch": "Vergessen"
   },
   "Забыть все": {
     "English": "Forget all",
@@ -161,17 +185,26 @@
   "Закрыть": {
     "English": "Close"
   },
+  "Записать": {
+    "English": "Record"
+  },
   "Записывать тексты реплик": {
     "English": "Log message texts",
     "Українська": "Записувати тексти реплік",
     "Español": "Registrar el texto de los mensajes",
     "Deutsch": "Nachrichtentexte protokollieren"
   },
+  "Записывать тексты реплик в журнал. По умолчанию выключено": {
+    "English": "Write reply texts to the log. Off by default"
+  },
   "Запуск без подписи": {
     "English": "Launching without a signature"
   },
   "Запускать при входе в систему": {
     "English": "Start when you sign in"
+  },
+  "Запускаться сразу в трее, без окна": {
+    "English": "Start in the tray, without a window"
   },
   "Запустить один раз": {
     "English": "Run once"
@@ -194,6 +227,9 @@
     "Español": "Importar",
     "Deutsch": "Importieren"
   },
+  "Имя модели на этом сервере": {
+    "English": "Model name on that server"
+  },
   "Искать нераспознанное": {
     "English": "Search unrecognized commands"
   },
@@ -203,11 +239,17 @@
   "Источник: {0}": {
     "English": "Source: {0}"
   },
+  "Каким характером модель отвечает": {
+    "English": "What character the model answers with"
+  },
   "Какое действие": {
     "English": "Which action"
   },
   "Какой адрес открыть": {
     "English": "Which address to open"
+  },
+  "Какой микрофон слушать": {
+    "English": "Which microphone to listen to"
   },
   "Какую папку открыть": {
     "English": "Which folder to open"
@@ -229,6 +271,18 @@
   },
   "Комбинации действий": {
     "English": "Action shortcuts"
+  },
+  "Короткий сигнал, когда Рина услышала и когда ответила": {
+    "English": "A short sound when Rina hears you and when she answers"
+  },
+  "Крестик прячет окно, а не выходит из программы": {
+    "English": "The close button hides the window instead of quitting"
+  },
+  "Крупнее — точнее и медленнее": {
+    "English": "Larger is more accurate and slower"
+  },
+  "Куда говорить": {
+    "English": "Where to speak"
   },
   "МОИ КОМАНДЫ": {
     "English": "MY COMMANDS"
@@ -284,6 +338,12 @@
   "Напомню {0}": {
     "English": "I’ll remind you {0}"
   },
+  "Насколько громко Рина говорит": {
+    "English": "How loudly Rina speaks"
+  },
+  "Насколько подробен журнал": {
+    "English": "How detailed the log is"
+  },
   "Настройки": {
     "English": "Settings",
     "Українська": "Налаштування",
@@ -295,6 +355,12 @@
   },
   "Не прочиталось: {0}": {
     "English": "Couldn’t read it: {0}"
+  },
+  "Непонятое уходит в поиск, а не остаётся без ответа": {
+    "English": "What isn’t understood goes to search instead of nowhere"
+  },
+  "Ниже — откликается чаще, но и на чужое тоже": {
+    "English": "Lower means she responds more often — to other things too"
   },
   "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
     "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
@@ -347,6 +413,9 @@
   "Отвечать моделью": {
     "English": "Answer with a model"
   },
+  "Отвечать языковой моделью, когда команда не распознана": {
+    "English": "Answer with a language model when a command isn’t recognised"
+  },
   "Отделка": {
     "English": "Finish"
   },
@@ -379,6 +448,9 @@
   },
   "ПРАВКА КОМАНДЫ": {
     "English": "EDITING A COMMAND"
+  },
+  "Папка с распакованной моделью Vosk": {
+    "English": "Folder with the unpacked Vosk model"
   },
   "Плавающая строка команд": {
     "English": "Floating command bar",
@@ -424,6 +496,9 @@
   },
   "Показать": {
     "English": "Show"
+  },
+  "Показать окно и начать слушать": {
+    "English": "Show the window and start listening"
   },
   "Показывать ответы, когда окно скрыто": {
     "English": "Show answers when the window is hidden"
@@ -479,6 +554,15 @@
     "Español": "Rina",
     "Deutsch": "Rina"
   },
+  "Рина будет запускаться сама при входе в систему": {
+    "English": "Rina will start by herself when you sign in"
+  },
+  "Рина скажет это вместо «Готово»": {
+    "English": "Rina will say this instead of “Done”"
+  },
+  "С этих слов начинается обращение к Рине": {
+    "English": "Words that start an address to Rina"
+  },
   "Сбросить все": {
     "English": "Reset all"
   },
@@ -500,8 +584,14 @@
   "Система синтеза": {
     "English": "Synthesis engine"
   },
+  "Сколько ждать ответа, прежде чем сдаться": {
+    "English": "How long to wait for an answer before giving up"
+  },
   "Сколько ждать ответа, секунд": {
     "English": "How long to wait for an answer, seconds"
+  },
+  "Сколько ждать фразу после обращения": {
+    "English": "How long to wait for the phrase after being addressed"
   },
   "Скорость речи": {
     "English": "Speech rate",
@@ -529,6 +619,9 @@
     "Українська": "Зберігати історію",
     "Español": "Guardar historial",
     "Deutsch": "Verlauf speichern"
+  },
+  "Сочетания, назначенные отдельным действиям": {
+    "English": "Combinations assigned to individual actions"
   },
   "Таймер": {
     "English": "Timer",
@@ -572,14 +665,29 @@
   "Устройство по умолчанию": {
     "English": "Default device"
   },
+  "Файл модели .onnx": {
+    "English": "The .onnx model file"
+  },
   "Фразы, по которым сработает": {
     "English": "Phrases that trigger it"
   },
   "Характер": {
     "English": "Persona"
   },
+  "Хранить переписку между запусками": {
+    "English": "Keep the conversation between runs"
+  },
   "Цвет, которым Рина выделяет важное": {
     "English": "The colour Rina highlights with"
+  },
+  "Чем Рина говорит. Офлайновые работают без интернета": {
+    "English": "How Rina speaks. Offline engines work without the internet"
+  },
+  "Чем Рина слышит. Без него команды только с клавиатуры": {
+    "English": "How Rina hears. Without it, commands are typed only"
+  },
+  "Что Рина запомнила: какое слово какую программу означает": {
+    "English": "What Rina learned: which word means which program"
   },
   "Что ответить (необязательно)": {
     "English": "What to answer (optional)"
@@ -638,6 +746,9 @@
   "Язык интерфейса": {
     "English": "Interface language"
   },
+  "Язык подписей в окне": {
+    "English": "Language of the labels in the window"
+  },
   "без имени": {
     "English": "unnamed"
   },
@@ -662,8 +773,29 @@
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
   },
+  "нажмите сочетание…": {
+    "English": "press a combination…"
+  },
+  "например, C:\\Program Files\\App\\app.exe": {
+    "English": "for example, C:\\Program Files\\App\\app.exe"
+  },
+  "например, D:\\Проекты": {
+    "English": "for example, D:\\Projects"
+  },
+  "например, github.com": {
+    "English": "for example, github.com"
+  },
+  "например, «открой почту»": {
+    "English": "for example, “open mail”"
+  },
+  "не назначено": {
+    "English": "not set"
+  },
   "не разобрал сочетание «{0}»": {
     "English": "couldn’t parse the shortcut “{0}”"
+  },
+  "нужен Ctrl, Alt, Shift или Win": {
+    "English": "needs Ctrl, Alt, Shift or Win"
   },
   "о программе": {
     "English": "about"
@@ -683,6 +815,9 @@
   "сейчас": {
     "English": "now"
   },
+  "такое сочетание не подойдёт": {
+    "English": "that combination won’t work"
+  },
   "через 15 минут": {
     "English": "in 15 minutes"
   },
@@ -697,6 +832,12 @@
   },
   "через час": {
     "English": "in an hour"
+  },
+  "что открыть или произнести": {
+    "English": "what to open or say"
+  },
+  "что произнести": {
+    "English": "what to say"
   },
   "ядро запускается": {
     "English": "the core is starting"

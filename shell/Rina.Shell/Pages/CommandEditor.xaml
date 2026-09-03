@@ -1,7 +1,8 @@
 <UserControl x:Class="Rina.Shell.Pages.CommandEditor"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+             xmlns:loc="clr-namespace:Rina.Shell.Strings"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles">
   <Border Style="{StaticResource Card}" Margin="0,0,0,12">
     <StackPanel>
       <TextBlock x:Name="Legend" Text="{loc:S 'НОВАЯ КОМАНДА'}"
@@ -13,7 +14,8 @@
                  Style="{StaticResource Text.Body}" />
       <StackPanel x:Name="Phrases" Margin="0,6,0,0" />
       <StackPanel Orientation="Horizontal" Margin="0,6,0,12">
-        <TextBox x:Name="NewTrigger" Style="{StaticResource Field}" Width="260" />
+        <TextBox x:Name="NewTrigger" Style="{StaticResource Field}" Width="260"
+                 ui:Ui.Hint="{loc:S 'например, «открой почту»'}" />
         <Button Style="{StaticResource Btn}" Content="{loc:S 'Добавить фразу'}"
                 Margin="8,0,0,0" Click="OnAddTrigger" />
       </StackPanel>
@@ -35,7 +37,8 @@
         <TextBlock x:Name="TargetLabel" Text="{loc:S 'Что открыть'}"
                    Style="{StaticResource Text.Body}" Margin="0,0,0,6" />
         <StackPanel Orientation="Horizontal">
-          <TextBox x:Name="Target" Style="{StaticResource Field}" Width="260" />
+          <TextBox x:Name="Target" Style="{StaticResource Field}" Width="260"
+                   x:FieldModifier="private" />
           <Button x:Name="Browse" Style="{StaticResource Btn}"
                   Content="{loc:S 'Обзор…'}" Margin="8,0,0,0"
                   Click="OnBrowse" />
@@ -64,7 +67,8 @@
               <ComboBox x:Name="StepKind" Style="{StaticResource Choice}"
                         Width="220" SelectionChanged="OnStepKindChanged" />
               <TextBox x:Name="StepTarget" Style="{StaticResource Field}"
-                       Width="240" Margin="8,0,0,0" />
+                       Width="240" Margin="8,0,0,0"
+                       ui:Ui.Hint="{loc:S 'что открыть или произнести'}" />
               <ComboBox x:Name="StepAction" Style="{StaticResource Choice}"
                         Width="240" Margin="8,0,0,0"
                         Visibility="Collapsed" />
@@ -85,7 +89,8 @@
       <TextBlock Text="{loc:S 'Что ответить (необязательно)'}"
                  Style="{StaticResource Text.Body}" Margin="0,0,0,6" />
       <TextBox x:Name="Response" Style="{StaticResource Field}" Width="380"
-               HorizontalAlignment="Left" Margin="0,0,0,12" />
+               HorizontalAlignment="Left" Margin="0,0,0,12"
+               ui:Ui.Hint="{loc:S 'Рина скажет это вместо «Готово»'}" />
 
       <StackPanel Orientation="Horizontal">
         <Button Style="{StaticResource Btn.Primary}"

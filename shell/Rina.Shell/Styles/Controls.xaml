@@ -11,6 +11,7 @@
   не существует.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:ui="clr-namespace:Rina.Shell.Styles"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <Style x:Key="Btn" TargetType="Button">
@@ -162,9 +163,31 @@
           <Border x:Name="Well" Background="{TemplateBinding Background}"
                   CornerRadius="{StaticResource Radius.Max}"
                   Padding="{TemplateBinding Padding}">
-            <ScrollViewer x:Name="PART_ContentHost" VerticalAlignment="Center" />
+            <Grid>
+              <!-- Подсказка под содержимым: она гаснет, как только в поле
+                   появляется текст, и никогда не становится значением. -->
+              <TextBlock x:Name="Hint" VerticalAlignment="Center"
+                         IsHitTestVisible="False"
+                         Foreground="{DynamicResource C.InkFaint}"
+                         FontFamily="{StaticResource Font.Ui}"
+                         FontSize="{StaticResource Type.Value.Size}"
+                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding Path=(ui:Ui.Hint),
+                                RelativeSource={RelativeSource TemplatedParent}}"
+                         Visibility="Collapsed" />
+              <ScrollViewer x:Name="PART_ContentHost"
+                            VerticalAlignment="Center" />
+            </Grid>
           </Border>
           <ControlTemplate.Triggers>
+            <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding Text.Length,
+                           RelativeSource={RelativeSource Self}}" Value="0" />
+              </MultiDataTrigger.Conditions>
+              <Setter TargetName="Hint" Property="Visibility"
+                      Value="Visible" />
+            </MultiDataTrigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="Well" Property="BorderBrush"
                       Value="{DynamicResource C.Signal}" />
@@ -214,6 +237,74 @@
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground"
                       Value="{DynamicResource C.InkFaint}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    Ползунок.
+
+    Заводится там, где ядро назвало **обе** границы: «громкость от нуля до
+    ста» — это приглашение тянуть, а не набирать. Правило общее, а не
+    список ключей: настройка, у которой появятся границы, получит ползунок
+    сама, и никто не забудет её сюда вписать.
+
+    Значение показано рядом всегда. Ползунок без числа отвечает на вопрос
+    «примерно сколько», а на «ровно сколько» не отвечает — и человек,
+    которому надо выставить восемьдесят, обречён возить мышью.
+  -->
+  <Style x:Key="Slide" TargetType="Slider">
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="IsMoveToPointEnabled" Value="True" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid VerticalAlignment="Center">
+            <!-- Дорожка утоплена, пройденное — акцентом: «сколько уже» и
+                 «сколько всего» должны различаться без подписи. -->
+            <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                    Background="{DynamicResource C.FaceSunk}" />
+            <Border x:Name="PART_SelectionRange" Height="4" CornerRadius="2"
+                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Background="{DynamicResource C.Signal}" />
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="Slider.DecreaseLarge"
+                              Opacity="0" Focusable="False" />
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="Slider.IncreaseLarge"
+                              Opacity="0" Focusable="False" />
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Width="16" Height="16">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Ellipse x:Name="Grip"
+                               Fill="{DynamicResource C.Ink}" />
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Grip" Property="Fill"
+                                  Value="{DynamicResource C.Signal}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                          <Setter TargetName="Grip" Property="Fill"
+                                  Value="{DynamicResource C.Signal}" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.5" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
