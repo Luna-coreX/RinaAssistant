@@ -92,6 +92,10 @@
   <Duration x:Key="Motion.Panel">0:0:0.220</Duration>
   <Duration x:Key="Motion.Afterglow">0:0:1.000</Duration>
 
+  <!-- Смягчение: cubic-bezier(0.2, 0, 0, 1) для появления, cubic-bezier(0.4, 0, 1, 1) для затухания -->
+  <CubicEase x:Key="Ease.In" EasingMode="EaseOut" />
+  <CubicEase x:Key="Ease.Out" EasingMode="EaseIn" />
+
   <!-- Штриховка опасного (§6): единственный признак необратимого -->
   <sys:Double x:Key="Hatch.Angle">45</sys:Double>
   <sys:Double x:Key="Hatch.Line">2</sys:Double>

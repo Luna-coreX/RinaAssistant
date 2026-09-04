@@ -127,6 +127,20 @@ public partial class MainWindow : Window
         _section = section;
         Pane.Content = build();
 
+        // Переход между разделами — 220 мс (SYSTEM §7). Появление, а не
+        // «выезд»: движение обязано отвечать на вопрос «что изменилось»,
+        // и здесь изменилось содержимое, а не его положение. Панель
+        // прибора не ездит.
+        Pane.Opacity = 0;
+        Pane.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                To = 1,
+                Duration = (Duration)FindResource("Motion.Panel"),
+                EasingFunction = (System.Windows.Media.Animation.IEasingFunction)
+                    FindResource("Ease.In"),
+            });
+
         foreach (var child in Sections.Children.OfType<RadioButton>())
             if ((string?)child.Tag == section && child.IsChecked != true)
                 child.IsChecked = true;
@@ -215,11 +229,57 @@ public partial class MainWindow : Window
         // принадлежит прибору целиком, а не разделу: полоса уровня и то,
         // что видно поверх экрана.
         if (message.Method is "listening.capturing")
-            Level.Width = message.Payload["active"]?.GetValue<bool>() == true
-                ? ActualWidth * 0.4 : 0;
+            ShowLevel(message.Payload["active"]?.GetValue<bool>() == true
+                      ? 0.4f : 0f);
 
         Overlay(message);
     }
+
+    /// <summary>
+    /// Показать уровень микрофона с послесвечением.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Подпись направления, а не украшение</b> (`DIRECTION` §4). Полоса
+    /// не переключается между «выключено» и «включено»: после услышанной
+    /// фразы след гаснет примерно за секунду, и по панели видно не только
+    /// то, что Рина слушает <i>сейчас</i>, но и то, что она только что
+    /// слышала. Мгновенное переключение — прямое «не в стиле» по
+    /// двенадцати вопросам §6, и до этой правки полоса именно скакала.
+    /// </para>
+    /// <para>
+    /// <b>Вверх — быстро, вниз — медленно.</b> Рост показывает то, что
+    /// происходит сейчас, и опаздывать ему нельзя; спад показывает то, что
+    /// уже прошло, и торопиться ему некуда. Одна длительность на оба
+    /// направления дала бы либо вялую реакцию, либо мигание.
+    /// </para>
+    /// </remarks>
+    public void ShowLevel(float level)
+    {
+        var wanted = Math.Clamp(level, 0f, 1f) * ActualWidth;
+        var now = Level.ActualWidth;
+
+        // Рост — отклик на нажатие по длительности: полоса и есть
+        // микрофон, и её движение вверх это то же «сейчас», что у кнопки.
+        var rising = wanted > now;
+        var span = rising ? (Duration)FindResource("Motion.Press")
+                          : (Duration)FindResource("Motion.Afterglow");
+
+        var glide = new global::System.Windows.Media.Animation.DoubleAnimation
+        {
+            To = wanted,
+            Duration = span,
+            EasingFunction = (global::System.Windows.Media.Animation.IEasingFunction)
+                FindResource(rising ? "Ease.In" : "Ease.Out"),
+            FillBehavior = global::System.Windows.Media.Animation
+                .FillBehavior.HoldEnd,
+        };
+        Level.BeginAnimation(WidthProperty, glide);
+        LevelShown = level;
+    }
+
+    /// <summary>Какой уровень показан последним — для сквозной проверки.</summary>
+    public float LevelShown { get; private set; }
 
     /// <summary>Что видно поверх экрана: реплика и плашка «слушаю».</summary>
     public Overlays.Toast? Toast { get; set; }

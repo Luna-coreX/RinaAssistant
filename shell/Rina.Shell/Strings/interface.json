@@ -422,6 +422,9 @@
   "Настройки сброшены.": {
     "English": "Settings have been reset."
   },
+  "Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново.": {
+    "English": "Settings live in the core, and there is no link to it right now. The shell is trying to bring it back up."
+  },
   "Настройки, история, команды": {
     "English": "Settings, history, commands"
   },
@@ -898,9 +901,6 @@
   },
   "Ядро не на связи": {
     "English": "Core not connected"
-  },
-  "Ядро не на связи — настройки недоступны.": {
-    "English": "The core is offline — settings are unavailable."
   },
   "Ядро не объявило возможность «плагины».": {
     "English": "The core didn’t declare the “plugins” capability."

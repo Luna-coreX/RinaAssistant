@@ -27,27 +27,85 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Border x:Name="Face" Background="{TemplateBinding Background}"
-                  CornerRadius="{StaticResource Radius.Max}"
-                  Padding="{TemplateBinding Padding}">
-            <ContentPresenter HorizontalAlignment="Center"
-                              VerticalAlignment="Center" />
-          </Border>
+          <Grid>
+            <!--
+              Слой подсветки поверх лица. Анимируется его прозрачность, а
+              не цвет кисти: кисти из словаря общие и заморожены, и
+              анимация цвета уронила бы приложение на первом наведении.
+            -->
+            <Border x:Name="Face" Background="{TemplateBinding Background}"
+                    CornerRadius="{StaticResource Radius.Max}" />
+            <Border x:Name="Warm" Opacity="0"
+                    Background="{DynamicResource C.FaceHigh}"
+                    CornerRadius="{StaticResource Radius.Max}" />
+            <Border x:Name="Sunk" Opacity="0"
+                    Background="{DynamicResource C.FaceLow}"
+                    CornerRadius="{StaticResource Radius.Max}" />
+            <Border x:Name="Ring" BorderThickness="0"
+                    CornerRadius="{StaticResource Radius.Max}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+            </Border>
+          </Grid>
           <ControlTemplate.Triggers>
+            <!-- Наведение — смена состояния: 160 мс (SYSTEM §7). -->
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Face" Property="Background"
-                      Value="{DynamicResource C.FaceHigh}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
+            <!-- Нажатие — отклик: 90 мс. Быстрее наведения нарочно: палец
+                 уже нажал, и ждать от прибора нечего. -->
             <Trigger Property="IsPressed" Value="True">
-              <Setter TargetName="Face" Property="Background"
-                      Value="{DynamicResource C.FaceLow}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Sunk"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Sunk"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <!-- Фокус рамкой, а не подсветкой фона: пользователь клавиатуры
                  должен видеть, где он, не гадая, выделено это или наведено. -->
             <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Face" Property="BorderBrush"
+              <Setter TargetName="Ring" Property="BorderBrush"
                       Value="{DynamicResource C.Signal}" />
-              <Setter TargetName="Face" Property="BorderThickness" Value="2" />
+              <Setter TargetName="Ring" Property="BorderThickness" Value="2" />
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
@@ -124,14 +182,38 @@
               <ColumnDefinition Width="2" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
+            <!-- Подсветка наведения — отдельным слоем: цвет общей кисти
+                 анимировать нельзя, она заморожена. -->
+            <Border x:Name="Warm" Grid.ColumnSpan="2" Opacity="0"
+                    Background="{DynamicResource C.FaceHigh}" />
             <Rectangle x:Name="Mark" Grid.Column="0" Fill="Transparent" />
             <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
                               Margin="14,0,0,0" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Row" Property="Background"
-                      Value="{DynamicResource C.FaceHigh}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsChecked" Value="True">
               <Setter TargetName="Row" Property="Background"
@@ -409,26 +491,71 @@
                  телефона; у приборов углы тугие, и предел радиуса — 3
                  (DIRECTION §2). Заодно так он честнее: это переключатель
                  на панели, а не мягкий значок в списке. -->
-            <Border x:Name="Track" Width="40" Height="22"
-                    CornerRadius="{StaticResource Radius.Max}"
-                    Background="{DynamicResource C.FaceSunk}"
-                    VerticalAlignment="Center">
+            <Grid Width="40" Height="22" VerticalAlignment="Center">
+              <Border x:Name="Track"
+                      CornerRadius="{StaticResource Radius.Max}"
+                      Background="{DynamicResource C.FaceSunk}" />
+              <!-- Включённое положение — отдельным слоем поверх: цвет
+                   общей кисти анимировать нельзя, она заморожена. -->
+              <Border x:Name="On" Opacity="0"
+                      CornerRadius="{StaticResource Radius.Max}"
+                      Background="{DynamicResource C.Signal}" />
+              <!--
+                Бегунок ездит сдвигом, а не сменой выравнивания:
+                выравнивание переключается мгновенно, а состояние в системе
+                меняется за 160 мс (SYSTEM §7). Тумблер, у которого
+                бегунок телепортируется, читается как картинка, а не как
+                орган управления.
+              -->
               <Border x:Name="Knob" Width="14" Height="14"
                       CornerRadius="{StaticResource Radius.Tight}"
                       HorizontalAlignment="Left" Margin="4,0,0,0"
-                      Background="{DynamicResource C.InkFaint}" />
-            </Border>
+                      Background="{DynamicResource C.InkFaint}">
+                <Border.RenderTransform>
+                  <TranslateTransform x:Name="Shift" X="0" />
+                </Border.RenderTransform>
+              </Border>
+            </Grid>
             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
           </StackPanel>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Track" Property="Background"
-                      Value="{DynamicResource C.Signal}" />
-              <Setter TargetName="Knob" Property="HorizontalAlignment"
-                      Value="Right" />
-              <Setter TargetName="Knob" Property="Margin" Value="0,0,4,0" />
               <Setter TargetName="Knob" Property="Background"
                       Value="{DynamicResource C.FaceHigh}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <!-- 40 ширина дорожки − 14 бегунок − 4 отступ слева
+                         − 4 справа = 18 точек хода. -->
+                    <DoubleAnimation Storyboard.TargetName="Shift"
+                                     Storyboard.TargetProperty="X"
+                                     To="18"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                    <DoubleAnimation Storyboard.TargetName="On"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Shift"
+                                     Storyboard.TargetProperty="X"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <DoubleAnimation Storyboard.TargetName="On"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

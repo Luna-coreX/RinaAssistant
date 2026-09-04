@@ -193,6 +193,33 @@ check("состояние гаснет, а не переключается",
       tokens["motion"]["afterglow"] >= 500,
       f"| {tokens['motion']['afterglow']} мс")
 
+# --- движение объявлено и **применено** -------------------------------------
+#
+# Токен, которым никто не пользуется, — это намерение, а не решение.
+# Система движения (SYSTEM §7) была порождена в `Motion.*` и не
+# использовалась нигде: состояния переключались мгновенно, а полоса уровня
+# скакала между нулём и сорока процентами. Двенадцать вопросов направления
+# называют это прямым «не в стиле», и проверка на токены его не поймала —
+# значение-то в файле было.
+SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
+used = []
+for base, dirs, files in os.walk(SHELL):
+    dirs[:] = [d for d in dirs if d not in ("obj", "bin", "Generated")]
+    for name in files:
+        if name.endswith((".xaml", ".cs")):
+            used.append(read(os.path.join(base, name)))
+code = chr(10).join(used)
+
+for name in ("Press", "State", "Panel", "Afterglow"):
+    applied = f"Motion.{name}" in code
+    check(f"длительность {name} применена, а не только объявлена", applied,
+          "" if applied else "| токен без применения — намерение, а не решение")
+
+on_strip = "Motion.Afterglow" in read(os.path.join(SHELL, "MainWindow.xaml.cs"))
+check("послесвечение висит на полосе уровня", on_strip,
+      "" if on_strip else "| «полоса не переключается между выключено и "
+                          "включено» (DIRECTION §4)")
+
 # просвет вокруг опасного вдвое больше обычного
 check("опасное отделено пустотой",
       tokens["space"]["danger"] >= tokens["space"]["between"] * 2,

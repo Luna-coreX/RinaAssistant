@@ -139,6 +139,10 @@ public sealed class CoreLink : IAsyncDisposable
         _speaker = new Audio.Speaker();
         _voice = new Audio.AudioLink(connection, connection.Data,
                                      new Audio.Microphone(), _speaker);
+
+        // Полоса показывает настоящий уровень, а не одно и то же число:
+        // прибор, у которого стрелка знает два положения, — это лампочка.
+        _voice.Level += level => OnUi(() => _window.ShowLevel(level));
         _ = ApplyAudioSettingsAsync();
     }
 

@@ -749,6 +749,11 @@ public static partial class Loc
                 {
                     ["English"] = "Settings have been reset.",
                 },
+            ["Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings live in the core, and there is no link to it right now. The shell is trying to bring it back up.",
+                },
             ["Настройки, история, команды"] =
                 new Dictionary<string, string>
                 {
@@ -1646,11 +1651,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Core not connected",
-                },
-            ["Ядро не на связи — настройки недоступны."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The core is offline — settings are unavailable.",
                 },
             ["Ядро не объявило возможность «плагины»."] =
                 new Dictionary<string, string>

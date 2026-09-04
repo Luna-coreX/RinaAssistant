@@ -108,7 +108,14 @@ public partial class SettingsPage : UserControl
 
         if (_link is null)
         {
-            Note.Text = S("Ядро не на связи — настройки недоступны.");
+            // Не строкой в подвале: пустая страница с примечанием внизу
+            // читается как «ещё грузится», а не как «нечего показать».
+            Empty.Content = EmptyState.For(
+                S("Ядро не на связи"),
+                S("Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."));
+            Empty.Visibility = Visibility.Visible;
+            Scroll.Visibility = Visibility.Collapsed;
+            Bottom.Visibility = Visibility.Collapsed;
             return;
         }
         Loaded += async (_, _) => await LoadAsync();

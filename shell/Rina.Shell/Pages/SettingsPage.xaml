@@ -17,6 +17,8 @@
     <TextBlock Grid.Row="0" Text="{loc:S 'Настройки'}"
                Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
 
+    <ContentControl x:Name="Empty" Grid.Row="1" Visibility="Collapsed" />
+
     <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                   Padding="0,0,12,0">
       <StackPanel x:Name="Body" />

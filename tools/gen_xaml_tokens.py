@@ -129,6 +129,20 @@ def common_xaml(tokens: dict) -> str:
         lines.append(f'  <Duration x:Key="Motion.{key(name)}">'
                      f'0:0:{value / 1000:.3f}</Duration>')
 
+    # Смягчения — тоже токен, а не число, набранное в каждом стиле. WPF
+    # не умеет cubic-bezier, поэтому кривые из токенов выражаются
+    # ближайшими штатными: «появление» — замедление к концу, «затухание» —
+    # ускорение. Замена честная по смыслу: у первой кривой ускорение в
+    # начале, у второй — в конце.
+    easing = motion.get("easing", {})
+    if easing:
+        lines.append("")
+        lines.append(f'  <!-- Смягчение: {easing.get("default", "")} '
+                     f'для появления, {easing.get("decay", "")} '
+                     f'для затухания -->')
+        lines.append('  <CubicEase x:Key="Ease.In" EasingMode="EaseOut" />')
+        lines.append('  <CubicEase x:Key="Ease.Out" EasingMode="EaseIn" />')
+
     lines.append("")
     lines.append("  <!-- Штриховка опасного (§6): единственный признак необратимого -->")
     lines.append(f'  <sys:Double x:Key="Hatch.Angle">{hatch["angle"]}</sys:Double>')
