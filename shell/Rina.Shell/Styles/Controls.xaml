@@ -638,11 +638,53 @@
     Строка внутри блока. Отделена от соседней волосяным швом — тем же
     средством, что и области панели, и никогда тенью.
   -->
+  <!--
+    Своя кисть каждой строке.
+
+    `x:Shared="False"` обязателен: значение из словаря иначе одно на всех,
+    и оно заморожено — анимировать его нельзя, а если бы было можно,
+    подсветилась бы разом вся таблица. Одна строка — одна кисть.
+  -->
+  <SolidColorBrush x:Key="Row.Warm" x:Shared="False" Opacity="0"
+                   Color="{DynamicResource Color.FaceLow}" />
+
   <Style x:Key="Rows.Item" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Row.Warm}" />
     <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />
     <Setter Property="BorderThickness" Value="0,0,0,1" />
     <Setter Property="Padding" Value="16,12" />
     <Setter Property="MinHeight" Value="{StaticResource Size.Row}" />
+    <Style.Triggers>
+      <!--
+        Наведение на строку — та же смена состояния, что у кнопки: 160 мс.
+        Строка списка не орган управления, но она **отзывается**, и по
+        отклику видно, к чему относятся кнопки справа. Без отклика
+        человек целится в кнопку, не понимая, какой строке она
+        принадлежит.
+      -->
+      <Trigger Property="IsMouseOver" Value="True">
+        <Trigger.EnterActions>
+          <BeginStoryboard>
+            <Storyboard>
+              <DoubleAnimation Storyboard.TargetProperty="Background.Opacity"
+                               To="1"
+                               Duration="{StaticResource Motion.State}"
+                               EasingFunction="{StaticResource Ease.In}" />
+            </Storyboard>
+          </BeginStoryboard>
+        </Trigger.EnterActions>
+        <Trigger.ExitActions>
+          <BeginStoryboard>
+            <Storyboard>
+              <DoubleAnimation Storyboard.TargetProperty="Background.Opacity"
+                               To="0"
+                               Duration="{StaticResource Motion.State}"
+                               EasingFunction="{StaticResource Ease.Out}" />
+            </Storyboard>
+          </BeginStoryboard>
+        </Trigger.ExitActions>
+      </Trigger>
+    </Style.Triggers>
   </Style>
 
   <Style x:Key="Card" TargetType="Border">

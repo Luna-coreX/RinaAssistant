@@ -80,6 +80,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-hover"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckHoverAsync(window);
+            return;
+        }
+
         if (args.Contains("--check-motion"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -761,6 +768,159 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetCursorPos(int x, int y);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out System.Drawing.Point point);
+
+    /// <summary>
+    /// Наводка на строку списка: подсвечена одна, и гаснет, когда ушли.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Курсор двигается по-настоящему: `IsMouseOver` только читается, его
+    /// выставляет попадание курсора, и ни снимком, ни вызовом метода это
+    /// не проверяется.
+    /// </para>
+    /// <para>
+    /// <b>И возвращается туда, где был.</b> Проверка не имеет права
+    /// оставить чужую мышь в углу экрана — то же правило, по которому
+    /// проверка автозапуска возвращает запись в реестре.
+    /// </para>
+    /// </remarks>
+    private async Task CheckHoverAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== движение: наводка на строку списка ===");
+        GetCursorPos(out var was);
+        try
+        {
+            window.Width = 940;
+            window.Height = 620;
+            window.WindowStartupLocation = WindowStartupLocation.Manual;
+            window.Left = 40;
+            window.Top = 40;
+            // Поверх всех и с фокусом: `Synchronize` определяет, над чем
+            // курсор, попаданием в **видимое** окно, и чужое окно сверху
+            // делало проверку то зелёной, то красной без единой правки.
+            window.Topmost = true;
+            window.Show();
+            window.Activate();
+
+            // Со своим ядром: страница команд без связи показывает «ядро
+            // не на связи» и ни одной строки — проверять было бы нечего.
+            var real = CoreLink.FindCore();
+            var link = new CoreLink(window, new Rina.Protocol.CoreLaunch(
+                real.Python,
+                Path.Combine(real.WorkingDirectory, "tools",
+                             "_core_sandboxed.py"),
+                real.WorkingDirectory));
+            window.Link = link;
+            await link.StartAsync();
+            for (var i = 0; i < 300
+                 && link.State != Rina.Protocol.CoreState.Ready; i++)
+                await Task.Delay(100);
+
+            window.ShowSectionFor("commands");
+            await Task.Delay(2000);
+
+            var rows = Rows(window).Take(2).ToArray();
+            Check("строки списка нашлись", rows.Length == 2,
+                  $"| {rows.Length}");
+            if (rows.Length < 2)
+            {
+                // Не `return`: режим живёт до явного завершения, и выход
+                // отсюда оставил бы окно висеть навсегда. Так и вышло с
+                // первой редакцией этой проверки.
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {fails}");
+                Environment.ExitCode = 1;
+                Shutdown();
+                return;
+            }
+
+            Check("у каждой строки своя кисть",
+                  !ReferenceEquals(rows[0].Background, rows[1].Background),
+                  "| общая подсветила бы всю таблицу разом");
+
+            await HoverAsync(rows[0]);
+            Check("наведённая строка подсветилась",
+                  Lit(rows[0]) > 0.5, $"| {Lit(rows[0]):0.00}");
+            Check("соседняя осталась тёмной",
+                  Lit(rows[1]) < 0.1, $"| {Lit(rows[1]):0.00}");
+
+            await HoverAsync(rows[1]);
+            Check("подсветка перешла на соседнюю",
+                  Lit(rows[1]) > 0.5 && Lit(rows[0]) < 0.1,
+                  $"| {Lit(rows[0]):0.00} → {Lit(rows[1]):0.00}");
+
+            SetCursorPos((int)window.Left + 20, (int)window.Top + 600);
+            await Task.Delay(500);
+            Check("ушли — погасло", Lit(rows[1]) < 0.1,
+                  $"| {Lit(rows[1]):0.00}");
+        }
+        finally
+        {
+            SetCursorPos(was.X, was.Y);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>Насколько строка подсвечена сейчас.</summary>
+    private static double Lit(System.Windows.Controls.Border row)
+        => (row.Background as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
+
+    /// <summary>Навести курсор в середину строки и дать движению пройти.</summary>
+    private static async Task HoverAsync(System.Windows.Controls.Border row)
+    {
+        var middle = row.PointToScreen(new Point(row.ActualWidth / 2,
+                                                 row.ActualHeight / 2));
+        SetCursorPos((int)middle.X, (int)middle.Y);
+
+        // Одного `SetCursorPos` мало: WPF узнаёт о положении курсора из
+        // сообщений ввода, а телепортация их не порождает — окно так и
+        // считало, что мышь не над ним. `Synchronize` заставляет заново
+        // определить, над чем курсор сейчас.
+        System.Windows.Input.Mouse.Synchronize();
+        await Task.Delay(500);
+    }
+
+    /// <summary>Строки списка в порядке появления.</summary>
+    private static IEnumerable<System.Windows.Controls.Border> Rows(
+        DependencyObject root)
+    {
+        var style = Application.Current.TryFindResource("Rows.Item") as Style;
+        foreach (var child in Children(root))
+        {
+            if (child is System.Windows.Controls.Border border
+                && ReferenceEquals(border.Style, style))
+                yield return border;
+            foreach (var deeper in Rows(child)) yield return deeper;
+        }
+    }
+
+    private static IEnumerable<DependencyObject> Children(DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+            yield return System.Windows.Media.VisualTreeHelper.GetChild(root, i);
     }
 
     /// <summary>
