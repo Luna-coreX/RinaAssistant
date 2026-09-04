@@ -49,6 +49,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        Pane.RenderTransform = _paneRise;
 
         // Страницы заводятся отложенно: раздел, на который не заходили, не
         // должен ничего строить. Это же и место, куда F04 подставит
@@ -131,20 +132,53 @@ public partial class MainWindow : Window
         // «выезд»: движение обязано отвечать на вопрос «что изменилось»,
         // и здесь изменилось содержимое, а не его положение. Панель
         // прибора не ездит.
-        Pane.Opacity = 0;
+        // `From` указан нарочно. Без него анимация начинается с текущего
+        // значения свойства — а его удерживает **предыдущая** анимация,
+        // завершившаяся на единице (`HoldEnd`). Присвоение `Opacity = 0`
+        // меняет базовое значение, которое удерживаемая анимация
+        // перебивает, и потому дипа не происходило: первый переход после
+        // запуска был виден, все следующие — нет.
+        var span = (Duration)FindResource("Motion.Panel");
+        var ease = (System.Windows.Media.Animation.IEasingFunction)
+            FindResource("Ease.In");
+
         Pane.BeginAnimation(OpacityProperty,
             new System.Windows.Media.Animation.DoubleAnimation
             {
+                From = 0,
                 To = 1,
-                Duration = (Duration)FindResource("Motion.Panel"),
-                EasingFunction = (System.Windows.Media.Animation.IEasingFunction)
-                    FindResource("Ease.In"),
+                Duration = span,
+                EasingFunction = ease,
+            });
+
+        // Одной прозрачности мало, чтобы переход **читался**. Кривая
+        // системы (`0.2, 0, 0, 1`) резко стартует: к трети времени панель
+        // уже на восемьдесят процентов видна, и глаз принимает это за
+        // мгновенную подмену. Небольшой подъём — шесть точек — говорит
+        // «содержимое пришло», не превращая панель в едущую карусель:
+        // движется содержимое раздела, а не сам прибор.
+        _paneRise.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 6,
+                To = 0,
+                Duration = span,
+                EasingFunction = ease,
             });
 
         foreach (var child in Sections.Children.OfType<RadioButton>())
             if ((string?)child.Tag == section && child.IsChecked != true)
                 child.IsChecked = true;
     }
+
+    /// <summary>Сдвиг, которым содержимое раздела «приходит».</summary>
+    private readonly System.Windows.Media.TranslateTransform _paneRise = new();
+
+    /// <summary>Прозрачность панели раздела — для проверки движения.</summary>
+    public double PaneOpacity => Pane.Opacity;
+
+    /// <summary>Насколько содержимое ещё не доехало — для проверки.</summary>
+    public double PaneRise => _paneRise.Y;
 
     /// <summary>Связь с ядром; ставится при запуске (<c>4.0-F07</c>, <c>F12</c>).</summary>
     public CoreLink? Link

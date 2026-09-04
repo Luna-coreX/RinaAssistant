@@ -80,6 +80,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-motion"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckMotionAsync(window);
+            return;
+        }
+
         if (args.Contains("--check-confirm"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -750,6 +757,74 @@ public partial class App
 
         window.Toast.Close();
         window.Plaque.Close();
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// Движение видно во времени, а не на снимке.
+    /// </summary>
+    private async Task CheckMotionAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== движение: переход между разделами ===");
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        await Task.Delay(400);
+
+        window.ShowSectionFor("commands");
+
+        // Меряем не мгновенно, а в середине хода. До первого такта часов
+        // анимации свойство отдаёт базовое значение, и мгновенное чтение
+        // показало бы единицу даже при исправной анимации — проверка
+        // соврала бы в обе стороны.
+        await Task.Delay(80);
+        var midway = window.PaneOpacity;
+        var rise = window.PaneRise;
+        Check("на середине перехода панель ещё проявляется",
+              midway is > 0.01 and < 0.95,
+              $"| прозрачность {midway:0.00}");
+        Check("и ещё не доехала", rise > 0.05, $"| осталось {rise:0.00} точек");
+
+        await Task.Delay(400);
+        var later = window.PaneOpacity;
+        Check("через 400 мс панель на месте", later > 0.99,
+              $"| прозрачность {later:0.00}");
+        Check("и доехала", Math.Abs(window.PaneRise) < 0.01,
+              $"| смещение {window.PaneRise:0.00}");
+
+        // Второй переход — отдельная проверка, и не для полноты. Анимация
+        // завершается с `HoldEnd`, то есть продолжает удерживать единицу
+        // после конца. Без явного `From` следующая начиналась бы с
+        // удерживаемого значения, и дипа не было бы: первый переход после
+        // запуска виден, все следующие — нет.
+        window.ShowSectionFor("reminders");
+        await Task.Delay(80);
+        var second = window.PaneOpacity;
+        Check("второй переход тоже проявляется",
+              second is > 0.01 and < 0.95,
+              $"| прозрачность {second:0.00}");
+
+        await Task.Delay(400);
+        window.ShowSectionFor("settings");
+        await Task.Delay(80);
+        var third = window.PaneOpacity;
+        Check("и третий", third is > 0.01 and < 0.95,
+              $"| прозрачность {third:0.00}");
+
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
