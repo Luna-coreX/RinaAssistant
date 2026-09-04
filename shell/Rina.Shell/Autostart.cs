@@ -3,27 +3,29 @@ using Microsoft.Win32;
 namespace Rina.Shell;
 
 /// <summary>
-/// Запуск при входе в систему.
+/// Starting when the user signs in.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F05</c>.
+/// Plan item <c>4.0-F05</c>.
 /// </para>
 /// <para>
-/// <b>Ветка текущего пользователя, а не машины.</b> `HKCU` не требует прав
-/// администратора и не касается других людей за этим компьютером: Рина —
-/// личный помощник, и заводить её всем сразу никто не просил.
+/// <b>The current user's branch, not the machine's.</b> `HKCU` needs no
+/// administrator rights and does not touch other people at this computer:
+/// Rina is a personal assistant, and nobody asked to set her up for
+/// everyone at once.
 /// </para>
 /// <para>
-/// <b>Своё имя записи, и чужих мы не трогаем.</b> Запись называется так же,
-/// как программа; всё остальное в этой ветке принадлежит другим программам,
-/// и перебирать её в поисках «похожего на нас» — способ однажды удалить
-/// чужое.
+/// <b>Our own entry name, and we do not touch anyone else's.</b> The entry
+/// is named after the program; everything else in that branch belongs to
+/// other programs, and sifting through it looking for "something like us"
+/// is a way to one day delete someone else's.
 /// </para>
 /// <para>
-/// Настройка живёт в ядре (`autostart`), а исполняет её оболочка: реестр —
-/// система, а системный слой в 4.0 принадлежит оболочке. Ядро хранит
-/// намерение, оболочка приводит систему в соответствие.
+/// The setting lives in the core (`autostart`) and the shell carries it
+/// out: the registry is the system, and the system layer in 4.0 belongs to
+/// the shell. The core keeps the intent, the shell brings the system into
+/// line with it.
 /// </para>
 /// </remarks>
 public static class Autostart
@@ -32,7 +34,7 @@ public static class Autostart
         @"Software\Microsoft\Windows\CurrentVersion\Run";
     private const string Name = "RinaAssistant";
 
-    /// <summary>Стоит ли запись сейчас.</summary>
+    /// <summary>Whether the entry is there right now.</summary>
     public static bool Enabled
     {
         get
@@ -49,19 +51,20 @@ public static class Autostart
         }
     }
 
-    /// <summary>Что именно будет запущено.</summary>
+    /// <summary>What exactly will be started.</summary>
     public static string Command
     {
         get
         {
             var exe = Environment.ProcessPath ?? "";
-            // Кавычки обязательны: путь почти наверняка содержит пробел, и
-            // без них система запустит «C:\Program».
+            // The quotes are mandatory: the path almost certainly contains
+            // a space, and without them the system would launch
+            // "C:\Program".
             return exe.Length > 0 ? $"\"{exe}\"" : "";
         }
     }
 
-    /// <summary>Привести систему в соответствие настройке. `true` — получилось.</summary>
+    /// <summary>Bring the system into line with the setting. `true` — it worked.</summary>
     public static bool Apply(bool wanted)
     {
         try
@@ -82,8 +85,9 @@ public static class Autostart
         }
         catch
         {
-            // Групповая политика может запретить запись. Молчать нельзя, но
-            // и падать не за чем: вызывающий покажет, что не вышло.
+            // Group policy may forbid the write. Staying silent is not an
+            // option, but there is no reason to fall over either: the caller
+            // will show that it did not work.
             return false;
         }
     }

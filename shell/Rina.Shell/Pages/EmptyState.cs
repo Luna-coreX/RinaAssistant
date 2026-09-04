@@ -4,47 +4,48 @@ using System.Windows.Controls;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Пустое место, которое объясняет себя.
+/// An empty place that explains itself.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замечание человека: «выглядит хорошо, но пустовато». Разбор показал, что
-/// дело не в количестве украшений, а в том, что раздел без записей
-/// заканчивался одной серой строкой и тремястами точками пустоты под ней.
-/// Панель прибора так не выглядит: у неё нет незаполненного низа.
+/// From the person: "it looks good, but a bit empty". The examination
+/// showed it was not about the amount of decoration but about a section
+/// with no entries ending in one grey line with three hundred points of
+/// emptiness below it. An instrument panel does not look like that: it has
+/// no unfilled bottom.
 /// </para>
 /// <para>
-/// <b>Пустое состояние — это показание, а не отсутствие показания.</b> Оно
-/// отвечает на три вопроса разом: что здесь бывает, почему сейчас пусто и
-/// что сделать, чтобы не было. «Ничего не запланировано» отвечает на
-/// половину первого.
+/// <b>An empty state is a reading, not the absence of one.</b> It answers
+/// three questions at once: what lives here, why it is empty now, and what
+/// to do so it is not. "Nothing is scheduled" answers half of the first.
 /// </para>
 /// <para>
-/// <b>Занимает весь остаток и центрируется в нём.</b> Прижатое к верху
-/// пустое состояние читается как обрезанная страница; в середине пустого
-/// места оно читается как состояние прибора.
+/// <b>It takes the whole remainder and centres itself in it.</b> An empty
+/// state pinned to the top reads as a truncated page; in the middle of the
+/// empty space it reads as the state of the instrument.
 /// </para>
 /// <para>
-/// Значка нет. Направление запрещает значок без подписи, а значок с
-/// подписью здесь — это подпись, которая уже есть.
+/// There is no icon. The design direction forbids an icon without a
+/// caption, and an icon with a caption here is the caption that is already
+/// there.
 /// </para>
 /// </remarks>
 public static class EmptyState
 {
     /// <summary>
-    /// Собрать пустое состояние.
+    /// Build an empty state.
     /// </summary>
-    /// <param name="what">Чего пока нет — одной строкой.</param>
-    /// <param name="why">Что здесь появляется и откуда.</param>
-    /// <param name="how">Что сказать или нажать. Необязательно.</param>
+    /// <param name="what">What there is none of yet — in one line.</param>
+    /// <param name="why">What appears here and where from.</param>
+    /// <param name="how">What to say or press. Optional.</param>
     /// <param name="onGlass">
-    /// Пустое состояние лежит на стеклянном поле, а не на панели.
+    /// The empty state lies on the glass field rather than on the panel.
     /// </param>
     /// <remarks>
-    /// Цвета на стекле свои — `GLASS_TEXT` и `GLASS_DIM`. Не украшение:
-    /// пара «чернила на стекле» в проверке контраста не значится, потому
-    /// что стекло и панель — разные поверхности, и краска панели на стекле
-    /// не проверена никем.
+    /// Glass has colours of its own — `GLASS_TEXT` and `GLASS_DIM`. Not
+    /// decoration: the pair "ink on glass" does not appear in the contrast
+    /// check, because glass and panel are different surfaces, and panel
+    /// paint on glass has been verified by nobody.
     /// </remarks>
     public static FrameworkElement For(string what, string why,
                                        string how = "", bool onGlass = false)
@@ -80,8 +81,9 @@ public static class EmptyState
 
         if (how.Length > 0)
         {
-            // Пример набран моноширинным: это то, что говорят или пишут
-            // дословно, а дословное в системе набирается цифровым шрифтом.
+            // The example is set in the monospaced face: it is what one
+            // says or types verbatim, and verbatim things in this system are
+            // set in the figure face.
             stack.Children.Add(new TextBlock
             {
                 Text = how,

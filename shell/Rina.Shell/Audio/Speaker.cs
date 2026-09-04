@@ -3,25 +3,26 @@ using NAudio.Wave;
 namespace Rina.Shell.Audio;
 
 /// <summary>
-/// Воспроизведение речи: очередь кусков и мгновенное прерывание.
+/// Speech playback: a queue of chunks and instant interruption.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F10</c>. Ядро синтезирует, оболочка воспроизводит.
-/// Разделение принципиальное: модели живут там, где ML-экосистема, а
-/// воспроизведение — там, где низкая задержка и нативное аудио.
+/// Plan item <c>4.0-F10</c>. The core synthesises, the shell plays. The
+/// split is a matter of principle: the models live where the ML ecosystem
+/// is, and playback lives where latency is low and audio is native.
 /// </para>
 /// <para>
-/// <b>Очередь кусков, а не файл целиком.</b> Речь начинается раньше, чем
-/// синтез закончен, — иначе после каждой реплики была бы пауза длиной в
-/// синтез, и Рина отвечала бы с задержкой ровно там, где важнее всего её
-/// не иметь.
+/// <b>A queue of chunks, not a whole file.</b> Speech begins before
+/// synthesis has finished — otherwise every reply would carry a pause the
+/// length of the synthesis, and Rina would answer late exactly where being
+/// late matters most.
 /// </para>
 /// <para>
-/// <b>Прерывание мгновенное и без хвоста.</b> «Стоп» посреди фразы обязан
-/// оборвать её сейчас, а не доиграть то, что уже в буфере: человек,
-/// перебивший Рину и услышавший ещё полсекунды речи, перебьёт её снова.
-/// Поэтому очередь чистится, а буфер устройства сбрасывается.
+/// <b>Interruption is instant and leaves no tail.</b> A "stop" mid-sentence
+/// has to cut it off now, not play out what is already buffered: someone
+/// who interrupted Rina and then heard another half-second of speech will
+/// interrupt her again. So the queue is cleared and the device buffer is
+/// flushed.
 /// </para>
 /// </remarks>
 public sealed class Speaker : IDisposable
@@ -31,18 +32,18 @@ public sealed class Speaker : IDisposable
     private WaveOutEvent? _device;
     private BufferedWaveProvider? _buffer;
 
-    /// <summary>Рина говорит. Пока да — микрофон не слушает себя.</summary>
+    /// <summary>Rina is speaking. While she is, the microphone does not hear itself.</summary>
     public event Action<bool>? Speaking;
 
     public bool IsSpeaking { get; private set; }
 
-    /// <summary>Сколько байт лежит непроигранными.</summary>
+    /// <summary>How many bytes are lying unplayed.</summary>
     public int Pending
     {
         get { lock (_lock) return _buffer?.BufferedBytes ?? 0; }
     }
 
-    /// <summary>Куда выводить. Применится к следующему устройству.</summary>
+    /// <summary>Where to output. Applies to the next device.</summary>
     public int Device { get; set; }
 
     public static IReadOnlyList<AudioDevice> Devices()
@@ -53,8 +54,8 @@ public sealed class Speaker : IDisposable
         return found;
     }
 
-    /// <summary>По имени — номер; не нашлось — устройство по умолчанию.</summary>
-    /// <remarks>Почему по имени — см. <see cref="Microphone.IndexOf"/>.</remarks>
+    /// <summary>By name — a number; not found — the default device.</summary>
+    /// <remarks>Why by name — see <see cref="Microphone.IndexOf"/>.</remarks>
     public static int IndexOf(string name) => Devices()
         .FirstOrDefault(d => d.Name == name)?.Index ?? 0;
 
@@ -62,7 +63,7 @@ public sealed class Speaker : IDisposable
                    int bits = Microphone.Bits, int channels = Microphone.Channels)
         => _format = new WaveFormat(sampleRate, bits, channels);
 
-    /// <summary>Добавить кусок в очередь; воспроизведение начнётся само.</summary>
+    /// <summary>Add a chunk to the queue; playback starts by itself.</summary>
     public void Enqueue(ReadOnlySpan<byte> pcm)
     {
         if (pcm.Length == 0) return;
@@ -76,13 +77,13 @@ public sealed class Speaker : IDisposable
     }
 
     /// <summary>
-    /// Перейти на другую частоту.
+    /// Switch to another sample rate.
     /// </summary>
     /// <remarks>
-    /// Движки говорят на разных частотах: Edge на 24000, системный на 22050.
-    /// Частота приходит в `format` при открытии потока; проиграть чужую в
-    /// прежнем устройстве значит услышать Рину ниже и медленнее, чем она
-    /// говорит.
+    /// Engines speak at different rates: Edge at 24000, the system one at
+    /// 22050. The rate arrives in `format` when the stream is opened;
+    /// playing one rate through a device set up for another means hearing
+    /// Rina lower and slower than she speaks.
     /// </remarks>
     public void Reopen(int sampleRate)
     {
@@ -103,8 +104,8 @@ public sealed class Speaker : IDisposable
         if (_device is not null) return;
         _buffer = new BufferedWaveProvider(_format)
         {
-            // Полторы секунды звука. Больше — значит дольше выгребать при
-            // прерывании; меньше — риск щелчков на медленной машине.
+            // A second and a half of audio. More means longer to drain on
+            // an interruption; less risks clicks on a slow machine.
             BufferDuration = TimeSpan.FromSeconds(1.5),
             DiscardOnBufferOverflow = true,
         };
@@ -117,18 +118,19 @@ public sealed class Speaker : IDisposable
         _device.Init(_buffer);
     }
 
-    /// <summary>Речь кончилась сама: очередь пуста.</summary>
+    /// <summary>Speech ended by itself: the queue is empty.</summary>
     public void Finish()
     {
         if (Pending == 0) SetSpeaking(false);
     }
 
     /// <summary>
-    /// Оборвать речь сейчас же.
+    /// Cut the speech off right now.
     /// </summary>
     /// <remarks>
-    /// Порядок важен: сначала остановить устройство, потом вычистить буфер.
-    /// Наоборот — значит дать устройству доиграть то, что оно уже забрало.
+    /// The order matters: stop the device first, then clear the buffer. The
+    /// other way round means letting the device play out what it has
+    /// already taken.
     /// </remarks>
     public void Interrupt()
     {

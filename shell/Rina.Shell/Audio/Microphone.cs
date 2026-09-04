@@ -2,30 +2,31 @@ using NAudio.Wave;
 
 namespace Rina.Shell.Audio;
 
-/// <summary>Устройство ввода, как его называют человеку.</summary>
+/// <summary>An input device, as it is named to a person.</summary>
 public sealed record AudioDevice(int Index, string Name);
 
 /// <summary>
-/// Микрофон: захват, уровень, заготовка распознавания тишины.
+/// The microphone: capture, level, the beginnings of silence detection.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F09</c>. Микрофон принадлежит оболочке: у неё низкая
-/// задержка и нативный доступ к устройствам, а модели распознавания живут в
-/// ядре (<c>4.0-E03</c>). Ровно поэтому звук течёт по каналу данных, а не
-/// внутри JSON.
+/// Plan item <c>4.0-F09</c>. The microphone belongs to the shell: it has low
+/// latency and native access to devices, while the recognition models live
+/// in the core (<c>4.0-E03</c>). That is exactly why audio flows over the
+/// data channel rather than inside JSON.
 /// </para>
 /// <para>
-/// <b>Формат прибит гвоздями: 16 кГц, моно, 16 бит.</b> Не потому, что
-/// другого не бывает, а потому, что это формат, который понимают и Vosk, и
-/// Whisper, и передавать что-то иное значило бы пересчитывать его на той
-/// стороне — в процессе, у которого и без того есть чем заняться.
+/// <b>The format is nailed down: 16 kHz, mono, 16 bit.</b> Not because
+/// nothing else exists, but because this is the format both Vosk and Whisper
+/// understand, and sending anything else would mean resampling it on the
+/// other side — in a process that has plenty to do already.
 /// </para>
 /// <para>
-/// <b>Заготовка тишины (VAD), а не сама тишина.</b> Уровень считается, порог
-/// есть, решение «речь или нет» — нет: настоящее определение речи живёт в
-/// ядре рядом с распознаванием. Здесь ровно столько, чтобы полоса уровня
-/// показывала правду и чтобы <c>5.0</c> было куда встроить настоящий VAD.
+/// <b>The beginnings of silence detection (VAD), not the thing itself.</b>
+/// The level is measured and a threshold exists; the "speech or not"
+/// decision does not: real speech detection lives in the core next to
+/// recognition. There is exactly enough here for the level strip to tell the
+/// truth and for <c>5.0</c> to have somewhere to fit a real VAD.
 /// </para>
 /// </remarks>
 public sealed class Microphone : IDisposable
@@ -37,23 +38,23 @@ public sealed class Microphone : IDisposable
     private WaveInEvent? _device;
     private bool _muted;
 
-    /// <summary>Пришёл кусок звука. Уже в нужном формате.</summary>
+    /// <summary>A chunk of audio arrived. Already in the right format.</summary>
     public event Action<byte[]>? Captured;
 
-    /// <summary>Уровень 0..1 — для полосы прибора.</summary>
+    /// <summary>Level 0..1 — for the instrument strip.</summary>
     public event Action<float>? Level;
 
-    /// <summary>Захват идёт.</summary>
+    /// <summary>Capture is running.</summary>
     public bool Running { get; private set; }
 
     /// <summary>
-    /// Не слушать себя.
+    /// Do not listen to oneself.
     /// </summary>
     /// <remarks>
-    /// Пока Рина говорит, захват продолжается, но наружу не идёт. Именно
-    /// заглушить, а не остановить: остановка и запуск устройства занимают
-    /// десятки миллисекунд, и на каждой реплике они превратились бы в
-    /// проглоченное начало следующей фразы.
+    /// While Rina is speaking, capture continues but nothing goes out.
+    /// Muted, not stopped: stopping and starting a device take tens of
+    /// milliseconds, and on every reply those would turn into a swallowed
+    /// beginning of the next phrase.
     /// </remarks>
     public bool Muted
     {
@@ -70,31 +71,32 @@ public sealed class Microphone : IDisposable
     }
 
     /// <summary>
-    /// Найти устройство по имени. Не нашлось — устройство по умолчанию.
+    /// Find a device by name. Not found — the default device.
     /// </summary>
     /// <remarks>
-    /// Настройка хранит имя, а не номер, потому что номера перетасовываются
-    /// от втыкания наушников: сохранённая «единица» назавтра оказывается
-    /// другим микрофоном молча. Имя же либо совпадает, либо честно не
-    /// находится — и тогда работает устройство по умолчанию, а не случайное.
+    /// The setting stores a name, not a number, because numbers get
+    /// reshuffled when headphones are plugged in: a saved "one" silently
+    /// becomes a different microphone tomorrow. A name either matches or
+    /// honestly does not — and then the default device is used, not a random
+    /// one.
     /// </remarks>
     public static int IndexOf(string name) => Devices()
         .FirstOrDefault(d => d.Name == name)?.Index ?? 0;
 
     /// <summary>
-    /// Послушать устройство и вернуть самый громкий кусок.
+    /// Listen to the device and return the loudest chunk.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Для проверки микрофона из настроек. Отвечает на вопрос «слышно ли
-    /// вас вообще» — не на «понимает ли она слова»: это разные вопросы, и
-    /// первый закрывает большинство жалоб. Заодно работает и там, где
-    /// распознавание выключено вовсе.
+    /// For the microphone check in settings. It answers "can you be heard at
+    /// all" — not "does she understand the words": these are different
+    /// questions, and the first one closes most complaints. It also works
+    /// where recognition is switched off entirely.
     /// </para>
     /// <para>
-    /// Устройство открывается своё, а не то, что уже слушает Рина:
-    /// проверять надо выбранное в настройках, даже если сейчас слушается
-    /// другое.
+    /// It opens a device of its own rather than the one Rina is already
+    /// listening to: what must be checked is the one chosen in settings,
+    /// even if something else is being listened to right now.
     /// </para>
     /// </remarks>
     public static async Task<(bool Ok, float Loudest, string Reason)>
@@ -125,7 +127,7 @@ public sealed class Microphone : IDisposable
     {
         if (Running) return;
         if (WaveInEvent.DeviceCount == 0)
-            // Текст исключения читает разработчик в журнале.
+            // The exception text is read by a developer in the log.
             throw new InvalidOperationException(
                 "no recording devices found");                 // not UI
 
@@ -148,12 +150,12 @@ public sealed class Microphone : IDisposable
     }
 
     /// <summary>
-    /// Громкость куска: среднеквадратичное по образцам.
+    /// Loudness of a chunk: root mean square over the samples.
     /// </summary>
     /// <remarks>
-    /// Среднеквадратичное, а не пик: пик подскакивает от одного щелчка и
-    /// делает полосу дёрганой, а прибору положено показывать состояние, а не
-    /// вздрагивать.
+    /// Root mean square, not peak: a peak jumps on a single click and makes
+    /// the strip twitchy, whereas an instrument is supposed to show a state
+    /// rather than flinch.
     /// </remarks>
     public static float LevelOf(ReadOnlySpan<byte> pcm)
     {
@@ -166,8 +168,8 @@ public sealed class Microphone : IDisposable
             sum += value * value;
         }
         var rms = Math.Sqrt(sum / samples);
-        // Слух логарифмичен, и линейный уровень выглядит мёртвым: обычная
-        // речь даёт 0.05–0.15 и почти не сдвинула бы полосу.
+        // Hearing is logarithmic, and a linear level looks dead: ordinary
+        // speech gives 0.05–0.15 and would barely move the strip.
         return (float)Math.Clamp(Math.Sqrt(rms) * 1.4, 0, 1);
     }
 

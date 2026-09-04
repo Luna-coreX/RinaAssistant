@@ -3,25 +3,25 @@ using System.Windows;
 namespace Rina.Shell.Styles;
 
 /// <summary>
-/// Мелкие свойства, которых нет у стандартных контролов.
+/// Small properties the standard controls do not have.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Пока здесь одно — подсказка внутри поля. Заведено вложенным свойством, а
-/// не тринадцатью самодельными накладками поверх тринадцати полей:
-/// накладки разъезжаются, а свойство работает всюду, где поле нарисовано
-/// нашим стилем.
+/// So far there is one — the hint inside a field. Made an attached property
+/// rather than thirteen hand-made overlays on top of thirteen fields:
+/// overlays drift apart, while a property works everywhere the field is
+/// drawn by our style.
 /// </para>
 /// <para>
-/// <b>Подсказка — не значение.</b> Она гаснет, как только в поле появляется
-/// текст, и не участвует ни в сохранении, ни в проверке. Поле, в котором
-/// подсказка притворяется значением, — способ однажды сохранить слова
-/// «например, C:\Program Files» как путь.
+/// <b>A hint is not a value.</b> It goes out the moment text appears in the
+/// field, and it takes no part in saving or validation. A field where the
+/// hint pretends to be a value is a way to one day save the words
+/// "for example, C:\Program Files" as a path.
 /// </para>
 /// </remarks>
 public static class Ui
 {
-    /// <summary>Что показать в пустом поле.</summary>
+    /// <summary>What to show in an empty field.</summary>
     public static readonly DependencyProperty HintProperty =
         DependencyProperty.RegisterAttached(
             "Hint", typeof(string), typeof(Ui),

@@ -6,13 +6,14 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Заглушка раздела: заголовок и честное признание, что содержимого нет.
+/// A section stub: a heading and an honest admission that there is no
+/// content yet.
 /// </summary>
 /// <remarks>
-/// Настоящие страницы — <c>4.0-F04</c>. Заглушка нужна не «чтобы что-то
-/// было»: она проверяет то, ради чего писался <c>F03</c>, — что окно
-/// маршрутизирует, а раздел рисует себя сам. Пустая панель этого не
-/// показала бы.
+/// The real pages are <c>4.0-F04</c>. The stub is not here "so that
+/// something is": it verifies the very thing <c>F03</c> was written for —
+/// that the window routes and a section draws itself. An empty pane would
+/// not have shown that.
 /// </remarks>
 public static class Placeholder
 {

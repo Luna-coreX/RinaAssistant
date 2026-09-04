@@ -5,31 +5,25 @@ namespace Rina.Shell;
 public partial class App : Application
 {
     /// <summary>
-    /// Отделка, выбранная на старте.
-    /// </summary>
-    /// <remarks>
-    /// Две отделки равноправны (<c>4.0-R08</c>): ни одна не «основная» и ни
-    /// одна не инверсия другой. Поэтому подменяется целый словарь ресурсов, а
-    /// не пересчитываются цвета от одного базового.
-    /// </remarks>
-    /// <summary>
-    /// Сменить акцент, не трогая остальную отделку.
+    /// Change the accent without touching the rest of the finish.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Замечание человека, `4.0-R08` уточнён. Пять палитр 3.1.0 уступили
-    /// двум отделкам, и это решение остаётся: отделка — вся поверхность, её
-    /// цвета проверены парами, и менять их поштучно нельзя. Но **акцент —
-    /// не палитра**: это один цвет с двумя обязанностями, читаться на
-    /// панели и на приподнятом. Его можно выбирать, если каждый вариант
-    /// проверен там же, где проверялся исходный, — и каждый проверен
+    /// Raised by the person; `4.0-R08` was refined. The five palettes of
+    /// 3.1.0 gave way to two finishes, and that decision stands: a finish is
+    /// the whole surface, its colours were verified in pairs, and they must
+    /// not be changed one at a time. But <b>an accent is not a palette</b>:
+    /// it is one colour with two duties, to read on the panel and on the
+    /// raised surface. It may be chosen, provided every option was verified
+    /// where the original was — and every one is
     /// (`tools/check_contrast.py`).
     /// </para>
     /// <para>
-    /// Подменяются и кисть, и цвет: их два представления одного и того же,
-    /// и подменить одно, забыв другое, — вопрос времени. Незнакомое имя
-    /// оставляет всё как есть: акцент, которого нет, не повод обесцветить
-    /// программу.
+    /// Both the brush and the colour are replaced: they are two
+    /// representations of the same thing, and replacing one while forgetting
+    /// the other is a matter of time. An unknown name leaves everything as
+    /// it is: an accent that does not exist is no reason to drain the colour
+    /// out of the program.
     /// </para>
     /// </remarks>
     public static void ApplyAccent(string finish, string accent)
@@ -52,15 +46,15 @@ public partial class App : Application
             new System.Windows.Media.SolidColorBrush(deep);
     }
 
-    /// <summary>Акцент по умолчанию — тот, что был до выбора.</summary>
+    /// <summary>The default accent — the one that was there before any choice.</summary>
     public static string DefaultAccent =>
         Current?.TryFindResource("Accent.Default") as string ?? "amber";
 
-    /// <summary>Какие акценты есть у этой отделки, с именами.</summary>
+    /// <summary>Which accents this finish has, with their names.</summary>
     /// <remarks>
-    /// Набор свой у каждой отделки: одна и та же краска на светлом и на
-    /// тёмном читается по-разному, и общий список был бы списком,
-    /// половина которого не проходит проверку.
+    /// Each finish has its own set: the same paint reads differently on
+    /// light and on dark, and a shared list would be a list half of which
+    /// fails the check.
     /// </remarks>
     public static IEnumerable<(string Value, string Title)> Accents(
         string finish)
@@ -79,6 +73,19 @@ public partial class App : Application
         }
     }
 
+    /// <summary>
+    /// The finish chosen at startup.
+    /// </summary>
+    /// <remarks>
+    /// The two finishes are equals (<c>4.0-R08</c>): neither is the "main"
+    /// one and neither is an inversion of the other. That is why a whole
+    /// resource dictionary is swapped rather than colours being derived from
+    /// one base.
+    ///
+    /// This block used to sit above <c>ApplyAccent</c>, orphaned by an
+    /// earlier edit, while the method it describes had no documentation at
+    /// all.
+    /// </remarks>
     public static void ApplyFinish(string finish)
     {
         var name = finish is "black" ? "Black" : "Silver";
