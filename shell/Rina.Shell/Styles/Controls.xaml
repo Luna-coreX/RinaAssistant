@@ -14,6 +14,29 @@
                     xmlns:ui="clr-namespace:Rina.Shell.Styles"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
+  <!--
+    Кисти подсветки. Своя у каждого места, где она нужна.
+
+    `x:Shared="False"` обязателен: значение из словаря иначе одно на всех,
+    и оно заморожено — анимировать его нельзя, а если бы было можно,
+    подсветилась бы разом вся таблица.
+
+    Объявлены **в начале словаря**: `StaticResource` ищет объявленное
+    выше, и ссылка на ресурс из нижней половины файла падает во время
+    работы, а сборку проходит.
+
+    Кистей две, потому что подсветка обязана отличаться от того, на чём
+    лежит. Строка списка лежит на приподнятом (`FACE_HIGH`) и темнеет;
+    вариант выпадающего списка лежит на утопленном (`FACE_LOW`) и,
+    наоборот, светлеет. Одна кисть на оба случая означала бы, что в
+    раскрытом списке подсветка совпадает с фоном и её попросту нет.
+  -->
+  <SolidColorBrush x:Key="Row.Warm" x:Shared="False" Opacity="0"
+                   Color="{DynamicResource Color.FaceLow}" />
+  <SolidColorBrush x:Key="Choice.Warm" x:Shared="False" Opacity="0"
+                   Color="{DynamicResource Color.FaceHigh}" />
+
+
   <Style x:Key="Btn" TargetType="Button">
     <Setter Property="Background" Value="Transparent" />
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
@@ -307,14 +330,43 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="ComboBoxItem">
-          <Border x:Name="Row" Background="Transparent"
+          <Border x:Name="Row" Background="{StaticResource Choice.Warm}"
                   Padding="{TemplateBinding Padding}">
             <ContentPresenter />
           </Border>
           <ControlTemplate.Triggers>
+            <!--
+              Вариант под курсором подсвечивается тем же движением, что и
+              строка списка: 160 мс. Раньше здесь стояла мгновенная смена
+              цвета — единственное место, где состояние переключалось, а
+              не менялось.
+
+              Кисть своя у каждого варианта (`Row.Warm`, `x:Shared="False"`):
+              общая заморожена, и анимировать её нельзя.
+            -->
             <Trigger Property="IsHighlighted" Value="True">
-              <Setter TargetName="Row" Property="Background"
-                      Value="{DynamicResource C.FaceHigh}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Row"
+                                     Storyboard.TargetProperty="Background.Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Row"
+                                     Storyboard.TargetProperty="Background.Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground"
@@ -638,16 +690,6 @@
     Строка внутри блока. Отделена от соседней волосяным швом — тем же
     средством, что и области панели, и никогда тенью.
   -->
-  <!--
-    Своя кисть каждой строке.
-
-    `x:Shared="False"` обязателен: значение из словаря иначе одно на всех,
-    и оно заморожено — анимировать его нельзя, а если бы было можно,
-    подсветилась бы разом вся таблица. Одна строка — одна кисть.
-  -->
-  <SolidColorBrush x:Key="Row.Warm" x:Shared="False" Opacity="0"
-                   Color="{DynamicResource Color.FaceLow}" />
-
   <Style x:Key="Rows.Item" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource Row.Warm}" />
     <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />

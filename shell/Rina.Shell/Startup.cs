@@ -871,6 +871,61 @@ public partial class App
             await Task.Delay(500);
             Check("ушли — погасло", Lit(rows[1]) < 0.1,
                   $"| {Lit(rows[1]):0.00}");
+
+            // --- варианты раскрытого списка ---------------------------
+            Console.WriteLine();
+            Console.WriteLine("=== движение: наводка на вариант списка ===");
+
+            window.ShowSectionFor("settings");
+            await Task.Delay(2500);
+
+            // Страница настроек собирается по проводу: схема, значения и
+            // списки вариантов — три отдельных ответа ядра. Ждём, пока
+            // появятся варианты, а не фиксированное время: на медленной
+            // машине фиксированного всегда не хватит.
+            System.Windows.Controls.ComboBox? choice = null;
+            for (var i = 0; i < 60 && choice is null; i++)
+            {
+                choice = Boxes(window).FirstOrDefault(b => b.Items.Count > 2);
+                if (choice is null) await Task.Delay(200);
+            }
+            Console.WriteLine($"     списков на странице: "
+                              + $"{Boxes(window).Count()}");
+            Check("выпадающий список с вариантами нашёлся", choice is not null,
+                  $"| вариантов {choice?.Items.Count ?? 0}");
+            if (choice is null)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {++fails}");
+                Environment.ExitCode = 1;
+                Shutdown();
+                return;
+            }
+
+            choice.IsDropDownOpen = true;
+            await Task.Delay(600);
+
+            var options = choice.Items.OfType<System.Windows.Controls.ComboBoxItem>()
+                                .Where(o => o.IsEnabled).Take(2).ToArray();
+            Check("варианты раскрылись", options.Length == 2,
+                  $"| {options.Length}");
+            if (options.Length == 2)
+            {
+                Check("у каждого варианта своя кисть",
+                      !ReferenceEquals(Warm(options[0]), Warm(options[1])));
+
+                await HoverAsync(options[1]);
+                Check("вариант под курсором подсветился",
+                      Glow(options[1]) > 0.5, $"| {Glow(options[1]):0.00}");
+                Check("соседний остался тёмным",
+                      Glow(options[0]) < 0.1, $"| {Glow(options[0]):0.00}");
+
+                await HoverAsync(options[0]);
+                Check("подсветка перешла",
+                      Glow(options[0]) > 0.5 && Glow(options[1]) < 0.1,
+                      $"| {Glow(options[1]):0.00} → {Glow(options[0]):0.00}");
+            }
+            choice.IsDropDownOpen = false;
         }
         finally
         {
@@ -881,6 +936,39 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>Выпадающие списки страницы в порядке появления.</summary>
+    private static IEnumerable<System.Windows.Controls.ComboBox> Boxes(
+        DependencyObject root)
+    {
+        foreach (var child in Children(root))
+        {
+            if (child is System.Windows.Controls.ComboBox box)
+                yield return box;
+            foreach (var deeper in Boxes(child)) yield return deeper;
+        }
+    }
+
+    /// <summary>Кисть подсветки варианта: она у каждого своя.</summary>
+    private static System.Windows.Media.Brush? Warm(
+        System.Windows.Controls.ComboBoxItem option)
+        => (option.Template?.FindName("Row", option)
+            as System.Windows.Controls.Border)?.Background;
+
+    /// <summary>Насколько вариант подсвечен сейчас.</summary>
+    private static double Glow(System.Windows.Controls.ComboBoxItem option)
+        => (Warm(option) as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
+
+    /// <summary>Навести курсор в середину варианта.</summary>
+    private static async Task HoverAsync(
+        System.Windows.Controls.ComboBoxItem option)
+    {
+        var middle = option.PointToScreen(new Point(option.ActualWidth / 2,
+                                                    option.ActualHeight / 2));
+        SetCursorPos((int)middle.X, (int)middle.Y);
+        System.Windows.Input.Mouse.Synchronize();
+        await Task.Delay(500);
     }
 
     /// <summary>Насколько строка подсвечена сейчас.</summary>
