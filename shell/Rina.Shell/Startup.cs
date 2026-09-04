@@ -914,6 +914,19 @@ public partial class App
                 Check("у каждого варианта своя кисть",
                       !ReferenceEquals(Warm(options[0]), Warm(options[1])));
 
+                // Главная проверка, и она не про движение. Прозрачность
+                // может честно уезжать в единицу, а видно не будет
+                // ничего, если цвет подсветки равен цвету подложки —
+                // именно так и было: анимация шла, проверка зеленела,
+                // человек не видел наводки.
+                var under = Surface(options[0]);
+                var over = (Warm(options[0]) as
+                            System.Windows.Media.SolidColorBrush)?.Color;
+                Check("подсветка отличается от подложки",
+                      under is not null && over is not null
+                      && Apart(under.Value, over.Value) > 8,
+                      $"| подложка {under} против подсветки {over}");
+
                 await HoverAsync(options[1]);
                 Check("вариант под курсором подсветился",
                       Glow(options[1]) > 0.5, $"| {Glow(options[1]):0.00}");
@@ -955,6 +968,26 @@ public partial class App
         System.Windows.Controls.ComboBoxItem option)
         => (option.Template?.FindName("Row", option)
             as System.Windows.Controls.Border)?.Background;
+
+    /// <summary>На чём лежит вариант: цвет ближайшей залитой подложки.</summary>
+    private static System.Windows.Media.Color? Surface(DependencyObject item)
+    {
+        for (var node = System.Windows.Media.VisualTreeHelper.GetParent(item);
+             node is not null;
+             node = System.Windows.Media.VisualTreeHelper.GetParent(node))
+        {
+            if (node is System.Windows.Controls.Border { Background:
+                    System.Windows.Media.SolidColorBrush paint }
+                && paint.Opacity > 0.5)
+                return paint.Color;
+        }
+        return null;
+    }
+
+    /// <summary>Насколько два цвета различимы: сумма расхождений каналов.</summary>
+    private static int Apart(System.Windows.Media.Color a,
+                             System.Windows.Media.Color b)
+        => Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);
 
     /// <summary>Насколько вариант подсвечен сейчас.</summary>
     private static double Glow(System.Windows.Controls.ComboBoxItem option)
