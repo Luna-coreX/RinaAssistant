@@ -6,70 +6,73 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Update;
 
-/// <summary>Что делать с найденным выпуском.</summary>
+    /// <summary>The check did not go through: network, address, broken metadata.</summary>
 public enum Verdict
 {
-    /// <summary>Проверить не удалось: сеть, адрес, испорченные метаданные.</summary>
+    /// <summary>Nothing newer exists.</summary>
     Unknown,
 
-    /// <summary>Стоит свежее некуда.</summary>
+    /// <summary>Only the shell updates.</summary>
     UpToDate,
 
-    /// <summary>Обновляется только оболочка.</summary>
+    /// <summary>Only the core updates.</summary>
     ShellOnly,
 
-    /// <summary>Обновляется только ядро.</summary>
+    /// <summary>Both parts update.</summary>
     CoreOnly,
 
-    /// <summary>Обновляются обе части.</summary>
+    /// <summary>The pair is incompatible: it must not be installed.</summary>
     Both,
 
-    /// <summary>Пара несовместима: ставить нельзя.</summary>
+/// <summary>The outcome of a check: what was found and what to do about it.</summary>
     Incompatible,
 }
 
-/// <summary>Исход проверки: что нашли и что с этим делать.</summary>
+/// <summary>The outcome of a check: what was found and what to do about it.</summary>
 public sealed record Found(Verdict Verdict, string Explanation,
                            Part? Shell = null, Part? Core = null,
                            bool MustUpdate = false);
 
 /// <summary>
-/// Клиент обновлений.
+/// The update client.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-U03</c>, <c>U04</c>, <c>U05</c>. Решение о версиях —
-/// [ADR 0004](../../../docs/adr/0004-versioning-and-compatibility.md),
-/// форма метаданных — [MANIFEST.md](../../../docs/updates/MANIFEST.md).
+/// Plan items <c>4.0-U03</c>, <c>U04</c>, <c>U05</c>. The versioning
+/// decision is
+/// [ADR 0004](../../../docs/adr/0004-versioning-and-compatibility.md); the
+/// shape of the metadata is
+/// [MANIFEST.md](../../../docs/updates/MANIFEST.md).
 /// </para>
 /// <para>
-/// <b>Живёт в оболочке.</b> Скачать файл и положить его на диск — работа
-/// системного слоя ([ADR 0009](../../../docs/adr/0009-system-layer.md)), а
-/// заменять файлы ядра может только тот, кто ядро останавливает. Оболочка
-/// к тому же переживает ядро и имеет, где показать вопрос.
+/// <b>It lives in the shell.</b> Downloading a file and putting it on disk
+/// is system-layer work
+/// ([ADR 0009](../../../docs/adr/0009-system-layer.md)), and only whoever
+/// stops the core can replace the core's files. The shell also outlives
+/// the core and has somewhere to show the question.
 /// </para>
 /// <para>
-/// <b>Совместимость проверяется до установки, а решает всё равно
-/// рукопожатие.</b> Здесь сверяются объявленные наборы версий протокола —
-/// это позволяет не качать пару, которая всё равно не поздоровается.
-/// Ошибка в такой проверке стоит бесполезной закачки; ошибка в проверке,
-/// которой доверяют как последней инстанции, стоит отказа от обновления,
-/// которое работало бы.
+/// <b>Compatibility is checked before installing, and the handshake
+/// decides all the same.</b> What is compared here are the declared sets
+/// of protocol versions — that lets us avoid downloading a pair that would
+/// fail the handshake anyway. A mistake here costs a pointless download; a
+/// mistake in a check trusted as the last word would cost a refused update
+/// that would in fact have worked.
 /// </para>
 /// <para>
-/// <b>Установки здесь нет.</b> Проверенный файл кладётся в отдельную папку
-/// и ждёт: подмена файлов на работающей программе — работа установщика
-/// (<c>4.0-I01</c>), и делать её наполовину в двух местах хуже, чем в
-/// одном целиком.
+/// <b>There is no installing here.</b> A verified file is placed in a
+/// separate folder and waits: swapping files under a running program is
+/// the installer's job (<c>4.0-I01</c>), and doing half of it in two
+/// places is worse than doing all of it in one.
 /// </para>
 /// </remarks>
 public sealed class Updater
 {
-    /// <summary>Откуда берутся метаданные.</summary>
     /// <remarks>
-    /// Актив релиза, а не описание и не имя тега: из строки тега нельзя
-    /// узнать ни хэша, ни адреса. Своего сервера пока нет — это
-    /// <c>4.0-U13</c>, и он изменит адрес, а не форму.
+    /// A release asset, not the description and not the tag name: a tag
+    /// string tells you neither a hash nor an address. There is no server
+    /// of our own yet — that is <c>4.0-U13</c>, and it will change the
+    /// address, not the shape.
     /// </remarks>
     public const string Source =
         "https://api.github.com/repos/Luna-corex/RinaAssistant/releases/latest";
@@ -85,13 +88,13 @@ public sealed class Updater
             _web.DefaultRequestHeaders.Add("User-Agent", "RinaAssistant");
     }
 
-    /// <summary>Куда кладётся проверенное и ждущее установки.</summary>
+    /// <summary>Where the verified and pending files are put.</summary>
     public static string Staging => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "RinaAssistant", "updates");
 
     /// <summary>
-    /// Спросить, есть ли что-то новее.
+    /// Ask whether anything newer exists.
     /// </summary>
     public async Task<Found> CheckAsync(string shellVersion, string coreVersion,
                                         int dataSchema,
@@ -126,17 +129,14 @@ public sealed class Updater
         if (shell is null && core is null)
             return new Found(Verdict.UpToDate, S("Установлена последняя версия."));
 
-        // Схема данных: откат ограничен данными, а не совместимостью
-        // процессов (ADR 0004). Ядро, которое не прочитает написанное, —
-        // не обновление, а потеря.
+        // The data schema: a rollback is bounded by data, not by process
+        // compatibility (ADR 0004). A core that will not read what has been
+        // written is not an update but a loss.
         if (core is not null && core.DataSchema > 0 && core.DataSchema < dataSchema)
-            // Ключ перевода — один литерал, а не склейка: извлекатель
-            // строк берёт первый и на этом останавливается, и половина
-            // фразы уехала бы в таблицу как самостоятельная строка.
             return Refuse(S("ядро {0} читает данные схемы {1}, а на диске уже {2}",
                             core.Version, core.DataSchema, dataSchema));
 
-        // Пара, которая не поздоровается, не стоит закачки.
+        // A pair that will not shake hands is not worth downloading.
         var willSpeak = shell?.Protocol ?? _protocol;
         var willHear = core?.Protocol ?? _protocol;
         if (willSpeak.Length > 0 && willHear.Length > 0
@@ -175,12 +175,13 @@ public sealed class Updater
             ? part : null;
 
     /// <summary>
-    /// Достать метаданные из релиза.
+    /// Fetch the metadata out of the release.
     /// </summary>
     /// <remarks>
-    /// Ищется актив с именем <c>manifest.json</c>. Его отсутствие — не
-    /// «обновлений нет», а «источник говорит не то, что мы понимаем», и
-    /// разница важна: первое успокаивает, второе требует внимания.
+    /// It looks for an asset named <c>manifest.json</c>. Its absence is not
+    /// "there are no updates" but "the source is saying something we do not
+    /// understand", and the difference matters: the first reassures, the
+    /// second calls for attention.
     /// </remarks>
     private async Task<string> FetchManifestAsync(CancellationToken token)
     {
@@ -199,18 +200,18 @@ public sealed class Updater
     }
 
     /// <summary>
-    /// Скачать часть и проверить хэш.
+    /// Download a part and verify the hash.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Хэш считается по дороге, а не потом.</b> Второе чтение файла с
-    /// диска ради проверки стоит времени и позволяет подменить файл между
-    /// записью и проверкой.
+    /// <b>The hash is computed on the way, not afterwards.</b> Reading the
+    /// file back off disk to verify it costs time and leaves a gap in
+    /// which the file can be swapped.
     /// </para>
     /// <para>
-    /// <b>Несовпадение — не «повреждён», а «не тот файл».</b> Он удаляется
-    /// целиком: половина обновления, оставшаяся на диске, однажды
-    /// окажется установленной.
+    /// <b>A mismatch is not "damaged" but "the wrong file".</b> It is
+    /// deleted whole: half an update left on disk will one day end up
+    /// installed.
     /// </para>
     /// </remarks>
     public async Task<(bool Ok, string Path, string Problem)> DownloadAsync(
@@ -263,8 +264,8 @@ public sealed class Updater
         }
         catch (Exception error)
         {
-            // Оборвалась закачка — файла быть не должно: недокачанное,
-            // оставшееся на диске, однажды окажется установленным.
+            // The download broke off — no file should remain: something
+            // half-downloaded and left on disk will one day end up installed.
             try { if (File.Exists(target)) File.Delete(target); } catch { }
             Platform.Journal.Update("download",
                 $"part={part.Name} version={part.Version} "
@@ -274,12 +275,12 @@ public sealed class Updater
     }
 
     /// <summary>
-    /// Только HTTPS.
+    /// HTTPS only.
     /// </summary>
     /// <remarks>
-    /// Обновление по открытому каналу — это приглашение подменить его по
-    /// дороге. Хэш из тех же метаданных от этого не спасает: подменивший
-    /// ответ подменит и хэш.
+    /// An update over an open channel is an invitation to swap it in
+    /// transit. The hash from the same metadata is no protection: whoever
+    /// swapped the answer will swap the hash too.
     /// </remarks>
     private static string Https(string url)
     {

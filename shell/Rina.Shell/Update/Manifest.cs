@@ -5,10 +5,10 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Update;
 
 /// <summary>
-/// Одна часть выпуска: оболочка или ядро.
+/// One part of a release: the shell or the core.
 /// </summary>
 /// <remarks>
-/// Поля и причины — [MANIFEST.md](../../../docs/updates/MANIFEST.md).
+/// The fields and the reasoning — [MANIFEST.md](../../../docs/updates/MANIFEST.md).
 /// </remarks>
 public sealed record Part
 {
@@ -17,11 +17,11 @@ public sealed record Part
     public required string Url { get; init; }
     public required string Sha256 { get; init; }
 
-    /// <summary>Версии протокола, которые часть реализует.</summary>
+    /// <summary>The protocol versions this part implements.</summary>
     /// <remarks>
-    /// Набор, а не число: совместимость решает пересечение наборов
-    /// (ADR 0004), и оболочка, держащая две версии ради ступенчатого
-    /// обновления, обязана уметь это объявить.
+    /// A set, not a number: compatibility is decided by intersecting the
+    /// sets (ADR 0004), and a shell holding two versions for the sake of a
+    /// staged update has to be able to say so.
     /// </remarks>
     public int[] Protocol { get; init; } = [];
 
@@ -29,29 +29,29 @@ public sealed record Part
     public string Notes { get; init; } = "";
     public bool MustUpdate { get; init; }
 
-    /// <summary>Версия схемы данных на диске. Есть только у ядра.</summary>
+    /// <summary>The on-disk data schema version. The core has one; the shell does not.</summary>
     public int DataSchema { get; init; }
 
-    /// <summary>Подсказка загрузчику, а не правило (ADR 0004).</summary>
+    /// <summary>A hint to the downloader, not a rule (ADR 0004).</summary>
     public string MinOther { get; init; } = "";
     public string MaxOther { get; init; } = "";
 }
 
 /// <summary>
-/// Метаданные выпуска целиком.
+/// The release metadata as a whole.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-U02</c>. Один файл на обе части, потому что части
-/// две, а решение одно: раздельные метаданные позволили бы прочитать
-/// свежие данные оболочки рядом с годовалыми данными ядра и счесть пару
-/// совместимой, не имея возможности это проверить.
+/// Plan item <c>4.0-U02</c>. One file for both parts, because there are
+/// two parts and one decision: separate metadata would allow reading the
+/// shell's fresh data next to the core's year-old data and calling the
+/// pair compatible with no way to check.
 /// </para>
 /// <para>
-/// <b>Разбор ничего не додумывает.</b> Часть без адреса, без хэша или без
-/// версии — это не часть, и она отбрасывается вместе с внятной причиной.
-/// Обновление, поставленное по наполовину прочитанным метаданным, — тот
-/// самый случай, когда молчаливая догадка стоит дороже отказа.
+/// <b>Parsing invents nothing.</b> A part without an address, a hash or a
+/// version is not a part, and it is dropped along with a stated reason.
+/// An update installed from half-read metadata is exactly the case where
+/// a silent guess costs more than a refusal.
 /// </para>
 /// </remarks>
 public sealed record Manifest
@@ -62,7 +62,7 @@ public sealed record Manifest
     public string NotesUrl { get; init; } = "";
     public Dictionary<string, Part> Parts { get; init; } = [];
 
-    /// <summary>Что не так с метаданными; пусто — всё в порядке.</summary>
+    /// <summary>What is wrong with the metadata; empty means all is well.</summary>
     public string Problem { get; init; } = "";
 
     public bool Ok => Problem.Length == 0;
@@ -71,12 +71,13 @@ public sealed record Manifest
     public Part? Core => Parts.GetValueOrDefault("core");
 
     /// <summary>
-    /// Разобрать метаданные.
+    /// Parse the metadata.
     /// </summary>
     /// <remarks>
-    /// Возвращает манифест с описанной бедой, а не бросает: «не смогли
-    /// прочитать» — обычный исход проверки обновлений, и показать его
-    /// человеку надо словами, а не исключением в журнале.
+    /// Returns a manifest with the trouble described rather than throwing:
+    /// "we could not read it" is an ordinary outcome of an update check,
+    /// and it has to be shown to the person in words, not as an exception
+    /// in a log.
     /// </remarks>
     public static Manifest Parse(string json)
     {
@@ -129,8 +130,8 @@ public sealed record Manifest
         var url = part["url"]?.GetValue<string>() ?? "";
         var hash = part["sha256"]?.GetValue<string>() ?? "";
 
-        // Без любого из трёх часть бесполезна: нечего сравнить, неоткуда
-        // взять или нечем проверить.
+        // Without any of the three the part is useless: nothing to compare,
+        // nowhere to fetch from, or nothing to verify with.
         if (version.Length == 0 || url.Length == 0 || hash.Length == 0)
             return null;
 
@@ -153,11 +154,11 @@ public sealed record Manifest
     }
 
     /// <summary>
-    /// Сравнить версии вида <c>4.0.10</c>.
+    /// Compare versions of the form <c>4.0.10</c>.
     /// </summary>
     /// <remarks>
-    /// Числами, а не строками: «4.0.10» строкой меньше «4.0.9», и
-    /// обновление на десятую заплату никогда бы не предложилось.
+    /// By numbers, not as strings: "4.0.10" sorts below "4.0.9", and the
+    /// tenth patch would never be offered as an update.
     /// </remarks>
     public static int Compare(string left, string right)
     {

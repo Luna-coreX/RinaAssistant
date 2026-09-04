@@ -6,51 +6,52 @@ using Microsoft.Win32;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Индекс установленных программ.
+/// The index of installed programs.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-G04</c>, <c>G08</c>, <c>G09</c>, <c>G11</c>.
-/// Индекс живёт в оболочке, потому что это <b>данные операционной
-/// системы</b>; сопоставление имени с записью — в ядре, потому что это
-/// язык ([ADR 0009](../../../docs/adr/0009-system-layer.md)).
+/// Plan items <c>4.0-G04</c>, <c>G08</c>, <c>G09</c>, <c>G11</c>. The
+/// index lives in the shell because it is <b>operating system data</b>;
+/// matching a name against an entry lives in the core because that is
+/// language ([ADR 0009](../../../docs/adr/0009-system-layer.md)).
 /// </para>
 /// <para>
-/// <b>Рабочий стол и «Загрузки» не сканируются.</b> В 3.1.0 рабочий стол
-/// обходился по умолчанию, и это было ошибкой: туда попадает скачанное, а
-/// индексировать скачанное значит предлагать запуск чему угодно, что
-/// человек когда-то сохранил. Portable-программы добавляются папкой
-/// вручную и видны списком в настройках. Запрет проверяется, а не
-/// подразумевается: <see cref="Forbidden"/> отрезает такие пути даже если
-/// их подсунули явной настройкой.
+/// <b>The desktop and Downloads are not scanned.</b> In 3.1.0 the desktop
+/// was walked by default, and that was a mistake: downloaded things land
+/// there, and indexing what was downloaded means offering to launch
+/// anything the person ever saved. Portable programs are added as a
+/// folder by hand and are visible as a list in settings. The prohibition
+/// is enforced, not assumed: <see cref="Forbidden"/> cuts such paths off
+/// even when an explicit setting slipped them in.
 /// </para>
 /// <para>
-/// <b>Порядок источников — от системного к пользовательскому</b>
-/// (<c>4.0-G08</c>): зарегистрированные системой пути → меню «Пуск» →
-/// пакеты → `PATH` → добавленные папки. При совпадении имён побеждает тот,
-/// что выше: у системной записи больше оснований быть тем, что человек
-/// имел в виду.
+/// <b>Sources run from system to user</b> (<c>4.0-G08</c>): paths
+/// registered by the system → the Start menu → packages → `PATH` → added
+/// folders. When names collide the higher one wins: a system entry has
+/// more claim to being what the person meant.
 /// </para>
 /// <para>
-/// <b>Путь приводится к каноническому виду</b> (<c>4.0-G11</c>): symlink
-/// или junction из доверенной папки наружу иначе провёл бы запуск мимо
-/// всех проверок. Записи с исчезнувшими файлами при переиндексации
-/// выбрасываются — индекс, помнящий удалённое, однажды запустит не то.
+/// <b>Paths are resolved to canonical form</b> (<c>4.0-G11</c>): a
+/// symlink or junction leading out of a trusted folder would otherwise
+/// carry a launch past every check. Entries whose files have vanished are
+/// dropped on reindex — an index that remembers deleted things will one
+/// day launch the wrong one.
 /// </para>
 /// </remarks>
 public static class AppIndex
 {
-    /// <summary>Порядок источников: чем меньше, тем весомее.</summary>
+    /// <summary>Source order: the smaller, the weightier.</summary>
     public static readonly string[] SourceOrder =
         ["app_paths", "start_menu", "uwp", "path", "folder"];
 
     /// <summary>
-    /// Каталоги, которые не индексируются никогда.
+    /// Directories that are never indexed.
     /// </summary>
     /// <remarks>
-    /// Сюда попадает скачанное и временное. Список именно запрещающий, а
-    /// не «не сканируемый по умолчанию»: разница в том, что человек может
-    /// добавить папку руками, и «Загрузки» он добавить не должен даже так.
+    /// Downloaded and temporary things land here. The list forbids rather
+    /// than merely "not scanned by default": the difference is that a
+    /// person may add a folder by hand, and Downloads is one they must not
+    /// be able to add even that way.
     /// </remarks>
     public static readonly Environment.SpecialFolder[] ForbiddenFolders =
     [
@@ -58,7 +59,7 @@ public static class AppIndex
         Environment.SpecialFolder.CommonDesktopDirectory,
     ];
 
-    /// <summary>Лежит ли путь там, откуда запускать нельзя.</summary>
+    /// <summary>Whether the path is somewhere we must not launch from.</summary>
     public static bool Forbidden(string path)
     {
         var full = Canonical(path);
@@ -89,12 +90,13 @@ public static class AppIndex
     }
 
     /// <summary>
-    /// Канонический путь: без symlink, junction и «..».
+    /// The canonical path: no symlink, no junction, no "..".
     /// </summary>
     /// <remarks>
-    /// Пустая строка — путь не разрешился, и это ответ «нельзя», а не
-    /// «наверное можно». Проверка доверия, споткнувшаяся о неразрешимый
-    /// путь, обязана отказать: непонятный путь и есть повод отказать.
+    /// An empty string means the path did not resolve, and that is an
+    /// answer of "no", not of "probably yes". A trust check that stumbled
+    /// over an unresolvable path is obliged to refuse: an unclear path is
+    /// itself grounds to refuse.
     /// </remarks>
     public static string Canonical(string path)
     {
@@ -114,9 +116,9 @@ public static class AppIndex
         }
     }
 
-    // ----------------------------------------------------------------- сбор
+    // --------------------------------------------------------- gathering
 
-    /// <summary>Собрать индекс заново.</summary>
+    /// <summary>Build the index from scratch.</summary>
     public static List<AppEntry> Build(IEnumerable<string>? folders = null)
     {
         var found = new List<AppEntry>();
@@ -127,9 +129,9 @@ public static class AppIndex
         foreach (var folder in folders ?? [])
             found.AddRange(FromFolder(folder));
 
-        // Один и тот же Telegram приходит и из меню «Пуск», и из PATH.
-        // Побеждает источник выше по списку: у системной записи больше
-        // оснований быть тем, что человек имел в виду.
+        // The same Telegram arrives both from the Start menu and from
+        // PATH. The source higher up the list wins: a system entry has
+        // more claim to being what the person meant.
         var best = new Dictionary<string, AppEntry>(StringComparer.OrdinalIgnoreCase);
         foreach (var entry in found)
         {
@@ -149,11 +151,11 @@ public static class AppIndex
         return at < 0 ? SourceOrder.Length : at;
     }
 
-    /// <summary>Зарегистрированные системой пути запуска (App Paths).</summary>
+    /// <summary>Launch paths registered by the system (App Paths).</summary>
     /// <remarks>
-    /// Самый весомый источник: сюда программа попадает, объявив себя при
-    /// установке, — то есть по решению установщика, а не по тому, что файл
-    /// где-то лежит.
+    /// The weightiest source: a program lands here by declaring itself at
+    /// install time — that is, by the installer's decision, not because a
+    /// file happens to lie somewhere.
     /// </remarks>
     private static IEnumerable<AppEntry> FromAppPaths()
     {
@@ -192,7 +194,7 @@ public static class AppIndex
         }
     }
 
-    /// <summary>Ярлыки меню «Пуск» — то, что человек видит сам.</summary>
+    /// <summary>Start menu shortcuts — what the person sees themselves.</summary>
     private static IEnumerable<AppEntry> FromStartMenu()
     {
         var roots = new[]
@@ -217,24 +219,25 @@ public static class AppIndex
                     Launch = path,
                     Source = "start_menu",
                     Aliases = [name],
-                    // Подпись у ярлыка не спрашиваем: подписан не ярлык, а
-                    // то, на что он показывает, и раскрывать цель ярлыка
-                    // ради этого — работа для запуска, а не для обхода.
+                    // We do not ask a shortcut for a signature: what is
+                    // signed is not the shortcut but what it points at, and
+                    // resolving the target for that is work for launching,
+                    // not for a sweep.
                     Signed = true,
                 };
             }
         }
     }
 
-    /// <summary>Пакеты Магазина: у них нет пути, есть AppID.</summary>
+    /// <summary>Store packages: they have no path, they have an AppID.</summary>
     private static IEnumerable<AppEntry> FromPackages()
     {
         var listed = new List<AppEntry>();
         try
         {
-            // Пакеты перечисляет PowerShell: своего API у .NET для этого
-            // нет, а COM-интерфейс пакетов потребовал бы обёртки ради
-            // одного вызова.
+            // PowerShell enumerates the packages: .NET has no API of its
+            // own for this, and the package COM interface would want a
+            // wrapper for the sake of one call.
             var process = Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
@@ -261,21 +264,21 @@ public static class AppIndex
                     Kind = "uwp",
                     Source = "uwp",
                     Aliases = [parts[0]],
-                    // Пакет Магазина подписан по определению: неподписанный
-                    // туда не попадает.
+                    // A Store package is signed by definition: an
+                    // unsigned one does not get in there.
                     Signed = true,
                 });
             }
         }
         catch
         {
-            // PowerShell выключен политикой или недоступен — это не повод
-            // остаться без индекса вовсе.
+            // PowerShell disabled by policy or unavailable — no reason to
+            // be left without an index entirely.
         }
         return listed;
     }
 
-    /// <summary>Программы из PATH — только существующие файлы.</summary>
+    /// <summary>Programs from PATH — existing files only.</summary>
     private static IEnumerable<AppEntry> FromPath()
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -301,7 +304,7 @@ public static class AppIndex
         }
     }
 
-    /// <summary>Папка, добавленная человеком: portable-программы.</summary>
+    /// <summary>A folder the person added: portable programs.</summary>
     private static IEnumerable<AppEntry> FromFolder(string folder)
     {
         if (!Directory.Exists(folder) || Forbidden(folder)) yield break;
@@ -311,8 +314,8 @@ public static class AppIndex
             var path = Canonical(file);
             if (path.Length == 0) continue;
 
-            // Junction внутри добавленной папки, ведущий наружу, не должен
-            // протаскивать в индекс что попало (4.0-G11).
+            // A junction inside an added folder that leads outside must
+            // not drag whatever it likes into the index (4.0-G11).
             if (!Inside(path, folder) || Forbidden(path)) continue;
             var name = Path.GetFileNameWithoutExtension(path);
             if (Junk(name)) continue;
@@ -328,8 +331,11 @@ public static class AppIndex
         }
     }
 
-    // -------------------------------------------------------------- мелочи
+    // ------------------------------------------------------- small things
 
+    // Words that mark a shortcut as junk. Both languages on purpose: on a
+    // Russian Windows the Start menu says «Удалить», on an English one it
+    // says «Uninstall», and the index sees whichever the system wrote.
     private static readonly string[] JunkWords =
     [
         "uninstall", "удалить", "readme", "changelog", "help", "справка",
@@ -342,7 +348,7 @@ public static class AppIndex
         return JunkWords.Any(word => lower.Contains(word));
     }
 
-    /// <summary>Имя из ресурсов файла, если оно там осмысленное.</summary>
+    /// <summary>The name from the file's resources, when it is meaningful.</summary>
     private static string FriendlyName(string path, string fallback)
     {
         try
@@ -356,8 +362,8 @@ public static class AppIndex
 
     private static IEnumerable<T> Safe<T>(Func<IEnumerable<T>> source)
     {
-        // Перебор реестра спотыкается о ветки без прав. Ронять из-за
-        // этого весь индекс нельзя.
+        // Walking the registry stumbles over branches without rights.
+        // The whole index must not fall over because of that.
         try
         {
             return source().ToList();
@@ -369,14 +375,15 @@ public static class AppIndex
     }
 
     /// <summary>
-    /// Обойти дерево, пропуская то, что не открылось.
+    /// Walk the tree, skipping whatever would not open.
     /// </summary>
     /// <remarks>
-    /// <c>EnumerateFiles</c> с <c>AllDirectories</c> для этого не годится:
-    /// он бросает на первой недоступной папке, и обход прекращается
-    /// целиком. Так и вышло — из меню «Пуск» не пришло ни одной записи,
-    /// хотя ярлыков там сотни. Обход своими руками: недоступная ветка
-    /// пропускается, соседние остаются.
+    /// <c>EnumerateFiles</c> with <c>AllDirectories</c> will not do here:
+    /// it throws on the first inaccessible folder and the walk stops
+    /// altogether. That is exactly what happened — not a single entry
+    /// arrived from the Start menu, though there are hundreds of shortcuts
+    /// there. Hence a walk of our own: an unreadable branch is skipped and
+    /// its neighbours remain.
     /// </remarks>
     private static IEnumerable<string> Walk(string root, string pattern,
                                             int depth = 8)
@@ -401,24 +408,24 @@ public static class AppIndex
         }
     }
 
-    // --------------------------------------------------------------- кэш
+    // --------------------------------------------------------------- cache
 
     private static string CachePath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "RinaAssistant", "app_index.json");
 
-    /// <summary>Как устроен файл кэша; растёт при смене формата.</summary>
+    /// <summary>How the cache file is shaped; grows when the format changes.</summary>
     private const int CacheVersion = 2;
 
     private static List<AppEntry>? _memory;
 
     /// <summary>
-    /// Индекс: из памяти, из файла или заново.
+    /// The index: from memory, from the file, or built afresh.
     /// </summary>
     /// <remarks>
-    /// Сборка занимает секунды, поэтому кэш есть. Записи с исчезнувшими
-    /// файлами при чтении выбрасываются: индекс, помнящий удалённое,
-    /// однажды запустит не то (<c>4.0-G11</c>).
+    /// Building takes seconds, hence the cache. Entries whose files have
+    /// vanished are dropped while reading: an index that remembers deleted
+    /// things will one day launch the wrong one (<c>4.0-G11</c>).
     /// </remarks>
     public static List<AppEntry> Get(IEnumerable<string>? folders = null,
                                      bool refresh = false)
@@ -469,7 +476,7 @@ public static class AppIndex
         }
         catch
         {
-            // Не записался кэш — программа работает, просто медленнее.
+            // The cache did not write — the program works, only slower.
         }
     }
 

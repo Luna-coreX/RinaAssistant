@@ -4,47 +4,48 @@ using System.Runtime.InteropServices;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Одна запись индекса программ.
+/// One entry in the program index.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-G09</c>. По записи должно быть видно, <b>откуда она
-/// взялась и когда проверялась</b>: без этого нельзя ни предупредить о
-/// неподписанном, ни вычистить устаревшее. В 3.1.0 запись состояла из
-/// имени, пути, вида и источника — и всё; «откуда» было, «насколько
-/// доверять» не было.
+/// Plan item <c>4.0-G09</c>. An entry has to show <b>where it came from
+/// and when it was last checked</b>: without that you can neither warn
+/// about something unsigned nor clear out what has gone stale. In 3.1.0
+/// an entry held a name, a path, a kind and a source — and that was all;
+/// "where from" was there, "how much to trust it" was not.
 /// </para>
 /// <para>
-/// <b>Псевдонимы собирает оболочка, сопоставляет ядро.</b> Здесь лежат
-/// только те имена, которые дала система: имя ярлыка, имя файла, название
-/// из ресурсов. Разговорные («телеграм», «фотошоп») — дело ядра
+/// <b>The shell gathers the aliases, the core matches them.</b> Only the
+/// names the system gave are kept here: the shortcut's name, the file
+/// name, the name from the resources. Spoken ones ("telegram",
+/// "photoshop") are the core's business
 /// ([ADR 0009](../../../docs/adr/0009-system-layer.md)).
 /// </para>
 /// </remarks>
 public sealed record AppEntry
 {
-    /// <summary>Как программа называется для человека.</summary>
+    /// <summary>What the program is called for a person.</summary>
     public required string Name { get; init; }
 
-    /// <summary>Что запускать: путь к файлу или AppID пакета.</summary>
+    /// <summary>What to launch: a file path or a package AppID.</summary>
     public required string Launch { get; init; }
 
-    /// <summary>«file» или «uwp».</summary>
+    /// <summary>"file" or "uwp".</summary>
     public string Kind { get; init; } = "file";
 
-    /// <summary>Откуда узнали: start_menu, app_paths, uwp, path, folder.</summary>
+    /// <summary>Where we learned of it: start_menu, app_paths, uwp, path, folder.</summary>
     public required string Source { get; init; }
 
-    /// <summary>Имена от системы: ярлык, файл, ресурсы.</summary>
+    /// <summary>Names from the system: shortcut, file, resources.</summary>
     public string[] Aliases { get; init; } = [];
 
-    /// <summary>Подпись файла проверена системой и действительна.</summary>
+    /// <summary>The file's signature was checked by the system and is valid.</summary>
     public bool Signed { get; init; }
 
-    /// <summary>Когда запись проверяли в последний раз (UTC).</summary>
+    /// <summary>When the entry was last checked (UTC).</summary>
     public DateTime CheckedAt { get; init; } = DateTime.UtcNow;
 
-    // --- проверка подписи ---------------------------------------------------
+    // --- signature verification ---------------------------------------------
 
     private static readonly Guid VerifyAction =
         new("00AAC56B-CD44-11d0-8CC2-00C04FC295EE");
@@ -87,7 +88,7 @@ public sealed record AppEntry
     private static extern int WinVerifyTrust(IntPtr window, ref Guid action,
                                              ref TrustData data);
 
-    // --- подпись каталогом --------------------------------------------------
+    // --- signature by catalogue ---------------------------------------------
 
     private const uint ChoiceCatalog = 2;
 
@@ -106,9 +107,9 @@ public sealed record AppEntry
         public IntPtr CatAdmin;
     }
 
-    // CharSet обязателен: `wszCatalogFile` — широкая строка, и без этого
-    // `ByValTStr` читает её как однобайтовую. Путь к каталогу приходил
-    // строкой «C» — первой буквой, за которой стоял нулевой байт.
+    // CharSet is mandatory: `wszCatalogFile` is a wide string, and without
+    // it `ByValTStr` reads it as single-byte. The catalogue path came back
+    // as the string "C" — the first letter, followed by a zero byte.
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct CatalogInfo
     {
@@ -145,18 +146,20 @@ public sealed record AppEntry
                                                            uint flags);
 
     /// <summary>
-    /// Подписан ли файл каталогом.
+    /// Whether the file is signed by a catalogue.
     /// </summary>
     /// <remarks>
-    /// Системные файлы Windows не носят подпись внутри себя: их хэши
-    /// перечислены в каталоге, а подписан каталог. Проверка только
-    /// встроенной подписи объявила бы неподписанной половину системы — и
-    /// научила бы человека жать «всегда доверять», не читая.
+    /// Windows system files do not carry a signature inside themselves:
+    /// their hashes are listed in a catalogue, and the catalogue is what
+    /// is signed. A check that knows only about embedded signatures would
+    /// declare half the system unsigned — and teach the person to click
+    /// "always trust" without reading.
     ///
-    /// Здесь ищется каталог по хэшу файла и проверяется <b>он</b> — той же
-    /// `WinVerifyTrust`, только с указанием, чей это член.
+    /// Here the catalogue is found by the file's hash and <b>it</b> is
+    /// verified — by the same `WinVerifyTrust`, only told whose member
+    /// this is.
     /// </remarks>
-    /// <summary>Где именно проверка каталога споткнулась — для разбора.</summary>
+    /// <summary>Where exactly the catalogue check stumbled — for diagnosis.</summary>
     public static string CatalogTrace(string path)
     {
         if (!CryptCATAdminAcquireContext2(out var admin, IntPtr.Zero,
@@ -271,21 +274,21 @@ public sealed record AppEntry
             CryptCATAdminReleaseContext(admin, 0);
         }
     }
-
     /// <summary>
-    /// Действительна ли подпись Authenticode у файла.
+    /// Whether the file's Authenticode signature is valid.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Спрашивается система (<c>WinVerifyTrust</c>), а не разбор файла
-    /// своими руками: проверить подпись значит пройти цепочку доверия,
-    /// сверить отзыв и учесть политику машины, — и делать это самим значит
-    /// делать хуже, чем уже сделано.
+    /// The system is asked (<c>WinVerifyTrust</c>) rather than the file
+    /// being taken apart by hand: verifying a signature means walking the
+    /// trust chain, checking revocation and honouring machine policy — and
+    /// doing that ourselves means doing it worse than it is already done.
     /// </para>
     /// <para>
-    /// Флаг «подпись действительна и после истечения сертификата» включён
-    /// нарочно: сертификат, которым подписали программу три года назад,
-    /// давно истёк, а программа от этого не стала неподписанной.
+    /// The "signature stays valid past certificate expiry" flag is on
+    /// deliberately: the certificate a program was signed with three years
+    /// ago has long expired, and the program did not become unsigned
+    /// because of it.
     /// </para>
     /// </remarks>
     public static bool HasSignature(string path)
@@ -315,21 +318,21 @@ public sealed record AppEntry
             var action = VerifyAction;
             var verdict = WinVerifyTrust(IntPtr.Zero, ref action, ref data);
 
-            // Закрыть состояние обязательно: иначе провайдер оставит за
-            // собой память и открытый файл на каждую проверку, а их здесь
-            // сотни за одну переиндексацию.
+            // Closing the state is mandatory: otherwise the provider keeps
+            // memory and an open file for every check, and there are
+            // hundreds of those in a single reindex.
             data.StateAction = StateActionClose;
             WinVerifyTrust(IntPtr.Zero, ref action, ref data);
 
-            // Встроенной подписи нет — файл может быть подписан каталогом.
-            // Порядок именно такой: встроенная дешевле, и у большинства
-            // сторонних программ она и есть.
+            // No embedded signature — the file may be signed by a
+            // catalogue. This order deliberately: embedded is the cheaper
+            // check, and most third-party programs have exactly that.
             return verdict == 0 || SignedByCatalog(path);
         }
         catch
         {
-            // Нет wintrust, отказ провайдера, файл занят — всё это один и
-            // тот же ответ: подтвердить подпись не удалось.
+            // No wintrust, a provider refusal, a busy file — all of it is
+            // one and the same answer: the signature could not be confirmed.
             return false;
         }
         finally

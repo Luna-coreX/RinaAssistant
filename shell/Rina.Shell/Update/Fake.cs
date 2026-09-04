@@ -4,20 +4,22 @@ using System.Net.Http;
 namespace Rina.Shell.Update;
 
 /// <summary>
-/// Источник обновлений, отвечающий заранее заданным.
+/// An update source that answers with whatever it was told to.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Нужен проверке. Обновления нельзя проверить на настоящем GitHub: там
-/// сегодня одно, завтра другое, и проверка, зависящая от чужого релиза,
-/// краснеет по причинам, к коду не относящимся. А проверить надо ровно
-/// шесть исходов, из которых пять на живом источнике не воспроизвести.
+/// The checks need it. Updates cannot be verified against the real
+/// GitHub: what is there today is not there tomorrow, and a check that
+/// depends on someone else's release goes red for reasons unrelated to
+/// the code. And there are exactly six outcomes to verify, five of which
+/// cannot be reproduced against a live source at all.
 /// </para>
 /// <para>
-/// Живёт рядом с клиентом, а не в проверке: подменяется <b>вход</b>
-/// клиента, и подмена обязана говорить на том же языке, что настоящий
-/// источник. Стой она в файле проверки, ей пришлось бы повторять форму
-/// ответа GitHub — второй раз и с расхождениями.
+/// It lives next to the client rather than in the check: what is being
+/// substituted is the client's <b>input</b>, and the substitute has to
+/// speak the same language as the real source. Sitting in a check file it
+/// would have to restate the shape of GitHub's answer — a second time and
+/// with discrepancies.
 /// </para>
 /// </remarks>
 public sealed class Fake : HttpMessageHandler
@@ -25,7 +27,7 @@ public sealed class Fake : HttpMessageHandler
     private readonly Dictionary<string, (string Body, byte[]? Bytes)> _answers
         = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Сколько раз спрашивали — проверка смотрит и на это.</summary>
+    /// <summary>How many times it was asked — the checks look at this too.</summary>
     public int Asked { get; private set; }
 
     public Fake Says(string url, string body)
@@ -40,7 +42,7 @@ public sealed class Fake : HttpMessageHandler
         return this;
     }
 
-    /// <summary>Ответ релиза GitHub с одним активом.</summary>
+    /// <summary>A GitHub release answer with one asset.</summary>
     public static string Release(string manifestUrl) =>
         "{\"assets\": [{\"name\": \"manifest.json\", "
         + $"\"browser_download_url\": \"{manifestUrl}\"}}]}}";
