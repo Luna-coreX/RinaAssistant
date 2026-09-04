@@ -4,94 +4,95 @@ using System.Diagnostics;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Запуск программ и учёт того, что запускалось.
+/// Launching programs, and keeping a record of what was launched.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-G05</c>, <c>G10</c>, <c>G11</c>, <c>G12</c>.
+/// Plan items <c>4.0-G05</c>, <c>G10</c>, <c>G11</c>, <c>G12</c>.
 /// </para>
 /// <para>
-/// <b>Между «Рина решила» и «процесс запущен» стоит эта проверка.</b> Путь
-/// приводится к каноническому виду, запрещённые каталоги отсекаются, а
-/// неподписанный файл при первом запуске требует согласия человека. Ядро
-/// решает, <i>что</i> запустить; отвечает за то, <i>можно ли</i>, —
-/// оболочка ([ADR 0009](../../../docs/adr/0009-system-layer.md)).
+/// <b>This check stands between "Rina decided" and "the process is
+/// running".</b> The path is resolved to its canonical form, forbidden
+/// directories are cut off, and an unsigned file needs the person's
+/// consent the first time. The core decides <i>what</i> to launch;
+/// answering <i>whether it may</i> is the shell's job
+/// ([ADR 0009](../../../docs/adr/0009-system-layer.md)).
 /// </para>
 /// <para>
-/// <b>Записывается каждый запуск</b> (<c>4.0-G12</c>): что, откуда,
-/// спрашивали ли согласие, чем кончилось. Текста команды в журнале нет —
-/// он под настройкой <c>log_texts</c> и в системный журнал не попадает
-/// никогда: «что запускали» и «что человек сказал» — разные сведения, и
-/// смешивать их в одном файле незачем.
+/// <b>Every launch is recorded</b> (<c>4.0-G12</c>): what, from where,
+/// whether consent was asked, how it ended. The command text is not in
+/// the journal — it never is, not even under the `log_texts` setting:
+/// "what was launched" and "what the person said" are different facts,
+/// and there is no reason to mix them in one file.
 /// </para>
 /// </remarks>
 public static class Launcher
 {
-    /// <summary>Чем кончился запуск.</summary>
-    /// <param name="Ok">Процесс пошёл.</param>
-    /// <param name="Reason">Почему не пошёл — для ядра, не для человека.</param>
-    /// <param name="NeedsTrust">Нужно согласие на неподписанное.</param>
+    /// <summary>How the launch ended.</summary>
+    /// <param name="Ok">The process started.</param>
+    /// <param name="Reason">Why it did not — for the core, not for the person.</param>
+    /// <param name="NeedsTrust">Consent for something unsigned is needed.</param>
     public sealed record Outcome(bool Ok, string Reason = "",
                                  bool NeedsTrust = false);
 
     /// <summary>
-    /// Запустить то, что назвало ядро.
+    /// Launch what the core named.
     /// </summary>
-    /// <param name="launch">Путь к файлу или AppID пакета.</param>
-    /// <param name="kind">«file» или «uwp».</param>
+    /// <param name="launch">A file path or a package AppID.</param>
+    /// <param name="kind">"file" or "uwp".</param>
     /// <param name="trusted">
-    /// Человек уже согласился на этот неподписанный файл.
+    /// The person has already consented to this unsigned file.
     /// </param>
     public static Outcome Start(string launch, string kind, bool trusted)
     {
         if (string.IsNullOrWhiteSpace(launch))
-            return new Outcome(false, "пусто");
+            return new Outcome(false, "empty");
 
         if (kind == "uwp")
         {
-            // У пакета нет пути: запускается через shell-протокол.
+            // A package has no path: it launches through a shell protocol.
             var started = Shell($"shell:AppsFolder\\{launch}");
             Journal.Launch(launch, "uwp", trusted: true, ok: started);
             return started ? new Outcome(true)
-                : new Outcome(false, "пакет не запустился");
+                : new Outcome(false, "the package did not start");
         }
 
         var path = AppIndex.Canonical(launch);
         if (path.Length == 0 || !File.Exists(path))
         {
-            Journal.Launch(launch, "file", trusted, ok: false, note: "нет файла");
-            return new Outcome(false, "файла нет");
+            Journal.Launch(launch, "file", trusted, ok: false, note: "no file");
+            return new Outcome(false, "the file is gone");
         }
 
-        // Запрет сильнее согласия: «Загрузки» не запускаются, даже если
-        // человек однажды сказал «всегда доверять» чему-то оттуда.
+        // A prohibition outweighs consent: Downloads does not run, even if
+        // the person once said "always trust" to something from there.
         if (AppIndex.Forbidden(path))
         {
             Journal.Launch(path, "file", trusted, ok: false,
-                           note: "запрещённый каталог");
-            return new Outcome(false, "запрещённый каталог");
+                           note: "forbidden directory");
+            return new Outcome(false, "forbidden directory");
         }
 
-        // Неподписанное — только с согласия, и только в первый раз.
+        // Unsigned runs only with consent, and only the first time.
         if (!trusted && !Trust.Allowed(path))
         {
             Journal.Launch(path, "file", trusted: false, ok: false,
-                           note: "нужно согласие");
-            return new Outcome(false, "нужно согласие", NeedsTrust: true);
+                           note: "consent required");
+            return new Outcome(false, "consent required", NeedsTrust: true);
         }
 
         var ran = Shell(path);
         Journal.Launch(path, "file", trusted || Trust.Allowed(path), ran);
-        return ran ? new Outcome(true) : new Outcome(false, "не запустилось");
+        return ran ? new Outcome(true) : new Outcome(false, "did not start");
     }
 
     /// <summary>
-    /// Запуск средствами оболочки системы.
+    /// Launching by way of the system shell.
     /// </summary>
     /// <remarks>
-    /// <c>UseShellExecute</c> обязателен: так запускаются и ярлыки, и
-    /// пакеты, и файлы с ассоциацией — тем же способом, каким это делает
-    /// проводник. Своего разбора ярлыков мы не пишем.
+    /// <c>UseShellExecute</c> is mandatory: it is how shortcuts, packages
+    /// and files with an association all launch — the same way Explorer
+    /// does it. We do not write our own shortcut parser.
     /// </remarks>
     private static bool Shell(string what)
     {
@@ -112,11 +113,12 @@ public static class Launcher
     }
 
     /// <summary>
-    /// Рабочий каталог — папка самой программы.
+    /// The working directory is the program's own folder.
     /// </summary>
     /// <remarks>
-    /// Иначе им станет каталог Рины, и программа, ищущая файлы рядом с
-    /// собой, их не найдёт. Для пакетов и протоколов каталога нет — пусто.
+    /// Otherwise it becomes Rina's folder, and a program looking for files
+    /// next to itself will not find them. Packages and protocols have no
+    /// folder — empty then.
     /// </remarks>
     private static string SafeFolder(string what)
     {

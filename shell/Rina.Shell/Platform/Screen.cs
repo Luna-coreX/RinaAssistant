@@ -6,33 +6,34 @@ using System.Runtime.InteropServices;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Снимок экрана.
+/// A screenshot.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-G03</c>.
+/// Plan item <c>4.0-G03</c>.
 /// </para>
 /// <para>
-/// <b>Снимает все мониторы разом.</b> Человек, просящий снимок, имеет в
-/// виду то, что видит, а видит он два экрана. Снять только основной значит
-/// отрезать половину без предупреждения.
+/// <b>Captures every monitor at once.</b> Someone asking for a screenshot
+/// means what they see, and what they see is two screens. Capturing only
+/// the primary one cuts half of it away without warning.
 /// </para>
 /// <para>
-/// <b>Границы берутся у системы в физических точках</b>
-/// (<c>GetSystemMetrics</c>), а не у WPF: у WPF они в независимых от
-/// плотности единицах, и на экране с масштабом 150% снимок вышел бы
-/// обрезанным ровно на треть. Своей зависимости от WinForms ради одного
-/// прямоугольника мы при этом не заводим.
+/// <b>The bounds come from the system in physical pixels</b>
+/// (<c>GetSystemMetrics</c>), not from WPF: WPF reports them in
+/// device-independent units, and on a display scaled to 150% the capture
+/// would come out short by exactly a third. We do not take a dependency
+/// on WinForms for the sake of one rectangle either.
 /// </para>
 /// <para>
-/// <b>В «Изображения», а не в скрытую папку.</b> Снимок нужен, чтобы его
-/// куда-то отправить; лежащий там, где его не найти, бесполезен. Путь
-/// возвращается наружу — ядро скажет его человеку.
+/// <b>Into Pictures, not into a hidden folder.</b> A screenshot exists to
+/// be sent somewhere; one that cannot be found is useless. The path is
+/// returned outward — the core will tell the person where it is.
 /// </para>
 /// <para>
-/// В 3.1.0 это делал Qt и только из потока интерфейса. Здесь ограничения
-/// нет: <c>CopyFromScreen</c> работает из любого потока, и снимок перестал
-/// быть операцией, которую надо просить у окна.
+/// In 3.1.0 this was done by Qt and only from the interface thread. There
+/// is no such restriction here: <c>CopyFromScreen</c> works from any
+/// thread, and a screenshot stopped being something one has to ask the
+/// window for.
 /// </para>
 /// </remarks>
 public static class Screen
@@ -45,7 +46,7 @@ public static class Screen
     [DllImport("user32.dll")]
     private static extern int GetSystemMetrics(int index);
 
-    /// <summary>Снять экран в файл. Пустая строка — не вышло.</summary>
+    /// <summary>Capture the screen to a file. Empty string — it did not work.</summary>
     public static string Grab()
     {
         try

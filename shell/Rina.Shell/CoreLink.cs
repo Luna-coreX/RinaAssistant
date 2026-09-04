@@ -357,7 +357,7 @@ public sealed class CoreLink : IAsyncDisposable
             {
                 ["granted"] = false,
                 // Причина уезжает в ядро и в журнал, а не человеку.
-                ["reason"] = "оболочка не умеет этот запрос", // не интерфейс
+                ["reason"] = "the shell does not know this request", // not UI
             });
             return;
         }
@@ -509,9 +509,11 @@ public sealed class CoreLink : IAsyncDisposable
         });
 
         if (answer == Pages.TrustWindow.Reply.Never)
-            // Причина уходит ядру, а не человеку: словами ответит Рина.
-            return new Platform.Launcher.Outcome(false,
-                                                 "человек отказался"); // не интерфейс
+            // The reason goes to the core, not to the person: Rina answers
+            // in words. It is a code rather than a phrase — matching on a
+            // substring of prose breaks on the first translation, and
+            // breaks silently.
+            return new Platform.Launcher.Outcome(false, "refused");
 
         if (answer == Pages.TrustWindow.Reply.Always)
             Platform.Trust.Remember(path);

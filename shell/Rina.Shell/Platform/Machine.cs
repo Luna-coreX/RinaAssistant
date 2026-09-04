@@ -4,37 +4,39 @@ using System.Runtime.InteropServices;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Системные действия: громкость, медиа, питание, снимок экрана.
+/// System actions: volume, media, power, screenshot.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-G01</c>, <c>G02</c>, <c>G03</c>. Решение —
-/// [ADR 0009](../../../docs/adr/0009-system-layer.md): машину трогает
-/// оболочка, а решает, что с ней сделать, ядро.
+/// Plan items <c>4.0-G01</c>, <c>G02</c>, <c>G03</c>. The decision is
+/// [ADR 0009](../../../docs/adr/0009-system-layer.md): the shell touches
+/// the machine, the core decides what to do with it.
 /// </para>
 /// <para>
-/// <b>Список закрыт и назван заранее.</b> Действие приходит по имени из
-/// этой таблицы; ничего похожего на «выполни строку» здесь нет и не
-/// появится. Именно этим системные действия отличаются от канала актуации
-/// (§12): «прибавить громкость» нельзя направить не туда.
+/// <b>The list is closed and named in advance.</b> An action arrives by a
+/// name from this table; nothing resembling "run this string" is here or
+/// ever will be. That is precisely what separates system actions from the
+/// actuation channel (§12): "turn the volume up" cannot be aimed
+/// somewhere else.
 /// </para>
 /// <para>
-/// <b>Слова говорит ядро.</b> Отсюда наружу уходит факт — получилось или
-/// нет; «Прибавила громкость» составит ядро, потому что это реплика Рины
-/// ([ADR 0007](../../../docs/adr/0007-localisation.md)), а не отчёт
-/// системы.
+/// <b>The core does the talking.</b> What leaves here is a fact — it
+/// worked or it did not; "Volume up" is composed by the core, because
+/// that is Rina speaking
+/// ([ADR 0007](../../../docs/adr/0007-localisation.md)), not a system
+/// report.
 /// </para>
 /// <para>
-/// <b>Клавиши, а не микшер.</b> Громкость и медиа делаются теми же
-/// сообщениями, что шлёт мультимедийная клавиатура: они уходят активному
-/// приложению и работают одинаково с чем угодно — от плеера до браузера.
-/// Управление громкостью через микшер трогало бы только собственный
-/// сеанс Рины, у которой звука нет вовсе.
+/// <b>Keys, not the mixer.</b> Volume and media use the same messages a
+/// multimedia keyboard sends: they reach the active application and work
+/// the same with anything, from a player to a browser. Driving volume
+/// through the mixer would touch only Rina's own session, and Rina has no
+/// sound of her own at all.
 /// </para>
 /// </remarks>
 public static class Machine
 {
-    // Виртуальные коды мультимедийных клавиш.
+    // Virtual key codes of the multimedia keys.
     private const byte VkVolumeMute = 0xAD;
     private const byte VkVolumeDown = 0xAE;
     private const byte VkVolumeUp = 0xAF;
@@ -51,11 +53,11 @@ public static class Machine
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool LockWorkStation();
 
-    /// <summary>Что оболочка умеет сделать с машиной.</summary>
+    /// <summary>What the shell can do to the machine.</summary>
     /// <remarks>
-    /// Имена те же, что в <c>voice/system_control.py</c> версии 3.1.0:
-    /// это одни и те же умения, переехавшие через границу процессов, и
-    /// переименование стоило бы правки распознавания на пустом месте.
+    /// The names are the ones from <c>voice/system_control.py</c> in 3.1.0:
+    /// these are the same abilities that moved across the process border,
+    /// and renaming them would cost a change in recognition for nothing.
     /// </remarks>
     public static readonly string[] Actions =
     [
@@ -65,11 +67,11 @@ public static class Machine
     ];
 
     /// <summary>
-    /// Сделать названное. Возвращает, получилось ли, и подробность.
+    /// Do the named thing. Returns whether it worked, and a detail.
     /// </summary>
     /// <remarks>
-    /// Незнакомое имя — не исключение, а «нет такого действия»: ядро может
-    /// оказаться новее оболочки, и падать из-за этого нельзя.
+    /// An unknown name is not an exception but "no such action": the core
+    /// may be newer than the shell, and falling over for that is not on.
     /// </remarks>
     public static (bool Ok, string Detail) Do(string action)
     {
@@ -86,11 +88,11 @@ public static class Machine
 
                 case "lock":
                     return LockWorkStation() ? (true, "")
-                        : (false, "система не дала заблокировать");
+                        : (false, "the system refused to lock");
 
-                // Питание — через штатные средства Windows, а не через
-                // ExitWindowsEx: те же права, то же поведение с открытыми
-                // документами, и никакого своего обхода.
+                // Power goes through the standard Windows tools rather
+                // than ExitWindowsEx: the same rights, the same behaviour
+                // with open documents, and no detour of our own.
                 case "sleep":
                     return Run("rundll32.exe", "powrprof.dll,SetSuspendState 0,1,0");
                 case "shutdown":
@@ -101,10 +103,10 @@ public static class Machine
                 case "screenshot":
                     var path = Screen.Grab();
                     return path.Length > 0 ? (true, path)
-                        : (false, "не вышло снять экран");
+                        : (false, "could not capture the screen");
 
                 default:
-                    return (false, "нет такого действия");
+                    return (false, "no such action");
             }
         }
         catch (Exception error)
@@ -113,12 +115,12 @@ public static class Machine
         }
     }
 
-    /// <summary>Нужно ли подтверждение — по мнению оболочки.</summary>
+    /// <summary>Whether confirmation is needed — in the shell's opinion.</summary>
     /// <remarks>
-    /// Спрашивает всё равно ядро (§11): подтверждение — часть разговора, а
-    /// не системного вызова. Здесь список нужен затем, чтобы оболочка
-    /// могла отказать необратимому, пришедшему без подтверждения, — второй
-    /// замок на случай, если первый однажды забудут повесить.
+    /// The core asks all the same (§11): confirmation is part of the
+    /// conversation, not of a system call. The list is here so the shell
+    /// can refuse an irreversible action that arrived without
+    /// confirmation — a second lock in case the first is ever left off.
     /// </remarks>
     public static readonly HashSet<string> Irreversible =
         ["sleep", "shutdown", "restart"];
@@ -138,6 +140,6 @@ public static class Machine
             UseShellExecute = false,
             CreateNoWindow = true,
         });
-        return started is null ? (false, "процесс не запустился") : (true, "");
+        return started is null ? (false, "the process did not start") : (true, "");
     }
 }

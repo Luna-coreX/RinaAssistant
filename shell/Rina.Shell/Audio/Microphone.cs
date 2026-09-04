@@ -127,7 +127,7 @@ public sealed class Microphone : IDisposable
         if (WaveInEvent.DeviceCount == 0)
             // Текст исключения читает разработчик в журнале.
             throw new InvalidOperationException(
-                "устройств записи не найдено");                // не интерфейс
+                "no recording devices found");                 // not UI
 
         _device = new WaveInEvent
         {

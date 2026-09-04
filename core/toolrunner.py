@@ -139,10 +139,14 @@ def _launch_app(ctx, args):
         started, why = launch(entry.launch, entry.kind)
 
     if not started:
-        # «Человек отказался» — не поломка: он ответил, и ответил «нет».
-        # Код тот же, что у отказа в разрешении: для ядра это одно и то же
-        # событие — человек сказал «нет», и повторять вопрос не надо.
-        if "отказал" in why:
+        # "The person refused" is not a fault: they answered, and the
+        # answer was no. The error code is the same as for a denied
+        # permission — for the core it is one and the same event, and the
+        # question should not be repeated.
+        #
+        # The shell replies with a code, not a phrase: matching on a
+        # substring of prose broke the moment the shell was translated.
+        if why == "refused":
             return ToolResult.failed(tr("Не стала запускать."),
                                      "permission.denied")
         return ToolResult.failed(
