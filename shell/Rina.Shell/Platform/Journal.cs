@@ -31,6 +31,9 @@ public static class Journal
 {
     private static readonly object Lock = new();
 
+    /// <summary>Куда пишется журнал — чтобы проверка искала там же.</summary>
+    public static string Where => Path;
+
     private static string Path => System.IO.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "RinaAssistant", "logs", "security.log");
@@ -49,6 +52,17 @@ public static class Journal
     /// <summary>Человек разрешил неподписанному запускаться всегда.</summary>
     public static void Trusted(string path)
         => Write($"trust path={path} scope=always");
+
+    /// <summary>
+    /// Обновления: проверка, закачка, целостность, установка.
+    /// </summary>
+    /// <remarks>
+    /// Задача плана <c>4.0-U05</c>. Пишется туда же, куда запуски: разбор
+    /// происшествия «после какого обновления это началось» невозможен,
+    /// если обновления лежат в одном файле, а запуски в другом.
+    /// </remarks>
+    public static void Update(string stage, string detail)
+        => Write($"update stage={stage} {detail}");
 
     /// <summary>Системное действие: громкость, питание, снимок.</summary>
     public static void Action(string action, bool ok)
@@ -98,14 +112,26 @@ public static class Journal
             {
                 Directory.CreateDirectory(
                     System.IO.Path.GetDirectoryName(Path)!);
-                File.AppendAllText(Path, stamped, Encoding.UTF8);
+
+                // Открываем, разрешая писать и другим. Тот же файл держит
+                // ядро своим журналом, и `File.AppendAllText` открывает
+                // его без права другим писать — то есть **никогда** не
+                // может дописать, пока ядро живо. Записи оболочки не
+                // появлялись вовсе, а исключение проглатывалось: журнал
+                // не имеет права ронять то, что он записывает.
+                using var file = new FileStream(
+                    Path, FileMode.Append, FileAccess.Write,
+                    FileShare.ReadWrite | FileShare.Delete);
+                var bytes = Encoding.UTF8.GetBytes(stamped);
+                file.Write(bytes, 0, bytes.Length);
             }
         }
         catch
         {
             // Журнал — свидетельство, а не разрешение: не записалось —
             // действие всё равно состоялось, и молчать об этом честнее,
-            // чем ронять запуск.
+            // чем ронять запуск. Молчание здесь и стоило того, что записи
+            // не было полгода: поэтому проверка теперь читает файл.
         }
     }
 }

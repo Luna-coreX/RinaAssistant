@@ -200,6 +200,15 @@
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
+  "Есть новая оболочка {0}.": {
+    "English": "There is a new shell {0}."
+  },
+  "Есть новое ядро {0}.": {
+    "English": "There is a new core {0}."
+  },
+  "Есть обновление: оболочка {0}, ядро {1}.": {
+    "English": "An update is available: shell {0}, core {1}."
+  },
   "Жду": {
     "English": "Waiting"
   },
@@ -476,6 +485,9 @@
   "О чём напомнить?": {
     "English": "What should I remind you about?"
   },
+  "ОБНОВЛЕНИЯ": {
+    "English": "UPDATES"
+  },
   "Обзор…": {
     "English": "Browse…",
     "Українська": "Огляд…",
@@ -487,6 +499,9 @@
     "Українська": "Оновити",
     "Español": "Actualizar",
     "Deutsch": "Aktualisieren"
+  },
+  "Обновление не подходит к тому, что установлено: {0}.": {
+    "English": "This update does not fit what is installed: {0}."
   },
   "Обновления": {
     "English": "Updates"
@@ -632,11 +647,23 @@
     "Español": "Privacidad",
     "Deutsch": "Datenschutz"
   },
+  "Проверить": {
+    "English": "Check",
+    "Українська": "Перевірити",
+    "Español": "Probar",
+    "Deutsch": "Testen"
+  },
   "Проверить голос": {
     "English": "Test voice"
   },
   "Проверить микрофон": {
     "English": "Test microphone"
+  },
+  "Проверить не вышло — попробуйте позже.": {
+    "English": "The check did not go through — try again later."
+  },
+  "Проверка не запускалась.": {
+    "English": "No check has been run yet."
   },
   "Проверять обновления": {
     "English": "Check for updates",
@@ -791,6 +818,9 @@
   "Список обновлён.": {
     "English": "List refreshed."
   },
+  "Спрашиваю…": {
+    "English": "Asking…"
+  },
   "Ставлю…": {
     "English": "Installing…"
   },
@@ -832,6 +862,15 @@
     "Українська": "Видалити",
     "Español": "Eliminar",
     "Deutsch": "Löschen"
+  },
+  "Установить эту пару нельзя.": {
+    "English": "This pair cannot be installed."
+  },
+  "Установка появится вместе с установщиком.": {
+    "English": "Installing arrives with the installer."
+  },
+  "Установлена последняя версия.": {
+    "English": "The latest version is installed."
   },
   "Устройство по умолчанию": {
     "English": "Default device"
@@ -914,6 +953,12 @@
   "без имени": {
     "English": "unnamed"
   },
+  "в метаданных нет ни одной части": {
+    "English": "the metadata lists no parts"
+  },
+  "в релизе нет manifest.json": {
+    "English": "the release has no manifest.json"
+  },
   "версия {0}": {
     "English": "version {0}"
   },
@@ -932,8 +977,14 @@
   "или ко времени": {
     "English": "or at a time"
   },
+  "источник обновлений обязан быть https, а это «{0}»": {
+    "English": "the update source must be https, and this is “{0}”"
+  },
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
+  },
+  "метаданные версии {0}, а мы умеем 1": {
+    "English": "metadata version {0}, and we speak 1"
   },
   "на чём они разговаривают": {
     "English": "what they talk over"
@@ -965,6 +1016,12 @@
   "не разобрал сочетание «{0}»": {
     "English": "couldn’t parse the shortcut “{0}”"
   },
+  "не разобрали ответ: {0}": {
+    "English": "could not read the answer: {0}"
+  },
+  "не удалось спросить источник: {0}": {
+    "English": "could not ask the source: {0}"
+  },
   "нет связи": {
     "English": "no connection"
   },
@@ -980,11 +1037,17 @@
   "о чём напомнить": {
     "English": "what to remind about"
   },
+  "оболочка говорит [{0}], ядро слышит [{1}]": {
+    "English": "the shell speaks [{0}], the core hears [{1}]"
+  },
   "оболочка не знает такого элемента страницы": {
     "English": "the shell doesn’t know this page element"
   },
   "окно, звук, системный слой": {
     "English": "window, audio, system layer"
+  },
+  "ответ не объект": {
+    "English": "the answer is not an object"
   },
   "папка с моделью": {
     "English": "folder with the model"
@@ -1013,6 +1076,9 @@
   "формат настроек и истории": {
     "English": "format of settings and history"
   },
+  "хэш не сошёлся: ждали {0}…, получили {1}…": {
+    "English": "the hash did not match: expected {0}…, got {1}…"
+  },
   "через 15 минут": {
     "English": "in 15 minutes"
   },
@@ -1036,6 +1102,9 @@
   },
   "ядро {0}": {
     "English": "core {0}"
+  },
+  "ядро {0} читает данные схемы {1}, а на диске уже {2}": {
+    "English": "core {0} reads schema {1}, and the disk already holds {2}"
   },
   "ядро запускается": {
     "English": "the core is starting"

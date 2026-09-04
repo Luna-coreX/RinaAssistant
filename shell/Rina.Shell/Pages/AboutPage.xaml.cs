@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+using Rina.Protocol;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -44,6 +46,95 @@ public partial class AboutPage : UserControl
         BuildLinks();
         BuildPlaces();
         Loaded += async (_, _) => await ShowPartsAsync();
+    }
+
+    /// <summary>Что сказала последняя проверка — для сквозной проверки.</summary>
+    public string UpdateSaid => UpdateState.Text;
+
+    /// <summary>
+    /// Спросить, есть ли новее.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Задача плана <c>4.0-U03</c>. Клиент живёт в оболочке
+    /// ([ADR 0009](../../../docs/adr/0009-system-layer.md)): скачать файл и
+    /// положить на диск — работа системного слоя, а заменять файлы ядра
+    /// может только тот, кто ядро останавливает.
+    /// </para>
+    /// <para>
+    /// <b>Кнопка есть всегда, даже когда автопроверка выключена.</b>
+    /// Настройка `check_updates` управляет тем, спрашиваем ли мы сами;
+    /// человек, пришедший спросить руками, уже ответил на этот вопрос.
+    /// </para>
+    /// </remarks>
+    private async void OnCheckUpdates(object sender, RoutedEventArgs e)
+    {
+        CheckNow.IsEnabled = false;
+        UpdateState.Text = S("Спрашиваю…");
+        UpdateNote.Text = "";
+        try
+        {
+            var found = await new Update.Updater([ProtocolVersion.Current])
+                .CheckAsync(ShellVersion, CoreVersion,
+                            await DataSchemaAsync());
+
+            UpdateState.Text = found.Explanation;
+            UpdateNote.Text = found.Verdict switch
+            {
+                Update.Verdict.UpToDate => "",
+                Update.Verdict.Unknown => S("Проверить не вышло — попробуйте позже."),
+                Update.Verdict.Incompatible => S("Установить эту пару нельзя."),
+                _ => S("Установка появится вместе с установщиком."),
+            };
+            UpdateState.SetResourceReference(ForegroundProperty,
+                found.Verdict is Update.Verdict.Unknown
+                                 or Update.Verdict.Incompatible
+                    ? "C.Signal" : "C.Ink");
+        }
+        finally
+        {
+            CheckNow.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Версия ядра: она названа в рукопожатии.
+    /// </summary>
+    /// <remarks>
+    /// Ноль значит «ядра нет на связи». Проверять обновления при этом
+    /// можно: оболочка обновляется отдельно от ядра, в этом и смысл
+    /// раздельных версий (ADR 0004).
+    /// </remarks>
+    private string CoreVersion
+        => _link?.Connection is { Ready: true, CoreVersion.Length: > 0 } live
+            ? live.CoreVersion : "0.0.0";
+
+    /// <summary>
+    /// Версия схемы данных на диске.
+    /// </summary>
+    /// <remarks>
+    /// Спрашивается у ядра, потому что на диск пишет оно. Ноль значит «не
+    /// знаем» — и тогда откат по схеме не запрещается, а не запрещается
+    /// молча: неизвестное число не повод отказать, но и не повод
+    /// разрешить, поэтому проверка схемы просто не срабатывает.
+    /// </remarks>
+    private async Task<int> DataSchemaAsync()
+    {
+        if (_link?.Connection is not { Ready: true } connection) return 0;
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject
+                {
+                    ["keys"] = new JsonArray("config_version"),
+                }, TimeSpan.FromSeconds(10));
+            return answer.Payload["values"]?["config_version"]
+                   ?.GetValue<int>() ?? 0;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     /// <summary>

@@ -132,6 +132,16 @@ public static partial class Loc
                 {
                     ["English"] = "Above 100 she hurries, below she drawls",
                 },
+            ["в метаданных нет ни одной части"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the metadata lists no parts",
+                },
+            ["в релизе нет manifest.json"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the release has no manifest.json",
+                },
             ["В файле не список команд."] =
                 new Dictionary<string, string>
                 {
@@ -349,6 +359,21 @@ public static partial class Loc
                 {
                     ["English"] = "If you don’t answer, nothing happens.",
                 },
+            ["Есть новая оболочка {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There is a new shell {0}.",
+                },
+            ["Есть новое ядро {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There is a new core {0}.",
+                },
+            ["Есть обновление: оболочка {0}, ядро {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "An update is available: shell {0}, core {1}.",
+                },
             ["Жду"] =
                 new Dictionary<string, string>
                 {
@@ -509,6 +534,11 @@ public static partial class Loc
                 {
                     ["English"] = "Source unknown",
                 },
+            ["источник обновлений обязан быть https, а это «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the update source must be https, and this is “{0}”",
+                },
             ["Источник: {0}"] =
                 new Dictionary<string, string>
                 {
@@ -606,6 +636,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Where to speak",
+                },
+            ["метаданные версии {0}, а мы умеем 1"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "metadata version {0}, and we speak 1",
                 },
             ["Микрофон"] =
                 new Dictionary<string, string>
@@ -789,6 +824,16 @@ public static partial class Loc
                 {
                     ["English"] = "couldn’t parse the shortcut “{0}”",
                 },
+            ["не разобрали ответ: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "could not read the answer: {0}",
+                },
+            ["не удалось спросить источник: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "could not ask the source: {0}",
+                },
             ["Непонятое уходит в поиск, а не остаётся без ответа"] =
                 new Dictionary<string, string>
                 {
@@ -896,6 +941,16 @@ public static partial class Loc
                     ["Español"] = "Actualizar",
                     ["Українська"] = "Оновити",
                 },
+            ["Обновление не подходит к тому, что установлено: {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This update does not fit what is installed: {0}.",
+                },
+            ["ОБНОВЛЕНИЯ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "UPDATES",
+                },
             ["Обновления"] =
                 new Dictionary<string, string>
                 {
@@ -905,6 +960,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Shell",
+                },
+            ["оболочка говорит [{0}], ядро слышит [{1}]"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the shell speaks [{0}], the core hears [{1}]",
                 },
             ["оболочка не знает такого элемента страницы"] =
                 new Dictionary<string, string>
@@ -920,6 +980,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Main shortcut",
+                },
+            ["ответ не объект"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the answer is not an object",
                 },
             ["Отвечать голосом"] =
                 new Dictionary<string, string>
@@ -1145,6 +1210,14 @@ public static partial class Loc
                 {
                     ["English"] = "applies after a restart",
                 },
+            ["Проверить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Testen",
+                    ["English"] = "Check",
+                    ["Español"] = "Probar",
+                    ["Українська"] = "Перевірити",
+                },
             ["Проверить голос"] =
                 new Dictionary<string, string>
                 {
@@ -1154,6 +1227,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Test microphone",
+                },
+            ["Проверить не вышло — попробуйте позже."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The check did not go through — try again later.",
+                },
+            ["Проверка не запускалась."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No check has been run yet.",
                 },
             ["Проверять обновления"] =
                 new Dictionary<string, string>
@@ -1404,6 +1487,11 @@ public static partial class Loc
                 {
                     ["English"] = "List refreshed.",
                 },
+            ["Спрашиваю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Asking…",
+                },
             ["ССЫЛКИ"] =
                 new Dictionary<string, string>
                 {
@@ -1466,6 +1554,21 @@ public static partial class Loc
                 {
                     ["English"] = "WORKS OUT OF THE BOX · programs found: {0}",
                 },
+            ["Установить эту пару нельзя."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This pair cannot be installed.",
+                },
+            ["Установка появится вместе с установщиком."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installing arrives with the installer.",
+                },
+            ["Установлена последняя версия."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The latest version is installed.",
+                },
             ["УСТАНОВЛЕННЫЕ"] =
                 new Dictionary<string, string>
                 {
@@ -1510,6 +1613,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Keep the conversation between runs",
+                },
+            ["хэш не сошёлся: ждали {0}…, получили {1}…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the hash did not match: expected {0}…, got {1}…",
                 },
             ["Цвет, которым Рина выделяет важное"] =
                 new Dictionary<string, string>
@@ -1631,6 +1739,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "core {0}",
+                },
+            ["ядро {0} читает данные схемы {1}, а на диске уже {2}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "core {0} reads schema {1}, and the disk already holds {2}",
                 },
             ["ядро запускается"] =
                 new Dictionary<string, string>

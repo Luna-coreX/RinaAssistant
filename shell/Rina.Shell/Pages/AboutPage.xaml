@@ -20,6 +20,31 @@
         </StackPanel>
       </Border>
 
+      <!-- Обновления спрашивают здесь: «о программе» — то место, куда
+           идут узнать, какая стоит версия, и следующий вопрос всегда
+           «а есть ли новее». -->
+      <TextBlock Text="{loc:S 'ОБНОВЛЕНИЯ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <TextBlock x:Name="UpdateState" Style="{StaticResource Text.Body}"
+                       TextWrapping="Wrap"
+                       Text="{loc:S 'Проверка не запускалась.'}" />
+            <TextBlock x:Name="UpdateNote" Style="{StaticResource Text.Meta}"
+                       TextWrapping="Wrap" Margin="0,4,0,0" />
+          </StackPanel>
+          <Button x:Name="CheckNow" Grid.Column="1"
+                  Style="{StaticResource Btn}"
+                  Content="{loc:S 'Проверить'}" Click="OnCheckUpdates"
+                  VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
       <TextBlock Text="{loc:S 'ИЗ ЧЕГО СОБРАНА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <Border Style="{StaticResource Rows}" Margin="0,0,0,16">

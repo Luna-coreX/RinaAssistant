@@ -1,4 +1,5 @@
 using System.IO;
+using System.Net.Http;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Media;
@@ -77,6 +78,13 @@ public partial class App
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = CheckOverlaysAsync(window, Value(args, "--shot"));
+            return;
+        }
+
+        if (args.Contains("--check-updates"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckUpdatesAsync();
             return;
         }
 
@@ -770,6 +778,197 @@ public partial class App
         Shutdown();
     }
 
+    /// <summary>
+    /// U02..U05: метаданные, четыре сценария, целостность, журнал.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Источник подменён (<see cref="Update.Fake"/>). На настоящем GitHub
+    /// проверить это нельзя: там сегодня одно, завтра другое, а из шести
+    /// исходов пять требуют релиза, которого не существует, — например
+    /// пары, которая не поздоровается.
+    /// </para>
+    /// <para>
+    /// Сеть при этом не трогается ни разу, и это тоже проверяется: клиент
+    /// обновлений, случайно сходивший наружу в проверке, однажды сходит
+    /// наружу там, где не звали.
+    /// </para>
+    /// </remarks>
+    private async Task CheckUpdatesAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        try
+        {
+        Console.WriteLine("=== U02: метаданные разбираются или отвергаются ===");
+
+        var good = Manifest("4.0.1", "4.0.1", "[1]", "[1]", 2);
+        Check("целые метаданные прочитаны",
+              Update.Manifest.Parse(good) is { Ok: true, Parts.Count: 2 });
+        Check("мусор отвергнут с причиной",
+              Update.Manifest.Parse("не json") is { Ok: false } bad
+              && bad.Problem.Length > 0);
+        Check("чужая версия формата отвергнута",
+              !Update.Manifest.Parse("""{"manifest_version": 9}""").Ok);
+        Check("часть без хэша не часть",
+              Update.Manifest.Parse(
+                  """
+                  {"manifest_version": 1, "parts": {"shell":
+                   {"version": "4.0.1", "url": "https://x/y"}}}
+                  """) is { Ok: false });
+        Check("версии сравниваются числами, а не строками",
+              Update.Manifest.Compare("4.0.10", "4.0.9") > 0,
+              "| иначе десятая заплата никогда не предложится");
+
+        Console.WriteLine();
+        Console.WriteLine("=== U03: четыре сценария ===");
+
+        Check("свежее некуда",
+              (await Ask(Manifest("4.0.0", "4.0.0", "[1]", "[1]", 2))).Verdict
+              == Update.Verdict.UpToDate);
+        Check("новее только оболочка",
+              (await Ask(Manifest("4.0.1", "4.0.0", "[1]", "[1]", 2))).Verdict
+              == Update.Verdict.ShellOnly);
+        Check("новее только ядро",
+              (await Ask(Manifest("4.0.0", "4.0.1", "[1]", "[1]", 2))).Verdict
+              == Update.Verdict.CoreOnly);
+        Check("новее обе",
+              (await Ask(Manifest("4.0.1", "4.0.1", "[1]", "[1]", 2))).Verdict
+              == Update.Verdict.Both);
+
+        var clash = await Ask(Manifest("4.0.1", "4.0.1", "[2]", "[3]", 2));
+        Check("пара, которая не поздоровается, не качается",
+              clash.Verdict == Update.Verdict.Incompatible,
+              $"| {clash.Explanation}");
+
+        var older = await Ask(Manifest("4.0.0", "4.0.1", "[1]", "[1]", 1));
+        Check("ядро, которое не прочитает данные, отвергнуто",
+              older.Verdict == Update.Verdict.Incompatible,
+              $"| {older.Explanation}");
+
+        Console.WriteLine();
+        Console.WriteLine("=== U04: целостность ===");
+
+        var payload = System.Text.Encoding.UTF8.GetBytes("это сборка");
+        var right = Convert.ToHexString(
+            System.Security.Cryptography.SHA256.HashData(payload))
+            .ToLowerInvariant();
+
+        var fetched = await Download(payload, right);
+        Check("верный хэш — файл принят", fetched.Ok, $"| {fetched.Problem}");
+        Check("и лежит там, где его ждут",
+              fetched.Path.StartsWith(Update.Updater.Staging),
+              $"| {fetched.Path}");
+
+        var wrong = await Download(payload, new string('0', 64));
+        Check("неверный хэш — отказ", !wrong.Ok, $"| {wrong.Problem}");
+        Check("и файла не осталось",
+              !Directory.EnumerateFiles(Update.Updater.Staging, "*-9.9.9.bin")
+                        .Any(),
+              "| половина обновления однажды окажется установленной");
+
+        var open = new Update.Updater([1], new HttpClient(new Update.Fake()));
+        var refused = await open.DownloadAsync(new Update.Part
+        {
+            Name = "shell", Version = "0.0.1",
+            Url = "http://example.com/build.zip", Sha256 = right,
+        });
+        Check("не https — отказ до всякой закачки",
+              !refused.Ok && refused.Problem.Contains("https"),
+              $"| {refused.Problem}");
+
+        Console.WriteLine();
+        Console.WriteLine("=== U05: журнал ===");
+        var log = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RinaAssistant", "logs", "security.log");
+        // Читаем, не мешая писать: журнал открыт на дозапись, и обычное
+        // чтение спотыкается о разделяемый доступ. Проверка, падающая от
+        // того, что журнал в этот момент пишут, проверяет не журнал.
+        var written = "";
+        try
+        {
+            using var journal = new FileStream(
+                log, FileMode.Open, FileAccess.Read,
+                FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(journal);
+            written = reader.ReadToEnd();
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine($"     журнал не прочитан: {error.GetType().Name}");
+        }
+        Check("проверка записана", written.Contains("update stage=check"));
+        Check("закачка записана", written.Contains("update stage=download"));
+        Check("несовместимость названа",
+              written.Contains("result=incompatible"));
+        Check("в журнале нет текста разговора",
+              !written.Contains("это сборка"),
+              "| «что обновляли» и «что человек сказал» — разные сведения");
+
+        try { Directory.Delete(Update.Updater.Staging, true); } catch { }
+        }
+        catch (Exception error)
+        {
+            // Иначе окно висит до убийства извне: режим живёт до явного
+            // завершения, и необработанное исключение его не завершает.
+            fails++;
+            Console.WriteLine($"  СБОЙ  {error.GetType().Name}: {error.Message}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>Метаданные с заданными версиями частей.</summary>
+    private static string Manifest(string shell, string core,
+                                   string shellProtocol, string coreProtocol,
+                                   int schema) =>
+        "{\"manifest_version\": 1, \"channel\": \"stable\", \"parts\": {"
+        + $"\"shell\": {{\"version\": \"{shell}\", "
+        + $"\"url\": \"https://x/shell.zip\", \"sha256\": \"aa\", "
+        + $"\"protocol\": {shellProtocol}}}, "
+        + $"\"core\": {{\"version\": \"{core}\", "
+        + $"\"url\": \"https://x/core.zip\", \"sha256\": \"bb\", "
+        + $"\"protocol\": {coreProtocol}, \"data_schema\": {schema}}}}}}}";
+
+    /// <summary>Спросить клиента об этих метаданных.</summary>
+    private static async Task<Update.Found> Ask(string manifest)
+    {
+        var fake = new Update.Fake()
+            .Says(Update.Updater.Source,
+                  Update.Fake.Release("https://x/manifest.json"))
+            .Says("https://x/manifest.json", manifest);
+        var updater = new Update.Updater([1], new HttpClient(fake));
+        return await updater.CheckAsync("4.0.0", "4.0.0", dataSchema: 2);
+    }
+
+    /// <summary>Скачать заданное содержимое под заданный хэш.</summary>
+    private static async Task<(bool Ok, string Path, string Problem)> Download(
+        byte[] payload, string sha256)
+    {
+        var fake = new Update.Fake().Gives("https://x/build.zip", payload);
+        var updater = new Update.Updater([1], new HttpClient(fake));
+        return await updater.DownloadAsync(new Update.Part
+        {
+            Name = "shell",
+            Version = sha256.StartsWith('0') ? "9.9.9" : "4.0.1",
+            Url = "https://x/build.zip",
+            Sha256 = sha256,
+        });
+    }
+
     [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool SetCursorPos(int x, int y);
 
@@ -968,6 +1167,23 @@ public partial class App
         System.Windows.Controls.ComboBoxItem option)
         => (option.Template?.FindName("Row", option)
             as System.Windows.Controls.Border)?.Background;
+
+    /// <summary>Прочитать журнал, не мешая тому, кто в него пишет.</summary>
+    private static string Journal(string path)
+    {
+        try
+        {
+            using var file = new FileStream(path, FileMode.Open,
+                                            FileAccess.Read,
+                                            FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(file);
+            return reader.ReadToEnd();
+        }
+        catch
+        {
+            return "";
+        }
+    }
 
     /// <summary>На чём лежит вариант: цвет ближайшей залитой подложки.</summary>
     private static System.Windows.Media.Color? Surface(DependencyObject item)
@@ -1314,6 +1530,17 @@ public partial class App
         Check("необратимое помечено",
               Platform.Machine.Irreversible.Contains("shutdown")
               && !Platform.Machine.Irreversible.Contains("volume_up"));
+
+        // --- журнал (G12) ---
+        // Раньше здесь проверялось поведение, но не запись. А запись не
+        // работала вовсе: журнал открывался без права другим писать, тот
+        // же файл держало ядро, и строки оболочки не появлялись никогда.
+        // Исключение при этом проглатывалось — молча.
+        var mark = $"проверка-{Guid.NewGuid():N}"[..24];
+        Platform.Journal.Action(mark, ok: true);
+        Check("запись в журнал доходит до файла",
+              Journal(Platform.Journal.Where).Contains(mark),
+              "| открытый на дозапись файл ядра не должен этому мешать");
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
