@@ -22,7 +22,10 @@
       <StackPanel x:Name="Body" />
     </ScrollViewer>
 
-    <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,12,0,0">
+    <!-- Просвет вдвое больше обычного: опасное отделено пустотой, а не
+         цветом (DIRECTION §3). При двенадцати точках кнопка сброса
+         читалась как продолжение списка настроек. -->
+    <StackPanel x:Name="Bottom" Grid.Row="2" Orientation="Horizontal">
       <!-- Сброс отделён пустотой, а не цветом: между необратимым и
            соседями просвет вдвое больше обычного (DIRECTION §3). -->
       <Button Style="{StaticResource Btn.Danger}" Margin="0,0,64,0"

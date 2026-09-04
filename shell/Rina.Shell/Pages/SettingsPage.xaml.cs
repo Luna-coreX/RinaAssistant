@@ -56,6 +56,42 @@ public partial class SettingsPage : UserControl
     /// </remarks>
     public void ScrollTo(double offset) => Scroll.ScrollToVerticalOffset(offset);
 
+    /// <summary>
+    /// Ширины всех органов управления — для проверки столбца.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Ширину задаёт колонка, а не орган. Проверялось это глазами и одним
+    /// человеком со скриншотами: поле пути было шириной 200, выпадающий
+    /// список 280, ползунок с числом 276, и правый край гулял на
+    /// восемьдесят точек.
+    /// </para>
+    /// <para>
+    /// По снимку такое не померить: правый край колонки не является
+    /// границей цвета — у ряда с путём справа кнопка, у ползунка число, и
+    /// заливка кончается раньше самой колонки. Поэтому меряется дерево, а
+    /// не картинка.
+    /// </para>
+    /// <para>
+    /// Переключатели и кнопки-приборы сюда не входят: они не занимают
+    /// колонку, а стоят у её левого края — им ширина колонки ни к чему.
+    /// </para>
+    /// </remarks>
+    public IReadOnlyList<(string Key, double Width)> ControlWidths()
+    {
+        var found = new List<(string, double)>();
+        foreach (var (key, editor) in _editors)
+        {
+            if (editor is CheckBox) continue;        // переключатель
+            if (double.IsNaN(editor.Width)) continue; // растущий по месту
+            found.Add((key, editor.Width));
+        }
+        return found;
+    }
+
+    /// <summary>Какой ширины обязан быть орган управления.</summary>
+    public static double WantedControlWidth => ControlWidth;
+
     /// <summary>Готово: схема получена и разложена.</summary>
     public event Action? Ready;
 
@@ -63,6 +99,12 @@ public partial class SettingsPage : UserControl
     {
         InitializeComponent();
         _link = link;
+
+        // Просвет берётся из токена, а не набирается числом: «вдвое больше
+        // обычного» — это `Sp.Danger`, и второе место, где написано 64,
+        // однажды разошлось бы с первым.
+        Bottom.Margin = new Thickness(0, (double)FindResource("Sp.Danger"),
+                                      0, 0);
 
         if (_link is null)
         {
@@ -225,7 +267,18 @@ public partial class SettingsPage : UserControl
     /// каждый ряд начинал орган там, где кончалась его подпись, — правый
     /// край рвался, а панель читалась как список, а не как прибор.
     /// </remarks>
-    private const double ControlColumn = 330;
+    private const double ControlColumn = 296;
+
+    /// <summary>
+    /// Ширина самого органа управления внутри колонки.
+    /// </summary>
+    /// <remarks>
+    /// Одна на все виды: выпадающий список, поле, путь, ползунок с числом.
+    /// Раньше каждый носил свою — 280, 200, 276, — и правый край гулял на
+    /// восемьдесят точек. У прибора органы стоят в столбец, а столбец
+    /// имеет две стороны, а не одну.
+    /// </remarks>
+    private const double ControlWidth = 280;
 
     /// <summary>Ширина колонки проверок. Пустая у большинства рядов.</summary>
     private const double ProbeColumn = 150;
@@ -254,7 +307,13 @@ public partial class SettingsPage : UserControl
             Width = new GridLength(ProbeColumn),
         });
 
-        var label = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        var label = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            // Просвет между легендой и органом. Без него подсказка
+            // упиралась в поле, и две колонки читались как одна.
+            Margin = new Thickness(0, 0, 24, 0),
+        };
         label.Children.Add(new TextBlock
         {
             Text = SettingsLayout.TitleOf(key),
@@ -509,7 +568,7 @@ public partial class SettingsPage : UserControl
             var box = new ComboBox
             {
                 Style = (Style)FindResource("Choice"),
-                Width = 280,
+                Width = ControlWidth,
                 ItemsSource = choices.Select(c => c!.GetValue<string>()).ToArray(),
                 SelectedItem = value?.GetValue<string>(),
             };
@@ -524,7 +583,7 @@ public partial class SettingsPage : UserControl
         var field = new TextBox
         {
             Style = (Style)FindResource("Field"),
-            Width = 260,
+            Width = ControlWidth,
             Text = Show(value),
         };
         Styles.Ui.SetHint(field, SettingsLayout.HintInField(key));
@@ -547,7 +606,7 @@ public partial class SettingsPage : UserControl
         var box = new ComboBox
         {
             Style = (Style)FindResource("Choice"),
-            Width = 280,
+            Width = ControlWidth,
         };
         foreach (var (value, title, available) in known)
             box.Items.Add(new ComboBoxItem
@@ -593,7 +652,7 @@ public partial class SettingsPage : UserControl
         var box = new ComboBox
         {
             Style = (Style)FindResource("Choice"),
-            Width = 280,
+            Width = ControlWidth,
             IsEnabled = false,
         };
         box.Items.Add(new ComboBoxItem { Content = S("выбирать не из чего") });
@@ -619,16 +678,26 @@ public partial class SettingsPage : UserControl
     private FrameworkElement BuildSlider(string key, double low, double high,
                                          bool whole, double current)
     {
-        var row = new StackPanel
+        // Та же сетка, что у пути: дорожка занимает остаток, число стоит у
+        // правого края колонки. Раньше дорожка носила свою ширину, и число
+        // оказывалось то ближе, то дальше от края.
+        var row = new Grid
         {
-            Orientation = Orientation.Horizontal,
+            Width = ControlWidth,
             VerticalAlignment = VerticalAlignment.Center,
         };
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
 
         var slider = new Slider
         {
             Style = (Style)FindResource("Slide"),
-            Width = 220,
             Minimum = low,
             Maximum = high,
             Value = Math.Clamp(current, low, high),
@@ -658,6 +727,8 @@ public partial class SettingsPage : UserControl
         slider.LostKeyboardFocus += async (_, _) => await SaveSliderAsync(
             key, slider.Value, whole);
 
+        Grid.SetColumn(slider, 0);
+        Grid.SetColumn(shown, 1);
         row.Children.Add(slider);
         row.Children.Add(shown);
         return row;
@@ -682,11 +753,20 @@ public partial class SettingsPage : UserControl
     /// <summary>Путь: поле и «Обзор…».</summary>
     private FrameworkElement BuildPath(string key, string format, string current)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        // Сетка, а не строка: поле занимает всё, что осталось от кнопки, и
+        // правый край совпадает с соседними органами.
+        var row = new Grid { Width = ControlWidth };
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
         var field = new TextBox
         {
             Style = (Style)FindResource("Field"),
-            Width = 200,
             Text = current,
             IsReadOnly = true,
             ToolTip = current,
@@ -706,6 +786,8 @@ public partial class SettingsPage : UserControl
             field.ToolTip = picked;
             await SaveAsync(key, picked);
         };
+        Grid.SetColumn(field, 0);
+        Grid.SetColumn(browse, 1);
         row.Children.Add(field);
         row.Children.Add(browse);
         return row;
@@ -809,7 +891,7 @@ public partial class SettingsPage : UserControl
             var typed = new TextBox
             {
                 Style = (Style)FindResource("Field"),
-                Width = 150,
+                Width = 170,
                 Margin = new Thickness(0, 0, 8, 0),
             };
             Styles.Ui.SetHint(typed, S("новое слово"));

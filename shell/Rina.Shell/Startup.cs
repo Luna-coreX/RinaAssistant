@@ -407,6 +407,22 @@ public partial class App
               settings is { KeyCount: > 20 },
               $"| {settings?.KeyCount}");
 
+        // Ширину задаёт колонка, а не орган. По снимку это не померить:
+        // правый край колонки не граница цвета — у ряда с путём справа
+        // кнопка, у ползунка число, и заливка кончается раньше колонки.
+        // Меряем дерево. Поймано было человеком со скриншотами: поле пути
+        // 200, список 280, ползунок 276 — край гулял на восемьдесят точек.
+        if (settings is not null)
+        {
+            var widths = settings.ControlWidths();
+            var wanted = Pages.SettingsPage.WantedControlWidth;
+            var odd = widths.Where(w => Math.Abs(w.Width - wanted) > 1)
+                            .Select(w => $"{w.Key}={w.Width}").ToArray();
+            Check("органы управления одной ширины", odd.Length == 0,
+                  odd.Length == 0 ? $"| {widths.Count} шт. по {wanted}"
+                                  : $"| {string.Join(", ", odd)}");
+        }
+
         // Раскрытый список проверяется отдельно: всплывающее окно — своё
         // окно, в снимок главного оно не попадает вовсе, и сломанный
         // шаблон остался бы незамеченным ровно там, где он написан руками.
