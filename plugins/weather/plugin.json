@@ -1,0 +1,9 @@
+{
+  "id": "weather",
+  "name": "Weather Widget",
+  "version": "1.0.0",
+  "author": "Luna",
+  "description": "Weather widget with multi-language support",
+  "description_ru": "Виджет погоды с поддержкой нескольких языков",
+  "dependencies": {}
+}
