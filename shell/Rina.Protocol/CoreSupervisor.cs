@@ -1,51 +1,53 @@
 namespace Rina.Protocol;
 
-/// <summary>В каком состоянии связь с ядром (для <c>4.0-F12</c>).</summary>
+/// <summary>The state of the link to the core (for <c>4.0-F12</c>).</summary>
 public enum CoreState
 {
-    /// <summary>Ещё не запускали.</summary>
+    /// <summary>Not started yet.</summary>
     Stopped,
-    /// <summary>Запускаем и здороваемся.</summary>
+    /// <summary>Starting it and saying hello.</summary>
     Starting,
-    /// <summary>Ядро отвечает.</summary>
+    /// <summary>The core answers.</summary>
     Ready,
-    /// <summary>Связь оборвалась, поднимаем заново.</summary>
+    /// <summary>The link broke; bringing it back up.</summary>
     Reconnecting,
-    /// <summary>Сдались: ядро не поднимается.</summary>
+    /// <summary>Given up: the core will not come up.</summary>
     Failed,
 }
 
 /// <summary>
-/// Надзор за ядром: запустить, слушать, перезапустить, показать состояние.
+/// Supervising the core: start it, listen, restart, show the state.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-E07</c>; §13 спецификации.
+/// Plan item <c>4.0-E07</c>; §13 of the specification.
 /// </para>
 /// <para>
-/// <b>Окно не должно выглядеть зависшим</b> — это прямое требование §13, и
-/// оно определяет всё устройство. Поэтому состояние объявляется наружу
-/// событием, а не выясняется опросом: тот, кто рисует, обязан узнать об обрыве
-/// в тот же миг, а не когда в следующий раз что-нибудь спросит.
+/// <b>The window must not look frozen</b> — that is a direct requirement of
+/// §13, and it shapes everything here. The state is therefore announced
+/// outward by an event rather than found by polling: whoever draws must learn
+/// of a break at that instant, not the next time it happens to ask something.
 /// </para>
 /// <para>
-/// <b>Молчание не признак смерти; признак смерти — молчание в ответ на прямой
-/// вопрос.</b> Отсюда: <c>ping</c> шлётся только после паузы, а мёртвым ядро
-/// считается после трёх неотвеченных подряд. Любое пришедшее сообщение
-/// засчитывается за ответ: занятый канал спрашивать незачем.
+/// <b>Silence is not a sign of death; the sign of death is silence in answer
+/// to a direct question.</b> Hence: <c>ping</c> is sent only after a pause,
+/// and the core counts as dead after three unanswered in a row. Any message
+/// that arrives counts as an answer: there is no point questioning a busy
+/// channel.
 /// </para>
 /// <para>
-/// <b>Отступ между попытками растёт.</b> Ядро, падающее при старте, иначе
-/// перезапускалось бы в цикле и съело бы процессор, пока человек смотрит на
-/// «переподключаемся». После нескольких попыток подряд надзор сдаётся и
-/// говорит об этом: бесконечное «сейчас-сейчас» — худший вид зависшего окна.
+/// <b>The gap between attempts grows.</b> A core that crashes at startup
+/// would otherwise restart in a loop and eat the processor while the person
+/// stares at "reconnecting". After several attempts in a row the supervisor
+/// gives up and says so: an endless "any moment now" is the worst kind of
+/// frozen window.
 /// </para>
 /// <para>
-/// <b>Состояние после переподключения собирается заново запросами.</b> §13
-/// прямо говорит, что незакрытый вопрос, открытые потоки, выданные разрешения
-/// и незавершённые задачи переподключение не переживают. Надзор поэтому не
-/// пытается ничего восстановить — он сообщает, что связь новая, и тот, кто
-/// рисует, спрашивает заново.
+/// <b>State after a reconnect is gathered afresh by asking.</b> §13 says
+/// plainly that an open question, open streams, granted permissions and
+/// unfinished tasks do not survive a reconnect. The supervisor therefore
+/// restores nothing — it reports that the link is new, and whoever draws asks
+/// again.
 /// </para>
 /// </remarks>
 public sealed class CoreSupervisor : IAsyncDisposable
@@ -55,33 +57,44 @@ public sealed class CoreSupervisor : IAsyncDisposable
     private readonly SemaphoreSlim _swap = new(1, 1);
     private Task? _watchdog;
 
-    /// <summary>После какой тишины спрашивать «жив ли» (§13).</summary>
+    /// <summary>After how much silence to ask "are you alive" (§13).</summary>
     public TimeSpan Silence { get; init; } = TimeSpan.FromSeconds(5);
 
-    /// <summary>Сколько неотвеченных вопросов подряд считать смертью.</summary>
+    /// <summary>How many unanswered questions in a row count as death.</summary>
     public int MissedLimit { get; init; } = 3;
 
-    /// <summary>Сколько ждать подключения ядра к трубам.</summary>
+    /// <summary>How long to wait for the core to connect to the pipes.</summary>
     public TimeSpan ConnectTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
-    /// <summary>Сколько раз пробовать поднять, прежде чем сдаться.</summary>
+    /// <summary>How many times to try bringing it up before giving up.</summary>
     public int MaxAttempts { get; init; } = 4;
 
-    /// <summary>С какого отступа начинать между попытками.</summary>
+    /// <summary>The gap to start from between attempts.</summary>
     public TimeSpan FirstBackoff { get; init; } = TimeSpan.FromMilliseconds(200);
 
     public CoreState State { get; private set; } = CoreState.Stopped;
     public string LastReason { get; private set; } = "";
     public int Restarts { get; private set; }
+
+    /// <summary>
+    /// Which attempt is in progress. One means the first.
+    /// </summary>
+    /// <remarks>
+    /// A number, not a phrase about it. This assembly does not know the
+    /// interface language and must not: composing «попытка 3» here would put
+    /// a Russian string on the panel past the translation table, which is
+    /// exactly what F08 forbids — and is what used to happen.
+    /// </remarks>
+    public int Attempt { get; private set; }
     public CoreConnection? Connection { get; private set; }
 
-    /// <summary>Состояние сменилось. Первый слушатель этого — <c>4.0-F12</c>.</summary>
+    /// <summary>The state changed. Its first listener is <c>4.0-F12</c>.</summary>
     public event Action<CoreState, string>? StateChanged;
 
-    /// <summary>Связь новая: всё, что не переживает обрыв, надо спросить заново.</summary>
+    /// <summary>The link is new: whatever does not survive a break must be asked again.</summary>
     public event Action<CoreConnection>? Connected;
 
-    /// <summary>События ядра, какая бы связь их ни принесла.</summary>
+    /// <summary>Core events, whichever link brought them.</summary>
     public event Action<Envelope>? EventReceived;
 
     public CoreSupervisor(CoreLaunch launch) => _launch = launch;
@@ -104,13 +117,12 @@ public sealed class CoreSupervisor : IAsyncDisposable
         var backoff = FirstBackoff;
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
-            // «Запускаем» человек должен увидеть один раз — при первом
-            // старте. Дальше это переподключение, и называть его запуском
-            // значит скрывать, что связь уже была и оборвалась.
+            // "Starting" is something the person should see once — at the
+            // first start. After that it is a reconnect, and calling it a
+            // start hides the fact that the link existed and broke.
+            Attempt = attempt;
             Move(first && attempt == 1 ? CoreState.Starting
-                                       : CoreState.Reconnecting,
-                 attempt == 1 ? (first ? "запускаем ядро" : "поднимаем заново")
-                              : $"попытка {attempt}");
+                                       : CoreState.Reconnecting, "");
 
             var connection = new CoreConnection();
             try
@@ -123,8 +135,9 @@ public sealed class CoreSupervisor : IAsyncDisposable
                 connection.Broken += OnBroken;
                 Connection = connection;
 
-                // Причина — версия, а не фраза о ней: `Rina.Protocol` не
-                // знает языка интерфейса и не должен; собирает подпись окно.
+                // The reason is the version, not a phrase about it:
+                // `Rina.Protocol` does not know the interface language and
+                // must not; the window composes the caption.
                 Move(CoreState.Ready, connection.CoreVersion);
                 Connected?.Invoke(connection);
                 return;
@@ -139,33 +152,16 @@ public sealed class CoreSupervisor : IAsyncDisposable
             }
         }
 
-        Move(CoreState.Failed,
-             $"ядро не поднялось за {Attempts(MaxAttempts)}: {LastReason}");
-    }
-
-    /// <summary>
-    /// «1 попытку», «3 попытки», «5 попыток».
-    /// </summary>
-    /// <remarks>
-    /// Строка видна человеку, а «за 3 попыт(ки)» — не русский язык.
-    /// Оболочка отвечает за то, как это читается (ADR 0006 о том же:
-    /// представление — её забота).
-    /// </remarks>
-    private static string Attempts(int n)
-    {
-        var tail = n % 100 is >= 11 and <= 14 ? "попыток"
-            : (n % 10) switch { 1 => "попытку", 2 or 3 or 4 => "попытки",
-                                _ => "попыток" };
-        return $"{n} {tail}";
+        Move(CoreState.Failed, LastReason);
     }
 
     private void OnEvent(Envelope message) => EventReceived?.Invoke(message);
 
     private void OnBroken(string reason)
     {
-        // Сам перезапуск делает сторож: обработчик события зовётся из насоса
-        // чтения, и поднимать связь изнутри её же насоса — верный способ
-        // получить два ядра.
+        // The restart itself is done by the watchdog: an event handler is
+        // called from the read pump, and bringing the link up from inside
+        // its own pump is a sure way to end up with two cores.
         LastReason = reason;
     }
 
@@ -196,8 +192,9 @@ public sealed class CoreSupervisor : IAsyncDisposable
                 catch (OperationCanceledException) { return; }
                 catch
                 {
-                    // Второй вопрос без ответа на первый — не удвоение
-                    // вопроса, а второй неотвеченный: именно они считаются.
+                    // A second question with no answer to the first is not
+                    // the question doubled but a second unanswered one:
+                    // those are what get counted.
                     if (++missed >= MissedLimit)
                         dead = true;
                 }
@@ -218,10 +215,14 @@ public sealed class CoreSupervisor : IAsyncDisposable
             var old = Connection;
             Connection = null;
             Restarts++;
+            // Technical text, not a phrase for a person: an exit code and a
+            // system error are what the developer reads in the log. Whether
+            // any of it reaches the panel, and in what words, is the
+            // window's decision.
             Move(CoreState.Reconnecting,
                  old?.CoreExitCode is { } code
-                     ? $"ядро вышло с кодом {code}"
-                     : LastReason.Length > 0 ? LastReason : "связь оборвалась");
+                     ? $"core exited with code {code}"
+                     : LastReason.Length > 0 ? LastReason : "link broke");
 
             if (old is not null)
             {
@@ -239,7 +240,7 @@ public sealed class CoreSupervisor : IAsyncDisposable
     {
         await _stopping.CancelAsync().ConfigureAwait(false);
         if (_watchdog is not null)
-            try { await _watchdog.ConfigureAwait(false); } catch { /* всё */ }
+            try { await _watchdog.ConfigureAwait(false); } catch { /* done */ }
         if (Connection is not null)
             await Connection.DisposeAsync().ConfigureAwait(false);
         _stopping.Dispose();

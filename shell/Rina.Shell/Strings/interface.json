@@ -1055,6 +1055,9 @@
   "плагин не загрузился": {
     "English": "the plugin didn’t load"
   },
+  "попытка {0}": {
+    "English": "attempt {0}"
+  },
   "применится после перезапуска": {
     "English": "applies after a restart"
   },

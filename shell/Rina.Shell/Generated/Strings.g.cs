@@ -1167,6 +1167,11 @@ public static partial class Loc
                 {
                     ["English"] = "Show answers when the window is hidden",
                 },
+            ["попытка {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "attempt {0}",
+                },
             ["Последовательность · шагов {0}"] =
                 new Dictionary<string, string>
                 {

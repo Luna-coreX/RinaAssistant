@@ -4,7 +4,7 @@ using System.Text.Json.Serialization;
 
 namespace Rina.Protocol;
 
-/// <summary>Тип сообщения управляющего канала (§3).</summary>
+/// <summary>Control-channel message type (§3).</summary>
 public static class MessageType
 {
     public const string Request = "request";
@@ -14,20 +14,22 @@ public static class MessageType
 }
 
 /// <summary>
-/// Конверт: поля, которые есть на каждом сообщении без исключений (§3).
+/// The envelope: the fields present on every message without exception (§3).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Незнакомые поля конверта пропускаются молча.</b> Правила совместимости
-/// (§4) разрешают добавить необязательное поле, не меняя версию протокола;
-/// получатель, спотыкающийся о такое поле, превращает это разрешение в ложь и
-/// делает ступенчатое обновление невозможным. <c>System.Text.Json</c> ведёт
-/// себя так по умолчанию, и это тот случай, когда умолчание верное.
+/// <b>Unknown envelope fields are skipped in silence.</b> The compatibility
+/// rules (§4) permit adding an optional field without changing the protocol
+/// version; a receiver that trips over such a field turns that permission
+/// into a lie and makes staged updates impossible.
+/// <c>System.Text.Json</c> behaves this way by default, and this is the case
+/// where the default is the right one.
 /// </para>
 /// <para>
-/// Нагрузка держится как <see cref="JsonNode"/>, а не разбирается в типы: у
-/// каждого метода она своя, а конверт обязан оставаться одним на всех.
-/// Разбор нагрузки — дело того, кто знает метод.
+/// The payload is held as a <see cref="JsonNode"/> rather than parsed into
+/// types: every method has its own, and the envelope has to stay one and the
+/// same for all of them. Parsing the payload is the business of whoever knows
+/// the method.
 /// </para>
 /// </remarks>
 public sealed record Envelope
@@ -45,11 +47,11 @@ public sealed record Envelope
     public bool IsError => Type == MessageType.Error;
     public bool IsEvent => Type == MessageType.Event;
 
-    /// <summary>Код ошибки, если это ошибка; иначе пусто.</summary>
+    /// <summary>The error code, if this is an error; empty otherwise.</summary>
     public string ErrorCode =>
         IsError ? Payload["code"]?.GetValue<string>() ?? "" : "";
 
-    /// <summary>Человеческий текст ошибки (§5: код и текст разделены).</summary>
+    /// <summary>Human text of the error (§5: code and text are separate).</summary>
     public string ErrorMessage =>
         IsError ? Payload["message"]?.GetValue<string>() ?? "" : "";
 
@@ -78,19 +80,19 @@ public sealed record Envelope
         var text = System.Text.Encoding.UTF8.GetString(raw);
         var envelope = JsonSerializer.Deserialize<Envelope>(text, Options)
             ?? throw new ProtocolException(ErrorCodes.ProtocolInvalidEnvelope,
-                                           "сообщение обязано быть объектом");
+                                           "a message must be an object");
         envelope.RequireComplete();
         return envelope;
     }
 
     /// <summary>
-    /// Проверить, что конверт полон (§15.1).
+    /// Check that the envelope is complete (§15.1).
     /// </summary>
     /// <remarks>
-    /// Проверяется у получателя, хотя отправитель уже проверил у себя. Это не
-    /// недоверие к ядру: сообщение могло прийти от другой его версии, и
-    /// «отсутствие обязательного поля — протокольная ошибка» есть требование
-    /// спецификации, а не пожелание.
+    /// Checked at the receiver even though the sender already checked at
+    /// home. This is not distrust of the core: the message could have come
+    /// from a different version of it, and "a missing mandatory field is a
+    /// protocol error" is a requirement of the specification, not a wish.
     /// </remarks>
     public void RequireComplete()
     {
@@ -111,11 +113,11 @@ public sealed record Envelope
         if (missing.Count > 0)
             throw new ProtocolException(
                 ErrorCodes.ProtocolInvalidEnvelope,
-                "в конверте нет обязательных полей: " + string.Join(", ", missing));
+                "the envelope is missing mandatory fields: " + string.Join(", ", missing));
     }
 }
 
-/// <summary>Время в том виде, в каком его понимает протокол: секунды с эпохи.</summary>
+/// <summary>Time as the protocol understands it: seconds since the epoch.</summary>
 public static class Clock
 {
     public static double Now() =>
@@ -123,12 +125,12 @@ public static class Clock
 }
 
 /// <summary>
-/// Идентификаторы сообщений, уникальные в пределах сессии.
+/// Message identifiers, unique within a session.
 /// </summary>
 /// <remarks>
-/// Префикс называет сторону (<c>s-</c> оболочка), чтобы в общем журнале двух
-/// процессов было видно отправителя без обращения к содержимому. Счётчик, а
-/// не случайность: пропуск номера виден глазом.
+/// The prefix names the side (<c>s-</c> for the shell) so that a shared log
+/// of two processes shows the sender without looking at the contents. A
+/// counter rather than randomness: a skipped number is visible to the eye.
 /// </remarks>
 public sealed class IdGenerator(string prefix)
 {
@@ -136,13 +138,13 @@ public sealed class IdGenerator(string prefix)
     public string Next() => $"{prefix}{Interlocked.Increment(ref _n):D4}";
 }
 
-/// <summary>Начало цепочки трассировки (§14).</summary>
+/// <summary>The start of a trace chain (§14).</summary>
 public static class Trace
 {
     public static string New() => "t-" + Guid.NewGuid().ToString("N")[..12];
 }
 
-/// <summary>Нарушение протокола, замеченное оболочкой.</summary>
+/// <summary>A protocol violation noticed by the shell.</summary>
 public sealed class ProtocolException(string code, string message)
     : Exception($"{code}: {message}")
 {

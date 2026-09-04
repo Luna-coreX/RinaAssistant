@@ -3,16 +3,17 @@ using System.IO.Pipes;
 
 namespace Rina.Protocol.Transport;
 
-/// <summary>Та сторона закрылась.</summary>
+/// <summary>The other side has closed.</summary>
 public sealed class ChannelClosedException(string message) : Exception(message);
 
 /// <summary>
-/// Кадрирование управляющего канала: длина, затем полезная нагрузка (§2).
+/// Control-channel framing: length, then payload (§2).
 /// </summary>
 /// <remarks>
-/// <b>Предел проверяется по заявленной длине, до выделения памяти.</b> Иначе
-/// он не защищает ни от чего: сторона, объявившая кадр в четыре гигабайта,
-/// добьётся своего ровно тем, что мы честно дождёмся его целиком.
+/// <b>The limit is checked against the declared length, before any memory is
+/// allocated.</b> Otherwise it protects against nothing: a side that declares
+/// a four-gigabyte frame gets exactly what it wanted the moment we honestly
+/// wait for all of it.
 /// </remarks>
 public static class Framing
 {
@@ -24,7 +25,7 @@ public static class Framing
         if (body.Length > ControlFrameLimit)
             throw new ProtocolException(
                 ErrorCodes.ProtocolFrameTooLarge,
-                $"сообщение {body.Length} Б больше предела {ControlFrameLimit} Б");
+                $"a {body.Length} B message exceeds the {ControlFrameLimit} B limit");
 
         var frame = new byte[4 + body.Length];
         BinaryPrimitives.WriteUInt32BigEndian(frame, (uint)body.Length);
@@ -34,21 +35,22 @@ public static class Framing
 }
 
 /// <summary>
-/// Управляющий канал: именованная труба, которую держит оболочка.
+/// The control channel: a named pipe held by the shell.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Сервером выступает оболочка, ядро подключается клиентом</b> — это
-/// решение ADR 0002. Инверсия привычной раскладки снимает зависимость с
-/// Python-стороны (там клиент это обычный <c>open()</c>) и совпадает с тем,
-/// что оболочка и так запускает ядро и следит за ним.
+/// <b>The shell is the server and the core connects as a client</b> — that is
+/// the ADR 0002 decision. Inverting the usual arrangement takes the
+/// dependency off the Python side (a client there is a plain <c>open()</c>)
+/// and matches the fact that the shell starts the core and supervises it
+/// anyway.
 /// </para>
 /// <para>
-/// <b>Права доступа — незакрытый долг.</b> ADR 0002 выбрал именованный канал
-/// именно потому, что у него есть дескриптор безопасности, и обещал ограничить
-/// доступ пользователем сессии. Здесь труба создаётся с умолчаниями: это
-/// делается до выпуска, задача <c>4.0-G07</c>, и пока оболочка не выпущена,
-/// долг виден — а не забыт.
+/// <b>Access rights are an open debt.</b> ADR 0002 chose a named pipe
+/// precisely because it has a security descriptor, and promised to restrict
+/// access to the session's user. Here the pipe is created with defaults: that
+/// is to be done before release, plan item <c>4.0-G07</c>, and while the
+/// shell is unreleased the debt is visible — not forgotten.
 /// </para>
 /// </remarks>
 public sealed class ControlChannel : IDisposable
@@ -67,7 +69,7 @@ public sealed class ControlChannel : IDisposable
             PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
     }
 
-    /// <summary>Дождаться, пока ядро подключится.</summary>
+    /// <summary>Wait for the core to connect.</summary>
     public async Task AcceptAsync(CancellationToken token = default) =>
         await _pipe.WaitForConnectionAsync(token).ConfigureAwait(false);
 
@@ -88,13 +90,13 @@ public sealed class ControlChannel : IDisposable
     }
 
     /// <summary>
-    /// Прочитать следующее сообщение.
+    /// Read the next message.
     /// </summary>
     /// <remarks>
-    /// Пустое чтение из трубы означает закрытие, и об этом говорит исключение,
-    /// а не пустой результат: «сейчас ничего нет» и «всё кончилось» — разные
-    /// вещи, и вызывающий, который их путает, крутит пустой цикл вместо
-    /// завершения.
+    /// An empty read from the pipe means closure, and that is reported by an
+    /// exception rather than an empty result: "there is nothing right now"
+    /// and "it is all over" are different things, and a caller that confuses
+    /// them spins an empty loop instead of finishing.
     /// </remarks>
     public async Task<Envelope> ReceiveAsync(CancellationToken token = default)
     {
@@ -114,7 +116,7 @@ public sealed class ControlChannel : IDisposable
             }
 
             if (read == 0)
-                throw new ChannelClosedException("ядро закрыло канал");
+                throw new ChannelClosedException("the core closed the channel");
 
             _pending.AddRange(_buffer.AsSpan(0, read).ToArray());
         }
@@ -130,7 +132,7 @@ public sealed class ControlChannel : IDisposable
         if (size > Framing.ControlFrameLimit)
             throw new ProtocolException(
                 ErrorCodes.ProtocolFrameTooLarge,
-                $"объявленный размер кадра {size} Б больше предела");
+                $"the declared frame size of {size} B exceeds the limit");
 
         if (_pending.Count < 4 + size) return false;
 
@@ -144,7 +146,7 @@ public sealed class ControlChannel : IDisposable
 
     public void Dispose()
     {
-        try { if (_pipe.IsConnected) _pipe.Disconnect(); } catch { /* уже нет */ }
+        try { if (_pipe.IsConnected) _pipe.Disconnect(); } catch { /* already gone */ }
         _pipe.Dispose();
     }
 }

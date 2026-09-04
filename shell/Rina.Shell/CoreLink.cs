@@ -157,6 +157,9 @@ public sealed class CoreLink : IAsyncDisposable
 
     public CoreState State => _boss.State;
 
+    /// <summary>Какая по счёту попытка поднять ядро идёт сейчас.</summary>
+    public int Attempt => _boss.Attempt;
+
     /// <summary>Текущая связь; `null`, пока её нет.</summary>
     public CoreConnection? Connection => _boss.Connection;
 

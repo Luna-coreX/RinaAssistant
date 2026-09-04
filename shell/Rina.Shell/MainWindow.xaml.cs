@@ -244,9 +244,17 @@ public partial class MainWindow : Window
         // это правильно: её дело провод, а не язык. Самую частую фразу окно
         // собирает само; остальное показывает как есть — техническая
         // подробность на языке журнала честнее её кривого перевода.
-        var about = state == CoreState.Ready && reason.Length > 0
-            ? S("ядро {0}", reason)   // причина здесь — версия ядра
-            : reason;
+        // Слова собирает окно, а не надзор: `Rina.Protocol` не знает языка
+        // интерфейса (F08), и раньше он присылал готовую русскую фразу —
+        // она попадала в подвал мимо таблицы переводов и оставалась
+        // русской при английском интерфейсе.
+        var about = state switch
+        {
+            CoreState.Ready when reason.Length > 0 => S("ядро {0}", reason),
+            CoreState.Reconnecting when Link?.Attempt > 1
+                => S("попытка {0}", Link.Attempt),
+            _ => reason,
+        };
 
         CoreStateText.Text = about.Length > 0 ? $"{text} · {about}" : text;
         CoreStateText.SetResourceReference(

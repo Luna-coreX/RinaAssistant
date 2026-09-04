@@ -3,32 +3,34 @@ using System.IO.Pipes;
 
 namespace Rina.Protocol.Transport;
 
-/// <summary>Кадр канала данных (§2).</summary>
-/// <param name="StreamId">К какому потоку относится.</param>
-/// <param name="Seq">Порядковый номер в пределах потока.</param>
-/// <param name="Payload">Байты.</param>
+/// <summary>A data-channel frame (§2).</summary>
+/// <param name="StreamId">Which stream it belongs to.</param>
+/// <param name="Seq">Sequence number within the stream.</param>
+/// <param name="Payload">The bytes.</param>
 public readonly record struct DataFrame(int StreamId, long Seq, byte[] Payload);
 
 /// <summary>
-/// Канал данных: звук и кадры экрана, мимо JSON.
+/// The data channel: audio and screen frames, bypassing JSON.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Отдельная труба, а не поле в сообщении. Base64 внутри JSON раздувает
-/// объём на треть, но дело не в объёме: закодированный звук встал бы в одну
-/// очередь с командами, и нажатие кнопки ждало бы, пока проедет секунда речи.
-/// Измерено в <c>4.0-D07</c>: 301 968 байт против 166 до команды.
+/// A separate pipe, not a field in a message. Base64 inside JSON inflates
+/// the volume by a third, but volume is not the point: encoded audio would
+/// queue up behind commands, and a button press would wait for a second of
+/// speech to go by. Measured in <c>4.0-D07</c>: 301,968 bytes against 166
+/// before the command.
 /// </para>
 /// <para>
-/// Заголовок кадра двоичный и короткий: длина остатка, номер потока,
-/// порядковый номер. Номер нужен для обнаружения потерь при отладке — без
-/// него пропавший кусок звука выглядит как «Рина расслышала не всё», и
-/// причину ищут в распознавании, а не в канале.
+/// The frame header is binary and short: length of the remainder, stream
+/// number, sequence number. The sequence number exists to spot losses while
+/// debugging — without it a missing chunk of audio looks like "Rina misheard
+/// part of it", and the cause gets hunted in recognition rather than in the
+/// channel.
 /// </para>
 /// </remarks>
 public sealed class DataChannel : IDisposable
 {
-    /// <summary>Предел одного кадра (§2). Меньше управляющего намеренно.</summary>
+    /// <summary>The limit for one frame (§2). Smaller than the control one on purpose.</summary>
     public const int FrameLimit = 256 * 1024;
 
     private readonly NamedPipeServerStream _pipe;
@@ -57,7 +59,7 @@ public sealed class DataChannel : IDisposable
     {
         if (payload.Length + 12 > FrameLimit)
             throw new ProtocolException(ErrorCodes.ProtocolFrameTooLarge,
-                $"кадр данных {payload.Length} Б больше предела {FrameLimit} Б");
+                $"a {payload.Length} B data frame exceeds the {FrameLimit} B limit");
 
         await _writing.WaitAsync(token).ConfigureAwait(false);
         try
@@ -78,7 +80,7 @@ public sealed class DataChannel : IDisposable
         finally { _writing.Release(); }
     }
 
-    /// <summary>Забыть номера потока: следующий с тем же номером начнёт с единицы.</summary>
+    /// <summary>Forget a stream's numbering: the next stream with that id starts at one.</summary>
     public void Forget(int streamId) => _seq.Remove(streamId);
 
     public async Task<DataFrame> ReceiveAsync(CancellationToken token = default)
@@ -94,7 +96,7 @@ public sealed class DataChannel : IDisposable
             }
             catch (IOException e) { throw new ChannelClosedException(e.Message); }
 
-            if (read == 0) throw new ChannelClosedException("ядро закрыло канал данных");
+            if (read == 0) throw new ChannelClosedException("the core closed the data channel");
             _pending.AddRange(_buffer.AsSpan(0, read).ToArray());
         }
     }
@@ -106,14 +108,14 @@ public sealed class DataChannel : IDisposable
 
         var span = System.Runtime.InteropServices.CollectionsMarshal.AsSpan(_pending);
         var size = BinaryPrimitives.ReadUInt32BigEndian(span[..4]);
-        // Предел по заявленной длине, до выделения памяти: иначе он не
-        // защищает ни от чего.
+        // The limit is checked against the declared length, before any
+        // memory is allocated: otherwise it protects against nothing.
         if (size > FrameLimit)
             throw new ProtocolException(ErrorCodes.ProtocolFrameTooLarge,
-                $"объявленный размер кадра данных {size} Б больше предела");
+                $"the declared data frame size of {size} B exceeds the limit");
         if (size < 12)
             throw new ProtocolException(ErrorCodes.ProtocolInvalidPayload,
-                "кадр данных короче собственного заголовка");
+                "the data frame is shorter than its own header");
         if (_pending.Count < 4 + size) return false;
 
         var body = span.Slice(4, (int)size);
