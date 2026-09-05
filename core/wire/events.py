@@ -1,28 +1,30 @@
 """
-События: ядро сообщает, не спрашивая.
+Events: the core reports without being asked.
 
-Задачи плана `4.0-D11` (push-события) и `4.0-D06` (потоковый текст);
-спецификация, §7 и §10.
+Plan items `4.0-D11` (push events) and `4.0-D06` (streamed text);
+specification, §7 and §10.
 
-**Событие ничего не гарантирует о доставке.** Если оболочка перезапускается,
-событие теряется — и это не дефект, а свойство. То, что терять нельзя, лежит в
-хранилище и запрашивается после переподключения; событие лишь сообщает, что
-смотреть туда стоит прямо сейчас.
+**An event guarantees nothing about delivery.** If the shell restarts, the
+event is lost — and that is a property, not a defect. What must not be lost
+lies in the store and is requested after reconnecting; an event only reports
+that it is worth looking there right now.
 
-**Неизвестное событие получатель игнорирует молча** (§3). Асимметрия с
-запросом намеренна: пропущенный запрос — потерянное действие, пропущенное
-событие — потерянное уведомление. Благодаря этому ядро может завести новое
-событие, не ломая старую оболочку, — и правило совместимости «добавить событие
-можно, не меняя версию» перестаёт быть обещанием на словах.
+**An unknown event is ignored by the receiver in silence** (§3). The
+asymmetry with a request is deliberate: a missed request is a lost action, a
+missed event is a lost notification. Thanks to this the core can introduce a
+new event without breaking an old shell — and the compatibility rule "an
+event may be added without changing the version" stops being a promise in
+words only.
 
-**Полезная нагрузка проверяется у отправителя, а не у получателя.** Событие с
-неверными полями — дефект отправляющей стороны, и узнать о нём лучше дома.
-У получателя же сломанное событие роняет ровно себя: обрывать канал из-за
-одного испорченного уведомления хуже, чем его потерять.
+**The payload is checked at the sender, not at the receiver.** An event with
+wrong fields is a defect of the sending side, and it is better to learn of
+it at home. At the receiver, a broken event drops precisely itself: breaking
+off the channel because of one spoiled notification is worse than losing it.
 
-Каталог сверяется с двумя источниками сразу (`tools/test_wire.py`): с
-перечнем `core/protocol.py`, по которому писалась спецификация, и с таблицей
-§6 самой спецификации. Три списка, которые никто не сверяет, разъезжаются.
+The catalogue is checked against two sources at once
+(`tools/test_wire.py`): the list in `core/protocol.py`, which the
+specification was written from, and the table in §6 of the specification
+itself. Three lists that nobody compares drift apart.
 """
 
 from dataclasses import dataclass, field
@@ -32,8 +34,9 @@ from core.wire.envelope import Envelope
 from core.wire.errors import (ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE,
                               fault)
 
-#: Типы полей. Тот же словарь, что у реестра инструментов, — намеренно:
-#: два разных языка описания данных внутри одного ядра пришлось бы сверять.
+#: The types of fields. The same dictionary as the tool registry's,
+#: deliberately: two different languages for describing data inside one core
+#: would have to be reconciled.
 _TYPES = {
     "string": str,
     "boolean": bool,
@@ -41,9 +44,9 @@ _TYPES = {
     "number": (int, float),
     "object": dict,
     "array": list,
-    # Результат задачи бывает каким угодно: строкой у переписанного текста,
-    # объектом у разбора, списком у поиска. Навязать здесь форму значило бы
-    # решить за пятую версию, чем занимаются долгие задачи.
+    # A task's result is anything at all: a string for rewritten text, an
+    # object for a parse, a list for a search. Imposing a shape here would
+    # mean deciding for version five what long tasks do.
     "any": object,
 }
 
@@ -73,10 +76,10 @@ def _f(name, type_, *choices, required=True, low=None, high=None):
     return Field(name, type_, tuple(choices), required, low, high)
 
 
-#: Все события. Первые двенадцать — поведение 3.1.0, перенесённое без
-#: изменений; остальные появляются вместе с протоколом.
+#: All the events. The first twelve are 3.1.0 behaviour carried over
+#: unchanged; the rest appear together with the protocol.
 EVENTS: dict[str, EventSpec] = {s.name: s for s in (
-    # --- микрофон -----------------------------------------------------------
+    # --- the microphone -----------------------------------------------------
     _e("listening.started", note="началось однократное прослушивание"),
     _e("listening.stopped", note="прослушивание закончилось"),
     _e("listening.capturing", _f("active", "boolean"),
@@ -85,30 +88,30 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
        note="режим постоянного прослушивания"),
     _e("speech.recognized", _f("text", "string"), note="распознанная фраза"),
 
-    # --- ответы ассистента --------------------------------------------------
+    # --- the assistant's answers --------------------------------------------
     _e("assistant.response", _f("text", "string")),
     _e("assistant.error", _f("text", "string")),
     _e("assistant.thinking", _f("active", "boolean"),
        note="модель думает; это может занять секунды, и молчать нельзя"),
 
-    # --- данные -------------------------------------------------------------
+    # --- data ---------------------------------------------------------------
     _e("history.changed", note="содержимое диалога изменилось"),
     _e("reminder.fired", _f("item", "object"),
        note="первый настоящий потребитель канала событий (4.0-E05)"),
 
-    # --- запросы к оболочке, выраженные событием ----------------------------
+    # --- requests to the shell, expressed as an event -----------------------
     _e("apps.not_found", _f("query", "string")),
     _e("window.action",
        _f("action", "string", "screenshot", "minimize", "show", "quit"),
        note="ядро сообщает о намерении, оболочка решает, как это выглядит"),
 
-    # --- потоковый текст (4.0-D06, §7) --------------------------------------
+    # --- streamed text (4.0-D06, §7) ----------------------------------------
     _e("stream.chunk", _f("text", "string"),
        note="часть ответа; поток назван stream_id в конверте"),
     _e("stream.end", _f("reason", "string", "done", "cancelled", "failed"),
        note="при failed рядом идёт error с тем же stream_id"),
 
-    # --- долгие задачи (4.0-D09, §9) ----------------------------------------
+    # --- long tasks (4.0-D09, §9) -------------------------------------------
     _e("task.progress", _f("task_id", "string"), _f("note", "string"),
        _f("fraction", "number", required=False, low=0.0, high=1.0),
        note="доля необязательна: она известна не всякой задаче, "
@@ -125,14 +128,15 @@ ALL_EVENTS = tuple(EVENTS)
 
 def validate_event(name: str, payload: dict[str, Any]) -> None:
     """
-    Проверить нагрузку события перед отправкой.
+    Check an event's payload before sending.
 
-    Лишнее поле — ошибка, как и в реестре инструментов: здесь обе стороны
-    описаны одним документом, и лишнее поле значит, что отправитель считал,
-    будто сообщает одно, а сообщает другое. Послабление §4 про незнакомые
-    поля относится к конверту, а не к нагрузке: конверт общий для всех
-    сообщений и растёт версиями протокола, нагрузка же принадлежит
-    конкретному событию и растёт вместе с ним.
+    A surplus field is an error, as in the tool registry: here both sides
+    are described by one document, and a surplus field means the sender
+    believed it was reporting one thing and is reporting another. The
+    concession in §4 about unfamiliar fields applies to the envelope, not to
+    the payload: the envelope is common to every message and grows with
+    protocol versions, whereas the payload belongs to a particular event and
+    grows together with it.
     """
     spec = EVENTS.get(name)
     if spec is None:
@@ -157,7 +161,7 @@ def validate_event(name: str, payload: dict[str, Any]) -> None:
                         event=name, field=fname)
         value = payload[fname]
         wanted = _TYPES[spec_field.type]
-        # bool — подкласс int: «истина» вместо числа прошла бы молча.
+        # bool is a subclass of int: "true" instead of a number would pass in silence.
         if spec_field.type in ("integer", "number") and isinstance(value, bool):
             raise fault(ERROR_INVALID_PAYLOAD,
                         f"поле {fname!r} обязано быть числом, а не логическим",
@@ -184,7 +188,7 @@ def validate_event(name: str, payload: dict[str, Any]) -> None:
 def event(name: str, payload: dict[str, Any] | None = None, *, id: str,
           stream_id: int | None = None, trace_id: str | None = None,
           v: int = 1) -> Envelope:
-    """Собрать событие, проверив нагрузку. `trace_id` — из контекста (D15)."""
+    """Build an event, checking the payload. `trace_id` comes from the context (D15)."""
     payload = dict(payload or {})
     validate_event(name, payload)
     return Envelope.event(name, payload, id=id, stream_id=stream_id,
@@ -193,11 +197,11 @@ def event(name: str, payload: dict[str, Any] | None = None, *, id: str,
 
 class Router:
     """
-    Приём событий на стороне получателя.
+    Receiving events on the receiver's side.
 
-    Незнакомое событие не ошибка: `dispatch` возвращает `False` и молчит.
-    Знакомое, но испорченное, роняет только себя — обработчик не вызывается,
-    а причина уходит наблюдателю, если он назначен.
+    An unfamiliar event is not an error: `dispatch` returns `False` and says
+    nothing. A familiar but spoiled one drops only itself — the handler is
+    not called, and the reason goes to the observer if one is appointed.
     """
 
     def __init__(self, on_broken: Callable[[str, Exception], None] | None = None):
@@ -214,7 +218,7 @@ class Router:
         return handler
 
     def dispatch(self, envelope: Envelope) -> bool:
-        """`True` — событие доставлено хотя бы одному подписчику."""
+        """`True` — the event was delivered to at least one subscriber."""
         name = envelope.method or ""
         if name not in EVENTS:
             self.ignored.append(name)
@@ -232,9 +236,9 @@ class Router:
 
 
 # ---------------------------------------------------------------------------
-# Потоковый текст (4.0-D06, §7)
+# Streamed text (4.0-D06, §7)
 # ---------------------------------------------------------------------------
-#: Чем поток может закончиться.
+#: How a stream may end.
 STREAM_DONE = "done"
 STREAM_CANCELLED = "cancelled"
 STREAM_FAILED = "failed"
@@ -242,11 +246,12 @@ STREAM_FAILED = "failed"
 
 class StreamSender:
     """
-    Отправитель потока текста.
+    The sender of a stream of text.
 
-    Ответ модели идёт по частям, чтобы речь начиналась раньше, чем ответ
-    дописан. В 4.0 потребителя ещё нет — он появляется в 5.0; заложено сейчас,
-    потому что добавить потом стоит переписывания обеих сторон.
+    A model's answer goes in parts, so that speech can begin before the
+    answer is finished. In 4.0 there is no consumer yet — it appears in 5.0;
+    it is laid down now, because adding it later costs a rewrite of both
+    sides.
     """
 
     def __init__(self, ids, first_stream_id: int = 1):
@@ -255,7 +260,7 @@ class StreamSender:
         self.open: set[int] = set()
 
     def begin(self) -> int:
-        """Занять номер потока. Он же уходит в ответ, открывающий поток."""
+        """Take a stream number. It also goes into the answer that opens the stream."""
         stream_id = self._next
         self._next += 1
         self.open.add(stream_id)
@@ -274,7 +279,7 @@ class StreamSender:
         return message
 
     def close_all(self) -> int:
-        """Забыть все потоки: обрыв уносит их с собой (§13)."""
+        """Forget every stream: a disconnection takes them with it (§13)."""
         count = len(self.open)
         self.open.clear()
         return count
@@ -288,13 +293,13 @@ class StreamSender:
 
 class StreamReceiver:
     """
-    Сборка потока на стороне получателя.
+    Assembling a stream on the receiver's side.
 
-    **Часть потока может прийти раньше ответа, открывшего поток** — сообщения
-    асинхронны, и §7 прямо этого требует. Поэтому приёмник копит по номеру
-    потока и не спрашивает, знает ли он о нём: приёмник, который отбрасывает
-    ранние части, теряет начало каждого быстрого ответа, причём тем чаще, чем
-    быстрее отвечает модель.
+    **A part of a stream may arrive before the answer that opened the
+    stream** — messages are asynchronous, and §7 expressly requires this. So
+    the receiver accumulates by stream number and does not ask whether it
+    knows about it: a receiver that discards early parts loses the beginning
+    of every fast answer, and the more often the faster the model answers.
     """
 
     def __init__(self):
@@ -302,7 +307,7 @@ class StreamReceiver:
         self.finished: dict[int, str] = {}
 
     def accept(self, envelope: Envelope) -> bool:
-        """Принять `stream.chunk` или `stream.end`. `False` — не про поток."""
+        """Accept `stream.chunk` or `stream.end`. `False` — not about a stream."""
         name = envelope.method
         stream_id = envelope.stream_id
         if stream_id is None or name not in ("stream.chunk", "stream.end"):

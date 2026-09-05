@@ -1,24 +1,27 @@
 """
-Транспорт: как байты попадают на ту сторону.
+The transport: how bytes get to the other side.
 
-Задача плана `4.0-E01`; решение о транспорте — [ADR 0002](../../docs/adr/0002-ipc-transport.md).
+Plan item `4.0-E01`; the transport decision is
+[ADR 0002](../../docs/adr/0002-ipc-transport.md).
 
-Протокол от транспорта не зависит — это записано в ADR 0002 и проверяется
-conformance-набором, который гоняет тот же контракт через транспорт внутри
-процесса. Здесь собраны реализации, и все они умеют ровно три вещи: отдать
-байты, принять байты, закрыться.
+The protocol does not depend on the transport — that is written down in
+ADR 0002 and is checked by the conformance suite, which drives the same
+contract over an in-process transport. Gathered here are the
+implementations, and every one of them can do exactly three things: give out
+bytes, take bytes, close.
 
-**Именованный канал держит оболочка, ядро подключается клиентом.** Инверсия
-привычной раскладки, и она же снимает зависимость: в Python клиент — это
-обычный `open(r'\\\\.\\pipe\\...', 'r+b')`, тогда как сервер потребовал бы
-`pywin32` или Proactor-цикл.
+**The named pipe is held by the shell, the core connects as a client.** An
+inversion of the usual layout, and it is also what removes a dependency: in
+Python a client is an ordinary `open(r'\\\\.\\pipe\\...', 'r+b')`, whereas a
+server would demand `pywin32` or a Proactor loop.
 
-**Режим `stdio` — ответ на единственную цену того решения.** ADR 0002 честно
-записал, что у канала нет ни `netstat`, ни перехвата пакетов, и отверг
-отладочный режим по TCP: порт без проверки подлинности, который однажды
-забудут выключить. У стандартного ввода-вывода этого недостатка нет — он не
-слушающая точка, к нему нельзя подключиться снаружи, он живёт ровно столько,
-сколько живёт запущенный процесс. Отладка получается, дыры не появляется.
+**The `stdio` mode is the answer to that decision's only price.** ADR 0002
+honestly recorded that a pipe has neither `netstat` nor packet capture, and
+turned down a TCP debugging mode: a port without authentication that will
+one day be left switched on. Standard input and output do not have that
+drawback — it is not a listening point, it cannot be connected to from
+outside, it lives exactly as long as the started process. Debugging is
+possible, and no hole appears.
 """
 
 import os
@@ -27,14 +30,14 @@ import sys
 import threading
 import time
 
-try:                                  # только Windows; на другой системе
-    import msvcrt                     # именованных каналов у нас и нет
+try:                                  # Windows only; on another system we
+    import msvcrt                     # have no named pipes anyway
 except ImportError:                   # pragma: no cover
     msvcrt = None                     # type: ignore[assignment]
 
 
 def _peek_named_pipe():
-    """`PeekNamedPipe` или `None`, если заглянуть в канал нечем."""
+    """`PeekNamedPipe`, or `None` if there is nothing to peek into the pipe with."""
     if msvcrt is None or not sys.platform.startswith("win"):
         return None
     import ctypes
@@ -50,25 +53,26 @@ def _peek_named_pipe():
 
 
 class TransportClosed(Exception):
-    """Та сторона закрылась. Для ядра это значит «оболочки больше нет»."""
+    """The other side closed. For the core this means "the shell is gone"."""
 
 
 class Transport:
-    """Один поток байтов в обе стороны."""
+    """One stream of bytes in both directions."""
 
     def send(self, data: bytes) -> None:
         raise NotImplementedError
 
     def recv(self, max_bytes: int = 65536) -> bytes:
         """
-        Прочитать сколько есть.
+        Read whatever there is.
 
-        Пустые байты значат «сейчас ничего нет», а не «всё кончилось».
-        Конец потока — это `TransportClosed`, и говорит о нём сам транспорт:
-        у канала пустое чтение означает закрытие, у очереди внутри процесса —
-        что сообщение ещё не положили. Сервер, догадывающийся об этом по виду
-        объекта, ошибётся на первом же новом транспорте — и ошибётся молча,
-        крутя пустой цикл вместо завершения.
+        Empty bytes mean "there is nothing right now", not "it is all over".
+        The end of the stream is `TransportClosed`, and the transport itself
+        says so: for a pipe an empty read means closure, for an in-process
+        queue it means the message has not been put there yet. A server that
+        guesses this from the object's kind will be wrong on the very first
+        new transport — and wrong in silence, spinning an empty loop instead
+        of finishing.
         """
         raise NotImplementedError
 
@@ -78,12 +82,13 @@ class Transport:
 
 class Channels:
     """
-    Пара каналов сессии: управляющий и данных.
+    A session's pair of channels: control and data.
 
-    Данных может не быть — например, в режиме `stdio`, где поток один. Это
-    не поломка: канал данных нужен звуку, а отлаживают обычно команды.
-    Отсутствие выражено явно, чтобы попытка открыть поток упиралась в
-    внятный отказ, а не в `None` посреди отправки.
+    There may be no data channel — for instance in `stdio` mode, where there
+    is one stream. This is not a breakage: the data channel is needed by
+    sound, and what is usually debugged is commands. The absence is
+    expressed explicitly, so that an attempt to open a stream runs into an
+    intelligible refusal rather than into a `None` in the middle of sending.
     """
 
     def __init__(self, control: Transport, data: Transport | None = None):
@@ -101,11 +106,11 @@ class Channels:
 
 class InProcessTransport(Transport):
     """
-    Транспорт внутри процесса: для тестов и conformance.
+    An in-process transport: for tests and for conformance.
 
-    Существует не ради удобства тестов, а потому что этого требует ADR 0002:
-    протокол, который нельзя прогнать мимо канала, от канала зависит — просто
-    об этом ещё не знают.
+    It exists not for the tests' convenience but because ADR 0002 demands
+    it: a protocol that cannot be driven past the pipe depends on the pipe —
+    it simply does not know that yet.
     """
 
     def __init__(self):
@@ -142,10 +147,10 @@ class InProcessTransport(Transport):
 
 class StdioTransport(Transport):
     """
-    Управляющий канал по стандартному вводу-выводу.
+    The control channel over standard input and output.
 
-    Двоичные потоки, а не текстовые: кадр несёт четыре байта длины, и
-    текстовая обёртка с переводом строк испортила бы их молча.
+    Binary streams, not text ones: a frame carries four bytes of length, and
+    a text wrapper with newline translation would spoil them in silence.
     """
 
     def __init__(self, stdin=None, stdout=None):
@@ -162,7 +167,7 @@ class StdioTransport(Transport):
         chunk = self._in.read1(max_bytes) if hasattr(self._in, "read1") \
             else self._in.read(max_bytes)
         if not chunk:
-            # На стандартном вводе пустое чтение бывает только одно — конец.
+            # On standard input an empty read happens only once — the end.
             raise TransportClosed("стандартный ввод закрыт")
         return chunk
 
@@ -175,34 +180,35 @@ class StdioTransport(Transport):
 
 class PipeClientTransport(Transport):
     """
-    Клиент именованного канала Windows.
+    A Windows named-pipe client.
 
-    Ядро подключается, а не слушает: сервером канала работает оболочка
-    (ADR 0002). В Python это обычный файл — ни `pywin32`, ни асинхронного
-    цикла не требуется.
+    The core connects rather than listens: the pipe's server is the shell
+    (ADR 0002). In Python this is an ordinary file — neither `pywin32` nor
+    an asynchronous loop is needed.
 
-    **Чтение не имеет права запирать запись, и это стоило отдельного
-    решения.** У синхронного файлового дескриптора Windows операции
-    сериализуются: пока главный поток висит в `ReadFile`, `WriteFile` из
-    рабочего потока ждёт его завершения. Ядро при этом молчит, пока
-    оболочка чего-нибудь не пришлёт, — то есть push-события (§10) не
-    работают вовсе, а выглядит это как «ядро задумалось».
+    **Reading has no right to lock writing out, and that cost a separate
+    decision.** On a synchronous Windows file descriptor, operations are
+    serialised: while the main thread hangs in `ReadFile`, a `WriteFile`
+    from a worker thread waits for it to finish. The core meanwhile stays
+    silent until the shell sends something — that is, push events (§10) do
+    not work at all, and it looks like "the core has gone off to think".
 
-    Дефект нашёлся только на настоящем канале: внутрипроцессный
-    conformance-набор поймать его не мог по построению — там нет ни
-    дескриптора, ни сериализации, а протокол ни при чём. Отсюда правило:
-    независимость протокола от транспорта (ADR 0002) не отменяет проверки
-    самого транспорта, и `shell/Rina.Protocol.Probe` — она и есть.
+    The defect turned up only on a real pipe: the in-process conformance
+    suite could not catch it by construction — there is neither a descriptor
+    nor serialisation there, and the protocol has nothing to do with it.
+    Hence the rule: the protocol's independence from the transport
+    (ADR 0002) does not do away with checking the transport itself, and
+    `shell/Rina.Protocol.Probe` is that check.
 
-    Лечится без сторонних библиотек: один замок на дескриптор и
-    `PeekNamedPipe` перед чтением. `ReadFile` вызывается, только когда байты
-    уже пришли, поэтому висеть внутри замка не на чем, и запись всегда
-    находит дескриптор свободным. Цена — опрос раз в несколько миллисекунд;
-    альтернатива (перекрытый ввод-вывод) требует `pywin32`, а его отсутствие
-    было половиной довода ADR 0002 в пользу этой раскладки.
+    It is cured without third-party libraries: one lock per descriptor and
+    `PeekNamedPipe` before reading. `ReadFile` is called only once the bytes
+    have already arrived, so there is nothing to hang on inside the lock,
+    and a write always finds the descriptor free. The price is polling every
+    few milliseconds; the alternative (overlapped I/O) demands `pywin32`,
+    and its absence was half of ADR 0002's argument for this layout.
     """
 
-    #: Как часто заглядывать в канал, когда он пуст.
+    #: How often to peek into the pipe when it is empty.
     POLL = 0.004
 
     def __init__(self, name: str):
@@ -217,11 +223,12 @@ class PipeClientTransport(Transport):
 
     def connect(self, timeout: float = 10.0) -> "PipeClientTransport":
         """
-        Подключиться, подождав, пока оболочка поднимет канал.
+        Connect, having waited for the shell to raise the pipe.
 
-        Ожидание нужно потому, что порядок запуска не гарантирован: оболочка
-        запускает ядро и создаёт каналы, и кто из двух окажется быстрее —
-        вопрос планировщика, а не замысла.
+        The wait is needed because the start order is not guaranteed: the
+        shell starts the core and creates the pipes, and which of the two
+        turns out faster is a question for the scheduler rather than for the
+        design.
         """
         import time as _time
         deadline = _time.monotonic() + timeout
@@ -248,11 +255,12 @@ class PipeClientTransport(Transport):
 
     def recv(self, max_bytes: int = 65536) -> bytes:
         """
-        Прочитать доступное. Пустые байты — «пока ничего», не «конец».
+        Read what is available. Empty bytes mean "nothing yet", not "the
+        end".
 
-        Замок держится только на время самого чтения, и читаем мы лишь
-        тогда, когда `PeekNamedPipe` уже насчитал байты. Без этого
-        отправляющий поток ждал бы завершения чужого чтения.
+        The lock is held only for the duration of the read itself, and we
+        read only when `PeekNamedPipe` has already counted bytes. Without
+        this a sending thread would wait for somebody else's read to finish.
         """
         if self._file is None:
             raise TransportClosed("канал не открыт")
@@ -272,11 +280,12 @@ class PipeClientTransport(Transport):
 
     def _available(self) -> int:
         """
-        Сколько байт уже лежит в канале. Ноль — пусто, исключение — конец.
+        How many bytes are already lying in the pipe. Zero means empty, an
+        exception means the end.
 
-        Если заглянуть нечем (не Windows, дескриптор недоступен), считаем,
-        что байты есть: тогда поведение возвращается к простому блокирующему
-        чтению, и хуже, чем было, не станет.
+        If there is nothing to peek with (not Windows, the descriptor
+        unavailable), we assume there are bytes: behaviour then falls back
+        to a plain blocking read, and nothing gets worse than it was.
         """
         if self._peek is None:
             time.sleep(self.POLL)
@@ -306,7 +315,7 @@ class PipeClientTransport(Transport):
 
 
 def open_channels(mode: str, session: str = "") -> Channels:
-    """Собрать каналы по имени режима. Используется точкой входа `4.0-E01`."""
+    """Assemble the channels by mode name. Used by the `4.0-E01` entry point."""
     if mode == "stdio":
         return Channels(StdioTransport())
     if mode == "pipe":

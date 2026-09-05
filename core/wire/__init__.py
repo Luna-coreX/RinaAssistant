@@ -1,34 +1,38 @@
 """
-Провод: реализация протокола «оболочка ↔ ядро» версии 1.
+The wire: the implementation of the shell-to-core protocol, version 1.
 
-Спецификация — [`docs/protocol/PROTOCOL-v1.md`](../../docs/protocol/PROTOCOL-v1.md).
-Она написана до реализации, и этот пакет ей подчиняется, а не наоборот:
-расхождение между кодом и документом означает, что неправ код, либо что
-документ надо править осознанно и отдельным решением.
+The specification is
+[`docs/protocol/PROTOCOL-v1.md`](../../docs/protocol/PROTOCOL-v1.md). It was
+written before the implementation, and this package obeys it rather than the
+other way round: a divergence between the code and the document means either
+that the code is wrong, or that the document has to be changed deliberately
+and as a separate decision.
 
-**Почему пакет называется не `protocol`.** Модуль `core/protocol.py` уже
-занят — там перечень событий 3.1.0, по которому сверялась спецификация. Это
-разные вещи: там каталог того, что ядро сообщает, здесь — как сообщение
-устроено, разложено на байты и как две стороны договариваются о версии.
-Каталог событий переедет сюда вместе с E02; до тех пор соседство временное,
-и одинаковое имя запутывало бы обоих.
+**Why the package is not called `protocol`.** The module `core/protocol.py`
+is already taken — it holds the 3.1.0 catalogue of events the specification
+was checked against. These are different things: there, a catalogue of what
+the core reports; here, how a message is built, laid out in bytes, and how
+the two sides agree on a version. The event catalogue will move here with
+E02; until then the neighbourhood is temporary, and one name would confuse
+both.
 
-Пакет не знает ни о Qt, ни о канале. Он умеет превращать сообщение в байты и
-обратно и следить за состоянием сессии; кто эти байты переносит — именованный
-канал, сокет или очередь внутри процесса — его не касается. Так требует
-ADR 0002: спецификация не зависит от транспорта, чтобы conformance-тесты
-(`4.0-D16`) могли гонять её через транспорт внутри процесса.
+The package knows nothing of Qt and nothing of the channel. It can turn a
+message into bytes and back and keep track of the session's state; who
+carries those bytes — a named pipe, a socket or an in-process queue — is
+none of its business. ADR 0002 requires this: the specification does not
+depend on the transport, so that the conformance tests (`4.0-D16`) can drive
+it over an in-process transport.
 
-Состав:
+Contents:
 
-    errors      каталог ошибок как части контракта (4.0-D05, §5)
-    envelope    конверт и кадрирование управляющего канала (4.0-D04, §2–3)
-    handshake   рукопожатие, версии и возможности (4.0-D03, §4)
-    events      каталог событий и потоковый текст (4.0-D11, 4.0-D06, §7, §10)
-    tasks       жизненный цикл долгой задачи и отмена (4.0-D09, D10, §9)
-    data        канал данных и обратное давление (4.0-D07, D08, §2, §8)
-    permissions канал разрешений поверх контура C05 (4.0-D12, §11)
-    liveness    живость, обрыв, переподключение (4.0-D14, §13)
+    errors      the error catalogue as part of the contract (4.0-D05, §5)
+    envelope    the envelope and control-channel framing (4.0-D04, §2-3)
+    handshake   the handshake, versions and capabilities (4.0-D03, §4)
+    events      the event catalogue and streamed text (4.0-D11, 4.0-D06, §7, §10)
+    tasks       the life cycle of a long task and cancellation (4.0-D09, D10, §9)
+    data        the data channel and backpressure (4.0-D07, D08, §2, §8)
+    permissions the permission channel over the C05 loop (4.0-D12, §11)
+    liveness    liveness, disconnection, reconnection (4.0-D14, §13)
 """
 
 from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,

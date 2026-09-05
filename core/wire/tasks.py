@@ -1,42 +1,43 @@
 """
-Долгие задачи и кооперативная отмена.
+Long tasks and cooperative cancellation.
 
-Задачи плана `4.0-D09` (жизненный цикл) и `4.0-D10` (отмена);
-спецификация, §9.
+Plan items `4.0-D09` (the life cycle) and `4.0-D10` (cancellation);
+specification, §9.
 
-Кодинг-задача в RinaNeuro идёт минутами. Модель «запрос — ответ» этого не
-выражает: у неё есть только «ещё не ответил» и «ответил», а между ними лежит
-всё интересное — сколько сделано, что уже получилось, можно ли остановить.
-Поэтому жизненный цикл закладывается сейчас, пока цена нулевая, хотя в 4.0
-долгих задач нет.
+A coding task in RinaNeuro runs for minutes. The request-response model does
+not express that: it has only "has not answered yet" and "answered", and
+everything interesting lies between them — how much is done, what has come
+out so far, whether it can be stopped. So the life cycle is laid down now,
+while the price is nil, although 4.0 has no long tasks.
 
     accepted ──> running ──┬──> done
                            ├──> failed
                            └──> cancelled
-                  (progress, partial — сколько угодно раз)
+                  (progress, partial — any number of times)
 
-**Ровно одно из `done`/`failed`/`cancelled` завершает задачу.** Это главный
-инвариант, и он проверяется, а не подразумевается: сторона, получившая два
-финальных события, не знает, какому верить, а получившая ноль — ждёт вечно.
-После финального события любое другое сообщение задачи — дефект отправителя
-(`protocol.invalid_state`).
+**Exactly one of `done`/`failed`/`cancelled` ends a task.** This is the main
+invariant, and it is checked rather than assumed: a side that received two
+final events does not know which to believe, and one that received none
+waits forever. After a final event, any other message about the task is a
+defect of the sender (`protocol.invalid_state`).
 
-**Отмена — три шага, а не один.**
+**Cancellation is three steps, not one.**
 
-    task.cancel ──> ответ {accepted} ──> … фактическая остановка … ──> task.cancelled
+    task.cancel ──> answer {accepted} ──> … the actual stop … ──> task.cancelled
 
-Подтверждение получения запроса — не то же самое, что остановка, и путать их
-нельзя: отмена, которая молча ничего не делает, хуже отсутствия отмены.
-Отмена кооперативная: задача сама замечает просьбу и останавливается там, где
-это безопасно, — прервать чужую работу в произвольной точке значит оставить
-после себя недописанный файл.
+Acknowledging receipt of the request is not the same as stopping, and the
+two must not be confused: a cancellation that silently does nothing is worse
+than no cancellation. Cancellation is cooperative: the task notices the
+request itself and stops where that is safe — interrupting somebody else's
+work at an arbitrary point means leaving a half-written file behind.
 
-**Гонка описана и разрешена.** Если задача завершилась сама раньше, чем
-отмена доехала, приходит `done`, а `task.cancelled` не приходит вовсе.
-Спецификация требует, чтобы запрашивающая сторона это выдержала; здесь та же
-гонка честно отражена в ответе на `task.cancel` — `accepted: false` вместе с
-текущим состоянием. Ответ `true`, за которым никогда не последует
-`task.cancelled`, был бы обещанием, которого никто не собирался выполнять.
+**The race is described and resolved.** If the task finished by itself
+before the cancellation arrived, `done` comes and `task.cancelled` does not
+come at all. The specification requires the requesting side to withstand
+this; here the same race is honestly reflected in the answer to
+`task.cancel` — `accepted: false` together with the current state. An answer
+of `true` that would never be followed by `task.cancelled` would be a
+promise nobody intended to keep.
 """
 
 from dataclasses import dataclass, field
@@ -55,36 +56,37 @@ class TaskState:
     CANCELLED = "cancelled"
 
 
-#: Состояния, из которых нет выхода.
+#: States there is no way out of.
 FINAL = (TaskState.DONE, TaskState.FAILED, TaskState.CANCELLED)
 
-#: Что отвечает `task.cancel` про задачу, о которой ничего не известно.
+#: What `task.cancel` answers about a task nothing is known about.
 STATUS_UNKNOWN = "unknown"
 
 
 @dataclass
 class Task:
     """
-    Одна долгая задача на стороне, которая её выполняет.
+    One long task on the side that performs it.
 
-    Задача не знает ни о канале, ни о том, кто её слушает: она возвращает
-    готовые сообщения, а отправляет их вызывающий. Так её можно прогнать в
-    тесте без транспорта — и так же её прогонят conformance-тесты `4.0-D16`.
+    The task knows nothing of the channel and nothing of who is listening to
+    it: it returns ready-made messages, and the caller sends them. That way
+    it can be run in a test without a transport — and that is how the
+    `4.0-D16` conformance tests will run it too.
     """
 
     id: str
-    ids: Any                      # IdGenerator: номера сообщений
+    ids: Any                      # IdGenerator: message numbers
     state: str = TaskState.ACCEPTED
     cancel_requested: bool = False
     events: list[Envelope] = field(default_factory=list)
 
-    # -- ответ на запрос, породивший задачу ----------------------------------
+    # -- the answer to the request that spawned the task ----------------------
 
     def accepted_payload(self) -> dict[str, Any]:
-        """Тело ответа на запрос: задача принята, работа началась."""
+        """The body of the answer to the request: the task is accepted, work has begun."""
         return {"task_id": self.id, "status": TaskState.ACCEPTED}
 
-    # -- ход работы ----------------------------------------------------------
+    # -- the course of the work -----------------------------------------------
 
     def start(self) -> None:
         self._require_live("начать")
@@ -92,10 +94,11 @@ class Task:
 
     def progress(self, note: str, fraction: float | None = None) -> Envelope:
         """
-        Сообщить о продвижении.
+        Report progress.
 
-        Пояснение обязательно, доля — нет: доля известна не всякой задаче, а
-        прогресс без слов не сообщает ничего, кроме того, что процесс жив.
+        A note is required, a fraction is not: not every task knows the
+        fraction, and progress without words reports nothing except that the
+        process is alive.
         """
         self._require_live("сообщить о прогрессе")
         payload: dict[str, Any] = {"task_id": self.id, "note": note}
@@ -108,14 +111,14 @@ class Task:
         return self._emit("task.partial",
                           {"task_id": self.id, "result": result})
 
-    # -- завершение ----------------------------------------------------------
+    # -- finishing --------------------------------------------------------------
 
     def done(self, result: Any) -> Envelope:
         self._finish(TaskState.DONE, "завершить")
         return self._emit("task.done", {"task_id": self.id, "result": result})
 
     def failed(self, error) -> Envelope:
-        """`error` — `ProtocolError` либо готовый словарь по §5."""
+        """`error` is either a `ProtocolError` or a ready-made dict per §5."""
         self._finish(TaskState.FAILED, "завалить")
         payload = error.to_payload() if hasattr(error, "to_payload") else error
         return self._emit("task.failed",
@@ -123,22 +126,24 @@ class Task:
 
     def cancelled(self) -> Envelope:
         """
-        Задача действительно остановилась.
+        The task really has stopped.
 
-        Отправляется только после того, как работа прекращена, — в этом весь
-        смысл третьего шага. Отправить его вместо подтверждения получения
-        значит соврать о том, что уже ничего не выполняется.
+        Sent only after the work has ceased — that is the whole point of the
+        third step. Sending it instead of an acknowledgement means lying
+        about nothing running any more.
         """
         self._finish(TaskState.CANCELLED, "отменить")
         return self._emit("task.cancelled", {"task_id": self.id})
 
-    # -- отмена --------------------------------------------------------------
+    # -- cancellation -----------------------------------------------------------
 
     def request_cancel(self) -> dict[str, Any]:
         """
-        Принять просьбу об отмене. Возвращает тело ответа на `task.cancel`.
+        Accept a request to cancel. Returns the body of the answer to
+        `task.cancel`.
 
-        Не останавливает задачу: остановиться она обязана сама, заметив флаг.
+        Does not stop the task: it is obliged to stop itself, on noticing
+        the flag.
         """
         if self.state in FINAL:
             return {"accepted": False, "status": self.state}
@@ -149,7 +154,7 @@ class Task:
     def finished(self) -> bool:
         return self.state in FINAL
 
-    # -- внутреннее ----------------------------------------------------------
+    # -- internals --------------------------------------------------------------
 
     def _emit(self, name: str, payload: dict[str, Any]) -> Envelope:
         message = event(name, payload, id=self.ids.next())
@@ -169,13 +174,13 @@ class Task:
 
 class Registry:
     """
-    Живые задачи стороны.
+    A side's live tasks.
 
-    Завершённые задачи не удаляются сразу: `task.cancel` на только что
-    завершённую задачу — обычная гонка, а не дефект, и ответить на неё
-    «такой задачи нет» значило бы отправить отладку по ложному следу.
-    Хранится последний известный итог, чего достаточно, чтобы отличить
-    «опоздал» от «ошибся идентификатором».
+    Finished tasks are not deleted at once: a `task.cancel` for a task that
+    has just finished is an ordinary race rather than a defect, and
+    answering it with "there is no such task" would send debugging down a
+    false trail. The last known outcome is kept, which is enough to tell
+    "too late" from "wrong identifier".
     """
 
     def __init__(self, ids, prefix: str = "task-"):
@@ -192,10 +197,11 @@ class Registry:
 
     def clear(self) -> int:
         """
-        Забыть все задачи — при обрыве связи (`4.0-D14`).
+        Forget every task — on a disconnection (`4.0-D14`).
 
-        Именно забыть, а не отменить: отменить значит сообщить о
-        `task.cancelled`, а сообщать некому — собеседника нет.
+        Forget precisely, not cancel: to cancel means to report
+        `task.cancelled`, and there is nobody to report to — the
+        correspondent is gone.
         """
         count = len(self.tasks)
         self.tasks.clear()
@@ -206,10 +212,11 @@ class Registry:
 
     def cancel(self, task_id: str) -> dict[str, Any]:
         """
-        Обработать `task.cancel`. Тело ответа — по §9.
+        Handle `task.cancel`. The answer body follows §9.
 
-        Неизвестный идентификатор не ошибка: чаще всего это задача, о которой
-        сторона уже забыла. Ответ говорит правду — принять нечего.
+        An unknown identifier is not an error: most often it is a task the
+        side has already forgotten. The answer tells the truth — there is
+        nothing to accept.
         """
         task = self.tasks.get(task_id)
         if task is None:
@@ -221,16 +228,17 @@ def run(task: Task, steps: int, clock: Callable[[], float],
         advance: Callable[[float], None], *, seconds: float,
         partial_every: int = 0) -> list[Envelope]:
     """
-    Прогнать задачу по шагам — заглушка §15.7 без ожидания в реальном времени.
+    Run a task step by step — the §15.7 stub without waiting in real time.
 
-    Часы передаются снаружи: требование спецификации говорит о задаче на
-    шестьдесят секунд, и проверять его настоящим ожиданием значило бы держать
-    проверку минуту ради формы, которая от длительности не зависит. Поддельные
-    часы дают ту же последовательность событий за миллисекунды.
+    The clock is passed in from outside: the specification's requirement
+    speaks of a sixty-second task, and checking it by really waiting would
+    mean holding the check for a minute for the sake of a shape that does
+    not depend on the duration. A fake clock gives the same sequence of
+    events in milliseconds.
 
-    Отмена проверяется **перед** каждым шагом: задача, замечающая просьбу
-    только после последнего шага, формально кооперативна и практически
-    бесполезна.
+    Cancellation is checked **before** each step: a task that notices the
+    request only after the last step is formally cooperative and practically
+    useless.
     """
     task.start()
     started = clock()

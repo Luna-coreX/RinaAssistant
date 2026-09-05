@@ -1,52 +1,54 @@
 """
-Живость, обрыв, переподключение.
+Liveness, disconnection, reconnection.
 
-Задача плана `4.0-D14`; спецификация, §13.
+Plan item `4.0-D14`; specification, §13.
 
-В одном процессе смерть половины программы не бывает: падает всё сразу, и это
-видно. В двух — сторона может умереть молча, и вторая будет ждать ответа,
-которого не будет никогда. Окно, которое ждёт мёртвое ядро, выглядит зависшим,
-и человек не отличит его от медленного.
+Within one process half the program does not die: everything falls at once,
+and that is visible. Across two, one side may die in silence, and the other
+will wait for an answer that will never come. A window waiting on a dead
+core looks frozen, and a person will not tell it apart from a slow one.
 
-**Молчание — не признак смерти.** Признак смерти — молчание в ответ на прямой
-вопрос. Поэтому `ping` шлётся только после паузы, а мёртвой сторона считается
-после трёх неотвеченных подряд: одна потеря может случиться от чего угодно,
-три подряд — уже закономерность.
+**Silence is not a sign of death.** The sign of death is silence in answer
+to a direct question. So a `ping` is sent only after a pause, and a side is
+considered dead after three unanswered ones in a row: one loss can happen
+for any reason, three in a row is already a pattern.
 
-**Любое сообщение считается за понг.** Занятый канал пинговать незачем: если
-собеседник только что прислал событие, он жив, и лишний вопрос — трата на
-пустом месте. Отсюда счётчик тишины, а не таймер по расписанию.
+**Any message counts as a pong.** There is no point pinging a busy channel:
+if the correspondent has just sent an event, it is alive, and an extra
+question is an expense for nothing. Hence a silence counter rather than a
+timer on a schedule.
 
-**Что переживает переподключение, а что нет.** Настройки, команды, история,
-напоминания, плагины лежат в хранилище и переживают. Не переживают:
-незакрытый уточняющий вопрос, открытые потоки, выданные разрешения,
-незавершённые задачи. Это не упрощение реализации, а решение: после обрыва
-неизвестно, что успело произойти на той стороне, и разрешение, выданное до
-обрыва, относится к разговору, которого больше нет.
+**What survives a reconnection and what does not.** Settings, commands,
+history, reminders and plugins lie in the store and survive. What does not
+survive: an unclosed clarifying question, open streams, granted permissions,
+unfinished tasks. This is not a simplification of the implementation but a
+decision: after a break it is unknown what managed to happen on the other
+side, and a permission granted before the break belongs to a conversation
+that no longer exists.
 
-Поэтому состояние после рукопожатия **собирается заново запросами, а не
-восстанавливается по памяти**. Память пережившей стороны — не источник правды
-о том, что происходит у собеседника.
+So the state after the handshake is **assembled afresh by requests, not
+restored from memory**. The memory of the surviving side is not a source of
+truth about what is going on at the correspondent.
 """
 
 import time
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-#: После какой тишины спрашивать «жив ли» (§13).
+#: After how much silence to ask "are you alive" (§13).
 SILENCE = 5.0
 
-#: Сколько неотвеченных вопросов подряд считать смертью.
+#: How many unanswered questions in a row count as death.
 MISSED_LIMIT = 3
 
 
 class Liveness:
     """
-    Счётчик тишины и неотвеченных вопросов на одной стороне.
+    The counter of silence and unanswered questions on one side.
 
-    Не шлёт ничего сам: решает, пора ли, и считает. Отправку делает тот, у
-    кого есть канал, — так эту логику можно проверить на поддельных часах, не
-    поднимая транспорта.
+    It sends nothing itself: it decides whether it is time, and counts. The
+    sending is done by whoever has the channel — that way this logic can be
+    checked on a fake clock without raising a transport.
     """
 
     def __init__(self, silence: float = SILENCE,
@@ -61,10 +63,10 @@ class Liveness:
 
     def note_traffic(self, now: float | None = None) -> None:
         """
-        Пришло любое сообщение.
+        Any message arrived.
 
-        Считается за ответ: собеседник, приславший событие, жив не менее
-        убедительно, чем приславший понг.
+        It counts as an answer: a correspondent that sent an event is alive
+        no less convincingly than one that sent a pong.
         """
         self.last_seen = self._clock() if now is None else now
         self.missed = 0
@@ -77,15 +79,16 @@ class Liveness:
         return (self._clock() if now is None else now) - self.last_seen
 
     def due(self, now: float | None = None) -> bool:
-        """Пора ли слать `ping`."""
+        """Whether it is time to send a `ping`."""
         return self.silent_for(now) >= self._silence
 
     def sent_ping(self, now: float | None = None) -> None:
         """
-        Вопрос задан и пока не отвечен.
+        The question has been asked and is not yet answered.
 
-        Второй `ping` без ответа на первый — не удвоение вопроса, а второй
-        неотвеченный: именно они и считаются.
+        A second `ping` without an answer to the first is not a doubling of
+        the question but a second unanswered one: those are exactly what is
+        counted.
         """
         self.missed += 1
         self._awaiting = True
@@ -104,12 +107,12 @@ class Liveness:
 @dataclass
 class VolatileState:
     """
-    То, что обрыв уносит с собой (§13).
+    What a break takes with it (§13).
 
-    Собрано в одном месте намеренно. Разложенное по владельцам, оно
-    сбрасывалось бы в нескольких местах, и однажды где-то не сбросилось бы —
-    причём незаметно: пережившее обрыв разрешение выглядит как обычное
-    разрешение, и обнаружится оно только тем, что сработает.
+    Gathered in one place deliberately. Laid out among its owners, it would
+    be reset in several places, and one day somewhere it would not be reset
+    — and unnoticeably at that: a permission that survived a break looks
+    like an ordinary permission, and it will be discovered only by firing.
     """
 
     permissions: Any = None      # PermissionChannel
@@ -120,7 +123,7 @@ class VolatileState:
     also: list[Callable[[], int]] = field(default_factory=list)
 
     def snapshot(self) -> dict[str, int]:
-        """Сколько всего живёт сейчас — для журнала и для проверки."""
+        """How much is alive right now in total — for the journal and for the check."""
         return {
             "разрешения": (self.permissions.ledger.pending()
                            if self.permissions else 0),
@@ -135,11 +138,12 @@ class VolatileState:
 
     def reset(self) -> dict[str, int]:
         """
-        Сбросить всё, что не переживает обрыв. Возвращает, чего сколько было.
+        Reset everything that does not survive a break. Returns how much of
+        what there was.
 
-        Задачи не «отменяются», а забываются: отменить — значит сообщить о
-        `task.cancelled`, а сообщать некому и незачем, собеседника нет. Тот,
-        кто переподключится, спросит заново.
+        Tasks are not "cancelled" but forgotten: to cancel means to report
+        `task.cancelled`, and there is nobody to report to and no point, the
+        correspondent is gone. Whoever reconnects will ask afresh.
         """
         was = self.snapshot()
         if self.permissions is not None:

@@ -1,42 +1,46 @@
 """
-Каталог ошибок: ошибка как часть контракта, а не как исключительная ситуация.
+The error catalogue: an error as part of the contract, not as an exceptional
+situation.
 
-Задачи плана `4.0-D05` (каталог) и часть `4.0-D04`; спецификация, §5.
+Plan items `4.0-D05` (the catalogue) and part of `4.0-D04`; specification,
+§5.
 
-**Код и текст разделены намеренно.** Логика ветвится по `code`, человек читает
-`message`. Код стабилен между версиями и языками, текст переводится и
-переформулируется; если бы ветвление шло по тексту, перевод ломал бы
-поведение.
+**The code and the text are separated deliberately.** Logic branches on
+`code`, a person reads `message`. The code is stable across versions and
+languages, the text is translated and reworded; if branching went by the
+text, translation would break behaviour.
 
-**Категория и признак повтора принадлежат коду, а не месту вызова.** Одна и та
-же ошибка, поднятая из двух мест, обязана одинаково отвечать на вопросы «кто
-виноват» и «есть ли смысл повторить»; поэтому вызывающая сторона передаёт код и
-текст, а остальное берётся отсюда. Иначе `app.not_found` однажды окажется
-`system` и неповторяемой в одном месте и `user` с повтором в другом, и оболочка
-станет вести себя по-разному в зависимости от того, каким путём пришла ошибка.
+**The category and the retry mark belong to the code, not to the call
+site.** One and the same error raised from two places must answer the
+questions "whose fault is it" and "is there any point retrying" in the same
+way; so the caller passes the code and the text, and the rest is taken from
+here. Otherwise `app.not_found` will one day be `system` and non-retryable
+in one place and `user` with a retry in another, and the shell will start
+behaving differently depending on which way the error arrived.
 
-**`retryable` значит «имеет ли смысл повторить то же самое».** Не «поможет ли
-что-нибудь»: просроченное подтверждение неповторяемо, потому что тот же вызов с
-тем же идентификатором провалится снова, — а вот получить новое подтверждение и
-позвать заново, разумеется, можно.
+**`retryable` means "is there any point repeating the same thing".** Not
+"will anything help": an expired confirmation is non-retryable, because the
+same call with the same identifier will fail again — while getting a fresh
+confirmation and calling again is of course possible.
 
-Каталог сверяется с тем, что ядро действительно умеет отправлять
-(`tools/test_wire.py`): каждый код, объявленный любым инструментом реестра,
-обязан здесь быть. Список, который пишут руками и не сверяют, расходится с
-кодом на первом же новом инструменте.
+The catalogue is checked against what the core can actually send
+(`tools/test_wire.py`): every code declared by any tool in the registry must
+be here. A list that is written by hand and never checked parts company with
+the code at the very first new tool.
 """
 
 from dataclasses import dataclass, field
 from typing import Any
 
-#: Категории из §5. `user` — человек может исправить сам; `system` — виновато
-#: окружение; `protocol` — дефект одной из сторон, и его чинят программисты.
+#: The categories from §5. `user` — the person can put it right themselves;
+#: `system` — the environment is at fault; `protocol` — a defect in one of
+#: the sides, and programmers are the ones who fix it.
 CATEGORIES = ("user", "system", "protocol")
 
 
 @dataclass(frozen=True)
 class ErrorSpec:
-    """Строка каталога: чем ошибка является, независимо от места вызова."""
+    """A catalogue row: what an error is, independently of the call site."""
 
     code: str
     category: str
@@ -48,9 +52,9 @@ def _spec(code, category, retryable, note=""):
     return ErrorSpec(code, category, retryable, note)
 
 
-#: Полный каталог. Дополняется вместе со спецификацией, а не в обход неё.
+#: The full catalogue. Extended together with the specification, not around it.
 CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
-    # --- протокол: дефект одной из сторон -----------------------------------
+    # --- protocol: a defect in one of the sides -----------------------------
     _spec("protocol.incompatible", "protocol", False,
           "общей версии протокола нет"),
     _spec("protocol.unknown_method", "protocol", False,
@@ -66,7 +70,7 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
     _spec("protocol.invalid_state", "protocol", False,
           "сообщение не к месту: поток закрыт, задача уже завершена"),
 
-    # --- права и подтверждения ----------------------------------------------
+    # --- permissions and confirmations --------------------------------------
     _spec("permission.denied", "user", False,
           "разрешение не выдано"),
     _spec("permission.required", "user", False,
@@ -78,13 +82,13 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
     _spec("confirmation.expired", "user", False,
           "срок подтверждения истёк; нужно новое, а не повтор того же"),
 
-    # --- реестр инструментов ------------------------------------------------
+    # --- the tool registry ---------------------------------------------------
     _spec("tool.unknown", "protocol", False,
           "вызвана несуществующая возможность"),
     _spec("tool.invalid_arguments", "protocol", False,
           "аргументы не проходят схему инструмента"),
 
-    # --- настройки ----------------------------------------------------------
+    # --- settings -------------------------------------------------------------
     _spec("settings.unknown_key", "protocol", False,
           "такой настройки нет"),
     _spec("settings.invalid_value", "user", False,
@@ -93,17 +97,17 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
           "адрес модели не локальный: разговоры уйдут на чужую машину; "
           "значение принято, но человека предупреждают"),
 
-    # --- плагины ------------------------------------------------------------
+    # --- plugins ---------------------------------------------------------------
     _spec("plugin.not_found", "protocol", False,
           "плагина с таким номером нет: список устарел или его удалили"),
 
-    # --- программы ----------------------------------------------------------
+    # --- programs --------------------------------------------------------------
     _spec("app.not_found", "user", False,
           "программа не найдена в индексе"),
     _spec("app.launch_failed", "system", True,
           "запуск сорвался; со второй попытки бывает иначе"),
 
-    # --- речь и модель ------------------------------------------------------
+    # --- speech and the model ----------------------------------------------------
     _spec("stt.unavailable", "system", False,
           "распознавания нет: модель не установлена или не загрузилась"),
     _spec("stt.failed", "system", True,
@@ -113,15 +117,15 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
     _spec("llm.unavailable", "system", True,
           "модель недоступна: сеть, адрес, запущенный сервер"),
 
-    # --- задачи -------------------------------------------------------------
+    # --- tasks ---------------------------------------------------------------
     _spec("task.cancelled", "user", False,
           "задача снята по просьбе человека"),
 
-    # --- инструменты со своими исходами -------------------------------------
+    # --- tools with outcomes of their own -------------------------------------
     _spec("calc.zero_division", "user", False,
           "деление на ноль в выражении"),
 
-    # --- последнее прибежище ------------------------------------------------
+    # --- the last resort ------------------------------------------------------
     _spec("internal", "system", True,
           "непредусмотренный сбой; подробности — в журнале"),
 )}
@@ -129,7 +133,7 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
 
 @dataclass(frozen=True)
 class ProtocolError:
-    """Полезная нагрузка сообщения типа `error` (§5)."""
+    """The payload of a message of type `error` (§5)."""
 
     code: str
     category: str
@@ -153,12 +157,13 @@ class ProtocolError:
 
 class ProtocolFault(Exception):
     """
-    Ошибка контракта, обнаруженная на этой стороне.
+    A contract error discovered on this side.
 
-    Несёт готовую `ProtocolError`: то, что уходит собеседнику, и то, что
-    поднимается по стеку, — одно и то же значение. Иначе текст в журнале и
-    текст в канале разошлись бы, и отладка двухпроцессной системы стала бы
-    сверкой двух разных описаний одного события.
+    It carries a ready-made `ProtocolError`: what goes to the correspondent
+    and what is raised up the stack are one and the same value. Otherwise
+    the text in the journal and the text in the channel would part company,
+    and debugging a two-process system would become a comparison of two
+    different descriptions of one event.
     """
 
     def __init__(self, error: ProtocolError):
@@ -167,7 +172,7 @@ class ProtocolFault(Exception):
 
 
 def make(code: str, message: str, **details) -> ProtocolError:
-    """Собрать ошибку по коду: категория и повтор берутся из каталога."""
+    """Build an error from a code: the category and the retry come from the catalogue."""
     spec = CATALOGUE.get(code)
     if spec is None:
         raise ValueError(
@@ -179,11 +184,11 @@ def make(code: str, message: str, **details) -> ProtocolError:
 
 
 def fault(code: str, message: str, **details) -> ProtocolFault:
-    """То же, но готовое к `raise`."""
+    """The same, but ready to `raise`."""
     return ProtocolFault(make(code, message, **details))
 
 
-# --- имена кодов, которыми пользуется сам пакет ------------------------------
+# --- the names of the codes the package itself uses --------------------------
 ERROR_INCOMPATIBLE = "protocol.incompatible"
 ERROR_UNKNOWN_METHOD = "protocol.unknown_method"
 ERROR_FRAME_TOO_LARGE = "protocol.frame_too_large"

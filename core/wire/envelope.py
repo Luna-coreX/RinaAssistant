@@ -1,26 +1,28 @@
 """
-Конверт сообщения и кадрирование управляющего канала.
+The message envelope and control-channel framing.
 
-Задача плана `4.0-D04`; спецификация, §2 и §3.
+Plan item `4.0-D04`; specification, §2 and §3.
 
-В 3.1.0 конверта не было вовсе: событие несло только полезную нагрузку, и
-связать нажатие в окне с тем, что произошло в ядре, было нечем — потому что
-всё происходило в одном процессе и связывать было незачем. В двух процессах
-это перестаёт работать, и конверт — цена, которую платят за разделение.
+In 3.1.0 there was no envelope at all: an event carried only its payload,
+and there was nothing to tie a click in the window to what happened in the
+core — because everything happened in one process and there was nothing to
+tie. Across two processes that stops working, and the envelope is the price
+paid for the split.
 
-**Поля конверта присутствуют в каждом сообщении без исключений.** Слово
-«исключений нет» здесь не риторика: конверт, который иногда неполон, требует
-проверки на каждой стороне у каждого получателя, и одна из этих проверок
-однажды будет забыта.
+**The envelope's fields are present in every message without exception.**
+The words "without exception" are not rhetoric here: an envelope that is
+sometimes incomplete demands a check on each side at every receiver, and one
+of those checks will one day be forgotten.
 
-**Неизвестные поля конверта пропускаются молча.** Это ровно обратное правилу
-реестра инструментов, где лишний аргумент — ошибка (`core/tools.py`), и
-разница не в аккуратности, а в том, кто с кем разговаривает. Внутри процесса
-вызывающий и вызываемый собраны вместе: лишний аргумент значит, что кто-то
-ошибся прямо сейчас. Через границу версий стороны собраны порознь, и правила
-совместимости (§4) прямо разрешают добавлять необязательное поле, не меняя
-версию протокола. Получатель, спотыкающийся о незнакомое поле, превращает это
-разрешение в ложь и делает ступенчатое обновление невозможным.
+**Unknown envelope fields are skipped in silence.** This is the exact
+opposite of the tool registry's rule, where a surplus argument is an error
+(`core/tools.py`), and the difference is not one of tidiness but of who is
+talking to whom. Inside one process the caller and the callee are built
+together: a surplus argument means somebody made a mistake just now. Across
+a version boundary the sides are built separately, and the compatibility
+rules (§4) expressly allow adding an optional field without changing the
+protocol version. A receiver that trips over an unfamiliar field turns that
+permission into a lie and makes staged upgrades impossible.
 """
 
 import json
@@ -33,11 +35,12 @@ from core.wire.errors import (ERROR_FRAME_TOO_LARGE, ERROR_INVALID_ENVELOPE,
                               fault)
 from core.trace import new_trace_id, require_trace
 
-#: Предел одного управляющего сообщения (§2). Больше — дефект или попытка
-#: исчерпать память, и то и другое лечится разрывом, а не разбором.
+#: The limit of one control message (§2). More than that is either a defect
+#: or an attempt to exhaust memory, and both are cured by disconnecting
+#: rather than by parsing.
 CONTROL_FRAME_LIMIT = 1024 * 1024
 
-#: Длина префикса кадра: 4 байта, big-endian, без знака.
+#: The length of a frame prefix: 4 bytes, big-endian, unsigned.
 _HEADER = struct.Struct(">I")
 
 PROTOCOL_VERSION = 1
@@ -53,10 +56,10 @@ class MessageType:
 ALL_TYPES = (MessageType.REQUEST, MessageType.RESPONSE,
              MessageType.EVENT, MessageType.ERROR)
 
-#: Какие поля обязательны сверх общих, в зависимости от типа сообщения (§3).
-#: Запрос и событие обязаны назвать метод; ответ и ошибка — сказать, на что
-#: они отвечают. Ответ без `correlation_id` неотличим от события и потому
-#: бесполезен.
+#: Which fields are required beyond the common ones, depending on the message
+#: type (§3). A request and an event must name the method; a response and an
+#: error must say what they are answering. A response without a
+#: `correlation_id` is indistinguishable from an event and therefore useless.
 _EXTRA_REQUIRED = {
     MessageType.REQUEST: ("method",),
     MessageType.EVENT: ("method",),
@@ -68,10 +71,10 @@ _EXTRA_REQUIRED = {
 @dataclass(frozen=True)
 class Envelope:
     """
-    Одно сообщение управляющего канала.
+    One message of the control channel.
 
-    Замороженный: сообщение, побывавшее в журнале и в трассировке, не должно
-    отличаться от того, что ушло в канал.
+    Frozen: a message that has been through the journal and the trace must
+    not differ from what went into the channel.
     """
 
     type: str
@@ -90,7 +93,7 @@ class Envelope:
                   self.payload)
 
     def to_dict(self) -> dict[str, Any]:
-        """Словарь для сериализации: необязательные поля опускаются."""
+        """A dict for serialisation: optional fields are omitted."""
         out: dict[str, Any] = {
             "v": self.v,
             "type": self.type,
@@ -107,7 +110,7 @@ class Envelope:
             out["stream_id"] = self.stream_id
         return out
 
-    # -- удобные конструкторы ------------------------------------------------
+    # -- convenience constructors ---------------------------------------------
 
     @staticmethod
     def request(method: str, payload: dict[str, Any], *, id: str,
@@ -122,12 +125,13 @@ class Envelope:
               trace_id: str | None = None, v: int = PROTOCOL_VERSION,
               stream_id: int | None = None) -> "Envelope":
         """
-        Событие.
+        An event.
 
-        `trace_id` по умолчанию берётся из контекста обработки (`4.0-D15`), а
-        не задаётся вызывающим: событие рождается глубоко — реестр вызывает
-        исполнение, исполнение поднимает событие, — и требовать, чтобы каждый
-        участник цепочки протащил идентификатор, значит однажды его потерять.
+        `trace_id` is taken from the handling context by default
+        (`4.0-D15`) rather than set by the caller: an event is born deep
+        down — the registry calls the execution, the execution raises the
+        event — and requiring every link in the chain to carry the
+        identifier through means losing it one day.
         """
         return Envelope(type=MessageType.EVENT, id=id, method=method,
                         payload=payload, trace_id=trace_id or require_trace(),
@@ -135,11 +139,11 @@ class Envelope:
 
     def reply(self, payload: dict[str, Any], *, id: str) -> "Envelope":
         """
-        Ответ на этот запрос.
+        A response to this request.
 
-        `trace_id` и версия наследуются, а не задаются заново: трассировка
-        сквозная по определению (§14), и восстанавливать её вручную на каждом
-        ответе значит однажды забыть.
+        `trace_id` and the version are inherited rather than set afresh: a
+        trace is end-to-end by definition (§14), and restoring it by hand on
+        every response means forgetting it one day.
         """
         return Envelope(type=MessageType.RESPONSE, id=id,
                         correlation_id=self.id, payload=payload,
@@ -147,7 +151,7 @@ class Envelope:
                         stream_id=self.stream_id, timestamp=time.time())
 
     def fail(self, error, *, id: str) -> "Envelope":
-        """Ошибка в ответ на этот запрос. `error` — `ProtocolError`."""
+        """An error in answer to this request. `error` is a `ProtocolError`."""
         return Envelope(type=MessageType.ERROR, id=id,
                         correlation_id=self.id, payload=error.to_payload(),
                         trace_id=self.trace_id, v=self.v,
@@ -161,7 +165,7 @@ def _validate(type_, id_, v, timestamp, trace_id, method, correlation_id,
 
     if type_ not in ALL_TYPES:
         bad(f"неизвестный тип сообщения: {type_!r}", field="type")
-    # bool — подкласс int, и «истина» вместо номера версии прошла бы молча.
+    # bool is a subclass of int, and "true" instead of a version number would pass in silence.
     if isinstance(v, bool) or not isinstance(v, int) or v < 1:
         bad("версия протокола должна быть целым числом от 1", field="v")
     if not isinstance(id_, str) or not id_:
@@ -186,16 +190,16 @@ def _validate(type_, id_, v, timestamp, trace_id, method, correlation_id,
 
 
 def encode(envelope: Envelope) -> bytes:
-    """Конверт → байты JSON в UTF-8, без кадрового префикса."""
+    """An envelope to JSON bytes in UTF-8, without the frame prefix."""
     return json.dumps(envelope.to_dict(), ensure_ascii=False,
                       separators=(",", ":")).encode("utf-8")
 
 
 def decode(raw: bytes) -> Envelope:
     """
-    Байты JSON → конверт.
+    JSON bytes to an envelope.
 
-    Незнакомые поля отбрасываются молча — см. заголовок модуля.
+    Unfamiliar fields are discarded in silence — see the module header.
     """
     try:
         data = json.loads(raw.decode("utf-8"))
@@ -228,7 +232,7 @@ def decode(raw: bytes) -> Envelope:
 
 
 def encode_frame(envelope: Envelope) -> bytes:
-    """Кадр управляющего канала: длина полезной нагрузки, затем она сама."""
+    """A control-channel frame: the payload's length, then the payload."""
     body = encode(envelope)
     if len(body) > CONTROL_FRAME_LIMIT:
         raise fault(
@@ -240,14 +244,16 @@ def encode_frame(envelope: Envelope) -> bytes:
 
 class FrameDecoder:
     """
-    Сборка кадров из потока байтов.
+    Assembling frames out of a stream of bytes.
 
-    Канал отдаёт байты как придётся: половину заголовка сейчас, полтора кадра
-    потом. Декодер держит остаток между вызовами и отдаёт готовые сообщения.
+    A channel gives out bytes as it pleases: half a header now, a frame and
+    a half later. The decoder keeps the remainder between calls and hands
+    back whatever messages have become whole.
 
-    **Предел проверяется по заявленной длине, до выделения памяти.** Иначе
-    предел не защищает ни от чего: сторона, объявившая кадр в четыре гигабайта,
-    добьётся своего ровно тем, что мы честно дождёмся его целиком.
+    **The limit is checked against the declared length, before memory is
+    allocated.** Otherwise the limit protects against nothing: a side that
+    announced a four-gigabyte frame gets its way precisely because we shall
+    honestly wait for the whole of it.
     """
 
     def __init__(self, limit: int = CONTROL_FRAME_LIMIT):
@@ -255,15 +261,16 @@ class FrameDecoder:
         self._buffer = bytearray()
 
     def feed(self, chunk: bytes) -> Iterator[Envelope]:
-        """Принять кусок потока и отдать все сообщения, ставшие целыми."""
+        """Take a piece of the stream and hand back every message now whole."""
         self._buffer.extend(chunk)
         while True:
             if len(self._buffer) < _HEADER.size:
                 return
             (size,) = _HEADER.unpack_from(self._buffer, 0)
             if size > self._limit:
-                # Буфер не очищается: после такого канал разрывают, а не
-                # пытаются продолжить с середины неизвестно чего.
+                # The buffer is not cleared: after such a thing the channel
+                # is broken off rather than continued from the middle of who
+                # knows what.
                 raise fault(
                     ERROR_FRAME_TOO_LARGE,
                     "объявленный размер кадра больше предела",
@@ -276,18 +283,19 @@ class FrameDecoder:
 
     @property
     def pending(self) -> int:
-        """Сколько байт лежит недособранными — для отладки и тестов."""
+        """How many bytes lie unassembled — for debugging and tests."""
         return len(self._buffer)
 
 
 class IdGenerator:
     """
-    Идентификаторы сообщений, уникальные в пределах сессии.
+    Message identifiers, unique within a session.
 
-    Префикс называет сторону (`s-` оболочка, `c-` ядро), чтобы в общем журнале
-    двух процессов было видно, кто отправитель, без обращения к содержимому.
-    Счётчик, а не случайность: в отладке важно, что номера идут подряд —
-    пропуск виден глазом.
+    The prefix names the side (`s-` the shell, `c-` the core), so that in a
+    shared journal of two processes it is visible who the sender is without
+    looking at the content. A counter rather than randomness: in debugging
+    it matters that the numbers run consecutively — a gap is visible to the
+    eye.
     """
 
     def __init__(self, prefix: str):

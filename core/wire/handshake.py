@@ -1,28 +1,31 @@
 """
-Рукопожатие, версии и возможности.
+The handshake, versions and capabilities.
 
-Задача плана `4.0-D03`; спецификация, §4.
+Plan item `4.0-D03`; specification, §4.
 
-Рукопожатие решает две задачи, которые легко перепутать.
+The handshake solves two problems that are easy to confuse.
 
-**Версия протокола** отвечает на вопрос «понимаем ли мы вообще друг друга».
-Каждая сторона объявляет **набор** версий, а не одну, и работают по
-наибольшей общей. Набор — потому что ADR 0004 обязывает оболочку держать
-предыдущую версию один выпуск: она объявляет `[1, 2]` и одинаково работает и
-с новым ядром, и со старым. С одним числом ступенчатое обновление невозможно
-— пришлось бы обновлять оба процесса одновременно, а они выпускаются порознь.
+**The protocol version** answers the question "do we understand each other
+at all". Each side declares a **set** of versions rather than one, and they
+work over the greatest common one. A set — because ADR 0004 obliges the
+shell to keep the previous version for one release: it declares `[1, 2]` and
+works the same with a new core and with an old one. With a single number a
+staged upgrade is impossible — both processes would have to be updated at
+once, and they are released separately.
 
-**Возможности** отвечают на вопрос «что из понятного собеседник умеет».
-Возможность — обещание понимать группу методов. Сторона не вызывает метод,
-чью возможность собеседник не объявил, и потому новая оболочка со старым
-ядром не ломается, а просто не показывает того, чего старое ядро не умеет.
+**Capabilities** answer the question "of what is understood, what can the
+correspondent do". A capability is a promise to understand a group of
+methods. A side does not call a method whose capability the correspondent
+has not declared, and so a new shell with an old core does not break but
+simply does not show what the old core cannot do.
 
-**Каталог возможностей заведён здесь, и это добавление к спецификации.**
-В §4 списки возможностей приведены примером («capabilities»: [...]), полного
-перечня с привязкой к методам там нет. Без него реализация завела бы частный
-словарь, и обещание «спецификация написана до реализации» стало бы
-неправдой при первом же расхождении сторон. Таблица ниже внесена в §4
-спецификации тем же изменением, что и этот модуль.
+**The capability catalogue is kept here, and that is an addition to the
+specification.** In §4 the lists of capabilities are given as an example
+("capabilities": [...]); there is no complete list tied to methods there.
+Without one the implementation would have kept a private dictionary, and the
+promise that "the specification was written before the implementation" would
+become untrue at the sides' first divergence. The table below was entered
+into §4 of the specification by the same change as this module.
 """
 
 import uuid
@@ -46,11 +49,12 @@ class SessionState:
 @dataclass(frozen=True)
 class Capability:
     """
-    Обещание понимать группу методов.
+    A promise to understand a group of methods.
 
-    `methods` бывает пустым: возможность может ничего не отпирать, а только
-    сообщать. `llm` — именно такая: отдельного метода у неё нет, но по ней
-    оболочка решает, показывать ли настройки языковой модели вообще.
+    `methods` is sometimes empty: a capability may unlock nothing and only
+    report. `llm` is exactly such a one: it has no method of its own, but
+    the shell decides by it whether to show the language model's settings at
+    all.
     """
 
     name: str
@@ -59,13 +63,13 @@ class Capability:
     note: str = ""
 
 
-#: Методы, доступные без объявленной возможности: без них сессия бессмысленна.
+#: Methods available without a declared capability: without them a session is meaningless.
 BASE_METHODS = (
-    # Рукопожатие — тоже метод, и его отсутствие в этом перечне было
-    # пробелом: сверка «каждый метод описан в спецификации» его не видела,
-    # а оболочка не могла назвать его иначе как строкой в кавычках.
-    # Обнаружилось при сборке C#-стороны, которая имена не пишет, а берёт
-    # из снимка контракта.
+    # The handshake is a method too, and its absence from this list was a
+    # gap: the check "every method is described in the specification" did
+    # not see it, and the shell could not name it other than as a quoted
+    # string. Found while building the C# side, which does not write names
+    # but takes them from a snapshot of the contract.
     "hello",
     "command.handle",
     "command.run_by_id",
@@ -78,16 +82,17 @@ BASE_METHODS = (
     "core.shutdown",
     "ping",
     "pong",
-    # Управление потоками — базовое, а вот вид потока отпирается
-    # возможностью: метод существует всегда, но открыть `audio.input` у
-    # собеседника без микрофона нельзя. См. core/wire/data.py::KINDS.
+    # Stream control is basic, whereas the kind of stream is unlocked by a
+    # capability: the method always exists, but `audio.input` cannot be
+    # opened on a correspondent without a microphone. See
+    # core/wire/data.py::KINDS.
     "stream.open",
     "stream.close",
     "stream.credit",
 )
 
 _CAPABILITY_LIST = (
-    # --- объявляет оболочка ---
+    # --- declared by the shell ---
     Capability("audio.input", Side.SHELL, (),
                "микрофон есть; поток открывается stream.open (4.0-D07)"),
     Capability("audio.output", Side.SHELL, (),
@@ -100,7 +105,7 @@ _CAPABILITY_LIST = (
                "индекс программ и запуск живут в оболочке (4.0-G06)"),
     Capability("system", Side.SHELL, ("system.do",),
                "громкость, медиа, питание, снимок экрана (4.0-G01..G03)"),
-    # --- объявляет ядро ---
+    # --- declared by the core ---
     Capability("stt", Side.CORE,
                ("speech.listen_once", "speech.set_always_listen"),
                "распознавание речи"),
@@ -112,10 +117,11 @@ _CAPABILITY_LIST = (
                ("plugins.list", "plugins.set_enabled", "plugins.page",
                 "plugins.action", "plugins.install"),
                "плагины"),
-    # Пользовательские команды и история. Заведены в 4.0-F04: инвентарь
-    # поверхности требует их, а методов не было вовсе — оболочка не могла
-    # ни показать список команд, ни очистить историю. Правило рубежа
-    # запрещает терять возможности, и без этих методов терялись бы шесть.
+    # User commands and history. Introduced in 4.0-F04: the surface
+    # inventory demands them, and there were no methods at all — the shell
+    # could neither show the list of commands nor clear the history. The
+    # boundary rule forbids losing capabilities, and without these methods
+    # six would have been lost.
     Capability("commands", Side.CORE,
                ("commands.list", "commands.kinds", "commands.builtin",
                 "commands.save", "commands.delete",
@@ -129,7 +135,7 @@ _CAPABILITY_LIST = (
                "ядро умеет отвечать моделью; отдельного метода нет"),
     Capability("tasks", Side.CORE, ("task.cancel",),
                "долгие задачи с прогрессом и отменой (4.0-D09, D10)"),
-    # --- не объявляется никем в 4.0 (§12) ---
+    # --- declared by nobody in 4.0 (§12) ---
     Capability("actuation", Side.CORE,
                ("actuation.session.begin", "actuation.session.end",
                 "actuation.input.click", "actuation.input.type",
@@ -141,9 +147,9 @@ _CAPABILITY_LIST = (
 
 CAPABILITIES = {c.name: c for c in _CAPABILITY_LIST}
 
-#: Что объявляет каждая сторона в 4.0. `actuation` не объявляет никто —
-#: именно поэтому её методы отвечают «неизвестный метод», а не «нет права»:
-#: в 4.0 их не существует, а не запрещено.
+#: What each side declares in 4.0. `actuation` is declared by nobody — which
+#: is exactly why its methods answer "unknown method" rather than "no
+#: permission": in 4.0 they do not exist rather than being forbidden.
 SHELL_CAPABILITIES = tuple(c.name for c in _CAPABILITY_LIST
                            if c.side == Side.SHELL)
 CORE_CAPABILITIES = tuple(c.name for c in _CAPABILITY_LIST
@@ -157,24 +163,25 @@ _METHOD_TO_CAPABILITY = {
 
 
 def capability_of(method: str) -> str | None:
-    """Какая возможность отпирает метод. `None` — метод базовый."""
+    """Which capability unlocks a method. `None` means the method is basic."""
     if method in BASE_METHODS:
         return None
     return _METHOD_TO_CAPABILITY.get(method, _UNKNOWN)
 
 
-#: Отличается от `None`: `None` значит «базовый метод», это — «нет такого».
+#: Different from `None`: `None` means "a basic method", this means "there is no such thing".
 _UNKNOWN = "?"
 
 
 def negotiate(local: list[int], remote: list[int]) -> int:
     """
-    Наибольшая общая версия протокола.
+    The greatest common protocol version.
 
-    Несовместимость обязана быть внятной (§15.3): не обрыв, а сообщение,
-    называющее обе стороны. Оболочка, объявившая `[1, 2]`, обязана работать с
-    ядром, объявившим `[1]`, — это требование §15.3a, и без него обязательство
-    ADR 0004 держать предыдущую версию остаётся декоративным.
+    Incompatibility is obliged to be intelligible (§15.3): not a
+    disconnection but a message naming both sides. A shell that declared
+    `[1, 2]` is obliged to work with a core that declared `[1]` — that is a
+    requirement of §15.3a, and without it ADR 0004's commitment to keep the
+    previous version stays decorative.
     """
     if not local or not remote:
         raise fault(ERROR_INCOMPATIBLE,
@@ -198,26 +205,27 @@ def _versions(values) -> str:
 @dataclass
 class Session:
     """
-    Состояние одной сессии на одной стороне.
+    The state of one session on one side.
 
-    До успешного рукопожатия любой метод, кроме `hello`, отвечает
-    `protocol.not_ready` (§4). Это не формальность: без версии неизвестно, как
-    читать сообщение, а без возможностей — можно ли вообще было его слать.
+    Until the handshake succeeds, any method except `hello` answers
+    `protocol.not_ready` (§4). This is no formality: without a version it is
+    unknown how to read a message, and without capabilities, whether it
+    could have been sent at all.
     """
 
     side: str
     versions: list[int] = field(default_factory=lambda: [1])
     capabilities: tuple[str, ...] = ()
     app_version: str = "4.0.0"
-    #: Версия формата данных на диске (ADR 0004). Ядро берёт её из
-    #: хранилища; оболочка получает в рукопожатии и показывает.
+    #: The version of the data format on disk (ADR 0004). The core takes it
+    #: from the store; the shell receives it in the handshake and shows it.
     data_version: int = 0
     locale: str = "ru"
 
     state: str = SessionState.NOT_READY
     version: int | None = None
     peer_capabilities: tuple[str, ...] = ()
-    #: Что о своих данных сказал собеседник.
+    #: What the correspondent said about its data.
     peer_data_version: int = 0
     peer_version: str = ""
     session_id: str = ""
@@ -235,10 +243,10 @@ class Session:
                 raise ValueError(
                     f"возможность {name!r} объявляет другая сторона")
 
-    # -- рукопожатие ---------------------------------------------------------
+    # -- the handshake --------------------------------------------------------
 
     def hello_payload(self) -> dict:
-        """Оболочка → ядро: первое сообщение сессии (§4)."""
+        """Shell to core: the session's first message (§4)."""
         return {
             "protocol_versions": sorted(self.versions),
             "shell_version": self.app_version,
@@ -248,10 +256,11 @@ class Session:
 
     def handle_hello(self, payload: dict) -> dict:
         """
-        Ядро принимает `hello` и отвечает.
+        The core accepts `hello` and answers.
 
-        Версия выбирается здесь и называется в ответе: дальше именно она стоит
-        в поле `v` каждого сообщения, и второй раз этот вопрос не задаётся.
+        The version is chosen here and named in the answer: from then on it
+        is that one which stands in every message's `v` field, and the
+        question is not asked a second time.
         """
         remote = payload.get("protocol_versions")
         if not isinstance(remote, list) or not all(
@@ -271,17 +280,18 @@ class Session:
             "protocol_versions": sorted(self.versions),
             "protocol_version": self.version,
             "core_version": self.app_version,
-            # Четвёртая версия из ADR 0004: схема данных на диске. Здесь, а
-            # не в `settings.get`: `config_version` секретен — это состояние
-            # хранилища, а не настройка. Но откат ограничен именно ею, и
-            # назвать её человеку надо.
+            # The fourth version from ADR 0004: the data schema on disk.
+            # Here rather than in `settings.get`: `config_version` is secret
+            # — it is the state of the store, not a setting. But a rollback
+            # is limited by precisely this one, and a person has to be told
+            # what it is.
             "data_version": self.data_version,
             "capabilities": list(self.capabilities),
             "session_id": self.session_id,
         }
 
     def accept_hello_result(self, payload: dict) -> int:
-        """Оболочка принимает ответ ядра и переходит в рабочее состояние."""
+        """The shell accepts the core's answer and moves into the working state."""
         chosen = payload.get("protocol_version")
         if isinstance(chosen, bool) or not isinstance(chosen, int):
             raise fault(ERROR_INCOMPATIBLE,
@@ -301,14 +311,14 @@ class Session:
         self.state = SessionState.READY
         return chosen
 
-    # -- сторожа -------------------------------------------------------------
+    # -- the guards -----------------------------------------------------------
 
     @property
     def ready(self) -> bool:
         return self.state == SessionState.READY
 
     def may_call(self, method: str) -> bool:
-        """Можно ли звать этот метод: собеседник объявил его возможность."""
+        """Whether this method may be called: the correspondent declared its capability."""
         if not self.ready:
             return False
         cap = capability_of(method)
@@ -320,11 +330,12 @@ class Session:
 
     def check_outgoing(self, method: str) -> None:
         """
-        Перед отправкой запроса. Молчит, если звать можно.
+        Before sending a request. Silent if the call is allowed.
 
-        Проверка на своей стороне, а не только на чужой: собеседник и так
-        ответит ошибкой, но тогда о дефекте узнают из журнала другого
-        процесса — самый дорогой способ узнавать о своих ошибках.
+        A check on our own side, not only on the other one: the
+        correspondent will answer with an error anyway, but then we learn of
+        the defect from another process's journal — the most expensive way
+        of learning about one's own mistakes.
         """
         if not self.ready:
             raise fault(ERROR_NOT_READY,
@@ -344,13 +355,14 @@ class Session:
 
     def check_incoming(self, method: str) -> None:
         """
-        Перед обработкой пришедшего запроса.
+        Before handling an incoming request.
 
-        Неизвестный метод и метод необъявленной возможности дают один и тот же
-        ответ — `protocol.unknown_method`. Это не небрежность: для собеседника
-        разницы нет. Методы актуации (§12) существуют в спецификации, но ни
-        одна сторона не объявляет `actuation` в 4.0, и потому они отвечают
-        «неизвестный метод», а не «нет права»: в 4.0 их не существует.
+        An unknown method and a method of an undeclared capability give one
+        and the same answer — `protocol.unknown_method`. This is not
+        carelessness: to the correspondent there is no difference. The
+        actuation methods (§12) exist in the specification, but neither side
+        declares `actuation` in 4.0, and so they answer "unknown method"
+        rather than "no permission": in 4.0 they do not exist.
         """
         if not self.ready and method != "hello":
             raise fault(

@@ -1,33 +1,36 @@
 """
-Канал данных и обратное давление.
+The data channel and backpressure.
 
-Задачи плана `4.0-D07` (бинарный канал) и `4.0-D08` (кредитная схема);
-спецификация, §2 и §8.
+Plan items `4.0-D07` (the binary channel) and `4.0-D08` (the credit scheme);
+specification, §2 and §8.
 
-**Двоичные данные никогда не кодируются внутри JSON.** Base64 раздувает объём
-на треть, но дело не в объёме: закодированный звук едет по управляющему
-каналу и встаёт в ту же очередь, что и команды. Пока едет секунда речи,
-нажатие кнопки ждёт — и это не медленный канал, а неверно устроенный.
+**Binary data is never encoded inside JSON.** Base64 inflates the volume by
+a third, but the matter is not volume: encoded sound travels over the
+control channel and joins the same queue as commands. While a second of
+speech travels, a button press waits — and that is not a slow channel but a
+wrongly built one.
 
-Отсюда два канала на сессию и два разных кадра. Управляющий несёт JSON,
-канал данных — байты с коротким двоичным заголовком:
+Hence two channels per session and two different frames. The control one
+carries JSON, the data channel carries bytes with a short binary header:
 
-    [4 байта: длина остатка кадра][4: stream_id][8: порядковый номер][байты]
+    [4 bytes: length of the rest of the frame][4: stream_id][8: sequence number][bytes]
 
-Порядковый номер растёт в пределах потока и нужен для обнаружения потерь при
-отладке: без него потерянный кусок звука выглядит как «Рина расслышала не всё»,
-и искать причину приходится в распознавании, а не в канале.
+The sequence number grows within a stream and is there for detecting losses
+while debugging: without it a lost chunk of sound looks like "Rina did not
+catch all of it", and the cause has to be hunted in recognition rather than
+in the channel.
 
-**Кредитная схема.** Приёмник объявляет, сколько байт готов принять;
-отправитель не имеет права держать в полёте больше. Начальный кредит — ноль,
-то есть отправитель молчит, пока его не позовут. Без этого быстрый источник
-кадров или звука переполняет очередь и утаскивает память — отказ, который
-снаружи выглядит как «программа съела гигабайт», а изнутри не выглядит никак.
+**The credit scheme.** The receiver announces how many bytes it is ready to
+take; the sender has no right to keep more than that in flight. The initial
+credit is zero, that is, the sender stays silent until it is called on.
+Without this a fast source of frames or sound overflows the queue and drags
+memory away — a failure that looks from outside like "the program ate a
+gigabyte" and from inside like nothing at all.
 
-Начальный кредит именно ноль, а не «немного авансом»: приёмник, который ещё не
-готов, не должен получать данные вовсе. Аванс превратил бы ошибку «забыли
-выдать кредит» в редко воспроизводимую — она проявлялась бы только на потоках
-длиннее аванса.
+The initial credit is precisely zero rather than "a little in advance": a
+receiver that is not ready yet must not get data at all. An advance would
+turn the mistake "we forgot to issue credit" into a rarely reproducible one
+— it would show up only on streams longer than the advance.
 """
 
 import struct
@@ -37,24 +40,25 @@ from typing import Iterator
 from core.wire.errors import (ERROR_FRAME_TOO_LARGE, ERROR_INVALID_PAYLOAD,
                               ERROR_INVALID_STATE, fault)
 
-#: Предел одного кадра данных (§2). Меньше управляющего: кадр звука не обязан
-#: быть большим, а мелкая нарезка даёт отзывчивость и ровное давление.
+#: The limit of one data frame (§2). Smaller than the control one: a frame of
+#: sound need not be large, and fine slicing gives responsiveness and even
+#: pressure.
 DATA_FRAME_LIMIT = 256 * 1024
 
-#: Заголовок кадра данных после поля длины: номер потока и порядковый номер.
+#: The data frame's header after the length field: the stream number and the sequence number.
 _HEADER = struct.Struct(">I")
 _INNER = struct.Struct(">IQ")
 
-#: Виды потоков (§8) и возможность, без которой вид не открывают.
+#: The kinds of stream (§8) and the capability without which a kind is not opened.
 KINDS = {
-    "audio.input": "audio.input",     # микрофон, оболочка → ядро
-    "audio.output": "audio.output",   # синтез, ядро → оболочка
-    "screen.frame": "actuation",      # 5.0, оболочка → ядро
+    "audio.input": "audio.input",     # the microphone, shell to core
+    "audio.output": "audio.output",   # synthesis, core to shell
+    "screen.frame": "actuation",      # 5.0, shell to core
 }
 
 
 def capability_for_kind(kind: str) -> str:
-    """Какую возможность собеседник обязан объявить, чтобы принять такой вид."""
+    """Which capability the correspondent must declare to accept such a kind."""
     try:
         return KINDS[kind]
     except KeyError:
@@ -80,10 +84,11 @@ def encode_data_frame(frame: DataFrame) -> bytes:
 
 class DataFrameDecoder:
     """
-    Сборка кадров данных из потока байтов.
+    Assembling data frames out of a stream of bytes.
 
-    Предел, как и в управляющем канале, проверяется **по заявленной длине, до
-    выделения памяти**: иначе он не защищает ни от чего.
+    The limit, as in the control channel, is checked **against the declared
+    length, before memory is allocated**: otherwise it protects against
+    nothing.
     """
 
     def __init__(self, limit: int = DATA_FRAME_LIMIT):
@@ -120,10 +125,11 @@ class DataFrameDecoder:
 @dataclass
 class Credit:
     """
-    Разрешение отправлять, выданное приёмником (§8).
+    Permission to send, issued by the receiver (§8).
 
-    Считается в байтах, а не в кадрах: память съедают байты, и поток из
-    тысячи мелких кадров ничем не лучше десяти крупных того же объёма.
+    Counted in bytes rather than in frames: bytes are what eat memory, and a
+    stream of a thousand small frames is no better than ten large ones of
+    the same volume.
     """
 
     granted: int = 0
@@ -151,11 +157,11 @@ class Credit:
 
 class DataSender:
     """
-    Отправляющая сторона канала данных.
+    The sending side of the data channel.
 
-    Кредит хранится **по потоку**: микрофон и синтез идут одновременно и в
-    разные стороны, и общий счёт связал бы их скорости друг с другом без
-    всякой на то причины.
+    Credit is kept **per stream**: the microphone and synthesis run at the
+    same time and in different directions, and a common tally would tie
+    their speeds to each other for no reason whatever.
     """
 
     def __init__(self):
@@ -164,7 +170,7 @@ class DataSender:
         self.open: dict[int, str] = {}
 
     def open_stream(self, stream_id: int, kind: str) -> None:
-        capability_for_kind(kind)          # неизвестный вид — сразу отказ
+        capability_for_kind(kind)          # an unknown kind: refused at once
         if stream_id in self.open:
             raise fault(ERROR_INVALID_STATE, f"поток {stream_id} уже открыт",
                         stream_id=stream_id)
@@ -173,7 +179,7 @@ class DataSender:
         self._credit[stream_id] = Credit()
 
     def grant(self, stream_id: int, extra: int) -> int:
-        """Приёмник прислал `stream.credit`."""
+        """The receiver sent `stream.credit`."""
         return self._require(stream_id).grant(extra)
 
     def available(self, stream_id: int) -> int:
@@ -181,10 +187,11 @@ class DataSender:
 
     def send(self, stream_id: int, payload: bytes) -> bytes:
         """
-        Собрать кадр, списав кредит. Кадр возвращается — отправляет вызывающий.
+        Assemble a frame, debiting the credit. The frame is returned — the
+        caller sends it.
 
-        Отправка без кредита — не «немного вперёд», а ошибка: приёмник,
-        объявивший ноль, ещё не готов принимать вовсе.
+        Sending without credit is not "a little ahead" but an error: a
+        receiver that announced zero is not ready to receive at all.
         """
         credit = self._require(stream_id)
         credit.spend(len(payload))
@@ -199,7 +206,7 @@ class DataSender:
         del self._credit[stream_id]
 
     def close_all(self) -> int:
-        """Закрыть все потоки: обрыв канала данных закрывает их все (§8)."""
+        """Close every stream: breaking the data channel closes them all (§8)."""
         count = len(self.open)
         self.open.clear()
         self._seq.clear()
@@ -216,12 +223,13 @@ class DataSender:
 
 class DataReceiver:
     """
-    Принимающая сторона: собирает поток и следит за пропусками.
+    The receiving side: assembles the stream and watches for gaps.
 
-    Пропуск порядкового номера не обрывает приём. Канал не теряет кадров сам
-    по себе — если пропуск случился, виновата одна из сторон, и полезнее
-    записать факт с номерами, чем упасть: упавший приёмник не расскажет, где
-    именно порвалось.
+    A gap in the sequence number does not break off reception. The channel
+    does not lose frames by itself — if a gap happened, one of the sides is
+    to blame, and it is more useful to record the fact with the numbers than
+    to fall over: a receiver that has fallen over will not tell where
+    exactly it tore.
     """
 
     def __init__(self, window: int = 64 * 1024):
@@ -242,11 +250,12 @@ class DataReceiver:
 
     def take_credit(self, stream_id: int) -> int:
         """
-        Сколько байт объявить отправителю после обработки принятого.
+        How many bytes to announce to the sender after handling what was
+        received.
 
-        Приёмник выдаёт кредит по мере обработки, а не по мере получения:
-        кредит за то, что лежит необработанным в буфере, — это и есть та самая
-        неограниченная очередь, ради устранения которой схема существует.
+        The receiver issues credit as it handles data, not as it receives
+        it: credit for what lies unhandled in the buffer is precisely the
+        unbounded queue the scheme exists to do away with.
         """
         ready = self.consumed.pop(stream_id, 0)
         return min(ready, self.window) if ready else 0

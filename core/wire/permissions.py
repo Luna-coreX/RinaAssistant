@@ -1,40 +1,43 @@
 """
-Канал разрешений: ядро просит, оболочка спрашивает человека.
+The permission channel: the core asks, the shell asks the person.
 
-Задача плана `4.0-D12`; спецификация, §11. Опирается на контур подтверждений
+Plan item `4.0-D12`; specification, §11. Rests on the confirmation loop
 `4.0-C05` (`core/confirmations.py`).
 
-Ядро не может выполнить опасное действие само и не умеет показывать окна. Оно
-сообщает о намерении — что произойдёт, почему и на какой срок, — оболочка
-показывает это человеку и возвращает решение.
+The core cannot perform a dangerous action itself and cannot show windows.
+It reports an intent — what will happen, why and for how long — the shell
+shows this to the person and returns the decision.
 
-**Идентификатор подтверждения выпускает ядро, а не оболочка.** Спецификация
-§11 в первой редакции возвращала `confirmation_id` в ответе оболочки, то есть
-оболочка его и порождала. Это прямо противоречило `4.0-C05`, где записано:
-решение о том, подтверждено ли действие, не должно приниматься на стороне
-оболочки, иначе его можно обойти со стороны интерфейса. Оболочка, выпускающая
-идентификаторы, может выпустить любой, и ядру нечем отличить настоящий от
-выдуманного — а вся однократность и привязка к аргументам держатся ровно на
-том, что идентификатор выдан ядром под конкретный вызов.
+**The confirmation identifier is issued by the core, not by the shell.** In
+its first edition §11 of the specification returned `confirmation_id` in the
+shell's answer, that is, the shell was what produced it. That directly
+contradicted `4.0-C05`, where it is written down: the decision on whether an
+action is confirmed must not be taken on the shell's side, or it can be
+circumvented from the interface. A shell that issues identifiers can issue
+any, and the core has nothing to tell a real one from an invented one — and
+the whole of one-time use and binding to arguments rests precisely on the
+identifier having been issued by the core for a particular call.
 
-Поэтому здесь: ядро заводит **просьбу** с собственным номером, оболочка
-отвечает «да» или «нет», и только после «да» ядро выписывает подтверждение.
-Оболочка не может создать подтверждение — она может лишь разрешить создать.
+So, here: the core creates a **request** with a number of its own, the shell
+answers "yes" or "no", and only after "yes" does the core write out a
+confirmation. The shell cannot create a confirmation — it can only permit
+one to be created.
 
-**Отказ по умолчанию.** Просьба, на которую не ответили в срок, считается
-отклонённой. Не «ждём дальше» и не «раз молчит, значит согласен»: молчание
-может означать, что окна вообще никто не увидел.
+**Refusal by default.** A request that is not answered in time is considered
+declined. Not "we keep waiting" and not "silence means consent": silence may
+mean nobody saw the window at all.
 
-**Область `session` из спецификации убрана.** Осталось две: `once` — одно
-исполнение, `until` — до истечения срока. Третья описывала то же, что
-`until`, потому что §13 и так говорит: выданные разрешения переподключение не
-переживают, то есть сессия — верхняя граница любой области.
+**The `session` scope from the specification has been removed.** Two remain:
+`once` — one execution, `until` — until a deadline. The third described the
+same thing as `until`, because §13 already says: granted permissions do not
+survive a reconnection, that is, the session is the upper bound of any
+scope.
 
-**Опасному действию `until` не выдаётся.** Разрешение, действующее полчаса на
-выключение компьютера, — это и есть тот случай, ради которого подтверждение
-заводили. Если оболочка попросит такую область, ядро понижает её до `once` и
-говорит об этом в ответе: человек согласился на это действие, и терять его
-согласие незачем, а вот расширять — незачем тем более.
+**A dangerous action is not granted `until`.** A permission valid for half
+an hour to shut the computer down is precisely the case confirmations were
+created for. If the shell asks for such a scope, the core lowers it to
+`once` and says so in the answer: the person agreed to this action, and
+there is no point losing their consent — but all the less point widening it.
 """
 
 import secrets
@@ -46,13 +49,13 @@ from core.confirmations import ONCE, SCOPES, UNTIL, ConfirmationLedger
 from core.permissions import dangerous
 from core.wire.errors import ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE, fault
 
-#: Сколько ждём ответа человека, если ядро не назвало срок.
+#: How long we wait for the person's answer if the core named no deadline.
 DEFAULT_TTL = 60
 
 
 @dataclass(frozen=True)
 class Ask:
-    """Просьба, отправленная оболочке и ещё не получившая ответа."""
+    """A request sent to the shell and not yet answered."""
 
     id: str
     permission: str
@@ -69,11 +72,12 @@ class Ask:
 
     def to_payload(self) -> dict[str, Any]:
         """
-        Что уходит в канал (§11).
+        What goes into the channel (§11).
 
-        Аргументы вызова наружу не идут: оболочке нужно показать человеку
-        `preview` — что именно произойдёт словами, — а не сериализованный
-        вызов. Отпечаток аргументов остаётся в ядре, там же, где проверяется.
+        The call's arguments do not go out: the shell needs to show the
+        person a `preview` — what exactly will happen, in words — not a
+        serialised call. The fingerprint of the arguments stays in the core,
+        in the same place where it is checked.
         """
         return {
             "request_id": self.id,
@@ -87,34 +91,36 @@ class Ask:
 
 class PermissionChannel:
     """
-    Ядерная сторона канала разрешений.
+    The core's side of the permission channel.
 
-    Хранит незакрытые просьбы и выписывает подтверждения по ответам оболочки.
-    Часы передаются снаружи, чтобы срок можно было проверить, а не переждать.
+    Keeps unclosed requests and writes out confirmations from the shell's
+    answers. The clock is passed in from outside so that the deadline can be
+    checked rather than waited out.
     """
 
     def __init__(self, ledger: ConfirmationLedger | None = None,
                  clock: Callable[[], float] = time.time):
-        #: Журнал по умолчанию заводится **на тех же часах**. Разные шкалы
-        #: времени у канала и у журнала — это срок, вычисленный на одной и
-        #: проверяемый на другой; conformance-набор поймал ровно это.
-        #: Переданный снаружи журнал обязан идти по тому же времени.
+        #: The default ledger is created **on the same clock**. Different
+        #: time scales for the channel and for the ledger mean a deadline
+        #: computed on one and checked on the other; the conformance suite
+        #: caught exactly this. A ledger passed in from outside is obliged
+        #: to run on the same time.
         self.ledger = ledger or ConfirmationLedger(clock=clock)
         self._clock = clock
         self._pending: dict[str, Ask] = {}
 
-    # -- ядро просит ---------------------------------------------------------
+    # -- the core asks ----------------------------------------------------------
 
     def ask(self, tool: str, args: dict[str, Any] | None = None, *,
             permission: str, reason: str, preview: str,
             ttl: int = DEFAULT_TTL) -> Ask:
         """
-        Завести просьбу. Возвращает её; отправляет вызывающий.
+        Create a request. Returns it; the caller sends it.
 
-        `preview` обязателен: §11 требует показать, что именно произойдёт, а
-        не только название действия. «Выключить компьютер» и «Компьютер будет
-        выключен немедленно» — разные сообщения, и второе человек успевает
-        осознать.
+        `preview` is required: §11 demands showing what exactly will happen,
+        not only the action's name. "Shut down the computer" and "The
+        computer will be shut down immediately" are different messages, and
+        the second one a person has time to take in.
         """
         if not preview.strip():
             raise fault(ERROR_INVALID_PAYLOAD,
@@ -138,15 +144,16 @@ class PermissionChannel:
         self._pending[ask.id] = ask
         return ask
 
-    # -- оболочка ответила ---------------------------------------------------
+    # -- the shell answered -----------------------------------------------------
 
     def resolve(self, request_id: str, granted: bool,
                 scope: str = ONCE) -> dict[str, Any]:
         """
-        Принять ответ оболочки и, если разрешено, выписать подтверждение.
+        Accept the shell's answer and, if permitted, write out a
+        confirmation.
 
-        Возвращает тело ответа по §11. Просьба закрывается в любом случае:
-        ответить на неё дважды нельзя, иначе «нет» можно было бы переиграть.
+        Returns the answer body per §11. The request is closed in any case:
+        it cannot be answered twice, or a "no" could be played over again.
         """
         ask = self._pending.pop(request_id, None)
         if ask is None:
@@ -183,11 +190,11 @@ class PermissionChannel:
 
     def expire(self, now: float | None = None) -> int:
         """
-        Закрыть просьбы, на которые не ответили. Возвращает сколько.
+        Close requests that were not answered. Returns how many.
 
-        Вызывается по таймеру: просьба, о которой все забыли, не должна
-        оставаться открытой — иначе поздний ответ разрешит действие, о
-        котором человек уже не помнит.
+        Called on a timer: a request everybody has forgotten about must not
+        stay open — otherwise a late answer permits an action the person no
+        longer remembers.
         """
         now = self._clock() if now is None else now
         dead = [i for i, a in self._pending.items() if now >= a.deadline()]
@@ -201,12 +208,12 @@ class PermissionChannel:
 
     def drop_all(self) -> int:
         """
-        Забыть всё: незакрытые просьбы и выданные подтверждения.
+        Forget everything: unclosed requests and issued confirmations.
 
-        Нужно при обрыве связи (`4.0-D14`). Разрешение, выданное до обрыва,
-        относится к разговору, которого больше нет: неизвестно, что успело
-        произойти на той стороне, и человек, соглашавшийся минуту назад,
-        соглашался не на это.
+        Needed on a disconnection (`4.0-D14`). A permission granted before
+        the break belongs to a conversation that no longer exists: it is
+        unknown what managed to happen on the other side, and the person who
+        agreed a minute ago was not agreeing to this.
         """
         count = len(self._pending) + self.ledger.pending()
         self._pending.clear()

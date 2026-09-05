@@ -1,28 +1,31 @@
 """
-Серверная сторона протокола: ядро отвечает по проводу.
+The protocol's server side: the core answers over the wire.
 
-Задача плана `4.0-E02`; спецификация — вся, и это её первый настоящий
-потребитель.
+Plan item `4.0-E02`; the specification — all of it, and this is its first
+real consumer.
 
-До сих пор пакет `core/wire` умел собирать и разбирать сообщения, но ни с
-чем не был связан: conformance-набор говорил с эталонным ядром, написанным
-тут же рядом. Здесь провод соединяется с настоящим `core/engine.py`.
+Until now the `core/wire` package could assemble and parse messages but was
+connected to nothing: the conformance suite talked to a reference core
+written right beside it. Here the wire is joined to the real
+`core/engine.py`.
 
-**Ядро решает, оболочка показывает.** Ответ на команду — не текст ответа, а
-«принято в обработку»: сам ответ придёт событием `assistant.response`, когда
-он появится. Так и работает 3.1.0, где команда может думать секундами и
-успеть сказать несколько вещей; выдать её результат ответом на запрос значило
-бы держать запрос открытым всё это время и потерять всё, кроме последнего.
+**The core decides, the shell shows.** The answer to a command is not the
+text of the reply but "accepted for handling": the reply itself will come as
+an `assistant.response` event, when it appears. That is how 3.1.0 works too,
+where a command may think for seconds and manage to say several things;
+giving its result as the answer to the request would mean keeping the
+request open all that time and losing everything but the last.
 
-**События ядра переливаются в события протокола один к одному.** Каталог
-`core/wire/events.py` для того и сверялся с `core/protocol.py`: перекладка не
-переименовывает и не додумывает, иначе к двум спискам добавился бы третий —
-таблица соответствия, которую тоже пришлось бы сверять.
+**The core's events pour into protocol events one for one.** That is exactly
+why the `core/wire/events.py` catalogue was checked against
+`core/protocol.py`: the transfer neither renames nor invents, or a third
+list would join the two — a mapping table, which would also have to be
+checked.
 
-**Обрыв канала — это смерть оболочки, и ядро завершается.** §13: без оболочки
-оно не нужно и не должно оставаться висеть. Отдельного «спящего режима» нет
-намеренно: ядро, пережившее свою оболочку, — это процесс, который никто не
-закроет.
+**A broken channel is the shell's death, and the core ends.** §13: without
+the shell it is not needed and must not be left hanging. There is
+deliberately no separate "sleep mode": a core that outlived its shell is a
+process nobody will close.
 """
 
 import contextvars
@@ -49,7 +52,7 @@ from core.wire.transport import Channels, TransportClosed
 
 
 class ProtocolServer:
-    """Ядро как собеседник: разбирает запросы, шлёт события."""
+    """The core as a correspondent: parses requests, sends events."""
 
     def __init__(self, engine, channels: Channels, *,
                  versions=(1,), capabilities=None,
@@ -68,9 +71,10 @@ class ProtocolServer:
         self.decoder = FrameDecoder()
         self.liveness = Liveness(clock=clock)
 
-        # Журнал подтверждений берётся у ядра, а не заводится свой: иначе
-        # канал разрешений выписывал бы подтверждения, которых исполнитель
-        # не знает, — и опасное действие не проходило бы никогда.
+        # The confirmation ledger is taken from the core rather than kept
+        # separately: otherwise the permission channel would write out
+        # confirmations the executor knows nothing about — and a dangerous
+        # action would never go through.
         runner = getattr(engine, "_tools", None)
         ledger = getattr(runner, "_confirmations", None)
         self.permissions = PermissionChannel(
@@ -83,21 +87,21 @@ class ProtocolServer:
             data_streams=self.data, text_streams=self.text,
             session=self.session)
 
-        #: Открытые входящие потоки: номер -> что про него известно.
+        #: Open incoming streams: number -> what is known about it.
         self.incoming: dict[int, dict] = {}
-        #: Сколько байт разрешаем держать в полёте. Небольшое окно: звук
-        #: приходит непрерывно, и большой кредит означает большую задержку
-        #: между «сказал» и «услышала».
+        #: How many bytes we allow to be kept in flight. A small window:
+        #: sound arrives continuously, and a large credit means a large delay
+        #: between "said" and "heard".
         self.credit_window = 64 * 1024
         self.receiver = None
-        #: Распознавание и синтез. Передаются снаружи, чтобы их можно было
-        #: подменить в проверке: настоящие модели ставятся не на всякой
-        #: машине, а провод обязан проверяться везде.
+        #: Recognition and synthesis. Passed in from outside so that they
+        #: can be substituted in a check: real models are not installed on
+        #: every machine, and the wire has to be checked everywhere.
         self.recogniser = recogniser or speech.recogniser_for(
             getattr(engine, "_settings", None) or {})
         self.synthesiser = synthesiser or speech.synthesiser_for(
             getattr(engine, "_settings", None) or {})
-        #: Переданные снаружи не переcобираются: проверка ставила их нарочно.
+        #: Those passed in from outside are not rebuilt: the check set them deliberately.
         self._speech_given = (recogniser is not None, synthesiser is not None)
         store = getattr(engine, "_settings", None)
         self._speech_wanted = (
@@ -109,23 +113,23 @@ class ProtocolServer:
         self._speech_stream = 0
         self._speech_rate = 0
 
-        #: Куда девать принятый звук, если распознавание не нужно.
+        #: Where to put received sound if recognition is not needed.
         self.on_audio = None
 
-        # Голос ядра уходит в оболочку, а не в местный динамик (4.0-E04).
+        # The core's voice goes to the shell, not to a local speaker (4.0-E04).
         engine.voice_out = self._speak
-        # Машину трогает оболочка (ADR 0009). Ядро решает, что сделать, и
-        # просит; своих системных вызовов у него больше нет.
+        # The machine is touched by the shell (ADR 0009). The core decides
+        # what to do and asks; it has no system calls of its own any more.
         engine.system_out = self.do_system
-        # Индекс программ — данные операционной системы, и живут они в
-        # оболочке (ADR 0009). Ядро спрашивает и сопоставляет.
+        # The program index is operating-system data, and it lives in the
+        # shell (ADR 0009). The core asks and matches.
         engine.apps_source = self.fetch_apps
         engine.launch_out = self.launch_app
-        # Опасное подтверждается окном, а не только словами (4.0-F11).
+        # Anything dangerous is confirmed with a window, not with words alone (4.0-F11).
         engine.on_question = self._on_question
 
-        #: Наши запросы, ждущие ответа оболочки. Сервер до сих пор умел
-        #: только отвечать; чтобы спросить (§11), надо уметь и дождаться.
+        #: Our requests awaiting the shell's answer. Until now the server
+        #: could only answer; to ask (§11) it has to be able to wait too.
         self._awaiting: dict[str, Callable[[Envelope], None]] = {}
 
         self._send_lock = threading.Lock()
@@ -134,15 +138,16 @@ class ProtocolServer:
         self.stopped_because = ""
         self._subscribe()
 
-    # -- события ядра --------------------------------------------------------
+    # -- the core's events ----------------------------------------------------
 
     def _subscribe(self) -> None:
         """
-        Подписаться на все события ядра разом.
+        Subscribe to every one of the core's events at once.
 
-        Именно все, а не перечисленные руками: перечень живёт в
-        `core/protocol.py`, сверен с каталогом провода и со спецификацией, и
-        второй его копии здесь быть не должно — она разошлась бы первой.
+        Every one, not a hand-written list: the list lives in
+        `core/protocol.py`, is checked against the wire's catalogue and
+        against the specification, and there must be no second copy of it
+        here — that copy would be the first to drift.
         """
         for name in ALL_EVENTS:
             self.engine.bus.on(name, self._make_forwarder(name))
@@ -153,8 +158,9 @@ class ProtocolServer:
                 self.send(event(name, dict(payload or {}),
                                 id=self.ids.next()))
             except ProtocolFault as exc:
-                # Событие с неверной нагрузкой — дефект ядра. Роняет себя,
-                # но не сессию: собеседник не виноват, что мы ошиблись.
+                # An event with a wrong payload is a defect of the core.
+                # It drops itself but not the session: the correspondent is
+                # not to blame for our mistake.
                 self._log_broken(name, exc)
             except TransportClosed:
                 self.stop("канал закрыт при отправке события")
@@ -164,28 +170,29 @@ class ProtocolServer:
         from core.logging_setup import get_logger
         get_logger("wire").error("Событие %s не отправлено: %s", name, exc)
 
-    # -- отправка ------------------------------------------------------------
+    # -- sending ----------------------------------------------------------------
 
     def send(self, envelope: Envelope) -> Envelope:
         with self._send_lock:
             self.channels.control.send(encode_frame(envelope))
         return envelope
 
-    # -- приём ---------------------------------------------------------------
+    # -- receiving --------------------------------------------------------------
 
     def serve_forever(self) -> str:
         """
-        Читать канал, пока он жив. Возвращает причину остановки.
+        Read the channel while it lives. Returns the reason for stopping.
 
-        Обрыв — не ошибка, а обычное завершение: оболочка закрылась, и ядру
-        больше нечего делать.
+        A break is not an error but an ordinary end: the shell closed, and
+        the core has nothing more to do.
         """
         self._running = True
 
-        # Канал данных читает свой поток — в этом и был смысл двух труб:
-        # всплеск звука не должен задерживать команду. Запускается здесь, а
-        # не снаружи: снаружи его заводили раньше, чем поднимался флаг
-        # работы, и поток умирал на первой же проверке условия, молча.
+        # The data channel reads its own stream — that was the whole point
+        # of two pipes: a burst of sound must not hold up a command. Started
+        # here rather than outside: outside it was started before the
+        # running flag went up, and the thread died on the very first check
+        # of the condition, in silence.
         if self.channels.data is not None:
             threading.Thread(target=self.pump_data, name="rina-data",
                              daemon=True).start()
@@ -197,7 +204,7 @@ class ProtocolServer:
                 except TransportClosed as exc:
                     return self.stop(f"оболочка закрыла канал: {exc}")
                 if chunk == b"":
-                    continue            # тишина, а не конец: см. Transport.recv
+                    continue            # silence, not the end: see Transport.recv
                 self.liveness.note_traffic()
                 for message in self.decoder.feed(chunk):
                     self.dispatch(message)
@@ -214,12 +221,12 @@ class ProtocolServer:
         return why
 
     def dispatch(self, message: Envelope) -> list[Envelope]:
-        """Обработать одно сообщение и отправить всё, что положено в ответ."""
+        """Handle one message and send everything due in reply."""
         out: list[Envelope] = []
 
-        # Ответ на наш собственный запрос — не метод, и искать для него
-        # обработчик значило бы ответить «неизвестный метод» на собственный
-        # вопрос.
+        # An answer to our own request is not a method, and looking for a
+        # handler for it would mean answering "unknown method" to our own
+        # question.
         if message.type in ("response", "error") and message.correlation_id:
             waiting = self._awaiting.pop(message.correlation_id, None)
             if waiting is not None:
@@ -253,7 +260,7 @@ class ProtocolServer:
                     message.reply(payload, id=self.ids.next())))
         return out
 
-    # -- методы --------------------------------------------------------------
+    # -- methods ------------------------------------------------------------------
 
     def _handlers(self) -> dict[str, Callable[[Envelope], Any]]:
         return {
@@ -299,8 +306,9 @@ class ProtocolServer:
         }
 
     def _hello(self, message: Envelope) -> dict:
-        # Версия данных берётся из хранилища в момент ответа: миграция
-        # могла случиться при загрузке, и число из константы соврало бы.
+        # The data version is taken from the store at the moment of
+        # answering: a migration may have happened on load, and a number
+        # from a constant would lie.
         store = self._settings()
         if store is not None:
             from core.settings_store import CONFIG_VERSION
@@ -315,10 +323,11 @@ class ProtocolServer:
 
     def _command_handle(self, message: Envelope) -> dict:
         """
-        Ответ — «принято», а не результат.
+        The answer is "accepted", not the result.
 
-        Результат придёт событием: команда может думать секундами и сказать
-        по дороге несколько вещей, и всё, кроме последней, потерялось бы.
+        The result will come as an event: a command may think for seconds
+        and say several things along the way, and everything but the last
+        would be lost.
         """
         text = str(message.payload.get("text", ""))
         self.engine.handle_command_async(
@@ -332,8 +341,8 @@ class ProtocolServer:
         return {"accepted": True}
 
     def _listen_once(self, message: Envelope) -> dict:
-        # Контекст копируется, чтобы события прослушивания попали в ту же
-        # цепочку, что и запрос: новый поток начинается с пустого контекста.
+        # The context is copied so that listening events land in the same
+        # chain as the request: a new thread starts with an empty context.
         ctx = contextvars.copy_context()
         threading.Thread(target=ctx.run, args=(self.engine.listen_once,),
                          daemon=True).start()
@@ -347,7 +356,7 @@ class ProtocolServer:
         self.engine.say(str(message.payload.get("text", "")))
         return {"accepted": True}
 
-    # -- настройки -----------------------------------------------------------
+    # -- settings -----------------------------------------------------------------
 
     def _settings(self):
         return getattr(self.engine, "_settings", None)
@@ -356,25 +365,26 @@ class ProtocolServer:
         keys = message.payload.get("keys") or []
         store = self._settings()
         schema = settings_schema.describe(keys)
-        # Секретное и устаревшее наружу не уходит: config_version и first_run
-        # — состояние хранилища, а theme и accent заменены отделками (R08).
-        # Данные при этом целы, просто оболочке они больше не нужны.
+        # What is secret or obsolete does not go out: config_version and
+        # first_run are the state of the store, while theme and accent were
+        # replaced by finishes (R08). The data is intact, the shell simply
+        # no longer needs it.
         return {"values": {k: store.get(k) for k in keys
                            if not schema.get(k, {}).get("secret")
                            and not schema.get(k, {}).get("obsolete")}}
 
     def _settings_set(self, message: Envelope) -> dict:
         """
-        Записать значения и отчитаться по каждому.
+        Write the values down and report on each.
 
-        Отчёт по ключу, а не одно «получилось» на всю посылку: из десяти
-        значений одно может не пройти, и сказать про это «не сохранилось»
-        значит не сказать ничего. Вердикты — кодами каталога D05, чтобы
-        оболочка ветвилась по ним, а не по тексту.
+        A report per key rather than one "it worked" for the whole parcel:
+        of ten values one may not go through, and saying "it was not saved"
+        about that is saying nothing. The verdicts are D05 catalogue codes,
+        so that the shell branches on them rather than on the text.
 
-        Предупреждение — не отказ. «Адрес модели не локальный» значит, что
-        значение принято и записано, а человеку сказано, чем это обернётся:
-        решать ему, а не нам.
+        A warning is not a refusal. "The model address is not local" means
+        the value was accepted and written down, and the person was told
+        what it will lead to: the decision is theirs, not ours.
         """
         values = message.payload.get("values") or {}
         store = self._settings()
@@ -391,24 +401,25 @@ class ProtocolServer:
                     store.set(key, value)
                 self._settle_voice(store, accepted, verdicts)
                 if "ui_language" in accepted:
-                    # Язык — не та настройка, ради которой перезапускают
-                    # программу. Реплики переключаются здесь, слова
-                    # интерфейса — в оболочке, каждый у себя.
+                    # The language is not the sort of setting a program is
+                    # restarted for. The replies switch here, the words of
+                    # the interface in the shell, each on its own side.
                     from core import i18n
                     i18n.set_language(str(accepted["ui_language"]))
                 if "log_level" in accepted:
-                    # Уровень журнала умел применяться на лету (`apply_settings`),
-                    # но звал его тот, кто менял, — экран настроек 3.1.0.
-                    # Та же потеря, что и с сохранением: экран уехал,
-                    # вызов остался.
+                    # The journal level could be applied on the fly
+                    # (`apply_settings`), but it was called by whoever
+                    # changed it — 3.1.0's settings screen. The same loss as
+                    # with saving: the screen moved away, the call stayed.
                     from core import logging_setup
                     logging_setup.apply_settings()
-                # Записать на диск. `set()` только помечает группу
-                # изменившейся, и в 3.1.0 сохранял тот, кто менял, — экран
-                # настроек. Экран уехал в другой процесс, а вызов остался
-                # там: настройка держалась до конца работы ядра и пропадала.
-                # Пишем внутри транзакции, чтобы между изменением и записью
-                # не встрял чужой поток.
+                # Write to disk. `set()` only marks the group as changed,
+                # and in 3.1.0 the saving was done by whoever changed it —
+                # the settings screen. The screen moved to another process
+                # and the call stayed there: a setting held until the core
+                # finished and then vanished. We write inside the
+                # transaction, so that no other thread wedges itself between
+                # the change and the write.
                 store.save()
         return {"values": {k: store.get(k) for k in accepted},
                 "verdicts": verdicts}
@@ -416,17 +427,18 @@ class ProtocolServer:
     @staticmethod
     def _settle_voice(store, accepted: dict, verdicts: dict) -> None:
         """
-        Сменился движок — сменить и голос, если старый ему чужой.
+        The engine changed — change the voice too, if the old one is foreign
+        to it.
 
-        У каждого движка своя нумерация голосов: `ru-RU-SvetlanaNeural` для
-        одного и `default` для другого. Оставить прежнее значение — значит
-        оставить настройку, которая навсегда показывает «сейчас недоступно»
-        и ничего не озвучивает; заставлять человека выбирать голос заново
-        после каждой смены движка — значит требовать шага, который мы можем
-        сделать сами и почти всегда угадаем.
+        Every engine has its own numbering of voices:
+        `ru-RU-SvetlanaNeural` for one and `default` for another. Leaving
+        the previous value means leaving a setting that shows "currently
+        unavailable" forever and voices nothing; making a person choose a
+        voice afresh after every change of engine means demanding a step we
+        can take ourselves and will almost always guess right.
 
-        Об этом говорится вслух: тихо переписанная настройка — та самая
-        неожиданность, которую человек потом ищет глазами.
+        This is said out loud: a setting quietly rewritten is exactly the
+        kind of surprise a person later hunts for with their eyes.
         """
         if "tts_engine" not in accepted:
             return
@@ -441,11 +453,11 @@ class ProtocolServer:
 
     def _settings_describe(self, message: Envelope) -> dict:
         """
-        Смысл значений, но **не** их вид (ADR 0006).
+        The meaning of the values, but **not** their appearance (ADR 0006).
 
-        `layout` отдаётся как `null` явно, а не опускается: отсутствие ключа
-        читалось бы как «ещё не сделали», тогда как `null` читается как «это
-        не наше дело» — что и есть действительное положение вещей.
+        `layout` is given as `null` explicitly rather than omitted: a
+        missing key would read as "not done yet", whereas `null` reads as
+        "none of our business" — which is the actual state of affairs.
         """
         keys = message.payload.get("keys") or None
         return {
@@ -456,19 +468,20 @@ class ProtocolServer:
 
     def _settings_options(self, message: Envelope) -> dict:
         """
-        Какие значения ключ принимает сейчас, на этой машине.
+        Which values a key takes right now, on this machine.
 
-        Отдельный метод, а не поле в схеме: схема описывает то, что верно
-        всегда, а этот список меняется от установки модели и даже от того,
-        какой движок выбран сейчас. Держать изменчивое рядом с постоянным
-        значит однажды закешировать первое вместе со вторым.
+        A separate method rather than a field in the schema: the schema
+        describes what is always true, and this list changes with a model's
+        installation and even with which engine is chosen right now. Keeping
+        the changeable next to the constant means one day caching the first
+        along with the second.
         """
         store = self._settings()
         keys = message.payload.get("keys") or []
         return {"options": {key: settings_schema.options_for(key, store)
                             for key in keys}}
 
-    # -- напоминания ---------------------------------------------------------
+    # -- reminders --------------------------------------------------------------
 
     def _reminders(self):
         return getattr(self.engine, "_reminders", None)
@@ -479,16 +492,18 @@ class ProtocolServer:
 
     def _reminders_create(self, message: Envelope) -> dict:
         """
-        Завести напоминание из окна.
+        Create a reminder from the window.
 
-        Голосом это делается разбором фразы («напомни в семь про хлеб»), и
-        поначалу казалось, что окну хватит того же пути. Не хватает:
-        человек у экрана выбирает время в поле, а не проговаривает его
-        словами, и заставлять оболочку составлять русскую фразу ради
-        обратного разбора — значит проверять разбор вместо намерения.
+        By voice this is done by parsing a phrase ("remind me at seven about
+        bread"), and at first it seemed the window would manage with the
+        same path. It does not: a person at the screen picks a time in a
+        field rather than saying it in words, and making the shell compose a
+        Russian phrase for the sake of parsing it back means testing the
+        parser instead of the intent.
 
-        Время приходит меткой, а не словами: у оболочки есть календарь, и
-        часовой пояс у неё тот же, что у ядра, — оба живут на одной машине.
+        The time arrives as a stamp rather than as words: the shell has a
+        calendar, and its time zone is the same as the core's — they both
+        live on one machine.
         """
         store = self._reminders()
         if store is None:
@@ -506,14 +521,15 @@ class ProtocolServer:
             raise fault("protocol.invalid_payload",
                         "Нужно время, когда напомнить.")
 
-        # Вид влияет только на то, как напоминание назовут человеку
-        # («Будильник», «Таймер», «Напоминание»), и оболочка вправе его не
-        # знать: заведённому из окна подходит обычное напоминание.
+        # The kind affects only what the reminder is called to a person
+        # ("Alarm", "Timer", "Reminder"), and the shell is entitled not to
+        # know it: an ordinary reminder suits one created from the window.
         kind = str(message.payload.get("kind", "reminder") or "reminder")
-        # События о заведении нет намеренно: список запросит тот, кто
-        # завёл, и он же его показывает. Событие понадобилось бы, если бы
-        # напоминания заводились помимо оболочки, — но голосом их заводит
-        # та же оболочка тем же соединением.
+        # There is deliberately no event about creation: the list will be
+        # requested by whoever created it, and the same one shows it. An
+        # event would be needed if reminders were created apart from the
+        # shell — but by voice they are created by the same shell over the
+        # same connection.
         return {"item": dict(store.add(kind, fire_at, text))}
 
     def _reminders_cancel(self, message: Envelope) -> dict:
@@ -523,7 +539,7 @@ class ProtocolServer:
         item_id = message.payload.get("id")
         return {"cancelled": 1 if store.remove(item_id) else 0}
 
-    # -- свои команды пользователя -------------------------------------------
+    # -- the user's own commands ---------------------------------------------------
 
     def _commands(self):
         return getattr(self.engine, "_cmd_store", None)
@@ -533,12 +549,12 @@ class ProtocolServer:
 
     def _speech_test(self, message: Envelope) -> dict:
         """
-        Произнести пробную фразу текущим голосом.
+        Say a test phrase in the current voice.
 
-        Отдельный метод, а не `speech.say`: сказанное на проверке не должно
-        попадать в историю разговора — человек проверял звук, а не
-        разговаривал. И фразу выбирает ядро: это её реплика, а слова Рины
-        живут здесь (`4.0-F08`).
+        A separate method rather than `speech.say`: what is said during a
+        check must not land in the conversation history — the person was
+        checking the sound, not talking. And the phrase is chosen by the
+        core: it is her line, and Rina's words live here (`4.0-F08`).
         """
         self._voice_follows_settings()
         if not self.synthesiser.available():
@@ -564,11 +580,12 @@ class ProtocolServer:
 
     def _hotkey_actions(self, message: Envelope) -> dict:
         """
-        Чему можно назначить сочетание.
+        What a hotkey can be assigned to.
 
-        Отдаёт ядро: исполняет действия оно, и список у него. Оболочка,
-        знающая его наизусть, предложила бы назначить сочетание тому, чего
-        ядро уже не делает, — и человек узнал бы об этом, нажав клавиши.
+        Given by the core: it is what performs the actions, and it has the
+        list. A shell that knew it by heart would offer to assign a hotkey
+        to something the core no longer does — and the person would find out
+        by pressing the keys.
         """
         from core.i18n import t as tr
         from voice.hotkey_actions import HOTKEY_ACTIONS
@@ -580,12 +597,12 @@ class ProtocolServer:
 
     def _commands_builtin(self, message: Envelope) -> dict:
         """
-        Что Рина умеет без всяких настроек.
+        What Rina can do with no setting up at all.
 
-        Отдаёт ядро, потому что это **фразы, которые ей говорят**, — часть
-        её словаря, а не подписи интерфейса (`4.0-F08`). Оболочка, знающая
-        их наизусть, показала бы то, чего ядро уже не понимает, и человек
-        сказал бы это вслух впустую.
+        Given by the core, because these are **the phrases people say to
+        her** — part of her vocabulary, not interface labels (`4.0-F08`). A
+        shell that knew them by heart would show what the core no longer
+        understands, and a person would say it aloud for nothing.
         """
         from voice.commands import known_commands
 
@@ -594,26 +611,27 @@ class ProtocolServer:
 
     def _commands_kinds(self, message: Envelope) -> dict:
         """
-        Из чего команда бывает сделана.
+        What a command can be made of.
 
-        Имена вещей приходят оттуда, где вещи живут (то же правило, что у
-        `settings.options`): виды команд и системные действия перечисляет
-        ядро, потому что выполнять их ему. Оболочка, знающая этот список
-        наизусть, разошлась бы с ядром молча — и показала бы человеку
-        действие, которого больше нет, или спрятала бы новое.
+        The names of things come from where the things live (the same rule
+        as for `settings.options`): the kinds of command and the system
+        actions are enumerated by the core, because it is what performs
+        them. A shell that knew this list by heart would drift apart from
+        the core in silence — and would show a person an action that no
+        longer exists, or hide a new one.
 
-        Здесь же сказано, какое действие **необратимо**: подтверждение
-        спрашивает ядро (§11), но человек должен видеть это ещё в
-        конструкторе, а не узнать при первом срабатывании.
+        The same place says which action is **irreversible**: confirmation
+        is asked for by the core (§11), but a person must see this in the
+        editor already rather than find out at the first firing.
         """
         from core.i18n import t as tr
         from voice import user_commands
 
-        # Переводим **на выходе**: таблицы `voice/user_commands.py` — это
-        # ключи, и хранить их переведёнными значит хранить их на одном
-        # языке. Переводы в ядре есть с 3.1.0, их просто никто не
-        # спрашивал, и при английском интерфейсе конструктор говорил
-        # «Программа».
+        # Translated **on the way out**: the tables in
+        # `voice/user_commands.py` are keys, and storing them translated
+        # means storing them in one language. Translations have existed in
+        # the core since 3.1.0, nobody simply asked for them, and under an
+        # English interface the editor said "Программа".
         return {
             "kinds": [{"value": kind, "title": tr(title), "icon": icon}
                       for kind, title, icon in user_commands.COMMAND_TYPES],
@@ -627,27 +645,29 @@ class ProtocolServer:
 
     def _commands_save(self, message: Envelope) -> dict:
         """
-        Создать или изменить — один метод, а не два.
+        Create or change — one method, not two.
 
-        Для оболочки это одно действие: человек правит карточку и нажимает
-        «сохранить». Разделять по тому, есть ли уже идентификатор, значит
-        заставлять её знать то, что знает хранилище.
+        For the shell this is one action: a person edits the card and
+        presses "save". Splitting it by whether an identifier already exists
+        means making the shell know what the store knows.
         """
         store = self._commands()
         command = dict(message.payload.get("command") or {})
         if command.get("id"):
             store.update(command)
         else:
-            # Номер назначает ядро, а не оболочка. Идентификатор, пришедший
-            # снаружи, — это чужое право решать, какая команда какая; та же
-            # причина, по которой confirmation_id выпускает ядро (§11).
+            # The number is assigned by the core, not by the shell. An
+            # identifier that came from outside is somebody else's right to
+            # decide which command is which; the same reason the core issues
+            # confirmation_id (§11).
             command["id"] = "cmd_" + secrets.token_hex(3)
             store.add(command)
         return {"command": dict(command)}
 
     def _commands_delete(self, message: Envelope) -> dict:
-        # Хранилище не говорит, удалило ли оно что-нибудь, поэтому считаем
-        # сами: «удалено» и «такой не было» — разные ответы для оболочки.
+        # The store does not say whether it deleted anything, so we count
+        # ourselves: "deleted" and "there was no such thing" are different
+        # answers for the shell.
         store = self._commands()
         was = len(store.all())
         store.remove(str(message.payload.get("id", "")))
@@ -661,21 +681,22 @@ class ProtocolServer:
 
     def _commands_export(self, message: Envelope) -> dict:
         """
-        Отдать команды, а не записать файл.
+        Hand over the commands rather than write a file.
 
-        Файл выбирает и пишет оболочка: диалог выбора места — её работа, а
-        ядро её и не умеет. Ядро отдаёт содержимое.
+        The shell picks the file and writes it: the save dialogue is its
+        work, and the core cannot do it anyway. The core hands over the
+        content.
         """
         return {"commands": [dict(c) for c in self._commands().all()]}
 
     def _commands_import(self, message: Envelope) -> dict:
         """
-        Принять команды. Существующие не затираются молча.
+        Accept commands. Existing ones are not overwritten in silence.
 
-        Совпадение по идентификатору значит, что команда уже есть, и импорт
-        её пропускает: «перенести на другую машину» и «затереть то, что
-        человек уже настроил» — разные намерения, и по умолчанию верно
-        второе не делать.
+        A match by identifier means the command already exists, and the
+        import skips it: "carry them over to another machine" and "overwrite
+        what the person has already set up" are different intents, and by
+        default it is right not to do the second.
         """
         store = self._commands()
         known = {c.get("id") for c in store.all()}
@@ -691,7 +712,7 @@ class ProtocolServer:
             added += 1
         return {"added": added, "skipped": skipped}
 
-    # -- история разговора ----------------------------------------------------
+    # -- the conversation's history ------------------------------------------------
 
     def _history(self):
         return getattr(self.engine, "_history", None)
@@ -712,7 +733,7 @@ class ProtocolServer:
     def _history_export(self, message: Envelope) -> dict:
         return {"items": [dict(i) for i in self._history().all()]}
 
-    # -- плагины --------------------------------------------------------------
+    # -- plugins ---------------------------------------------------------------------
 
     def _plugin_manager(self):
         return getattr(self.engine, "_plugins", None)
@@ -720,11 +741,12 @@ class ProtocolServer:
     @staticmethod
     def _plugin_state(plugin_id: str, loaded) -> dict:
         """
-        Что оболочка знает о плагине.
+        What the shell knows about a plugin.
 
-        Сбойный плагин показывается вместе с причиной, а не исчезает из
-        списка: человек поставил его сам и должен увидеть, почему он не
-        работает. Исчезнувший плагин выглядит как «я его не ставил».
+        A broken plugin is shown together with the reason rather than
+        disappearing from the list: a person installed it themselves and
+        must see why it does not work. A plugin that vanished looks like "I
+        never installed it".
         """
         manifest = loaded.manifest
         return {
@@ -739,7 +761,7 @@ class ProtocolServer:
             "error": loaded.error or "",
             "has_page": bool(loaded.instance is not None
                              and loaded.error is None),
-            # Как назвать раздел плагина в колонке оболочки (`4.0-F04`).
+            # What to call the plugin's section in the shell's column (`4.0-F04`).
             "page_title": str(getattr(loaded, "page_title", "")
                               or manifest.name),
             "page_icon": str(getattr(loaded, "page_icon", "")
@@ -760,11 +782,11 @@ class ProtocolServer:
 
     def _plugins_set_enabled(self, message: Envelope) -> dict:
         """
-        Включить или выключить плагин.
+        Switch a plugin on or off.
 
-        Возвращается **состояние после** изменения, а не «принято»: плагин
-        может отказаться загружаться, и тогда «включено» будет неправдой.
-        Оболочка рисует то, что есть, а не то, что просили.
+        What is returned is the **state after** the change, not "accepted":
+        a plugin may refuse to load, and then "on" would be an untruth. The
+        shell draws what is, not what was asked for.
         """
         manager = self._plugin_manager()
         plugin_id = str(message.payload.get("plugin_id", ""))
@@ -777,13 +799,14 @@ class ProtocolServer:
 
     def _plugins_page(self, message: Envelope) -> dict:
         """
-        Декларативное описание страницы плагина.
+        The declarative description of a plugin's page.
 
-        Плагин описывает страницу списком элементов, а рисует их оболочка.
-        Так было решено ещё в 3.1.0 (`plugins/page_spec.py`), когда плагин
-        перестал возвращать готовый виджет, — и ровно поэтому страница
-        плагина рисуется в другом процессе на другом языке без единой
-        правки в самом плагине.
+        A plugin describes the page as a list of elements, and the shell
+        draws them. This was decided back in 3.1.0
+        (`plugins/page_spec.py`), when a plugin stopped returning a
+        ready-made widget — and that is exactly why a plugin's page is drawn
+        in another process in another language without a single change to
+        the plugin itself.
         """
         manager = self._plugin_manager()
         plugin_id = str(message.payload.get("plugin_id", ""))
@@ -796,12 +819,12 @@ class ProtocolServer:
 
     def _plugins_action(self, message: Envelope) -> dict:
         """
-        Нажата кнопка на странице плагина; в ответ — новая страница.
+        A button on a plugin's page was pressed; the answer is a new page.
 
-        Новое описание возвращается тем же ответом, а не событием: кнопка
-        меняет то, что нарисовано рядом с ней, и заставлять оболочку
-        спрашивать страницу второй раз значило бы показать её устаревшей
-        ровно на один круг.
+        The new description is returned in the same answer rather than as an
+        event: a button changes what is drawn next to it, and making the
+        shell ask for the page a second time would mean showing it stale by
+        exactly one round.
         """
         manager = self._plugin_manager()
         plugin_id = str(message.payload.get("plugin_id", ""))
@@ -817,15 +840,15 @@ class ProtocolServer:
 
     def _plugins_install(self, message: Envelope) -> dict:
         """
-        Поставить плагин из папки или архива.
+        Install a plugin from a folder or an archive.
 
-        Проверка содержимого — до копирования (`plugins/manager.py`):
-        манифест и `main.py` обязательны, иначе в каталоге появится мусор,
-        который каждый запуск будет показываться сбойным плагином.
+        The contents are checked before copying (`plugins/manager.py`): the
+        manifest and `main.py` are required, or the catalogue will gain
+        rubbish that will show up as a broken plugin on every start.
 
-        **Ставит ядро, а окно выбора показывает оболочка.** Путь приходит
-        уже выбранным: диалог выбора файла — интерфейс, а распаковка и
-        проверка — работа с данными.
+        **The core installs, and the shell shows the picker.** The path
+        arrives already chosen: a file dialogue is interface, while
+        unpacking and checking are work with data.
         """
         from plugins.manager import PluginInstallError, install_plugin
 
@@ -834,18 +857,20 @@ class ProtocolServer:
             raise fault("protocol.invalid_payload", "Нечего устанавливать.")
 
         try:
-            # Возвращается пара: имя и был ли под этим именем плагин. Замена
-            # и установка — разные ответы человеку, и второе значение здесь
-            # не формальность: заменённый плагин принудительно выключается,
-            # чтобы подсунутый архив с чужим именем не запускался сам.
+            # A pair is returned: the name and whether there was a plugin
+            # under that name. Replacement and installation are different
+            # answers to a person, and the second value here is no
+            # formality: a replaced plugin is forcibly switched off, so that
+            # a slipped-in archive with somebody else's name does not run by
+            # itself.
             plugin_id, replaced = install_plugin(source)
         except PluginInstallError as exc:
             raise fault("plugin.not_found", str(exc)) from exc
         except Exception as exc:                     # noqa: BLE001
             raise fault("internal", str(exc)) from exc
 
-        # Список пересобирается сразу: поставленный плагин должен появиться
-        # в окне без перезапуска.
+        # The list is rebuilt at once: an installed plugin must appear in
+        # the window without a restart.
         manager = self._plugin_manager()
         if manager is not None:
             try:
@@ -857,12 +882,12 @@ class ProtocolServer:
 
     def _settings_reset(self, message: Envelope) -> dict:
         """
-        Сбросить настройки к умолчаниям.
+        Reset the settings to their defaults.
 
-        Сбрасывается **только группа настроек**: команды, история и плагины
-        остаются. Их удаление — отдельное осознанное действие, а не
-        побочный эффект «вернуть как было»; это правило пришло из 3.1.0
-        вместе с самим хранилищем.
+        **Only the settings group** is reset: commands, history and plugins
+        stay. Deleting those is a separate deliberate action rather than a
+        side effect of "put it back as it was"; this rule came from 3.1.0
+        along with the store itself.
         """
         store = self._settings()
         if store is None:
@@ -871,27 +896,28 @@ class ProtocolServer:
         from core.logging_setup import security_log
 
         store.reset(groups=("settings",))
-        # В журнал безопасности: сброс настроек стирает и приватность —
-        # выключенную запись текстов, выбранный язык, разрешения окна.
+        # Into the security journal: a settings reset erases privacy too —
+        # text recording switched off, the chosen language, the window's
+        # permissions.
         security_log().warning("Настройки сброшены к умолчаниям")
         return {"ok": True,
                 "values": {k: store.get(k) for k in settings_schema.SETTABLE}}
 
-    # -- задачи --------------------------------------------------------------
+    # -- tasks ----------------------------------------------------------------------
 
     def _task_cancel(self, message: Envelope) -> dict:
         return self.tasks.cancel(str(message.payload.get("task_id", "")))
 
-    # -- потоки данных (4.0-D07, D08; сторона ядра для 4.0-F09) ---------------
+    # -- data streams (4.0-D07, D08; the core's side for 4.0-F09) ------------------
 
     def _stream_open(self, message: Envelope) -> dict:
         """
-        Открыть двоичный поток и сразу выдать первый кредит.
+        Open a binary stream and issue the first credit right away.
 
-        Начальный кредит — ноль (§8), и пока приёмник его не выдаст,
-        отправитель молчит. Выдаём здесь же: ядро готово принимать ровно с
-        того мгновения, как согласилось открыть поток, и заставлять оболочку
-        ждать отдельного сообщения не за чем.
+        The initial credit is zero (§8), and until the receiver issues it
+        the sender stays silent. We issue it here and now: the core is ready
+        to receive from the very moment it agreed to open the stream, and
+        there is no point making the shell wait for a separate message.
         """
         stream_id = message.payload.get("stream_id")
         kind = str(message.payload.get("kind", ""))
@@ -924,7 +950,7 @@ class ProtocolServer:
                 "bytes": (state or {}).get("bytes", 0)}
 
     def _stream_credit(self, message: Envelope) -> dict:
-        """Кредит от оболочки — для потоков, которые шлёт ядро (4.0-F10)."""
+        """Credit from the shell — for streams the core sends (4.0-F10)."""
         stream_id = message.payload.get("stream_id")
         extra = int(message.payload.get("bytes") or 0)
         if stream_id in self.data.open and extra > 0:
@@ -933,13 +959,13 @@ class ProtocolServer:
 
     def pump_data(self) -> str:
         """
-        Читать канал данных, пока он жив.
+        Read the data channel while it lives.
 
-        Отдельный поток, потому что канал отдельный, — в этом и был смысл
-        двух труб: всплеск звука не должен задерживать команду. Кредит
-        выдаётся **по мере обработки**, а не получения: кредит за то, что
-        лежит непрочитанным в буфере, и есть та неограниченная очередь,
-        ради устранения которой схема существует.
+        A separate thread, because the channel is separate — that was the
+        whole point of two pipes: a burst of sound must not hold up a
+        command. Credit is issued **as data is handled**, not as it is
+        received: credit for what lies unread in the buffer is the very
+        unbounded queue the scheme exists to do away with.
         """
         if self.channels.data is None:
             return "канала данных нет"
@@ -958,8 +984,8 @@ class ProtocolServer:
     def _on_data(self, frame) -> None:
         state = self.incoming.get(frame.stream_id)
         if state is None:
-            # Поток, о котором не договаривались. Не обрыв: отправитель мог
-            # не успеть узнать, что мы его закрыли.
+            # A stream nobody agreed on. Not a break: the sender may not
+            # have had time to learn that we closed it.
             return
         state["bytes"] += len(frame.payload)
         state["frames"] += 1
@@ -967,17 +993,17 @@ class ProtocolServer:
             if self.on_audio is not None:
                 self.on_audio(frame.stream_id, frame.payload, state["format"])
             self._hear(frame.payload)
-        # Обработали — возвращаем кредит на обработанное.
+        # Handled — so we return credit for what was handled.
         self.send(Envelope.event("stream.credit",
                                  {"bytes": len(frame.payload)},
                                  id=self.ids.next(),
                                  stream_id=frame.stream_id))
 
-    # -- вопрос человеку (4.0-F11, §11) ---------------------------------------
+    # -- a question to the person (4.0-F11, §11) -----------------------------------
 
     def ask_shell(self, method: str, payload: dict,
                   on_answer: Callable[[Envelope], None]) -> Envelope:
-        """Задать вопрос оболочке и запомнить, кто ждёт ответа."""
+        """Ask the shell a question and remember who is waiting for the answer."""
         request = Envelope.request(method, payload, id=self.ids.next())
         self._awaiting[request.id] = on_answer
         return self.send(request)
@@ -985,16 +1011,17 @@ class ProtocolServer:
     def ask_shell_sync(self, method: str, payload: dict,
                        timeout: float = 10.0) -> dict:
         """
-        Спросить оболочку и дождаться ответа.
+        Ask the shell and wait for the answer.
 
-        Нужен потому, что системное действие выполняется **внутри** разбора
-        команды: инструмент «прибавь громкость» обязан вернуть исход, а не
-        «я попросил». Асинхронный `ask_shell` для этого не годится — он
-        оставляет вызывающего без ответа.
+        Needed because a system action is performed **inside** the parsing
+        of a command: the tool "turn the volume up" is obliged to return an
+        outcome rather than "I asked". The asynchronous `ask_shell` will not
+        do for this — it leaves the caller without an answer.
 
-        Ждём в том потоке, который обрабатывает команду, а не в приёмном:
-        приёмный поток здесь и отвечает, и заблокировать его значило бы
-        ждать ответа тем самым потоком, который его принесёт.
+        We wait in the thread that is handling the command, not in the
+        receiving one: the receiving thread is what answers here, and
+        blocking it would mean waiting for the answer with the very thread
+        that will bring it.
         """
         done = threading.Event()
         got: dict = {}
@@ -1003,8 +1030,9 @@ class ProtocolServer:
             got["reply"] = reply
             done.set()
 
-        # Проверка на своей стороне: оболочка без Windows не объявит
-        # `system`, и узнать об этом лучше здесь, чем по молчанию.
+        # A check on our own side: a shell without Windows will not declare
+        # `system`, and it is better to learn of that here than from
+        # silence.
         self.session.check_outgoing(method)
         request_id = self.ask_shell(method, payload, answered).id
         if not done.wait(timeout):
@@ -1019,24 +1047,25 @@ class ProtocolServer:
 
     def fetch_apps(self, refresh: bool = False) -> list:
         """
-        Спросить у оболочки индекс установленных программ.
+        Ask the shell for the index of installed programs.
 
-        Сопоставление имени с записью остаётся здесь: «телеграм» → Telegram
-        это транслитерация и нечёткое совпадение, то есть язык, а язык —
-        предмет ядра. Оболочка отдаёт факты о системе, ядро решает, что
-        человек имел в виду (ADR 0009).
+        Matching a name to a record stays here: "телеграм" → Telegram is
+        transliteration and fuzzy matching, that is, language, and language
+        is the core's business. The shell hands over facts about the system,
+        the core decides what the person meant (ADR 0009).
         """
         try:
             answer = self.ask_shell_sync("apps.index", {"refresh": refresh},
                                          timeout=60.0)
         except ProtocolFault:
-            # Оболочка без индекса — не повод падать: команда «открой
-            # телеграм» ответит «не нашла», а остальное будет работать.
+            # A shell without an index is no reason to fall over: the
+            # command "open telegram" will answer "not found", and the rest
+            # will work.
             return []
         return list(answer.get("entries") or [])
 
     def launch_app(self, launch: str, kind: str = "file") -> tuple[bool, str]:
-        """Попросить оболочку запустить найденное."""
+        """Ask the shell to launch what was found."""
         try:
             answer = self.ask_shell_sync("apps.launch",
                                          {"launch": launch, "kind": kind},
@@ -1047,11 +1076,11 @@ class ProtocolServer:
 
     def do_system(self, action: str) -> tuple[bool, str]:
         """
-        Попросить оболочку сделать системное действие.
+        Ask the shell to perform a system action.
 
-        Слова остаются здесь: «Прибавила громкость» — реплика Рины
-        (ADR 0007), а оболочка отвечает фактом. Поэтому наружу уходит пара
-        «получилось, подробность», а не готовое предложение.
+        The words stay here: "Volume turned up" is Rina's line (ADR 0007),
+        and the shell answers with a fact. So what goes out is a pair
+        "it worked, the detail" rather than a ready-made sentence.
         """
         try:
             answer = self.ask_shell_sync("system.do", {"action": action})
@@ -1061,32 +1090,32 @@ class ProtocolServer:
 
     def _on_question(self, question) -> None:
         """
-        Ядро задало вопрос — показать его человеку окном (§11).
+        The core asked a question — show it to the person in a window (§11).
 
-        Спрашивается **только необратимое**: у уточняющего «какой из трёх
-        телеграмов» нет ни опасности, ни предпросмотра, и вырывать его в
-        модальное окно значило бы прерывать разговор ради выбора, который
-        удобнее сделать словами.
+        **Only the irreversible** is asked about: a clarifying "which of the
+        three telegrams" has neither danger nor a preview, and tearing it
+        out into a modal window would mean interrupting the conversation for
+        a choice that is easier made in words.
 
-        Голосовой путь при этом не отменяется: человек может ответить «да»
-        вслух, и вопрос закроется сам — окно тогда просто перестанет быть
-        нужным.
+        The voice path is not thereby cancelled: a person can answer "yes"
+        out loud and the question closes itself — the window then simply
+        stops being needed.
         """
         if question.kind not in ("confirm_action", "confirm_command"):
             return
         if not self.session.ready:
             return
         if "permissions" not in self.session.peer_capabilities:
-            return          # оболочка не умеет спрашивать — останется голосом
+            return          # the shell cannot ask: it stays a voice question
 
         asked = question.to_dict()
         action = asked.get("action") or ""
         command_id = asked.get("command_id") or ""
 
-        # Предпросмотр — то, что человеку показывают вместо названия
-        # действия. §11 требует показать, **что именно произойдёт**:
-        # «Выключить компьютер?» человек успевает осознать, а «power_action»
-        # не значит ничего.
+        # The preview is what a person is shown instead of the action's
+        # name. §11 demands showing **what exactly will happen**: "Shut down
+        # the computer?" is something a person has time to take in, while
+        # "power_action" means nothing.
         if action:
             from voice import system_control
 
@@ -1106,25 +1135,26 @@ class ProtocolServer:
 
     def _on_permission_answer(self, message: Envelope) -> None:
         """
-        Ответ оболочки. Отказ по умолчанию: всё, кроме явного «да», — «нет».
+        The shell's answer. Refusal by default: everything but an explicit
+        "yes" is a "no".
         """
         granted = (message.type == "response"
                    and message.payload.get("granted") is True)
         self.engine.answer_question(granted)
 
-    # -- речь (4.0-E03, E04) --------------------------------------------------
+    # -- speech (4.0-E03, E04) --------------------------------------------------------
 
     def _hear(self, pcm: bytes) -> None:
         """
-        Накопить звук и распознать законченную фразу.
+        Accumulate sound and recognise a finished phrase.
 
-        Нарезка на фразы делается здесь, а не в оболочке: только рядом с
-        распознаванием известно, сколько тишины считать паузой в
-        предложении, а сколько концом фразы.
+        Slicing into phrases is done here, not in the shell: only next to
+        recognition is it known how much silence counts as a pause inside a
+        sentence and how much as the end of a phrase.
 
-        Распознавание идёт в своём потоке: модель думает сотни миллисекунд,
-        а на этом же потоке читается канал данных — задержка превратилась бы
-        в пропущенный звук.
+        Recognition runs in a thread of its own: the model thinks for
+        hundreds of milliseconds, and the data channel is read on this same
+        thread — the delay would turn into missed sound.
         """
         for phrase in self.segmenter.feed(pcm):
             threading.Thread(target=self._recognise, args=(phrase,),
@@ -1133,8 +1163,8 @@ class ProtocolServer:
     def _recognise(self, phrase: bytes) -> None:
         with trace_scope():
             if not self.recogniser.available():
-                # Молчать здесь нельзя: человек решит, что его не слышно, и
-                # станет говорить громче.
+                # Silence will not do here: the person will decide they
+                # cannot be heard and start speaking louder.
                 self.engine.bus.emit(
                     "assistant.error",
                     text="Распознавание недоступно: выберите модель в настройках.")
@@ -1145,26 +1175,26 @@ class ProtocolServer:
                                      text=f"Не удалось распознать: {heard.error}")
                 return
             if not heard.text:
-                return          # тишина — не ошибка и не повод сообщать
+                return          # silence is neither an error nor worth reporting
             self.engine.bus.emit("speech.recognized", text=heard.text)
             self.engine.handle_command_async(heard.text, source="voice")
 
     def _voice_follows_settings(self) -> None:
         """
-        Пересобрать синтез и распознавание, если движок сменили.
+        Rebuild synthesis and recognition if the engine was changed.
 
-        Иначе выбор в настройках начинал действовать только после
-        перезапуска ядра: человек ставит Edge, слышит тишину и решает, что
-        сломано. Настройка, которая «применится когда-нибудь», — это не
-        настройка, а обещание; помеченные `restart_required` говорят об
-        этом честно, а эти две ничего такого не обещали.
+        Otherwise the choice in settings began to take effect only after the
+        core restarted: a person picks Edge, hears silence and decides
+        something is broken. A setting that "will apply some day" is not a
+        setting but a promise; the ones marked `restart_required` say so
+        honestly, and these two promised nothing of the kind.
         """
         store = self._settings()
         if store is None:
             return
-        # Сравнивается то, что попросили, а не то, что получилось: движок,
-        # которого ядро не умеет, даёт «выключено», и сверка по имени
-        # пересобирала бы его на каждой реплике.
+        # What is compared is what was asked for, not what came of it: an
+        # engine the core cannot do gives "off", and comparing by name would
+        # rebuild it on every line.
         wanted = (str(store.get("stt_engine", "disabled") or "disabled"),
                   str(store.get("tts_engine", "silent") or "silent"))
         if wanted == self._speech_wanted:
@@ -1177,14 +1207,15 @@ class ProtocolServer:
 
     def _speak(self, text: str) -> None:
         """
-        Синтезировать и отправить оболочке.
+        Synthesise and send to the shell.
 
-        Синтез в ядре, воспроизведение в оболочке: модели живут там, где
-        ML-экосистема, а звук — там, где низкая задержка и нативное аудио.
+        Synthesis in the core, playback in the shell: the models live where
+        the ML ecosystem is, and the sound where latency is low and audio is
+        native.
         """
         self._voice_follows_settings()
         if not self.synthesiser.available():
-            return          # текст уже отправлен событием; голоса просто нет
+            return          # the text already went as an event; there is simply no voice
         pcm = self.synthesiser.synthesize(
             text,
             voice=str(self._settings().get("voice", "") if self._settings()
@@ -1195,14 +1226,14 @@ class ProtocolServer:
         self.send_speech(pcm, self.synthesiser.sample_rate)
 
     def send_speech(self, pcm: bytes, sample_rate: int) -> None:
-        """Отправить готовый звук оболочке кусками по каналу данных."""
+        """Send ready-made sound to the shell in chunks over the data channel."""
         if self.channels.data is None:
             return
 
-        # Частота объявляется при открытии потока, поэтому смена движка —
-        # это новый поток, а не продолжение старого. Иначе речь на 24000
-        # поехала бы в поток, объявленный на 22050, и Рина заговорила бы
-        # ниже и медленнее, чем должна.
+        # The rate is declared when the stream is opened, so a change of
+        # engine is a new stream rather than a continuation of the old one.
+        # Otherwise speech at 24000 would go into a stream declared at
+        # 22050, and Rina would speak lower and slower than she should.
         if self._speech_stream and self._speech_rate != sample_rate:
             self.send(Envelope.request(
                 "stream.close", {"stream_id": self._speech_stream},
@@ -1220,25 +1251,26 @@ class ProtocolServer:
                  "format": {"encoding": "pcm_s16le", "rate": sample_rate,
                             "channels": 1}},
                 id=self.ids.next()))
-            # Оболочка выдаст кредит, но ждать его молча нечестно по времени:
-            # первый кусок речи должен уйти сразу. Даём себе кредит на один
-            # ответ и дальше живём по выданному.
+            # The shell will issue credit, but waiting for it in silence is
+            # dishonest as regards time: the first chunk of speech must go
+            # out at once. We give ourselves credit for one reply and after
+            # that live by what is issued.
             self.data.grant(self._speech_stream, 512 * 1024)
 
         chunk = 8192
         for offset in range(0, len(pcm), chunk):
             piece = pcm[offset:offset + chunk]
             if self.data.available(self._speech_stream) < len(piece):
-                break       # оболочка не успевает: обрывать речь честнее,
-                            # чем копить её в памяти
+                break       # the shell cannot keep up: cutting speech off is
+                            # more honest than piling it up in memory
             self.channels.data.send(self.data.send(self._speech_stream, piece))
 
-    # -- обрыв ---------------------------------------------------------------
+    # -- the break ---------------------------------------------------------------
 
     def on_disconnect(self) -> dict[str, int]:
         """
-        Оболочка пропала: сбросить всё летучее (§13).
+        The shell has gone: reset everything volatile (§13).
 
-        Ядро после этого завершается — см. заголовок модуля.
+        The core ends after this — see the module header.
         """
         return self.volatile.reset()
