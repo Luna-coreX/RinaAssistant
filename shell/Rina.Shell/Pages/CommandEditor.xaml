@@ -8,8 +8,8 @@
       <TextBlock x:Name="Legend" Text="{loc:S 'НОВАЯ КОМАНДА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
 
-      <!-- Что сказать. Фраз бывает несколько: «запусти дискорд» и
-           «открой discord» — одно намерение, сказанное по-разному. -->
+      <!-- What to say. There can be several phrases: "start discord" and
+           "open discord" are one intent said in different ways. -->
       <TextBlock Text="{loc:S 'Фразы, по которым сработает'}"
                  Style="{StaticResource Text.Body}" />
       <StackPanel x:Name="Phrases" Margin="0,6,0,0" />
@@ -47,9 +47,9 @@
                   HorizontalAlignment="Left" Visibility="Collapsed" />
       </StackPanel>
 
-      <!-- Последовательность: шаги списком. Порядок важен — «открой
-           браузер, потом папку» и наоборот это разные команды, поэтому
-           шаги двигаются, а не только добавляются и убираются. -->
+      <!-- A sequence: the steps as a list. The order matters — "open the
+           browser, then the folder" and the reverse are different commands,
+           so the steps move rather than only being added and removed. -->
       <StackPanel x:Name="StepsBox" Margin="0,0,0,12" Visibility="Collapsed">
         <TextBlock Text="{loc:S 'Шаги по порядку'}"
                    Style="{StaticResource Text.Body}" Margin="0,0,0,6" />

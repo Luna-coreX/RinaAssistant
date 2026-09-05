@@ -65,6 +65,22 @@ def block_is_comment(lines: list[str], start: int, end: int) -> tuple[bool, str]
             inside_doc = not inside_doc
             continue
 
+        # Комментарий XML открывается и закрывается разными знаками, и
+        # внутри него строка не начинается ничем: `<!--` на своей строке,
+        # текст на следующих. Без этого многострочный комментарий в XAML
+        # получал отказ на второй же строке — а это ровно тот вид, в
+        # котором в разметке написано всё длинное.
+        # Именно `startswith`: строка вида `<Border/> <!-- пояснение` — это
+        # код с комментарием на хвосте, и пропускать её нельзя.
+        opens = stripped.startswith("<!--") and "-->" not in stripped[4:]
+        closes = stripped.endswith("-->")
+        if opens:
+            inside_doc = True
+            continue
+        if closes and inside_doc:
+            inside_doc = False
+            continue
+
         if not looks_like_comment(line, inside_doc):
             return False, f"строка {number}: {stripped[:60]!r}"
     return True, ""

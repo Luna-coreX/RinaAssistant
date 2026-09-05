@@ -8,38 +8,40 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell;
 
 /// <summary>
-/// Глобальные сочетания клавиш.
+/// Global hotkeys.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F06</c>.
+/// Plan item <c>4.0-F06</c>.
 /// </para>
 /// <para>
-/// <b>Обработка идёт максимально рано, и это архитектурное требование, а не
-/// придирка к скорости.</b> В 5.0 сюда встанет kill-switch — сочетание,
-/// мгновенно снимающее все разрешения и обрывающее управление компьютером
-/// (<c>5.0-D08</c>). Ему нельзя ждать очереди: если он окажется за
-/// обработкой сообщений окна, за занятым ядром или за чем угодно ещё, он
-/// сработает тогда, когда уже поздно.
+/// <b>Handling happens as early as possible, and this is an architectural
+/// requirement rather than fussing over speed.</b> In 5.0 the kill switch
+/// goes here — a hotkey that instantly revokes every permission and cuts
+/// off control of the computer (<c>5.0-D08</c>). It cannot wait in a
+/// queue: if it ends up behind the window's message handling, behind a
+/// busy core or behind anything else at all, it will fire when it is
+/// already too late.
 /// </para>
 /// <para>
-/// Поэтому сообщение перехватывается в самом начале оконной процедуры, до
-/// всякой логики, и обработчик зовётся прямо оттуда. Всё, что он делает,
-/// обязано быть быстрым; долгое уходит в другой поток самим обработчиком.
+/// So the message is intercepted at the very start of the window
+/// procedure, before any logic, and the handler is called straight from
+/// there. Everything it does is obliged to be fast; anything long is moved
+/// to another thread by the handler itself.
 /// </para>
 /// <para>
-/// <b>Регистрация в системе, а не перехват клавиатуры.</b> `RegisterHotKey`
-/// просит систему прислать сообщение и не видит остальных нажатий. Глобальный
-/// перехватчик клавиатуры видел бы всё, что человек печатает, — для
-/// программы, у которой в настройках есть «не записывать тексты реплик»,
-/// это было бы противоречием самой себе.
+/// <b>Registration with the system, not keyboard interception.</b>
+/// `RegisterHotKey` asks the system to send a message and does not see the
+/// other keypresses. A global keyboard hook would see everything a person
+/// types — for a program whose settings offer "do not record the text of
+/// lines", that would be a contradiction of itself.
 /// </para>
 /// </remarks>
 public sealed class Hotkeys : IDisposable
 {
     private const int WmHotkey = 0x0312;
 
-    /// <summary>Модификаторы в том виде, в каком их ждёт система.</summary>
+    /// <summary>Modifiers in the form the system expects them.</summary>
     [Flags]
     public enum Mod
     {
@@ -63,7 +65,7 @@ public sealed class Hotkeys : IDisposable
     private IntPtr _handle;
     private int _next = 1;
 
-    /// <summary>Сочетание не удалось занять: его держит другая программа.</summary>
+    /// <summary>A hotkey could not be registered: another program holds it.</summary>
     public event Action<string, string>? Refused;
 
     public void Attach(Window window)
@@ -76,8 +78,8 @@ public sealed class Hotkeys : IDisposable
     private IntPtr OnMessage(IntPtr hwnd, int message, IntPtr wParam,
                              IntPtr lParam, ref bool handled)
     {
-        // Раньше всего остального. Ни разбора, ни поиска по словарю сверх
-        // одного обращения: здесь начинается путь kill-switch'а.
+        // Before everything else. No parsing and no dictionary lookup
+        // beyond a single one: this is where the kill switch's path begins.
         if (message != WmHotkey) return IntPtr.Zero;
         if (_bound.TryGetValue(wParam.ToInt32(), out var act))
         {
@@ -88,12 +90,14 @@ public sealed class Hotkeys : IDisposable
     }
 
     /// <summary>
-    /// Занять сочетание. `false` — не вышло, и это не исключение.
+    /// Register a hotkey. `false` means it did not work, and that is not an
+    /// exception.
     /// </summary>
     /// <remarks>
-    /// Сочетание, занятое другой программой, — обычное дело, а не сбой: у
-    /// человека может стоять что угодно. Он должен об этом узнать и выбрать
-    /// другое, а не гадать, почему не работает.
+    /// A hotkey held by another program is an ordinary matter, not a
+    /// failure: a person may have anything installed. They must find out
+    /// about it and choose another one rather than guess why it does not
+    /// work.
     /// </remarks>
     public bool Bind(string name, string combination, Action action)
     {
@@ -123,16 +127,16 @@ public sealed class Hotkeys : IDisposable
         _byName.Remove(name);
     }
 
-    /// <summary>Сколько сочетаний занято сейчас.</summary>
+    /// <summary>How many hotkeys are registered right now.</summary>
     public int Count => _bound.Count;
 
     /// <summary>
-    /// «Ctrl+Shift+R» → модификаторы и код клавиши.
+    /// "Ctrl+Shift+R" → modifiers and a key code.
     /// </summary>
     /// <remarks>
-    /// Запись та же, что в 3.1.0: настройки переносятся как есть, и
-    /// заставлять человека перенабирать семь сочетаний ради нового формата
-    /// было бы потерей без выигрыша.
+    /// The notation is the same as in 3.1.0: settings carry over as they
+    /// are, and making a person retype seven hotkeys for the sake of a new
+    /// format would be a loss with no gain.
     /// </remarks>
     public static bool TryParse(string combination, out Mod modifiers,
                                 out uint key)
@@ -158,8 +162,9 @@ public sealed class Hotkeys : IDisposable
                     break;
             }
         }
-        // Сочетание без модификатора заняло бы клавишу во всей системе:
-        // человек нажал бы «R» в чужом редакторе и вызвал Рину.
+        // A hotkey without a modifier would take the key over the whole
+        // system: a person would press "R" in someone else's editor and
+        // summon Rina.
         return key != 0 && modifiers != 0;
     }
 

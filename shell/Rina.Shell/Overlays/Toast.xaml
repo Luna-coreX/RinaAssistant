@@ -18,7 +18,7 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
-      <!-- Полоса акцентом слева: знак, что говорит Рина, а не система. -->
+      <!-- An accent bar on the left: a sign that Rina is speaking, not the system. -->
       <Border Grid.Column="0" Width="3" CornerRadius="2"
               Background="{DynamicResource C.Signal}"
               Margin="0,0,12,0" />

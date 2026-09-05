@@ -8,25 +8,29 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Настройки: десять секций одной панелью.
+/// Settings: ten sections in one panel.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Здесь встречаются две половины [ADR 0006](../../../docs/adr/0006-settings-ownership.md).
-/// Ядро прислало смысл — тип, умолчание, перечисление, диапазон, зависимость,
-/// признак «нужен перезапуск». Оболочка знает вид — подписи и секции
-/// (<see cref="SettingsLayout"/>). Ни одна половина не может быть выведена
-/// из другой, и в этом всё решение.
+/// Here the two halves of
+/// [ADR 0006](../../../docs/adr/0006-settings-ownership.md) meet. The core
+/// sent the meaning — the type, the default, the enumeration, the range,
+/// the dependency, the "needs a restart" mark. The shell knows the
+/// appearance — the labels and the sections
+/// (<see cref="SettingsLayout"/>). Neither half can be derived from the
+/// other, and that is the whole decision.
 /// </para>
 /// <para>
-/// <b>Зависимые поля гаснут, а не прячутся.</b> «Адрес модели» при
-/// выключенной модели бесполезен, но спрятать его значит заставить человека
-/// гадать, куда он делся. Выключенное обязано читаться как выключенное, а не
-/// как отсутствующее — то же правило, что и в дизайн-системе про контраст.
+/// <b>Dependent fields go dim, they do not hide.</b> "Model address" is
+/// useless while the model is off, but hiding it makes a person guess
+/// where it went. What is switched off must read as switched off rather
+/// than as missing — the same rule as the design system's one about
+/// contrast.
 /// </para>
 /// <para>
-/// <b>Предупреждение — не отказ.</b> «Адрес не локальный» значит, что
-/// значение записано, а человеку сказано, чем это обернётся. Решать ему.
+/// <b>A warning is not a refusal.</b> "The address is not local" means the
+/// value was written down and the person was told what it will lead to.
+/// The decision is theirs.
 /// </para>
 /// </remarks>
 public partial class SettingsPage : UserControl
@@ -36,45 +40,47 @@ public partial class SettingsPage : UserControl
     private readonly Dictionary<string, JsonNode?> _values = [];
     private readonly Dictionary<string, FrameworkElement> _editors = [];
 
-    /// <summary>Сколько секций построено — для сквозной проверки.</summary>
+    /// <summary>How many sections were built — for the end-to-end check.</summary>
     public int SectionCount => Body.Children.Count;
 
-    /// <summary>Ключей, которые ядро прислало, а оболочка разложила.</summary>
+    /// <summary>Keys the core sent and the shell laid out.</summary>
     public int KeyCount => _schema.Count;
 
-    /// <summary>Первый выпадающий список — для сквозной проверки.</summary>
+    /// <summary>The first dropdown — for the end-to-end check.</summary>
     public ComboBox? FirstChoice() =>
         _editors.Values.OfType<ComboBox>().FirstOrDefault(b => b.Items.Count > 0);
 
     /// <summary>
-    /// Прокрутить на столько-то — чтобы снимок доставал ниже сгиба.
+    /// Scroll down by so much — so a screenshot reaches below the fold.
     /// </summary>
     /// <remarks>
-    /// Половина экрана настроек не видна на первом экране, и проверять
-    /// снимком только верх значит не проверять список папок, выбор модели и
-    /// выбор устройств — ровно то, что здесь и делалось.
+    /// Half the settings screen is not visible on the first screenful, and
+    /// checking only the top by screenshot means not checking the folder
+    /// list, the model choice and the device choice — which is exactly what
+    /// was happening here.
     /// </remarks>
     public void ScrollTo(double offset) => Scroll.ScrollToVerticalOffset(offset);
 
     /// <summary>
-    /// Ширины всех органов управления — для проверки столбца.
+    /// The widths of every control — for the column check.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Ширину задаёт колонка, а не орган. Проверялось это глазами и одним
-    /// человеком со скриншотами: поле пути было шириной 200, выпадающий
-    /// список 280, ползунок с числом 276, и правый край гулял на
-    /// восемьдесят точек.
+    /// The width is set by the column, not by the control. This used to be
+    /// checked by eye, by one person with screenshots: the path field was
+    /// 200 wide, the dropdown 280, the slider with a number 276, and the
+    /// right edge wandered by eighty points.
     /// </para>
     /// <para>
-    /// По снимку такое не померить: правый край колонки не является
-    /// границей цвета — у ряда с путём справа кнопка, у ползунка число, и
-    /// заливка кончается раньше самой колонки. Поэтому меряется дерево, а
-    /// не картинка.
+    /// A screenshot cannot measure that: the column's right edge is not a
+    /// colour boundary — the path row has a button on the right, the
+    /// slider has a number, and the fill ends before the column does. So
+    /// what is measured is the tree, not the picture.
     /// </para>
     /// <para>
-    /// Переключатели и кнопки-приборы сюда не входят: они не занимают
-    /// колонку, а стоят у её левого края — им ширина колонки ни к чему.
+    /// Toggles and instrument buttons are not included: they do not occupy
+    /// the column but stand at its left edge — the column's width is of no
+    /// use to them.
     /// </para>
     /// </remarks>
     public IReadOnlyList<(string Key, double Width)> ControlWidths()
@@ -89,10 +95,10 @@ public partial class SettingsPage : UserControl
         return found;
     }
 
-    /// <summary>Какой ширины обязан быть орган управления.</summary>
+    /// <summary>What width a control is obliged to have.</summary>
     public static double WantedControlWidth => ControlWidth;
 
-    /// <summary>Готово: схема получена и разложена.</summary>
+    /// <summary>Ready: the schema has arrived and been laid out.</summary>
     public event Action? Ready;
 
     public SettingsPage(CoreLink? link)
@@ -100,16 +106,17 @@ public partial class SettingsPage : UserControl
         InitializeComponent();
         _link = link;
 
-        // Просвет берётся из токена, а не набирается числом: «вдвое больше
-        // обычного» — это `Sp.Danger`, и второе место, где написано 64,
-        // однажды разошлось бы с первым.
+        // The gap is taken from a token rather than typed as a number:
+        // "twice the usual" is `Sp.Danger`, and a second place with 64
+        // written in it would part company with the first one day.
         Bottom.Margin = new Thickness(0, (double)FindResource("Sp.Danger"),
                                       0, 0);
 
         if (_link is null)
         {
-            // Не строкой в подвале: пустая страница с примечанием внизу
-            // читается как «ещё грузится», а не как «нечего показать».
+            // Not as a line in the footer: an empty page with a note at
+            // the bottom reads as "still loading" rather than as "nothing
+            // to show".
             Empty.Content = EmptyState.For(
                 S("Ядро не на связи"),
                 S("Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."));
@@ -126,10 +133,11 @@ public partial class SettingsPage : UserControl
         var described = await Ask(Methods.SettingsDescribe);
         if (described?["schema"] is not JsonObject schema) return;
 
-        // Пропускаются два признака, и они значат разное. `obsolete` —
-        // «заменено» (пять палитр 3.1.0 уступили двум отделкам). `secret` —
-        // «служебное»: состояние хранилища, а не настройка, и показывать его
-        // человеку незачем, как и писать в журнал.
+        // Two marks are skipped, and they mean different things.
+        // `obsolete` is "replaced" (3.1.0's five palettes gave way to two
+        // finishes). `secret` is "internal": the state of the store rather
+        // than a setting, and there is no point showing it to a person, any
+        // more than writing it to the log.
         foreach (var (key, spec) in schema)
             if (spec is JsonObject entry
                 && entry["obsolete"] is null && entry["secret"] is null)
@@ -150,12 +158,13 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Спросить у ядра списки, которые оно объявило изменчивыми.
+    /// Ask the core for the lists it declared changeable.
     /// </summary>
     /// <remarks>
-    /// Схема говорит, что набор значений есть, но не какой: «какие голоса
-    /// установлены» вчерашним быть не может. Устройства при этом
-    /// перечисляет оболочка — их знает она (<see cref="SettingsLayout.ShellKnows"/>).
+    /// The schema says a set of values exists, but not which one: "which
+    /// voices are installed" cannot be yesterday's answer. Devices,
+    /// meanwhile, are enumerated by the shell — it is what knows them
+    /// (<see cref="SettingsLayout.ShellKnows"/>).
     /// </remarks>
     private async Task LoadOptionsAsync()
     {
@@ -167,7 +176,7 @@ public partial class SettingsPage : UserControl
 
             if (key == "accent")
             {
-                // Варианты — те, что есть у выбранной сейчас отделки.
+                // The choices are those of the finish selected right now.
                 var finish = _values.GetValueOrDefault("finish")
                                  ?.GetValue<string>() ?? "black";
                 _options[key] = App.Accents(finish)
@@ -186,9 +195,10 @@ public partial class SettingsPage : UserControl
             _options[key] = listed;
         }
 
-        // Чему можно назначить сочетание — у ядра: исполняет действия оно,
-        // и список у него. Без этого словарь падал в общий редактор и
-        // показывал «записей: 0» вместо перечня действий.
+        // What a hotkey can be assigned to belongs to the core: it is what
+        // performs the actions, and it has the list. Without this the
+        // dictionary fell through to the general editor and showed
+        // "entries: 0" instead of a list of actions.
         if (_schema.ContainsKey("action_hotkeys"))
         {
             var listed = await Ask(Methods.HotkeysActions);
@@ -240,9 +250,10 @@ public partial class SettingsPage : UserControl
             foreach (var k in keys) placed.Add(k.Key);
         }
 
-        // Правило с зубами из ADR 0006: незнакомый ключ показывается, а не
-        // прячется. Ядро завело настройку, оболочку не обновили — и без
-        // этой секции настройка стала бы недостижимой незаметно.
+        // The rule with teeth from ADR 0006: an unfamiliar key is shown,
+        // not hidden. The core added a setting, the shell was not updated —
+        // and without this section the setting would have become
+        // unreachable unnoticed.
         var strangers = _schema.Keys
             .Where(k => !placed.Contains(k)
                         && !SettingsLayout.Elsewhere.Contains(k))
@@ -257,7 +268,7 @@ public partial class SettingsPage : UserControl
         var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
         stack.Children.Add(new TextBlock
         {
-            // Переводим здесь: в раскладке лежит ключ (см. SettingsLayout).
+            // Translated here: the layout holds a key (see SettingsLayout).
             Text = S(title).ToUpperInvariant(),
             Style = (Style)FindResource("Text.Section"),
             Margin = new Thickness(0, 0, 0, 12),
@@ -267,27 +278,28 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Ширина колонки органов управления.
+    /// The width of the column of controls.
     /// </summary>
     /// <remarks>
-    /// Одна на всю страницу. Раньше колонка была «по содержимому», и
-    /// каждый ряд начинал орган там, где кончалась его подпись, — правый
-    /// край рвался, а панель читалась как список, а не как прибор.
+    /// One for the whole page. The column used to be "by content", and
+    /// every row started its control where its own label ended — the right
+    /// edge was ragged, and the panel read as a list rather than as an
+    /// instrument.
     /// </remarks>
     private const double ControlColumn = 296;
 
     /// <summary>
-    /// Ширина самого органа управления внутри колонки.
+    /// The width of the control itself inside the column.
     /// </summary>
     /// <remarks>
-    /// Одна на все виды: выпадающий список, поле, путь, ползунок с числом.
-    /// Раньше каждый носил свою — 280, 200, 276, — и правый край гулял на
-    /// восемьдесят точек. У прибора органы стоят в столбец, а столбец
-    /// имеет две стороны, а не одну.
+    /// One for every kind: dropdown, field, path, slider with a number.
+    /// Each used to carry its own — 280, 200, 276 — and the right edge
+    /// wandered by eighty points. On an instrument the controls stand in a
+    /// column, and a column has two sides, not one.
     /// </remarks>
     private const double ControlWidth = 280;
 
-    /// <summary>Ширина колонки проверок. Пустая у большинства рядов.</summary>
+    /// <summary>The width of the checks column. Empty in most rows.</summary>
     private const double ProbeColumn = 150;
 
     private UIElement BuildRow(string key)
@@ -298,17 +310,17 @@ public partial class SettingsPage : UserControl
         {
             Width = new GridLength(1, GridUnitType.Star),
         });
-        // Колонка органов управления одной ширины на всю страницу: иначе
-        // каждый ряд начинается там, где кончился его собственный, и
-        // правый край рвётся. У лицевой панели органы стоят в столбец.
+        // The control column is one width for the whole page: otherwise
+        // every row starts where its own label ended, and the right edge
+        // goes ragged. On a front panel the controls stand in a column.
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(ControlColumn),
         });
-        // Третья колонка — для проверки, и она **тоже одной ширины на все
-        // ряды**. С «по содержимому» ряд с кнопкой отбирал место у своей
-        // подписи, и его орган уезжал левее соседних: колонки принадлежат
-        // панели, а не ряду.
+        // The third column is for the check, and it is **also one width
+        // for every row**. With "by content", a row with a button took room
+        // from its own label, and its control drifted left of its
+        // neighbours': columns belong to the panel, not to the row.
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(ProbeColumn),
@@ -317,8 +329,8 @@ public partial class SettingsPage : UserControl
         var label = new StackPanel
         {
             VerticalAlignment = VerticalAlignment.Center,
-            // Просвет между легендой и органом. Без него подсказка
-            // упиралась в поле, и две колонки читались как одна.
+            // The gap between the legend and the control. Without it the
+            // hint ran into the field, and two columns read as one.
             Margin = new Thickness(0, 0, 24, 0),
         };
         label.Children.Add(new TextBlock
@@ -349,7 +361,7 @@ public partial class SettingsPage : UserControl
         var editor = BuildEditor(key, spec);
         _editors[key] = editor;
 
-        // Проверка стоит рядом, но в своей колонке.
+        // The check stands alongside, but in a column of its own.
         if (BuildProbe(key) is { } probe)
         {
             Grid.SetColumn(probe, 2);
@@ -358,10 +370,11 @@ public partial class SettingsPage : UserControl
             row.Children.Add(probe);
         }
 
-        // Редактор-список встаёт под подписью во всю ширину. Рядом ему
-        // тесно: подпись сжимается в столбик из букв, а сам он всё равно
-        // не помещается. Признак — устройство значения, а не имя ключа:
-        // новая настройка того же рода получит это сама.
+        // A list editor goes under the label at full width. Alongside it
+        // is cramped: the label squeezes into a column of letters, and it
+        // still does not fit. The mark is the value's make-up, not the
+        // key's name: a new setting of the same sort will get this by
+        // itself.
         var type = spec["type"]?.GetValue<string>() ?? "string";
         if (type is "array" or "object")
         {
@@ -376,8 +389,9 @@ public partial class SettingsPage : UserControl
         else
         {
             Grid.SetColumn(editor, 1);
-            // Влево внутри своей колонки, а не вправо по краю окна: общий
-            // левый край и делает из органов столбец.
+            // Left inside its own column, not right along the window's
+            // edge: a shared left edge is what makes a column out of
+            // controls.
             editor.HorizontalAlignment = HorizontalAlignment.Left;
             editor.VerticalAlignment = VerticalAlignment.Center;
         }
@@ -385,9 +399,9 @@ public partial class SettingsPage : UserControl
 
         ApplyDependency(key, spec, row);
 
-        // Волосяной шов между настройками — то же средство, что и в
-        // списках: области панели отделяются значением и швом, а не
-        // пустотой между плитками.
+        // A hairline seam between settings — the same device as in the
+        // lists: areas of a panel are separated by value and by a seam, not
+        // by emptiness between tiles.
         return new Border
         {
             BorderBrush = (System.Windows.Media.Brush)FindResource("C.Seam"),
@@ -398,18 +412,19 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Проверка рядом с настройкой, которую она проверяет.
+    /// A check next to the setting it checks.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Настройка звука без проверки — выбор вслепую: человек ставит движок,
-    /// голос и устройство, а узнаёт, работает ли, при следующем обращении к
-    /// Рине. Поэтому кнопка стоит здесь, а не в отдельной «диагностике»,
-    /// куда никто не ходит.
+    /// A sound setting without a check is a blind choice: a person picks
+    /// the engine, the voice and the device, and finds out whether it works
+    /// the next time they talk to Rina. So the button stands here and not
+    /// in a separate "diagnostics" nobody visits.
     /// </para>
     /// <para>
-    /// Голос проверяет ядро — синтезирует оно; микрофон оболочка — устройства
-    /// у неё. Та же граница, что и везде (ADR 0009).
+    /// The voice is checked by the core — it is what synthesises; the
+    /// microphone by the shell — the devices are its. The same boundary as
+    /// everywhere (ADR 0009).
     /// </para>
     /// </remarks>
     private FrameworkElement? BuildProbe(string key)
@@ -437,7 +452,7 @@ public partial class SettingsPage : UserControl
         return probe;
     }
 
-    /// <summary>Сказать пробную фразу и услышать её.</summary>
+    /// <summary>Say a test phrase and hear it.</summary>
     private async Task TestVoiceAsync()
     {
         Note.Text = S("Говорю…");
@@ -447,8 +462,9 @@ public partial class SettingsPage : UserControl
         if (answer is null) return;
 
         var ok = answer["ok"]?.GetValue<bool>() ?? false;
-        // Сказать «получилось» мало: человек мог не услышать, и тогда дело
-        // не в синтезе, а в устройстве вывода. Поэтому и длительность.
+        // Saying "it worked" is not enough: the person may not have heard
+        // it, and then the matter is not the synthesis but the output
+        // device. Hence the duration too.
         Note.Text = ok
             ? S("Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик.",
                 answer["text"]?.GetValue<string>() ?? "",
@@ -459,13 +475,14 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Послушать микрофон пару секунд и сказать, что слышно.
+    /// Listen to the microphone for a couple of seconds and say what can be
+    /// heard.
     /// </summary>
     /// <remarks>
-    /// Проверяется <b>уровень</b>, а не распознавание: «слышно ли вас
-    /// вообще» и «понимает ли она слова» — разные вопросы, и первый
-    /// отвечает на большинство жалоб. Заодно проверка работает и там, где
-    /// распознавание выключено.
+    /// What is checked is the <b>level</b>, not recognition: "can you be
+    /// heard at all" and "does she understand the words" are different
+    /// questions, and the first one answers most complaints. It also means
+    /// the check works where recognition is switched off.
     /// </remarks>
     private async Task TestMicrophoneAsync()
     {
@@ -484,14 +501,15 @@ public partial class SettingsPage : UserControl
             return;
         }
 
-        // Порог из опыта: ниже пяти процентов — это тишина комнаты, а не
-        // голос. Точное число тут менее важно, чем то, что человеку
-        // сказано, что делать дальше.
+        // The threshold comes from experience: below five per cent is the
+        // silence of a room, not a voice. The exact number matters less
+        // here than the person being told what to do next.
         var heard = loudest >= 0.05f;
         Note.Text = heard
             ? S("Слышно: {0}%. Микрофон работает.", (int)(loudest * 100))
-            // Одной строкой, а не склейкой: склеенная переводится по
-            // кускам, и в таблице оказываются два обрывка вместо фразы.
+            // As one string rather than glued together: a glued one gets
+            // translated in pieces, and the table ends up with two
+            // fragments instead of a phrase.
             : S("Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.",
                 (int)(loudest * 100));
         Note.SetResourceReference(ForegroundProperty,
@@ -503,14 +521,15 @@ public partial class SettingsPage : UserControl
         var type = spec["type"]?.GetValue<string>() ?? "string";
         var value = _values.GetValueOrDefault(key);
 
-        // Порядок разбора — от устройства значения к его набору, а не
-        // наоборот. Список и словарь правят по-своему, что бы ядро о них
-        // ни перечислило: у «сочетаний действий» перечислены **ключи**
-        // словаря, и прочитать его как строку значит уронить страницу —
-        // ровно это и случилось при первом же живом прогоне.
-        // Сочетание клавиш нажимают, а не набирают: набранное строкой —
-        // это просьба знать, как мы его пишем, и ошибку человек заметит
-        // только по тому, что клавиши не работают.
+        // The order of the checks goes from the value's make-up to its
+        // set, not the other way round. A list and a dictionary are edited
+        // in their own way, whatever the core enumerated about them: for
+        // "action hotkeys" what is enumerated are the dictionary's
+        // **keys**, and reading it as a string means dropping the page —
+        // which is exactly what happened on the very first live run.
+        // A hotkey is pressed, not typed: one typed as a string is a
+        // request to know how we spell it, and the person will notice their
+        // mistake only from the keys not working.
         if (key == "hotkey")
         {
             var box = new HotkeyBox(value?.GetValue<string>() ?? "");
@@ -518,37 +537,40 @@ public partial class SettingsPage : UserControl
             return box;
         }
 
-        // Число, у которого ядро назвало обе границы, тянут, а не
-        // набирают. Правило общее, а не список ключей: настройка, у
-        // которой границы появятся, получит ползунок сама.
+        // A number whose both bounds the core has named is dragged, not
+        // typed. The rule is general rather than a list of keys: a setting
+        // that gains bounds will get a slider by itself.
         if (type is "integer" or "number"
             && spec["low"] is not null && spec["high"] is not null)
         {
             var low = spec["low"]!.GetValue<double>();
             var high = spec["high"]!.GetValue<double>();
-            // Слишком широкий диапазон мышью не выставить: секунду из
-            // шестисот придётся ловить. Такое остаётся полем.
+            // Too wide a range cannot be set with a mouse: one second out
+            // of six hundred would have to be caught. Such a thing stays a
+            // field.
             if (high - low <= 200)
                 return BuildSlider(key, low, high, type == "integer",
                                    value?.GetValue<double>() ?? low);
         }
 
         if (type == "array")
-            // У списка папок есть и тип «массив», и формат «путь». Массив
-            // решает, чем правят; формат — чем добавляют.
+            // The folder list has both the "array" type and the "path"
+            // format. The array decides how it is edited; the format, how
+            // things are added.
             return BuildList(key, value as JsonArray,
                              spec["format"]?.GetValue<string>() ?? "");
 
-        // Словарь, у которого ядро перечислило ключи, — это не «счётчик и
-        // забыть все», а список: каждому известному действию своя строка.
+        // A dictionary whose keys the core enumerated is not "a counter
+        // and forget everything" but a list: a row of its own for every
+        // known action.
         if (type == "object")
             return _options.TryGetValue(key, out var actions)
                    && actions.Count > 0
                 ? BuildAssignments(key, actions, value as JsonObject)
                 : BuildMap(key, value as JsonObject);
 
-        // Список известных значений — выпадающий список, а не строка.
-        // Набор пришёл от того, кто его знает: от ядра или от оболочки.
+        // A list of known values is a dropdown, not a line of text. The
+        // set came from whoever knows it: from the core or from the shell.
         if (_options.TryGetValue(key, out var known))
             return known.Count > 0
                 ? BuildChoice(key, known, value?.GetValue<string>() ?? "")
@@ -599,13 +621,14 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Выпадающий список. Недоступное показано, но выбрать нельзя.
+    /// A dropdown. What is unavailable is shown but cannot be chosen.
     /// </summary>
     /// <remarks>
-    /// Прятать неустановленный движок нельзя: человек не узнает, что такой
-    /// вообще бывает, и будет искать его в интернете, стоя перед списком, где
-    /// он есть. Показанный и погашенный — это ответ «такое бывает, но у вас
-    /// не установлено».
+    /// An engine that is not installed must not be hidden: the person will
+    /// not learn that such a thing exists at all and will go looking for it
+    /// on the internet while standing in front of a list that has it.
+    /// Shown and dimmed is the answer "such a thing exists, but you do not
+    /// have it installed".
     /// </remarks>
     private FrameworkElement BuildChoice(string key,
         List<(string Value, string Title, bool Available)> known, string current)
@@ -626,9 +649,10 @@ public partial class SettingsPage : UserControl
         box.SelectedItem = box.Items.OfType<ComboBoxItem>()
             .FirstOrDefault(item => (string?)item.Tag == current);
 
-        // Сохранённого значения в сегодняшнем наборе может не быть: движок
-        // сменили, модель удалили. Пустой список — худший из ответов: он
-        // выглядит как «ничего не выбрано», хотя выбрано, и работает.
+        // The saved value may be absent from today's set: the engine was
+        // changed, the model deleted. An empty list is the worst of
+        // answers: it looks like "nothing is chosen" when something is, and
+        // it works.
         if (box.SelectedItem is null && current.Length > 0)
         {
             var stale = new ComboBoxItem
@@ -648,11 +672,12 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Выбирать не из чего — и это надо сказать, а не дать поле ввода.
+    /// There is nothing to choose from — and that has to be said rather
+    /// than answered with an input field.
     /// </summary>
     /// <remarks>
-    /// У «Без озвучки» голосов нет. Поле, куда можно вписать что угодно,
-    /// пообещало бы, что вписанное заработает.
+    /// "No voice" has no voices. A field one can type anything into would
+    /// promise that what was typed will work.
     /// </remarks>
     private FrameworkElement Nothing()
     {
@@ -668,26 +693,27 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Ползунок со значением рядом.
+    /// A slider with the value beside it.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Число видно всегда: ползунок отвечает на «примерно сколько», а на
-    /// «ровно сколько» не отвечает, и человек, которому нужно ровно
-    /// восемьдесят, иначе обречён возить мышью.
+    /// The number is always visible: a slider answers "roughly how much"
+    /// and does not answer "exactly how much", and a person who needs
+    /// exactly eighty would otherwise be doomed to push a mouse around.
     /// </para>
     /// <para>
-    /// <b>Сохраняем не на каждое движение, а когда отпустили.</b> Иначе
-    /// протаскивание от нуля до ста — это сто запросов к ядру и сто
-    /// записей на диск.
+    /// <b>We save on release, not on every movement.</b> Otherwise dragging
+    /// from zero to a hundred is a hundred requests to the core and a
+    /// hundred writes to disk.
     /// </para>
     /// </remarks>
     private FrameworkElement BuildSlider(string key, double low, double high,
                                          bool whole, double current)
     {
-        // Та же сетка, что у пути: дорожка занимает остаток, число стоит у
-        // правого края колонки. Раньше дорожка носила свою ширину, и число
-        // оказывалось то ближе, то дальше от края.
+        // The same grid as for a path: the track takes the remainder, the
+        // number stands at the column's right edge. The track used to carry
+        // its own width, and the number ended up now closer to the edge,
+        // now further from it.
         var row = new Grid
         {
             Width = ControlWidth,
@@ -728,7 +754,7 @@ public partial class SettingsPage : UserControl
         slider.ValueChanged += (_, _) =>
             shown.Text = Format(slider.Value, whole);
 
-        // Отпустили мышь или ушли с клавиатуры — тогда и сохраняем.
+        // The mouse was released or the keyboard left — that is when we save.
         slider.PreviewMouseUp += async (_, _) => await SaveSliderAsync(
             key, slider.Value, whole);
         slider.LostKeyboardFocus += async (_, _) => await SaveSliderAsync(
@@ -749,19 +775,19 @@ public partial class SettingsPage : UserControl
     {
         JsonNode node = whole ? (int)Math.Round(value)
                               : Math.Round(value, 2);
-        // Не трогаем ядро, если значение то же: отпущенная без движения
-        // мышь не повод писать на диск.
+        // We do not trouble the core if the value is the same: a mouse
+        // released without moving is no reason to write to disk.
         if (_values.GetValueOrDefault(key)?.GetValue<double>() is { } was
             && Math.Abs(was - node.GetValue<double>()) < 1e-9)
             return;
         await SaveAsync(key, node);
     }
 
-    /// <summary>Путь: поле и «Обзор…».</summary>
+    /// <summary>A path: a field and "Browse…".</summary>
     private FrameworkElement BuildPath(string key, string format, string current)
     {
-        // Сетка, а не строка: поле занимает всё, что осталось от кнопки, и
-        // правый край совпадает с соседними органами.
+        // A grid, not a row: the field takes everything the button leaves,
+        // and the right edge lines up with the neighbouring controls.
         var row = new Grid { Width = ControlWidth };
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
@@ -820,11 +846,12 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Список: что в нём есть, что добавить, что убрать.
+    /// A list: what is in it, what to add, what to take away.
     /// </summary>
     /// <remarks>
-    /// Строка через запятую вместо списка была бы приглашением потерять
-    /// путь с запятой в имени. Здесь добавляют и убирают по одному.
+    /// A comma-separated string instead of a list would be an invitation to
+    /// lose a path with a comma in its name. Here things are added and
+    /// removed one at a time.
     /// </remarks>
     private FrameworkElement BuildList(string key, JsonArray? current,
                                        string format)
@@ -878,8 +905,9 @@ public partial class SettingsPage : UserControl
             Margin = new Thickness(0, 4, 0, 0),
         };
 
-        // Папку выбирают окном, слово набирают. Одна кнопка на оба случая
-        // означала бы либо путь с опечаткой, либо выбор папки вместо слова.
+        // A folder is picked with a dialogue, a word is typed. One button
+        // for both cases would mean either a mistyped path or picking a
+        // folder instead of a word.
         if (format == "folder")
         {
             var add = new Button
@@ -920,20 +948,21 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Назначения: строка на каждое известное действие.
+    /// Assignments: a row for every known action.
     /// </summary>
     /// <remarks>
-    /// «Записей: 0 · сбросить все» было честно ровно до тех пор, пока
-    /// назначить сочетание было негде. Человек, увидевший счётчик, не
-    /// узнает ни какие действия бывают, ни как к ним привязаться, — а
-    /// список действий у ядра есть, и он его прислал.
+    /// "Entries: 0 · reset all" was honest exactly as long as there was
+    /// nowhere to assign a hotkey. A person who sees the counter learns
+    /// neither what actions exist nor how to bind to them — and the core
+    /// has the list of actions, and it sent it.
     ///
-    /// Сочетание <b>записывают нажатием</b>. Первая редакция набирала его
-    /// строкой, и рядом стояло объяснение: перехват нажатия означал бы,
-    /// что окно слушает клавиатуру целиком. Объяснение было неверным.
-    /// <c>Hotkeys</c> избегает <b>глобального перехватчика</b> — того, что
-    /// видит набранное в чужих окнах; поле, читающее нажатие, пока на нём
-    /// фокус, получает те же события, которые окну и так приходят.
+    /// A hotkey is <b>recorded by pressing it</b>. The first edition had it
+    /// typed as a string, with an explanation alongside: intercepting the
+    /// press would mean the window listening to the whole keyboard. The
+    /// explanation was wrong. <c>Hotkeys</c> avoids a <b>global
+    /// interceptor</b> — the kind that sees what is typed in other
+    /// people's windows; a field reading a press while it holds focus gets
+    /// the same events the window receives anyway.
     /// </remarks>
     private FrameworkElement BuildAssignments(string key,
         List<(string Value, string Title, bool Available)> actions,
@@ -971,8 +1000,8 @@ public partial class SettingsPage : UserControl
                 foreach (var (existing, node) in assigned)
                     if (existing != action && node is not null)
                         next[existing] = node.DeepClone();
-                // Пустое — это «снять», а не «назначить пустоту»: ключ
-                // убирается, а не остаётся с пустой строкой.
+                // Empty means "unassign", not "assign emptiness": the key
+                // is removed rather than left with an empty string.
                 if (written.Length > 0) next[action] = written;
                 await SaveAsync(key, next);
             };
@@ -983,19 +1012,20 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Словарь: что выучено, и как забыть одно или всё.
+    /// A dictionary: what has been learned, and how to forget one or all.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Первая редакция показывала только счётчик и «забыть все» — с доводом,
-    /// что человек не помнит, какое слово к чему привязалось. Довод оказался
-    /// половинчатым: <b>не помнит — значит, надо показать</b>. Человек,
-    /// заметивший, что Рина открывает не тот «студио», хочет отвязать именно
-    /// его, а не забыть заодно шесть верных соответствий.
+    /// The first edition showed only a counter and "forget all", on the
+    /// argument that a person does not remember which word got bound to
+    /// what. The argument turned out to be half of one: <b>if they do not
+    /// remember, then it has to be shown</b>. A person who noticed that
+    /// Rina opens the wrong "studio" wants to unbind that one, not to
+    /// forget six correct associations along with it.
     /// </para>
     /// <para>
-    /// «Забыть все» остаётся: когда путаница общая, перебирать по одному —
-    /// работа без причины.
+    /// "Forget all" stays: when the muddle is general, going through them
+    /// one by one is work without a reason.
     /// </para>
     /// </remarks>
     private FrameworkElement BuildMap(string key, JsonObject? current)
@@ -1062,13 +1092,13 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// «слово → чему привязано» человеческими словами.
+    /// "word → what it is bound to" in human words.
     /// </summary>
     /// <remarks>
-    /// У выученной программы хранится не только путь, но и имя — его и
-    /// показываем: путь длиной в сто знаков не отвечает на вопрос, что это
-    /// за программа. Сочетание действий хранит строку и показывается как
-    /// есть.
+    /// A learned program stores not only a path but a name — and that is
+    /// what we show: a hundred-character path does not answer the question
+    /// of what program this is. An action hotkey stores a string and is
+    /// shown as it is.
     /// </remarks>
     private static string DescribeBinding(string word, JsonNode? bound)
     {
@@ -1084,11 +1114,12 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Погасить поле, если оно зависит от выключенного.
+    /// Dim a field if it depends on something switched off.
     /// </summary>
     /// <remarks>
-    /// Зависимость знает ядро: только оно понимает, что «адрес модели» без
-    /// «отвечать моделью» ничего не значит. Оболочка лишь показывает это.
+    /// The core knows the dependency: only it understands that "model
+    /// address" means nothing without "answer with a model". The shell only
+    /// shows it.
     /// </remarks>
     private void ApplyDependency(string key, JsonObject spec, Grid row)
     {
@@ -1133,8 +1164,8 @@ public partial class SettingsPage : UserControl
         var message = verdict["message"]?.GetValue<string>() ?? "";
         var code = verdict["code"]?.GetValue<string>() ?? "";
 
-        // Предупреждение не отказ: значение записано, а человеку сказано,
-        // чем это обернётся.
+        // A warning is not a refusal: the value was written down and the
+        // person was told what it will lead to.
         Note.Text = accepted && message.Length == 0
             ? S("«{0}» сохранено.", SettingsLayout.TitleOf(key))
             : message;
@@ -1148,9 +1179,9 @@ public partial class SettingsPage : UserControl
             {
                 var finish = value.GetValue<string>();
                 await _link.SetFinishAsync(finish);
-                // Отделка сменилась — акцент перевыбирается вместе с ней:
-                // набор у каждой свой, и прежнее имя может в нём не
-                // значиться. Имя при этом сохраняется, если значится.
+                // The finish changed — the accent is re-picked along with
+                // it: each has a set of its own, and the previous name may
+                // not be in it. The name is kept if it is.
                 App.ApplyAccent(finish,
                     _values.GetValueOrDefault("accent")?.GetValue<string>()
                     ?? App.DefaultAccent);
@@ -1161,36 +1192,38 @@ public partial class SettingsPage : UserControl
                     _values.GetValueOrDefault("finish")?.GetValue<string>()
                     ?? "black", value.GetValue<string>());
 
-            // Язык хранится в ядре, но слова интерфейса переводит оболочка:
-            // сказать ей об этом больше некому (ADR 0007).
+            // The language is stored in the core, but the interface's
+            // words are translated by the shell: there is nobody else to
+            // tell it (ADR 0007).
             if (key == "ui_language")
                 Strings.Loc.Use(value.GetValue<string>());
 
-            // Переключатели оболочки применяются на месте: настройка,
-            // ждущая перезапуска, читается как сломанная.
+            // The shell's own toggles apply on the spot: a setting waiting
+            // for a restart reads as a broken one.
             if (key is "floating_command_bar" or "notifications"
                     or "minimize_to_tray" or "action_hotkeys"
                 && System.Windows.Application.Current is App app)
                 app.ApplyShellSetting(key, value);
-            // Смена движка меняет набор голосов: списки перечитываются, а не
-            // остаются от прошлого движка.
+            // Changing the engine changes the set of voices: the lists are
+            // re-read rather than left over from the previous engine.
             if (key is "tts_engine" or "stt_engine") await LoadOptionsAsync();
             Build();          // зависимости могли измениться
         }
     }
 
     /// <summary>
-    /// Сбросить настройки к умолчаниям — с подтверждением.
+    /// Reset the settings to their defaults — with a confirmation.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Спрашиваем, потому что отменить нельзя: прежние значения нигде не
-    /// хранятся, и «ой, не то нажал» стоит человеку всех его настроек.
+    /// We ask because it cannot be undone: the previous values are stored
+    /// nowhere, and "oh, wrong button" costs a person all their settings.
     /// </para>
     /// <para>
-    /// В окне сказано, чего сброс <b>не</b> касается. Человек, нажимающий
-    /// «сбросить настройки», боится потерять команды и историю — и должен
-    /// увидеть, что они остаются, до нажатия, а не после.
+    /// The window says what the reset does <b>not</b> touch. A person
+    /// pressing "reset settings" is afraid of losing their commands and
+    /// their history — and must see that these stay, before pressing, not
+    /// after.
     /// </para>
     /// </remarks>
     private async void OnReset(object sender, RoutedEventArgs e)

@@ -8,10 +8,10 @@
         WindowStartupLocation="CenterScreen">
 
   <!--
-    Окно только маршрутизирует (4.0-F03): оно знает про пять разделов и про
-    то, где их показывать, и ничего — про их содержимое. Страницы независимы,
-    иначе окно станет тем самым god-object, ради избавления от которого
-    затевался блок B.
+    The window only routes (4.0-F03): it knows about the five sections and
+    about where to show them, and nothing about their contents. Pages are
+    independent; otherwise the window becomes the very god object that
+    block B was started to get rid of.
   -->
   <Grid>
     <Grid.RowDefinitions>
@@ -20,7 +20,7 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <!-- Полоса заголовка: своя, потому что своя типографика -->
+    <!-- The title bar: our own, because the typography is our own -->
     <Grid Grid.Row="0" Background="{DynamicResource C.FaceLow}"
           Height="{StaticResource Size.Row}">
       <TextBlock Text="Rina Assistant" VerticalAlignment="Center"
@@ -42,7 +42,7 @@
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 
-      <!-- Колонка разделов: пять, обычным регистром, без значков (4.0-R09) -->
+      <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
       <Grid Grid.Column="0" Background="{DynamicResource C.FaceLow}">
         <Grid.RowDefinitions>
           <RowDefinition Height="*" />
@@ -51,13 +51,14 @@
 
         <StackPanel x:Name="Sections" Grid.Row="0" Margin="0,6,0,0" />
 
-        <!-- Подвал: вид, «о программе», версия и состояние связи -->
+        <!-- The foot: the finish, "about", the version and the state of the link -->
         <StackPanel Grid.Row="1" Margin="16,12,16,12">
           <!--
-            Состояние связи (4.0-F12). Стоит рядом с версией, в подвале
-            колонки: это справка о приборе, а не работа. Видно всегда —
-            §13 требует, чтобы окно не выглядело зависшим, а для этого
-            человек должен понимать, что происходит, без нажатий.
+            The state of the link (4.0-F12). It stands next to the version,
+            in the foot of the column: this is a note about the instrument,
+            not work. Always visible — §13 requires that the window not look
+            frozen, and for that a person has to understand what is going on
+            without pressing anything.
           -->
           <TextBlock x:Name="CoreStateText" Style="{StaticResource Text.Meta}"
                      Text="{loc:S 'ядро не запускалось'}" TextWrapping="Wrap" />
@@ -77,13 +78,14 @@
         </StackPanel>
       </Grid>
 
-      <!-- Содержимое раздела -->
+      <!-- The section's contents -->
       <ContentControl x:Name="Pane" Grid.Column="1" Margin="32" />
     </Grid>
 
     <!--
-      Полоса уровня идёт вдоль нижней кромки всего окна, а не внутри
-      раздела: микрофон принадлежит прибору целиком, а не текущему экрану.
+      The level strip runs along the bottom edge of the whole window rather
+      than inside a section: the microphone belongs to the instrument as a
+      whole, not to the current screen.
     -->
     <Grid Grid.Row="2" Height="{StaticResource Size.LevelStrip}"
           Background="{DynamicResource C.FaceSunk}">

@@ -1,10 +1,11 @@
 <!--
-  Роли текста дизайн-системы (§3). Размеры и начертания берутся из
-  порождённых токенов; здесь только решение о том, как роль применяется.
+  The design system's text roles (§3). Sizes and weights are taken from the
+  generated tokens; what lies here is only the decision on how a role is
+  applied.
 
-  Прописные и трекинг остались ровно у одной роли — «секция». После правки
-  исполнения (R03/R05) прописные перестали быть общим приёмом: гравировка,
-  которой всё вокруг, перестаёт быть гравировкой.
+  Capitals and tracking are left on exactly one role — "section". After the
+  change to the execution (R03/R05) capitals stopped being a general
+  device: engraving that everything around is stops being engraving.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
@@ -25,8 +26,8 @@
     <Setter Property="FontSize" Value="{StaticResource Type.Section.Size}" />
     <Setter Property="FontWeight" Value="{StaticResource Type.Section.Weight}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
-    <!-- Трекинг в WPF задаётся межсимвольным интервалом шрифта; 0.10 em
-         на 11 px это 1.1 px, и округление до целого здесь безвредно. -->
+    <!-- Tracking in WPF is set through the font's character spacing; 0.10 em
+         at 11 px is 1.1 px, and rounding to a whole is harmless here. -->
     <Setter Property="Typography.Capitals" Value="Normal" />
   </Style>
 
@@ -51,7 +52,7 @@
     <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
   </Style>
 
-  <!-- Показания прибора: цифры не должны прыгать при смене значения. -->
+  <!-- Instrument readings: digits must not jump when the value changes. -->
   <Style x:Key="Text.Figure" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
     <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Figure.Size}" />

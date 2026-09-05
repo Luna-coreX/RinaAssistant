@@ -7,8 +7,8 @@
       <TextBlock Text="{loc:S 'О программе'}"
                  Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
 
-      <!-- Кто это. Имя, версия и одна строка о том, что она делает: без
-           неё «Рина 4.0.0» ничего не сообщает тому, кто открыл впервые. -->
+      <!-- Who this is. The name, the version and one line about what she
+           does: without it "Rina 4.0.0" tells a first-time reader nothing. -->
       <Border Style="{StaticResource Card}" Margin="0,0,0,16">
         <StackPanel>
           <TextBlock Text="Rina Assistant"
@@ -20,9 +20,9 @@
         </StackPanel>
       </Border>
 
-      <!-- Обновления спрашивают здесь: «о программе» — то место, куда
-           идут узнать, какая стоит версия, и следующий вопрос всегда
-           «а есть ли новее». -->
+      <!-- Updates are asked about here: "about" is the place people go to
+           find out which version is installed, and the next question is
+           always "is there a newer one". -->
       <TextBlock Text="{loc:S 'ОБНОВЛЕНИЯ'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <Border Style="{StaticResource Card}" Margin="0,0,0,16">
@@ -51,10 +51,10 @@
         <StackPanel x:Name="Parts" />
       </Border>
 
-      <!-- То, что спрашивают первым делом при разборе неполадки: где
-           лежат настройки, журналы и плагины. Без этого человек ищет их
-           по проводнику вслепую, а мы — просим прислать то, чего он не
-           может найти. -->
+      <!-- What is asked about first when a fault is being sorted out: where
+           the settings, the logs and the plugins live. Without this a person
+           hunts for them blindly through the file manager, and we ask them
+           to send us what they cannot find. -->
       <TextBlock Text="{loc:S 'ГДЕ ЧТО ЛЕЖИТ'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <Border Style="{StaticResource Rows}" Margin="0,0,0,16">

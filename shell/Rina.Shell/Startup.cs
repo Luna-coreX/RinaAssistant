@@ -10,13 +10,14 @@ namespace Rina.Shell;
 public partial class App
 {
     /// <summary>
-    /// Разбор аргументов и запуск.
+    /// Parsing the arguments and starting up.
     /// </summary>
     /// <remarks>
-    /// <c>--shot &lt;файл&gt;</c> рисует окно в PNG и выходит. Это не отладочная
-    /// прихоть: интерфейс, который никто не видел, проверен не был, а гонять
-    /// человека смотреть на окно после каждой правки — способ перестать
-    /// смотреть вовсе. Снимок делает тот же код, что рисует настоящее окно.
+    /// <c>--shot &lt;file&gt;</c> draws the window into a PNG and exits. This is
+    /// not a debugging whim: an interface nobody has seen has not been
+    /// checked, and sending a person to look at the window after every
+    /// change is a way of ceasing to look at all. The screenshot is made by
+    /// the same code that draws the real window.
     /// </remarks>
     private CoreLink? _link;
     private Tray? _tray;
@@ -31,8 +32,9 @@ public partial class App
 
         var args = e.Args;
 
-        // Язык можно задать снаружи: снимок на чужом языке — единственный
-        // способ увидеть перевод целиком, а не по строчке (4.0-F08).
+        // The language can be set from outside: a screenshot in another
+        // language is the only way to see the translation whole rather than
+        // line by line (4.0-F08).
         if (Value(args, "--language") is { } language)
             Strings.Loc.Use(language);
 
@@ -42,19 +44,19 @@ public partial class App
         var window = new MainWindow();
         window.ShowFinish(finish);
 
-        // Сквозная самопроверка: поднять настоящее ядро, дождаться связи,
-        // сказать, что получилось, и выйти. Снимок показывает, как окно
-        // выглядит; это показывает, что оно живое.
+        // The end-to-end self-check: raise a real core, wait for the link,
+        // say what came of it, and exit. The screenshot shows what the
+        // window looks like; this shows that it is alive.
         if (args.Contains("--check-core"))
         {
             _shotPath = Value(args, "--shot");
             _shotScroll = double.TryParse(Value(args, "--scroll"), out var down)
                 ? down : 0;
             _shotSection = Value(args, "--section") ?? "settings";
-            // Без окна WPF завершается сам, едва OnStartup вернёт управление:
-            // по умолчанию приложение живёт, пока живо хотя бы одно окно.
-            // Самопроверке окно показывать незачем, поэтому закрываемся мы
-            // сами и только когда закончим.
+            // Without a window WPF shuts down as soon as OnStartup returns
+            // control: by default an application lives while at least one
+            // window lives. The self-check has no reason to show a window,
+            // so we close ourselves, and only when we are done.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = CheckCoreAsync(window);
             return;
@@ -138,8 +140,9 @@ public partial class App
             return;
         }
 
-        // Снимок плавающей строки: она живёт поверх чужих окон, и в снимок
-        // главного окна не попадает вовсе.
+        // A screenshot of the floating bar: it lives on top of other
+        // people's windows and does not get into a screenshot of the main
+        // window at all.
         if (Value(args, "--shot-bar") is { } barShot)
         {
             var bar = new FloatingBar(null);
@@ -154,8 +157,9 @@ public partial class App
             return;
         }
 
-        // Снимок окна подтверждения: проверять вид необратимого, каждый раз
-        // выключая компьютер, — способ не проверять его вовсе.
+        // A screenshot of the confirmation window: checking how something
+        // irreversible looks by shutting the computer down every time is a
+        // way of not checking it at all.
         if (Value(args, "--shot-confirm") is { } confirmShot)
         {
             var ask = new Pages.ConfirmWindow(
@@ -175,22 +179,24 @@ public partial class App
         var shot = Value(args, "--shot");
         if (shot is null)
         {
-            // Ядро поднимается после того, как окно показано, а не до:
-            // человек должен увидеть программу сразу, а не через секунду,
-            // которую тратит чужой процесс на запуск. Состояние связи он
-            // при этом видит с первой же отрисовки (4.0-F12).
+            // The core is raised after the window is shown, not before: a
+            // person must see the program at once rather than a second
+            // later, a second spent by another process on starting up. The
+            // state of the link is visible to them from the very first
+            // draw (4.0-F12).
             window.Show();
 
-            // Трей и хоткеи заводятся до ядра: они принадлежат оболочке и
-            // обязаны работать, даже если ядро не поднялось. Помощник,
-            // которого нельзя вызвать с клавиатуры, потому что упал чужой
-            // процесс, — не помощник.
-            // Окна поверх экрана: реплика и плашка «слушаю». Заводятся до
-            // ядра — они принадлежат оболочке, и плашка обязана появиться,
-            // даже если ядро отвечает медленно.
+            // Windows on top of the screen: the line and the "listening"
+            // plaque. Set up before the core — they belong to the shell,
+            // and the plaque must appear even if the core answers slowly.
             window.Toast = new Overlays.Toast();
             window.Plaque = new Overlays.Listening();
 
+            // The tray and the hotkeys are set up before the core: they
+            // belong to the shell and are obliged to work even if the core
+            // did not come up. An assistant that cannot be summoned from
+            // the keyboard because another process fell over is no
+            // assistant.
             _tray = new Tray(window);
             _tray.ExitRequested += () => Shutdown();
             window.Tray = _tray;
@@ -202,30 +208,33 @@ public partial class App
             _link = new CoreLink(window, CoreLink.FindCore());
             window.Link = _link;
 
-            // Уведомления: то, чего человек не видит, ему говорят. Событие
-            // берётся то же, что рисует окно, — второго источника ответов
-            // Рины быть не должно.
+            // Notifications: what a person cannot see, they are told. The
+            // event taken is the same one the window draws from — there
+            // must not be a second source of Rina's answers.
             _link.CoreEvent += message => OnCoreEventForTray(window, message);
 
             _ = _link.StartAsync();
             _ = ApplySystemSettingsAsync(window);
 
-            // Репетиция трея в настоящем режиме запуска. Проверка --check-tray
-            // идёт при ShutdownMode.OnExplicitShutdown, а живая программа —
-            // при OnLastWindowClose, и разница между ними как раз о том,
-            // выживет ли программа без единого видимого окна.
+            // A rehearsal of the tray in the real startup mode. The
+            // --check-tray check runs under ShutdownMode.OnExplicitShutdown
+            // while the live program runs under OnLastWindowClose, and the
+            // difference between them is exactly about whether the program
+            // survives with no visible window at all.
             if (args.Contains("--rehearse-tray")) Rehearse(window);
             return;
         }
 
-        // Снимок может изображать состояние связи: проверять индикацию,
-        // дожидаясь настоящего обрыва, — способ проверять её редко.
+        // A screenshot may pretend to a state of the link: checking the
+        // indicator by waiting for a real disconnection is a way of
+        // checking it rarely.
         if (Value(args, "--core-state") is { } state)
             window.ShowCoreState(Enum.Parse<Rina.Protocol.CoreState>(state, true),
                                  Value(args, "--core-reason") ?? "");
 
-        // Снимок может показать любой раздел: проверять страницу, каждый
-        // раз щёлкая по колонке руками, — способ проверять её редко.
+        // A screenshot can show any section: checking a page by clicking
+        // through the column by hand every time is a way of checking it
+        // rarely.
         if (Value(args, "--section") is { } section) window.ShowSectionFor(section);
 
         window.Width = 940;
@@ -249,18 +258,7 @@ public partial class App
     private static extern uint GetCurrentThreadId();
 
     /// <summary>
-    /// F05: трей показывает окно обратно, а не роняет программу.
-    /// </summary>
-    /// <remarks>
-    /// Проверяется в первую очередь <b>поток</b>, на котором приходит
-    /// нажатие. Значок трея — это окно, и чьё оно, решает не тот, кто его
-    /// создал, а тот, кто качает его очередь сообщений. Обращение к окну
-    /// WPF с чужого потока — исключение, а исключение в обработчике,
-    /// которого никто не ловит, завершает процесс: программа «выходит по
-    /// нажатию на значок», хотя ничего похожего на выход в коде нет.
-    /// </remarks>
-    /// <summary>
-    /// Спрятать окно и вернуть его — так, как это делает человек.
+    /// Hide the window and bring it back — the way a person does it.
     /// </summary>
     private void Rehearse(MainWindow window)
     {
@@ -305,6 +303,18 @@ public partial class App
         clock.Start();
     }
 
+    /// <summary>
+    /// F05: the tray brings the window back rather than dropping the
+    /// program.
+    /// </summary>
+    /// <remarks>
+    /// What is checked first of all is the <b>thread</b> the click arrives
+    /// on. A tray icon is a window, and whose it is depends not on who
+    /// created it but on who pumps its message queue. Touching a WPF window
+    /// from another thread is an exception, and an exception in a handler
+    /// nobody catches ends the process: the program "quits when the icon is
+    /// clicked", although there is nothing resembling a quit in the code.
+    /// </remarks>
     private async Task CheckTrayAsync(MainWindow window)
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
@@ -347,7 +357,7 @@ public partial class App
         Check("крестик спрятал окно, а не закрыл", !window.IsVisible);
         Check("окно живо и его можно показать снова", window.IsLoaded);
 
-        // Возврат вызывается так же, как из меню значка: тем же методом.
+        // Coming back is called the same way as from the icon's menu: by the same method.
         Exception? died = null;
         try { tray.Show(); }
         catch (Exception error) { died = error; }
@@ -366,8 +376,9 @@ public partial class App
 
     private async Task CheckCoreAsync(MainWindow window)
     {
-        // Вывод в файл буферизуется блоками, и если процесс убьют по сроку,
-        // буфер пропадёт вместе с ответом на вопрос «почему так долго».
+        // Output to a file is buffered in blocks, and if the process is
+        // killed on a deadline the buffer goes along with the answer to
+        // "why is it taking so long".
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
         {
             AutoFlush = true,
@@ -405,15 +416,15 @@ public partial class App
               window.CoreStateTextValue.Contains("ядро"),
               $"| «{window.CoreStateTextValue}»");
 
-        // Отделку оболочка не читает из файла, а спрашивает у ядра.
+        // The shell does not read the finish from a file, it asks the core.
         await Task.Delay(1500);
         Check("отделка получена от ядра",
               window.FinishValue is "silver" or "black",
               $"| {window.FinishValue}");
 
-        // Страницы строятся только в живом дереве, поэтому окно показывается
-        // за краем экрана: проверять страницу, не показав её, значит
-        // проверять конструктор, а не страницу.
+        // Pages are built only inside a live tree, so the window is shown
+        // off the edge of the screen: checking a page without showing it
+        // means checking a constructor rather than a page.
         window.Left = -4000;
         window.Top = -4000;
         window.Show();
@@ -429,11 +440,13 @@ public partial class App
               settings is { KeyCount: > 20 },
               $"| {settings?.KeyCount}");
 
-        // Ширину задаёт колонка, а не орган. По снимку это не померить:
-        // правый край колонки не граница цвета — у ряда с путём справа
-        // кнопка, у ползунка число, и заливка кончается раньше колонки.
-        // Меряем дерево. Поймано было человеком со скриншотами: поле пути
-        // 200, список 280, ползунок 276 — край гулял на восемьдесят точек.
+        // The width is set by the column, not by the control. A screenshot
+        // cannot measure that: the column's right edge is not a colour
+        // boundary — the path row has a button on the right, the slider has
+        // a number, and the fill ends before the column does. We measure
+        // the tree. It was caught by a person with screenshots: the path
+        // field 200, the list 280, the slider 276 — the edge wandered by
+        // eighty points.
         if (settings is not null)
         {
             var widths = settings.ControlWidths();
@@ -445,9 +458,10 @@ public partial class App
                                   : $"| {string.Join(", ", odd)}");
         }
 
-        // Раскрытый список проверяется отдельно: всплывающее окно — своё
-        // окно, в снимок главного оно не попадает вовсе, и сломанный
-        // шаблон остался бы незамеченным ровно там, где он написан руками.
+        // An opened list is checked separately: a popup is a window of its
+        // own, it does not get into a screenshot of the main one at all,
+        // and a broken template would go unnoticed exactly where it is
+        // written by hand.
         if (settings?.FirstChoice() is { } choice)
         {
             choice.IsDropDownOpen = true;
@@ -471,10 +485,10 @@ public partial class App
         Check("страница команд открылась",
               window.CurrentPage is Pages.CommandsPage);
 
-        // Плагины: последняя страница, остававшаяся заглушкой. Проверяется
-        // весь круг — список, включение, своя страница плагина и действие
-        // на ней, — потому что каждое звено здесь пересекает границу
-        // процессов, и «список пришёл» ещё ничего не значит.
+        // Plugins: the last page that was still a stub. The whole round is
+        // checked — the list, switching on, the plugin's own page and an
+        // action on it — because every link here crosses the process
+        // boundary, and "the list arrived" does not mean anything yet.
         window.ShowSectionFor("plugins");
         await Task.Delay(1500);
         if (window.CurrentPage is Pages.PluginsPage plugins)
@@ -484,9 +498,9 @@ public partial class App
             Check("плагины пришли из ядра", plugins.PluginCount > 0,
                   $"| {plugins.PluginCount}");
 
-            // Что было включено до нас. Проверка идёт на настоящем ядре,
-            // то есть на настройках человека, и оставить после себя
-            // включённый плагин права не имеет.
+            // What was switched on before us. The check runs against a
+            // real core, that is, against a person's settings, and it has
+            // no right to leave a plugin switched on behind it.
             var before = await plugins.EnabledAsync();
 
             var drawn = await plugins.OpenFirstPageAsync();
@@ -494,9 +508,9 @@ public partial class App
                   $"| элементов {drawn}");
 
             var after = await plugins.EnabledAsync();
-            // Раздел плагина в колонке (замечание человека): «я этим
-            // пользуюсь» — это место слева, а не карточка в списке
-            // установленного.
+            // The plugin's section in the column (noted by a person): "I
+            // use this" is a place on the left, not a card in a list of
+            // what is installed.
             await link.RefreshPluginSectionsAsync();
             await Task.Delay(400);
             Check("у плагина со страницей есть свой раздел",
@@ -510,16 +524,17 @@ public partial class App
         }
         else Check("страница плагинов открылась", false);
 
-        // Снимок живого окна, если попросили: настройки с настоящими
-        // значениями от настоящего ядра — единственный способ увидеть, как
-        // это выглядит на самом деле, а не как выглядит пустая страница.
+        // A screenshot of the live window, if asked for: settings with
+        // real values from a real core are the only way to see how this
+        // actually looks rather than how an empty page looks.
         if (_shotPath is { } shot)
         {
             window.ShowSectionFor(_shotSection);
             await Task.Delay(800);
-            // Страница плагина рисуется по описанию из другого процесса, и
-            // увидеть её глазами можно только раскрыв: снимок пустого
-            // списка не показывает ни карточек, ни рядов.
+            // A plugin's page is drawn from a description sent by another
+            // process, and it can only be seen with one's eyes by opening
+            // it: a screenshot of an empty list shows neither cards nor
+            // rows.
             Pages.PluginsPage? shown = null;
             if (_shotSection == "plugins"
                 && window.CurrentPage is Pages.PluginsPage opened)
@@ -535,9 +550,9 @@ public partial class App
             }
             Save(window, shot);
 
-            // И вернуть как было. Снимок — наблюдение, а не действие:
-            // оставить после себя включённый плагин он права не имеет,
-            // потому что настройки под ним настоящие, человеческие.
+            // And put things back. A screenshot is an observation, not an
+            // action: it has no right to leave a plugin switched on behind
+            // it, because the settings under it are real, a person's own.
             if (shown is not null) await shown.RestoreAsync();
         }
 
@@ -551,13 +566,14 @@ public partial class App
     }
 
     /// <summary>
-    /// F09/F10: звук ходит в ядро и обратно, кредит соблюдается.
+    /// F09/F10: sound travels to the core and back, the credit is honoured.
     /// </summary>
     /// <remarks>
-    /// Часть проверок не трогает устройство вовсе: путь звука один и тот же,
-    /// приходит он с микрофона или из генератора, и проверять надо путь.
-    /// Иначе набор не запустится на машине без микрофона — то есть на любом
-    /// сервере сборки.
+    /// Part of the checks does not touch a device at all: the sound's path
+    /// is one and the same whether it comes from a microphone or from a
+    /// generator, and it is the path that has to be checked. Otherwise the
+    /// suite will not run on a machine without a microphone — that is, on
+    /// any build server.
     /// </remarks>
     private async Task CheckAudioAsync()
     {
@@ -579,7 +595,7 @@ public partial class App
         Console.WriteLine($"      устройств записи: {devices.Count}"
             + (devices.Count > 0 ? $" — {devices[0].Name}" : ""));
 
-        // --- F10: очередь и прерывание. Ядра для этого не нужно. ---
+        // --- F10: the queue and interruption. No core is needed for this. ---
         var speaker = new Audio.Speaker();
         var speaking = new List<bool>();
         speaker.Speaking += value => speaking.Add(value);
@@ -598,7 +614,7 @@ public partial class App
               speaking.Count >= 2 && speaking[^1] is false,
               "| " + string.Join(" -> ", speaking));
 
-        // --- «не слушать себя»: заглушка, а не остановка устройства ---
+        // --- "do not listen to oneself": muting, not stopping the device ---
         var microphone = new Audio.Microphone();
         speaker.Speaking += value => microphone.Muted = value;
         speaker.Enqueue(tone);
@@ -607,13 +623,13 @@ public partial class App
         Check("после речи слушает снова", !microphone.Muted);
         speaker.Dispose();
 
-        // --- уровень: тишина и звук различаются ---
+        // --- level: silence and sound differ ---
         Check("тишина даёт ноль",
               Audio.Microphone.LevelOf(new byte[3200]) < 0.01f);
         var loud = Audio.Microphone.LevelOf(tone);
         Check("звук даёт заметный уровень", loud > 0.3f, $"| {loud:0.00}");
 
-        // --- F09: поток в настоящее ядро с кредитом ---
+        // --- F09: a stream into a real core with credit ---
         var link = new CoreLink(new MainWindow(), CoreLink.FindCore());
         await link.StartAsync();
         for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
@@ -625,8 +641,9 @@ public partial class App
         {
             using var audio = new Audio.AudioLink(connection, connection.Data,
                                                   microphone, new Audio.Speaker());
-            // Устройство не включаем: иначе в поток пойдёт и настоящий
-            // звук из комнаты, и проверка будет считать чужое.
+            // We do not switch the device on: otherwise real sound from
+            // the room would go into the stream too, and the check would be
+            // counting somebody else's.
             var opened = await audio.StartCaptureAsync(listen: false);
             Check("ядро приняло поток микрофона", opened);
             Check("первый кредит выдан вместе с согласием", audio.Credit > 0,
@@ -662,14 +679,15 @@ public partial class App
     }
 
     /// <summary>
-    /// Реплика и плашка «слушаю» поверх экрана.
+    /// The line and the "listening" plaque on top of the screen.
     /// </summary>
     /// <remarks>
-    /// Проверяется поведение, а не картинка: реплика не показывается при
-    /// открытом окне, плашка не гаснет от `listening.stopped`, пока включён
-    /// режим «всегда слушаю». Оба правила легко нарушить правкой и
-    /// невозможно заметить глазами — плашка гаснет через час работы, а
-    /// лишняя реплика видна только тому, у кого окно открыто.
+    /// What is checked is behaviour, not a picture: the line is not shown
+    /// while the window is open, the plaque does not go out on
+    /// `listening.stopped` while the "always listening" mode is on. Both
+    /// rules are easy to break with a change and impossible to notice by
+    /// eye — the plaque goes out after an hour of work, and a superfluous
+    /// line is seen only by someone with the window open.
     /// </remarks>
     private async Task CheckOverlaysAsync(MainWindow window, string? shot)
     {
@@ -702,7 +720,7 @@ public partial class App
                 Version = 1,
             };
 
-        // Окно спрятано: реплику человек иначе не увидит.
+        // The window is hidden: otherwise the person will not see the line.
         window.Hide();
         window.OnCoreEvent(Event("assistant.response",
             new System.Text.Json.Nodes.JsonObject { ["text"] = "Сейчас 14:30." }));
@@ -711,7 +729,7 @@ public partial class App
               window.Toast.Shown == "Сейчас 14:30.",
               $"| {window.Toast.Shown}");
 
-        // Окно открыто: ответ уже перед человеком.
+        // The window is open: the answer is already in front of the person.
         window.Show();
         await Task.Delay(200);
         window.Toast.Dismiss();
@@ -724,7 +742,7 @@ public partial class App
               $"| {window.Toast.Shown}");
         window.Hide();
 
-        // Плашка: разовое слушание.
+        // The plaque: one-off listening.
         window.OnCoreEvent(Event("listening.started",
             new System.Text.Json.Nodes.JsonObject()));
         await Task.Delay(300);
@@ -738,7 +756,7 @@ public partial class App
         await Task.Delay(400);
         Check("и ушла, когда слушать перестали", !window.Plaque.Visible);
 
-        // Плашка: режим.
+        // The plaque: the mode.
         window.OnCoreEvent(Event("listening.always",
             new System.Text.Json.Nodes.JsonObject { ["enabled"] = true }));
         await Task.Delay(300);
@@ -748,7 +766,7 @@ public partial class App
               window.Plaque.Caption.Contains("Всегда"),
               $"| {window.Plaque.Caption}");
 
-        // Вот это и есть главное: распознанная фраза не гасит режим.
+        // This is the main thing: a recognised phrase does not put the mode out.
         window.OnCoreEvent(Event("listening.stopped",
             new System.Text.Json.Nodes.JsonObject()));
         await Task.Delay(400);
@@ -760,7 +778,7 @@ public partial class App
         await Task.Delay(400);
         Check("отмена режима убирает плашку", !window.Plaque.Visible);
 
-        // Снимок, если попросили: реплика и плашка вместе.
+        // A screenshot, if asked for: the line and the plaque together.
         if (shot is not null)
         {
             window.Toast.Say("Запускаю Visual Studio Code.");
@@ -779,19 +797,19 @@ public partial class App
     }
 
     /// <summary>
-    /// U02..U05: метаданные, четыре сценария, целостность, журнал.
+    /// U02..U05: the metadata, four scenarios, integrity, the journal.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Источник подменён (<see cref="Update.Fake"/>). На настоящем GitHub
-    /// проверить это нельзя: там сегодня одно, завтра другое, а из шести
-    /// исходов пять требуют релиза, которого не существует, — например
-    /// пары, которая не поздоровается.
+    /// The source is substituted (<see cref="Update.Fake"/>). On the real
+    /// GitHub this cannot be checked: there it is one thing today and
+    /// another tomorrow, and five of the six outcomes need a release that
+    /// does not exist — for instance a pair that will not say hello.
     /// </para>
     /// <para>
-    /// Сеть при этом не трогается ни разу, и это тоже проверяется: клиент
-    /// обновлений, случайно сходивший наружу в проверке, однажды сходит
-    /// наружу там, где не звали.
+    /// The network is not touched even once, and that is checked too: an
+    /// update client that went outside by accident during a check will one
+    /// day go outside where it was not invited.
     /// </para>
     /// </remarks>
     private async Task CheckUpdatesAsync()
@@ -891,9 +909,10 @@ public partial class App
         var log = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "RinaAssistant", "logs", "security.log");
-        // Читаем, не мешая писать: журнал открыт на дозапись, и обычное
-        // чтение спотыкается о разделяемый доступ. Проверка, падающая от
-        // того, что журнал в этот момент пишут, проверяет не журнал.
+        // We read without getting in the way of writing: the journal is
+        // open for appending, and an ordinary read trips over the shared
+        // access. A check that falls over because the journal is being
+        // written to at that moment is not checking the journal.
         var written = "";
         try
         {
@@ -919,8 +938,9 @@ public partial class App
         }
         catch (Exception error)
         {
-            // Иначе окно висит до убийства извне: режим живёт до явного
-            // завершения, и необработанное исключение его не завершает.
+            // Otherwise the window hangs until it is killed from outside:
+            // the mode lives until an explicit shutdown, and an unhandled
+            // exception does not end it.
             fails++;
             Console.WriteLine($"  СБОЙ  {error.GetType().Name}: {error.Message}");
         }
@@ -931,7 +951,7 @@ public partial class App
         Shutdown();
     }
 
-    /// <summary>Метаданные с заданными версиями частей.</summary>
+    /// <summary>Metadata with the given versions of the parts.</summary>
     private static string Manifest(string shell, string core,
                                    string shellProtocol, string coreProtocol,
                                    int schema) =>
@@ -943,7 +963,7 @@ public partial class App
         + $"\"url\": \"https://x/core.zip\", \"sha256\": \"bb\", "
         + $"\"protocol\": {coreProtocol}, \"data_schema\": {schema}}}}}}}";
 
-    /// <summary>Спросить клиента об этих метаданных.</summary>
+    /// <summary>Ask the client about this metadata.</summary>
     private static async Task<Update.Found> Ask(string manifest)
     {
         var fake = new Update.Fake()
@@ -954,7 +974,7 @@ public partial class App
         return await updater.CheckAsync("4.0.0", "4.0.0", dataSchema: 2);
     }
 
-    /// <summary>Скачать заданное содержимое под заданный хэш.</summary>
+    /// <summary>Download the given content under the given hash.</summary>
     private static async Task<(bool Ok, string Path, string Problem)> Download(
         byte[] payload, string sha256)
     {
@@ -976,18 +996,19 @@ public partial class App
     private static extern bool GetCursorPos(out System.Drawing.Point point);
 
     /// <summary>
-    /// Наводка на строку списка: подсвечена одна, и гаснет, когда ушли.
+    /// Hovering over a list row: one is highlighted, and it goes out when
+    /// the cursor leaves.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Курсор двигается по-настоящему: `IsMouseOver` только читается, его
-    /// выставляет попадание курсора, и ни снимком, ни вызовом метода это
-    /// не проверяется.
+    /// The cursor moves for real: `IsMouseOver` is only read, it is set by
+    /// the cursor actually landing there, and neither a screenshot nor a
+    /// method call checks that.
     /// </para>
     /// <para>
-    /// <b>И возвращается туда, где был.</b> Проверка не имеет права
-    /// оставить чужую мышь в углу экрана — то же правило, по которому
-    /// проверка автозапуска возвращает запись в реестре.
+    /// <b>And it goes back where it was.</b> A check has no right to leave
+    /// somebody else's mouse in the corner of the screen — the same rule by
+    /// which the autostart check puts the registry entry back.
     /// </para>
     /// </remarks>
     private async Task CheckHoverAsync(MainWindow window)
@@ -1012,15 +1033,17 @@ public partial class App
             window.WindowStartupLocation = WindowStartupLocation.Manual;
             window.Left = 40;
             window.Top = 40;
-            // Поверх всех и с фокусом: `Synchronize` определяет, над чем
-            // курсор, попаданием в **видимое** окно, и чужое окно сверху
-            // делало проверку то зелёной, то красной без единой правки.
+            // On top of everything and focused: `Synchronize` works out
+            // what the cursor is over by landing in a **visible** window,
+            // and somebody else's window on top made the check now green,
+            // now red without a single change.
             window.Topmost = true;
             window.Show();
             window.Activate();
 
-            // Со своим ядром: страница команд без связи показывает «ядро
-            // не на связи» и ни одной строки — проверять было бы нечего.
+            // With a core of its own: without a link the commands page
+            // shows "the core is not connected" and not a single row —
+            // there would be nothing to check.
             var real = CoreLink.FindCore();
             var link = new CoreLink(window, new Rina.Protocol.CoreLaunch(
                 real.Python,
@@ -1041,9 +1064,10 @@ public partial class App
                   $"| {rows.Length}");
             if (rows.Length < 2)
             {
-                // Не `return`: режим живёт до явного завершения, и выход
-                // отсюда оставил бы окно висеть навсегда. Так и вышло с
-                // первой редакцией этой проверки.
+                // Not `return`: the mode lives until an explicit shutdown,
+                // and leaving here would have left the window hanging
+                // forever. Which is what happened with the first edition of
+                // this check.
                 Console.WriteLine();
                 Console.WriteLine($"Ошибок: {fails}");
                 Environment.ExitCode = 1;
@@ -1071,17 +1095,18 @@ public partial class App
             Check("ушли — погасло", Lit(rows[1]) < 0.1,
                   $"| {Lit(rows[1]):0.00}");
 
-            // --- варианты раскрытого списка ---------------------------
+            // --- options of an opened list ----------------------------
             Console.WriteLine();
             Console.WriteLine("=== движение: наводка на вариант списка ===");
 
             window.ShowSectionFor("settings");
             await Task.Delay(2500);
 
-            // Страница настроек собирается по проводу: схема, значения и
-            // списки вариантов — три отдельных ответа ядра. Ждём, пока
-            // появятся варианты, а не фиксированное время: на медленной
-            // машине фиксированного всегда не хватит.
+            // The settings page is assembled over the wire: the schema,
+            // the values and the option lists are three separate answers
+            // from the core. We wait for the options to appear rather than
+            // for a fixed time: on a slow machine a fixed one is never
+            // enough.
             System.Windows.Controls.ComboBox? choice = null;
             for (var i = 0; i < 60 && choice is null; i++)
             {
@@ -1113,11 +1138,11 @@ public partial class App
                 Check("у каждого варианта своя кисть",
                       !ReferenceEquals(Warm(options[0]), Warm(options[1])));
 
-                // Главная проверка, и она не про движение. Прозрачность
-                // может честно уезжать в единицу, а видно не будет
-                // ничего, если цвет подсветки равен цвету подложки —
-                // именно так и было: анимация шла, проверка зеленела,
-                // человек не видел наводки.
+                // The main check, and it is not about movement. Opacity
+                // may honestly travel to one and nothing will be visible if
+                // the highlight colour equals the colour underneath — which
+                // is exactly how it was: the animation ran, the check went
+                // green, the person saw no hover.
                 var under = Surface(options[0]);
                 var over = (Warm(options[0]) as
                             System.Windows.Media.SolidColorBrush)?.Color;
@@ -1150,7 +1175,7 @@ public partial class App
         Shutdown();
     }
 
-    /// <summary>Выпадающие списки страницы в порядке появления.</summary>
+    /// <summary>The page's dropdowns in order of appearance.</summary>
     private static IEnumerable<System.Windows.Controls.ComboBox> Boxes(
         DependencyObject root)
     {
@@ -1162,13 +1187,13 @@ public partial class App
         }
     }
 
-    /// <summary>Кисть подсветки варианта: она у каждого своя.</summary>
+    /// <summary>An option's highlight brush: each has one of its own.</summary>
     private static System.Windows.Media.Brush? Warm(
         System.Windows.Controls.ComboBoxItem option)
         => (option.Template?.FindName("Row", option)
             as System.Windows.Controls.Border)?.Background;
 
-    /// <summary>Прочитать журнал, не мешая тому, кто в него пишет.</summary>
+    /// <summary>Read the journal without getting in the way of whoever writes to it.</summary>
     private static string Journal(string path)
     {
         try
@@ -1185,7 +1210,7 @@ public partial class App
         }
     }
 
-    /// <summary>На чём лежит вариант: цвет ближайшей залитой подложки.</summary>
+    /// <summary>What an option lies on: the colour of the nearest filled surface.</summary>
     private static System.Windows.Media.Color? Surface(DependencyObject item)
     {
         for (var node = System.Windows.Media.VisualTreeHelper.GetParent(item);
@@ -1200,16 +1225,16 @@ public partial class App
         return null;
     }
 
-    /// <summary>Насколько два цвета различимы: сумма расхождений каналов.</summary>
+    /// <summary>How distinguishable two colours are: the sum of the channel differences.</summary>
     private static int Apart(System.Windows.Media.Color a,
                              System.Windows.Media.Color b)
         => Math.Abs(a.R - b.R) + Math.Abs(a.G - b.G) + Math.Abs(a.B - b.B);
 
-    /// <summary>Насколько вариант подсвечен сейчас.</summary>
+    /// <summary>How brightly an option is lit right now.</summary>
     private static double Glow(System.Windows.Controls.ComboBoxItem option)
         => (Warm(option) as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
 
-    /// <summary>Навести курсор в середину варианта.</summary>
+    /// <summary>Move the cursor to the middle of an option.</summary>
     private static async Task HoverAsync(
         System.Windows.Controls.ComboBoxItem option)
     {
@@ -1220,26 +1245,26 @@ public partial class App
         await Task.Delay(500);
     }
 
-    /// <summary>Насколько строка подсвечена сейчас.</summary>
+    /// <summary>How brightly a row is lit right now.</summary>
     private static double Lit(System.Windows.Controls.Border row)
         => (row.Background as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
 
-    /// <summary>Навести курсор в середину строки и дать движению пройти.</summary>
+    /// <summary>Move the cursor to the middle of a row and let the motion run.</summary>
     private static async Task HoverAsync(System.Windows.Controls.Border row)
     {
         var middle = row.PointToScreen(new Point(row.ActualWidth / 2,
                                                  row.ActualHeight / 2));
         SetCursorPos((int)middle.X, (int)middle.Y);
 
-        // Одного `SetCursorPos` мало: WPF узнаёт о положении курсора из
-        // сообщений ввода, а телепортация их не порождает — окно так и
-        // считало, что мышь не над ним. `Synchronize` заставляет заново
-        // определить, над чем курсор сейчас.
+        // `SetCursorPos` alone is not enough: WPF learns the cursor's
+        // position from input messages, and teleporting produces none — the
+        // window went on believing the mouse was not over it.
+        // `Synchronize` makes it work out afresh what the cursor is over.
         System.Windows.Input.Mouse.Synchronize();
         await Task.Delay(500);
     }
 
-    /// <summary>Строки списка в порядке появления.</summary>
+    /// <summary>The list's rows in order of appearance.</summary>
     private static IEnumerable<System.Windows.Controls.Border> Rows(
         DependencyObject root)
     {
@@ -1261,7 +1286,7 @@ public partial class App
     }
 
     /// <summary>
-    /// Движение видно во времени, а не на снимке.
+    /// Motion is visible in time, not in a screenshot.
     /// </summary>
     private async Task CheckMotionAsync(MainWindow window)
     {
@@ -1284,10 +1309,10 @@ public partial class App
 
         window.ShowSectionFor("commands");
 
-        // Меряем не мгновенно, а в середине хода. До первого такта часов
-        // анимации свойство отдаёт базовое значение, и мгновенное чтение
-        // показало бы единицу даже при исправной анимации — проверка
-        // соврала бы в обе стороны.
+        // We measure mid-flight rather than instantly. Before the
+        // animation clock's first tick the property gives back its base
+        // value, and an instant read would show one even with a working
+        // animation — the check would lie in both directions.
         await Task.Delay(80);
         var midway = window.PaneOpacity;
         var rise = window.PaneRise;
@@ -1303,11 +1328,12 @@ public partial class App
         Check("и доехала", Math.Abs(window.PaneRise) < 0.01,
               $"| смещение {window.PaneRise:0.00}");
 
-        // Второй переход — отдельная проверка, и не для полноты. Анимация
-        // завершается с `HoldEnd`, то есть продолжает удерживать единицу
-        // после конца. Без явного `From` следующая начиналась бы с
-        // удерживаемого значения, и дипа не было бы: первый переход после
-        // запуска виден, все следующие — нет.
+        // The second transition is a separate check, and not for
+        // completeness. The animation finishes with `HoldEnd`, that is, it
+        // goes on holding one after the end. Without an explicit `From` the
+        // next one would start from the held value and there would be no
+        // dip: the first transition after startup is visible, every later
+        // one is not.
         window.ShowSectionFor("reminders");
         await Task.Delay(80);
         var second = window.PaneOpacity;
@@ -1329,18 +1355,18 @@ public partial class App
     }
 
     /// <summary>
-    /// F11: у вопроса есть срок, но не у всякого.
+    /// F11: a question has a deadline, but not every question does.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Поймано человеком, а не проверкой: «Сбросить настройки» открывало
-    /// окно, которое пропадало раньше, чем его успевали прочесть.
-    /// Переданный ноль означал «без срока», а конструктор превращал его в
-    /// одну секунду.
+    /// Caught by a person, not by a check: "Reset settings" opened a window
+    /// that vanished before it could be read. The zero that was passed
+    /// meant "no deadline", and the constructor turned it into one second.
     /// </para>
     /// <para>
-    /// Снимок такое не ловит — на снимке окно правильное. Ловится только
-    /// временем: подождать и посмотреть, здесь ли оно ещё.
+    /// A screenshot does not catch such a thing — in a screenshot the
+    /// window is right. It is caught only by time: wait and see whether it
+    /// is still there.
     /// </para>
     /// </remarks>
     private async Task CheckConfirmAsync()
@@ -1358,7 +1384,7 @@ public partial class App
 
         Console.WriteLine("=== F11: срок у вопроса ===");
 
-        // Вопрос, который человек открыл сам: срока нет.
+        // A question the person opened themselves: there is no deadline.
         var mine = new Pages.ConfirmWindow("Настройки вернутся к умолчанию.",
                                            "Команды останутся.", 0);
         mine.Left = -4000;
@@ -1375,7 +1401,7 @@ public partial class App
               mine.Result == Pages.Consent.Refused, $"| {mine.Result}");
         mine.Close();
 
-        // Вопрос от ядра: срок есть, и по нему окно закрывается само.
+        // A question from the core: there is a deadline, and the window closes itself on it.
         var theirs = new Pages.ConfirmWindow("Компьютер будет выключен.",
                                              "Сказано голосом", 2);
         theirs.Left = -4000;
@@ -1397,19 +1423,19 @@ public partial class App
     }
 
     /// <summary>
-    /// G01..G12: системный слой оболочки.
+    /// G01..G12: the shell's system layer.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Проверяется то, что <b>не</b> должно случиться, наравне с тем, что
-    /// должно: «Загрузки» не попадают в индекс, junction наружу не проходит
-    /// проверку доверия, неподписанное не запускается молча. Правило, за
-    /// которым никто не следит, держится ровно до первой правки.
+    /// What <b>must not</b> happen is checked alongside what must:
+    /// "Downloads" does not get into the index, a junction pointing outside
+    /// does not pass the trust check, something unsigned is not launched in
+    /// silence. A rule nobody watches holds exactly until the first change.
     /// </para>
     /// <para>
-    /// Ничего необратимого проверка не делает: питание и блокировка есть в
-    /// таблице действий, но здесь не вызываются — проверка, выключающая
-    /// компьютер, запускается один раз.
+    /// The check does nothing irreversible: power and locking are in the
+    /// table of actions but are not called here — a check that shuts the
+    /// computer down gets run once.
     /// </para>
     /// </remarks>
     private Task CheckPlatformAsync()
@@ -1427,7 +1453,7 @@ public partial class App
 
         Console.WriteLine("=== G: системный слой оболочки ===");
 
-        // --- запреты (G08) ---
+        // --- prohibitions (G08) ---
         var downloads = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             "Downloads", "что-нибудь.exe");
@@ -1444,16 +1470,16 @@ public partial class App
               !Platform.AppIndex.Forbidden(
                   @"C:\Windows\System32\notepad.exe"));
 
-        // --- канонический путь (G11) ---
+        // --- the canonical path (G11) ---
         var link = Path.Combine(Path.GetTempPath(), "rina-check-link");
         var outside = Environment.GetFolderPath(
             Environment.SpecialFolder.UserProfile);
         try
         {
             if (Directory.Exists(link)) Directory.Delete(link);
-            // Junction, а не symlink: symlink требует прав, а junction —
-            // нет, и в G11 назван именно он. Создаётся тем же `mklink`,
-            // которым его создал бы человек.
+            // A junction, not a symlink: a symlink needs privileges and a
+            // junction does not, and G11 names precisely the latter. It is
+            // created with the same `mklink` a person would create it with.
             var made = global::System.Diagnostics.Process.Start(
                 new global::System.Diagnostics.ProcessStartInfo
                 {
@@ -1488,7 +1514,7 @@ public partial class App
               Platform.AppIndex.Canonical("").Length == 0
               && Platform.AppIndex.Forbidden(""));
 
-        // --- подпись (G09) ---
+        // --- the signature (G09) ---
         var signed = @"C:\Windows\System32\notepad.exe";
         Check("системная программа подписана",
               Platform.AppEntry.HasSignature(signed),
@@ -1508,7 +1534,7 @@ public partial class App
             try { File.Delete(unsigned); } catch { }
         }
 
-        // --- индекс (G04) ---
+        // --- the index (G04) ---
         var index = Platform.AppIndex.Get(refresh: true);
         Check("индекс собрался", index.Count > 0, $"| записей {index.Count}");
         Check("у каждой записи есть источник",
@@ -1522,7 +1548,7 @@ public partial class App
         Check("подпись проверена у файлов, а не у пакетов",
               index.Any(e => e.Kind == "file" && e.Signed));
 
-        // --- действия (G01) ---
+        // --- actions (G01) ---
         Check("таблица действий закрыта и названа",
               Platform.Machine.Actions.Length >= 10
               && Platform.Machine.Do("сделай-что-нибудь") is { Ok: false },
@@ -1531,11 +1557,12 @@ public partial class App
               Platform.Machine.Irreversible.Contains("shutdown")
               && !Platform.Machine.Irreversible.Contains("volume_up"));
 
-        // --- журнал (G12) ---
-        // Раньше здесь проверялось поведение, но не запись. А запись не
-        // работала вовсе: журнал открывался без права другим писать, тот
-        // же файл держало ядро, и строки оболочки не появлялись никогда.
-        // Исключение при этом проглатывалось — молча.
+        // --- the journal (G12) ---
+        // What used to be checked here was behaviour but not writing. And
+        // writing did not work at all: the journal was opened without
+        // letting others write, the core held the same file, and the
+        // shell's lines never appeared. The exception was swallowed —
+        // in silence.
         var mark = $"проверка-{Guid.NewGuid():N}"[..24];
         Platform.Journal.Action(mark, ok: true);
         Check("запись в журнал доходит до файла",
@@ -1550,12 +1577,13 @@ public partial class App
     }
 
     /// <summary>
-    /// F04: команду и напоминание заводят из окна.
+    /// F04: a command and a reminder are set up from the window.
     /// </summary>
     /// <remarks>
-    /// Ядро под песочницей: проверка заводит настоящие записи, и хранилище
-    /// человека для этого не трогают. Именно поэтому проверка и возможна —
-    /// «завести» иначе означало бы оставить след в чужих данных.
+    /// The core runs sandboxed: the check creates real records, and a
+    /// person's store is not touched for that. That is exactly why the
+    /// check is possible — "set up" would otherwise mean leaving a trace in
+    /// somebody else's data.
     /// </remarks>
     private async Task CheckPagesAsync(MainWindow window)
     {
@@ -1584,7 +1612,7 @@ public partial class App
         Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
               $"| {link.State}");
 
-        // --- команды ---
+        // --- commands ---
         window.ShowSectionFor("commands");
         await Task.Delay(1200);
         if (window.CurrentPage is Pages.CommandsPage commands)
@@ -1601,9 +1629,8 @@ public partial class App
                   commands.CommandCount == before + 1,
                   $"| {commands.CommandCount}");
 
-            // Последовательность — то, что раньше можно было только
-            // импортировать. Проверяется весь путь: вид, шаги, порядок,
-            // сохранение.
+            // A sequence is what used to be importable only. The whole
+            // path is checked: the kind, the steps, the order, saving.
             var was = commands.CommandCount;
             await commands.OpenEditorAsync(null);
             var built = commands.Editor?.BuildSequenceForCheck(
@@ -1619,9 +1646,9 @@ public partial class App
             Check("шаги дошли до ядра в том же порядке",
                   commands.StepsOfLastSaved() == "app, system, speak",
                   $"| {commands.StepsOfLastSaved()}");
-            // Страница строится заново: описание обязано быть человеческим
-            // на первой же отрисовке, а не после того, как что-то успело
-            // подгрузить виды по дороге.
+            // The page is built afresh: the description must be human on
+            // the very first draw, not after something has managed to load
+            // the kinds along the way.
             window.ShowSectionFor("dialog");
             await Task.Delay(300);
             window.ShowSectionFor("commands");
@@ -1633,7 +1660,7 @@ public partial class App
         }
         else Check("страница команд открылась", false);
 
-        // --- напоминания ---
+        // --- reminders ---
         window.ShowSectionFor("reminders");
         await Task.Delay(1200);
         if (window.CurrentPage is Pages.RemindersPage reminders)
@@ -1648,8 +1675,9 @@ public partial class App
         }
         else Check("страница напоминаний открылась", false);
 
-        // Снимок с настоящими записями: пустая страница и страница с одной
-        // командой выглядят по-разному, и проверять стоит вторую.
+        // A screenshot with real records: an empty page and a page with
+        // one command look different, and it is the second one worth
+        // checking.
         if (Value(Environment.GetCommandLineArgs(), "--shot") is { } shot)
         {
             window.ShowSectionFor(_shotSection);
@@ -1666,18 +1694,18 @@ public partial class App
     }
 
     /// <summary>
-    /// E04 + F10: ядро синтезирует, оболочка воспроизводит.
+    /// E04 + F10: the core synthesises, the shell plays.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Проверка сквозная и <b>звучит вслух</b>: только так видно, что путь
-    /// цел от текста до динамика. Каждое звено в отдельности было исправно,
-    /// а Рина молчала — синтез умел один Piper, а канал речи в живой
-    /// программе не читал никто.
+    /// The check is end-to-end and <b>sounds out loud</b>: only that way is
+    /// it visible that the path is whole from text to speaker. Every link
+    /// on its own was in order, and Rina was silent — synthesis could do
+    /// Piper alone, and in the live program nobody read the speech channel.
     /// </para>
     /// <para>
-    /// Ядро поднимается под песочницей, потому что проверке нужно сменить
-    /// движок синтеза: настройки человека для этого не трогают.
+    /// The core is raised sandboxed, because the check needs to change the
+    /// synthesis engine: a person's settings are not touched for that.
     /// </para>
     /// </remarks>
     private async Task CheckVoiceAsync(MainWindow window)
@@ -1708,14 +1736,15 @@ public partial class App
         Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
               $"| {link.State}");
 
-        // Связь возникает в чужом потоке, а звук заводится в потоке окна:
-        // между «Ready» и «есть чем играть» лежит одна очередь сообщений.
+        // The link comes up in another thread while sound is set up in the
+        // window's thread: between "Ready" and "there is something to play
+        // with" lies one message queue.
         for (var i = 0; i < 50 && link.Voice is null; i++) await Task.Delay(100);
         Check("звук заведён вместе со связью", link.Voice is not null);
 
         if (link.Connection is { Ready: true } connection && link.Voice is { } voice)
         {
-            // Системный синтез: он есть на всякой Windows и не ходит в сеть.
+            // System synthesis: it exists on every Windows and does not go to the network.
             var told = await connection.CallAsync(Rina.Protocol.Methods.SettingsSet,
                 new JsonObject
                 {
@@ -1740,9 +1769,9 @@ public partial class App
             Check("речь пришла из ядра в оболочку", voice.Received > 0,
                   $"| {voice.Received} Б");
 
-            // Слышно ли это на самом деле, машина сказать не может; но
-            // очередь динамика — то место, откуда звук уже никуда не
-            // денется, кроме как в устройство.
+            // Whether this is actually audible a machine cannot say; but
+            // the speaker's queue is the place from which sound goes
+            // nowhere except into the device.
             await Task.Delay(300);
             Check("динамик получил речь",
                   voice.Received > 0 && voice.Pending >= 0,
@@ -1762,12 +1791,12 @@ public partial class App
     }
 
     /// <summary>
-    /// F05/F06: трей, автозапуск, сочетания клавиш.
+    /// F05/F06: the tray, autostart, hotkeys.
     /// </summary>
     /// <remarks>
-    /// Автозапуск проверяется на настоящем реестре, но **возвращается как
-    /// было**: проверка не имеет права оставить после себя запись в
-    /// автозагрузке пользователя.
+    /// Autostart is checked against the real registry, but is **put back as
+    /// it was**: a check has no right to leave an entry in the user's
+    /// startup behind it.
     /// </remarks>
     private Task CheckSystemAsync(MainWindow window)
     {
@@ -1785,7 +1814,7 @@ public partial class App
 
         Console.WriteLine("=== F05/F06: трей, автозапуск, сочетания ===");
 
-        // --- F06: разбор сочетаний ---
+        // --- F06: parsing hotkeys ---
         Check("обычное сочетание разбирается",
               Hotkeys.TryParse("Ctrl+Shift+R", out var mods, out var key)
               && key != 0 && mods.HasFlag(Hotkeys.Mod.Control)
@@ -1818,7 +1847,7 @@ public partial class App
         Check("о неразобранном сочетании сказано", refusals.Count == 1,
               $"| {string.Join("; ", refusals)}");
 
-        // --- F05: трей ---
+        // --- F05: the tray ---
         using var tray = new Tray(window);
         Check("значок в трее создан", true);
         tray.Hide();
@@ -1826,7 +1855,7 @@ public partial class App
         tray.Show();
         Check("и возвращается по требованию", window.IsVisible);
 
-        // --- F05: автозапуск, с возвратом как было ---
+        // --- F05: autostart, put back as it was ---
         var was = Autostart.Enabled;
         Check("команда запуска указывает на нас",
               Autostart.Command.Contains("Rina.Shell"), $"| {Autostart.Command}");
@@ -1856,7 +1885,7 @@ public partial class App
         return Task.CompletedTask;
     }
 
-    /// <summary>Синтетический звук: 440 Гц в формате микрофона.</summary>
+    /// <summary>Synthetic sound: 440 Hz in the microphone's format.</summary>
     private static byte[] Tone(double seconds)
     {
         var samples = (int)(Audio.Microphone.SampleRate * seconds);
@@ -1883,12 +1912,13 @@ public partial class App
     }
 
     /// <summary>
-    /// Привести систему в соответствие настройкам ядра.
+    /// Bring the system into line with the core's settings.
     /// </summary>
     /// <remarks>
-    /// Ждём связи: настройки живут в ядре, и до рукопожатия их неоткуда
-    /// взять. Пока ждём, окно уже показано и работает — запуск не заложник
-    /// чужого процесса.
+    /// We wait for the link: settings live in the core, and before the
+    /// handshake there is nowhere to get them from. While we wait the
+    /// window is already shown and working — startup is not a hostage of
+    /// another process.
     /// </remarks>
     private async Task ApplySystemSettingsAsync(MainWindow window)
     {
@@ -1909,13 +1939,13 @@ public partial class App
         window.MinimiseToTray = values["minimize_to_tray"]?.GetValue<bool>()
                                 ?? true;
 
-        // Основное сочетание: показать окно и начать слушать.
+        // The main hotkey: show the window and start listening.
         if (values["hotkey"]?.GetValue<string>() is { Length: > 0 } main)
             _hotkeys?.Bind("main", main, () => window.OnMainHotkey());
 
-        // Сочетания действий. Список действий прислало ядро — оно знает,
-        // что бывает; исполняет их оболочка, потому что клавиатура,
-        // окно и трей принадлежат ей.
+        // Action hotkeys. The list of actions was sent by the core — it
+        // knows what exists; they are carried out by the shell, because the
+        // keyboard, the window and the tray belong to it.
         if (values["action_hotkeys"] is JsonObject bound)
             BindActions(window, bound);
 
@@ -1932,12 +1962,13 @@ public partial class App
     private FloatingBar? _bar;
 
     /// <summary>
-    /// Привязать сочетания к действиям.
+    /// Bind hotkeys to actions.
     /// </summary>
     /// <remarks>
-    /// Занятое чужой программой сочетание — обычное дело, и человек узнаёт
-    /// об этом строкой в подвале, а не молчанием: сочетание, которое просто
-    /// не работает, выглядит поломкой Рины.
+    /// A hotkey held by another program is an ordinary matter, and the
+    /// person finds out about it from a line in the footer rather than from
+    /// silence: a hotkey that simply does not work looks like a breakage in
+    /// Rina.
     /// </remarks>
     private void BindActions(MainWindow window, JsonObject bound)
     {
@@ -1995,12 +2026,12 @@ public partial class App
     }
 
     /// <summary>
-    /// Применить настройку, которой распоряжается оболочка.
+    /// Apply a setting the shell is in charge of.
     /// </summary>
     /// <remarks>
-    /// Ядро хранит намерение и уже его записало; здесь оболочка приводит
-    /// себя в соответствие. Тот же порядок, что у отделки и языка: одна
-    /// настройка, две стороны, каждая делает своё.
+    /// The core holds the intent and has already written it down; here the
+    /// shell brings itself into line. The same order as for the finish and
+    /// the language: one setting, two sides, each doing its own part.
     /// </remarks>
     public void ApplyShellSetting(string key, System.Text.Json.Nodes.JsonNode value)
     {
@@ -2022,9 +2053,8 @@ public partial class App
             case "action_hotkeys":
                 if (window is not null && value is JsonObject bound)
                 {
-                    // Перепривязка целиком: снятое сочетание должно
-                    // перестать работать, а не остаться висеть до
-                    // перезапуска.
+                    // A complete rebind: a hotkey that was taken away must
+                    // stop working rather than hang on until a restart.
                     _hotkeys?.Dispose();
                     _hotkeys = new Hotkeys();
                     _hotkeys.Attach(window);
@@ -2035,7 +2065,7 @@ public partial class App
         }
     }
 
-    /// <summary>Показать плавающую строку, заведя её при надобности.</summary>
+    /// <summary>Show the floating bar, creating it if need be.</summary>
     private void ShowFloatingBar(MainWindow window)
     {
         _bar ??= new FloatingBar(_link);
@@ -2043,21 +2073,22 @@ public partial class App
     }
 
     /// <summary>
-    /// Показать то, чего человек не видит в окне.
+    /// Show what a person cannot see in the window.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Всплывающее сообщение о том, что и так написано в открытом окне, —
-    /// шум, и человек учится его не читать. Поэтому условие не «пришёл
-    /// ответ», а «пришёл ответ, которого он не видит».
+    /// A pop-up about something already written in an open window is noise,
+    /// and a person learns not to read it. So the condition is not "an
+    /// answer arrived" but "an answer arrived that they cannot see".
     /// </para>
     /// <para>
-    /// <b>Реплика и напоминание расходятся по разным путям, и это не
-    /// украшение.</b> Реплика живёт секунды и принадлежит разговору: её
-    /// показывает своё окно, которое само уйдёт. Напоминание живёт, пока
-    /// его не увидят, и может застать человека отошедшим — его место в
-    /// центре уведомлений, где оно дождётся. Раньше и то и другое уходило
-    /// в трей, и «который час» ложился в почту рядом с письмами.
+    /// <b>A line and a reminder go by different paths, and that is not
+    /// decoration.</b> A line lives for seconds and belongs to the
+    /// conversation: it is shown by a window of its own, which will go away
+    /// by itself. A reminder lives until it is seen and may catch a person
+    /// who has stepped away — its place is the notification centre, where
+    /// it will wait. Both used to go to the tray, and "what time is it"
+    /// landed in the mail next to the letters.
     /// </para>
     /// </remarks>
     private void OnCoreEventForTray(MainWindow window,
@@ -2074,8 +2105,9 @@ public partial class App
 
     protected override void OnExit(ExitEventArgs e)
     {
-        // Ядро завершается само, увидев обрыв (§13), но попрощаться вежливо
-        // дешевле, чем полагаться на это: у него есть что закрыть.
+        // The core ends by itself when it sees the break (§13), but saying
+        // goodbye politely is cheaper than relying on that: it has things
+        // to close.
         _bar?.Close();
         _hotkeys?.Dispose();
         _tray?.Dispose();

@@ -4,8 +4,9 @@
              xmlns:loc="clr-namespace:Rina.Shell.Strings"
              xmlns:ui="clr-namespace:Rina.Shell.Styles">
   <!--
-    Диалог поглотил Историю (4.0-R04): это одно содержимое, и разница между
-    «сейчас» и «вчера» — прокрутка, а не второй экран.
+    Dialogue absorbed History (4.0-R04): this is one body of content, and the
+    difference between "now" and "yesterday" is scrolling, not a second
+    screen.
   -->
   <Grid>
     <Grid.RowDefinitions>
@@ -27,8 +28,8 @@
 
     <Border Grid.Row="1" Style="{StaticResource Glass}">
       <Grid>
-      <!-- Пустое стекло тоже объясняет себя: разговор, которого ещё не
-           было, — это не поломка и не «загрузка». -->
+      <!-- Empty glass explains itself too: a conversation that has not
+           happened yet is neither a breakage nor "loading". -->
       <ContentControl x:Name="Empty" Visibility="Collapsed" />
 
       <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto">
@@ -67,9 +68,9 @@
     </Grid>
 
     <!--
-      «Отвечать голосом» и «всегда слушать» стоят здесь, а не в настройках
-      (4.0-R04): это не настройка, а режим работы прибора, и переключают его
-      в процессе разговора.
+      "Answer by voice" and "always listen" stand here rather than in
+      settings (4.0-R04): these are not a setting but the instrument's mode
+      of work, and they are switched in the middle of a conversation.
     -->
     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
       <CheckBox x:Name="VoiceReply" Style="{StaticResource Toggle}"

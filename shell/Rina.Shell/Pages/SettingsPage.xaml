@@ -3,9 +3,10 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:Rina.Shell.Strings">
   <!--
-    Одна длинная панель с прокруткой, а не вложенные вкладки (4.0-R04):
-    прибор — это лицевая панель с секциями, а не шкаф с ящиками. При сценарии
-    «сеанс за настройкой» видеть соседние секции полезнее, чем прятать их.
+    One long panel that scrolls, not nested tabs (4.0-R04): an instrument is
+    a front panel with sections, not a cabinet with drawers. In the "a
+    session at the settings" scenario, seeing the neighbouring sections is
+    more use than hiding them.
   -->
   <Grid>
     <Grid.RowDefinitions>
@@ -24,12 +25,13 @@
       <StackPanel x:Name="Body" />
     </ScrollViewer>
 
-    <!-- Просвет вдвое больше обычного: опасное отделено пустотой, а не
-         цветом (DIRECTION §3). При двенадцати точках кнопка сброса
-         читалась как продолжение списка настроек. -->
+    <!-- A gap twice the usual: what is dangerous is set apart by emptiness
+         rather than by colour (DIRECTION §3). At twelve points the reset
+         button read as a continuation of the list of settings. -->
     <StackPanel x:Name="Bottom" Grid.Row="2" Orientation="Horizontal">
-      <!-- Сброс отделён пустотой, а не цветом: между необратимым и
-           соседями просвет вдвое больше обычного (DIRECTION §3). -->
+      <!-- The reset is set apart by emptiness, not by colour: between the
+           irreversible and its neighbours the gap is twice the usual
+           (DIRECTION §3). -->
       <Button Style="{StaticResource Btn.Danger}" Margin="0,0,64,0"
               Content="{loc:S 'Сбросить настройки'}" Click="OnReset" />
       <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"

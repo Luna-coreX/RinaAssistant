@@ -1,10 +1,11 @@
 <!--
-  Каркас окна. Своя рама, потому что своя типографика и свои цвета: системный
-  заголовок принёс бы шрифт и палитру Windows на панель, у которой они свои.
+  The window's frame. Our own, because the typography and the colours are our
+  own: a system title bar would bring Windows' font and palette onto a panel
+  that has its own.
 
-  Скругление углов самого окна оставлено системе: в Windows 11 его рисует
-  диспетчер окон, и повторять это своими руками значит спорить с ним о
-  полпикселя на каждом мониторе.
+  Rounding the window's corners is left to the system: in Windows 11 the
+  window manager draws it, and repeating that by hand means arguing with it
+  over half a pixel on every monitor.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -19,10 +20,11 @@
     <Setter Property="shell:WindowChrome.WindowChrome">
       <Setter.Value>
         <!--
-          CaptionHeight равен высоте нашей полосы заголовка: за неё окно
-          таскают, по ней же двойной щелчок разворачивает. GlassFrameThickness
-          в единицу оставляет системе тень и скругление окна, ResizeBorder —
-          привычные края для изменения размера.
+          CaptionHeight equals the height of our title bar: the window is
+          dragged by it, and a double click on it maximises the window.
+          GlassFrameThickness of one leaves the shadow and the window's
+          rounding to the system, and ResizeBorder gives the familiar edges
+          for resizing.
         -->
         <shell:WindowChrome CaptionHeight="40"
                             CornerRadius="0"

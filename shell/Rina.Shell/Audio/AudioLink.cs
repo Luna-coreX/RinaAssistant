@@ -5,32 +5,35 @@ using Rina.Protocol.Transport;
 namespace Rina.Shell.Audio;
 
 /// <summary>
-/// Звук между микрофоном, ядром и динамиком.
+/// Sound between the microphone, the core and the speaker.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-F09</c> и <c>4.0-F10</c>: захват в ядро и
-/// воспроизведение из ядра, оба по каналу данных с обратным давлением.
+/// Plan items <c>4.0-F09</c> and <c>4.0-F10</c>: capture into the core and
+/// playback out of the core, both over the data channel with
+/// backpressure.
 /// </para>
 /// <para>
-/// <b>Кредит соблюдается, а не подразумевается.</b> Приёмник объявляет,
-/// сколько байт готов принять; отправитель не имеет права держать в полёте
-/// больше. Микрофон — источник, который не умеет ждать: он выдаёт по куску
-/// каждые сто миллисекунд независимо от того, успевает ли ядро. Без кредита
-/// очередь росла бы молча, и отказ выглядел бы как «программа съела
-/// гигабайт».
+/// <b>The credit is honoured, not assumed.</b> The receiver announces how
+/// many bytes it is ready to take; the sender has no right to keep more
+/// than that in flight. The microphone is a source that cannot wait: it
+/// gives out a chunk every hundred milliseconds regardless of whether the
+/// core keeps up. Without credit the queue would grow in silence, and the
+/// failure would look like "the program ate a gigabyte".
 /// </para>
 /// <para>
-/// <b>Что делать с куском, на который нет кредита.</b> Он отбрасывается, а
-/// не копится. Для звука это верно: устаревший кусок речи никому не нужен,
-/// и лучше потерять сто миллисекунд, чем отстать на секунду и распознавать
-/// вчерашнее. Отброшенное считается — молча терять нельзя.
+/// <b>What to do with a chunk there is no credit for.</b> It is dropped,
+/// not accumulated. For sound that is right: a stale chunk of speech is of
+/// no use to anyone, and it is better to lose a hundred milliseconds than
+/// to fall a second behind and recognise yesterday's words. What is
+/// dropped is counted — losing it in silence is not allowed.
 /// </para>
 /// <para>
-/// <b>Рина не слушает себя.</b> Пока идёт воспроизведение, захват заглушен.
-/// Иначе синтезированная речь попадёт в микрофон, распознается как команда,
-/// и Рина ответит сама себе — в 3.1.0 от этого спасал счётчик говорящих, и
-/// причина никуда не делась.
+/// <b>Rina does not listen to herself.</b> While playback is going on,
+/// capture is muted. Otherwise synthesised speech reaches the microphone,
+/// is recognised as a command, and Rina answers herself — in 3.1.0 a
+/// counter of speakers saved us from this, and the reason has not gone
+/// anywhere.
 /// </para>
 /// </remarks>
 public sealed class AudioLink : IDisposable
@@ -47,19 +50,19 @@ public sealed class AudioLink : IDisposable
     private long _credit;
     private CancellationTokenSource? _reading;
 
-    /// <summary>Сколько байт отброшено из-за нехватки кредита.</summary>
+    /// <summary>How many bytes were dropped for want of credit.</summary>
     public long Dropped { get; private set; }
 
-    /// <summary>Сколько байт ушло в ядро.</summary>
+    /// <summary>How many bytes went to the core.</summary>
     public long Sent { get; private set; }
 
-    /// <summary>Сколько байт речи принято от ядра.</summary>
+    /// <summary>How many bytes of speech were received from the core.</summary>
     public long Received { get; private set; }
 
-    /// <summary>Сколько принятого ещё не проиграно.</summary>
+    /// <summary>How much of what was received is not yet played.</summary>
     public int Pending => _speaker.Pending;
 
-    /// <summary>Уровень микрофона 0..1 — для полосы прибора.</summary>
+    /// <summary>The microphone level, 0..1 — for the instrument strip.</summary>
     public event Action<float>? Level;
 
     public AudioLink(CoreConnection connection, DataChannel data,
@@ -77,20 +80,13 @@ public sealed class AudioLink : IDisposable
     }
 
     /// <summary>
-    /// Открыть поток звука в ядро.
-    /// </summary>
-    /// <param name="listen">
-    /// Включать ли устройство. Открыть поток и начать слушать — разные
-    /// действия: звук может прийти из файла при проверке голоса, и тогда
-    /// микрофон не нужен вовсе.
-    /// </param>
-    /// <summary>
-    /// Какими устройствами пользоваться. Имена — из настроек ядра.
+    /// Which devices to use. The names come from the core's settings.
     /// </summary>
     /// <remarks>
-    /// Ядро хранит выбор, но самих устройств не видит: звук в 4.0
-    /// принадлежит оболочке (<c>4.0-F09</c>). Поэтому имя разрешается здесь,
-    /// и «default» — не имя, а признак «не выбирали».
+    /// The core stores the choice but does not see the devices themselves:
+    /// sound in 4.0 belongs to the shell (<c>4.0-F09</c>). So the name is
+    /// resolved here, and "default" is not a name but a mark meaning "not
+    /// chosen".
     /// </remarks>
     public void UseDevices(string input, string output)
     {
@@ -100,8 +96,16 @@ public sealed class AudioLink : IDisposable
 
     private int _inputDevice;
 
+    /// <summary>
+    /// Open a stream of sound into the core.
+    /// </summary>
     /// <param name="deviceIndex">
-    /// Номер устройства; <c>-1</c> — то, что выбрано в настройках.
+    /// The device number; <c>-1</c> means whatever is chosen in settings.
+    /// </param>
+    /// <param name="listen">
+    /// Whether to switch the device on. Opening a stream and starting to
+    /// listen are different actions: sound may come from a file during a
+    /// voice check, and then the microphone is not needed at all.
     /// </param>
     public async Task<bool> StartCaptureAsync(int deviceIndex = -1,
                                               bool listen = true)
@@ -125,7 +129,7 @@ public sealed class AudioLink : IDisposable
         }, TimeSpan.FromSeconds(10));
         if (answer.IsError) return false;
 
-        // Первый кредит ядро выдаёт вместе с согласием открыть поток.
+        // The core issues the first credit together with its consent to open the stream.
         Interlocked.Add(ref _credit,
                         answer.Payload["credit"]?.GetValue<int>() ?? 0);
 
@@ -157,21 +161,21 @@ public sealed class AudioLink : IDisposable
     private void OnCaptured(byte[] chunk) => Push(chunk);
 
     /// <summary>
-    /// Отправить кусок звука в ядро. <c>false</c> — не хватило кредита.
+    /// Send a chunk of sound to the core. <c>false</c> — not enough credit.
     /// </summary>
     /// <remarks>
-    /// Открыт наружу, а не только для микрофона: звук приходит и не с
-    /// устройства — из файла при проверке голоса, из записи при разборе
-    /// жалобы. Путь при этом обязан быть тот же самый, иначе проверяется
-    /// не он.
+    /// Open to the outside rather than only to the microphone: sound comes
+    /// from places other than a device — from a file during a voice check,
+    /// from a recording while a complaint is being looked into. The path
+    /// must be the same one, or it is not the path being checked.
     /// </remarks>
     public bool Push(ReadOnlySpan<byte> chunk)
     {
         var stream = _inputStream;
         if (stream == 0) return false;
 
-        // Кредит проверяется до отправки, а не после: «уже отправил,
-        // извините» — не обратное давление, а его изображение.
+        // The credit is checked before sending, not after: "already sent,
+        // sorry" is not backpressure but an impression of it.
         if (Interlocked.Read(ref _credit) < chunk.Length)
         {
             Dropped += chunk.Length;
@@ -183,7 +187,7 @@ public sealed class AudioLink : IDisposable
         return true;
     }
 
-    /// <summary>Сколько байт разрешено отправить прямо сейчас.</summary>
+    /// <summary>How many bytes may be sent right now.</summary>
     public long Credit => Interlocked.Read(ref _credit);
 
     private void OnEvent(Envelope message)
@@ -194,7 +198,7 @@ public sealed class AudioLink : IDisposable
                         message.Payload["bytes"]?.GetValue<int>() ?? 0);
     }
 
-    /// <summary>Слушать канал данных: оттуда приходит синтезированная речь.</summary>
+    /// <summary>Listen to the data channel: synthesised speech comes from there.</summary>
     private async Task ReadAsync(CancellationToken token)
     {
         try
@@ -204,9 +208,9 @@ public sealed class AudioLink : IDisposable
                 var frame = await _data.ReceiveAsync(token).ConfigureAwait(false);
                 Received += frame.Payload.Length;
                 _speaker.Enqueue(frame.Payload);
-                // Кредит возвращается по мере воспроизведения, а не приёма:
-                // иначе ядро набьёт нам очередь на минуту вперёд, и «стоп»
-                // перестанет быть мгновенным.
+                // Credit is returned as playback proceeds, not as data is
+                // received: otherwise the core will pack our queue a minute
+                // ahead, and "stop" stops being instant.
                 await _connection.CallAsync(Methods.StreamCredit, new JsonObject
                 {
                     ["stream_id"] = frame.StreamId,
@@ -219,16 +223,17 @@ public sealed class AudioLink : IDisposable
     }
 
     /// <summary>
-    /// Ядро открыло поток речи: начать слушать канал данных.
+    /// The core opened a speech stream: start listening to the data channel.
     /// </summary>
     /// <remarks>
-    /// Чтение канала раньше начиналось только вместе с захватом микрофона —
-    /// то есть речь можно было услышать, лишь если Рину перед этим слушали.
-    /// Воспроизведение и захват независимы: Рина отвечает и на набранное
-    /// руками.
+    /// Reading the channel used to begin only together with microphone
+    /// capture — that is, speech could be heard only if Rina had been
+    /// listened to beforehand. Playback and capture are independent: Rina
+    /// answers what was typed by hand too.
     ///
-    /// Возвращает выданный кредит: приёмник объявляет, сколько готов
-    /// принять, и это не формальность — динамик медленнее провода.
+    /// Returns the credit issued: the receiver announces how much it is
+    /// ready to take, and this is no formality — a speaker is slower than a
+    /// wire.
     /// </remarks>
     public int StartPlayback(int streamId, string kind, int sampleRate)
     {
@@ -245,24 +250,24 @@ public sealed class AudioLink : IDisposable
         return PlaybackCredit;
     }
 
-    /// <summary>Сколько байт речи оболочка готова принять сразу.</summary>
+    /// <summary>How many bytes of speech the shell is ready to take at once.</summary>
     /// <remarks>
-    /// Полсекунды звука при 24 кГц. Больше — и «стоп» перестанет быть
-    /// мгновенным: оборвать можно то, что ещё не отправлено, а не то, что
-    /// уже лежит в нашей очереди.
+    /// Half a second of sound at 24 kHz. Any more and "stop" stops being
+    /// instant: what can be cut off is what has not been sent yet, not what
+    /// is already lying in our queue.
     /// </remarks>
     private const int PlaybackCredit = 24000 * 2 / 2;
 
     private int _outputStream;
 
-    /// <summary>Поток речи закрыт ядром.</summary>
+    /// <summary>The speech stream was closed by the core.</summary>
     public void StopPlayback()
     {
         _outputStream = 0;
         _speaker.Interrupt();
     }
 
-    /// <summary>Оборвать речь: «стоп» обязан быть мгновенным.</summary>
+    /// <summary>Cut the speech off: "stop" is obliged to be instant.</summary>
     public void Interrupt() => _speaker.Interrupt();
 
     public void Dispose()

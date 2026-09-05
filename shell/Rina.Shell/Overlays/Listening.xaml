@@ -11,8 +11,8 @@
           CornerRadius="{StaticResource Radius.Max}"
           Padding="18,10,20,10" Opacity="0">
     <StackPanel Orientation="Horizontal">
-      <!-- Точка дышит, пока Рина слушает: неподвижная плашка не отличима
-           от забытой на экране. -->
+      <!-- The dot breathes while Rina is listening: a motionless plaque is
+           indistinguishable from one forgotten on the screen. -->
       <Ellipse x:Name="Dot" Width="10" Height="10"
                Fill="{DynamicResource C.Signal}"
                VerticalAlignment="Center" Margin="0,0,12,0" />

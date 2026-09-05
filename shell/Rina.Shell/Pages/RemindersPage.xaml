@@ -14,9 +14,9 @@
                Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
 
     <StackPanel Grid.Row="1" Margin="0,0,0,16">
-      <!-- Завести напоминание можно и голосом; здесь — руками, потому что
-           «через двадцать минут» проще выбрать, чем выговорить так, чтобы
-           разбор понял с первого раза. -->
+      <!-- A reminder can be set by voice as well; here it is done by hand,
+           because "in twenty minutes" is easier to pick than to pronounce in
+           a way the parser gets right first time. -->
       <Border Style="{StaticResource Card}" Margin="0,0,0,16">
         <StackPanel>
           <TextBlock Text="{loc:S 'НОВОЕ НАПОМИНАНИЕ'}"
@@ -47,9 +47,9 @@
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
     </StackPanel>
 
-    <!-- Пустое состояние занимает весь остаток и центрируется в нём:
-         прижатое к верху читается как обрезанная страница, а не как
-         состояние прибора. -->
+    <!-- The empty state takes up the whole remainder and is centred in it:
+         pressed to the top it reads as a page cut short rather than as the
+         state of an instrument. -->
     <ContentControl x:Name="Empty" Grid.Row="2" Visibility="Collapsed" />
 
     <ScrollViewer x:Name="List" Grid.Row="2"

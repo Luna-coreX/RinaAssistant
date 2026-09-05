@@ -8,24 +8,25 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell;
 
 /// <summary>
-/// Главное окно: рама, колонка разделов, место для раздела.
+/// The main window: the frame, the column of sections, the room for a
+/// section.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Окно только маршрутизирует.</b> Оно знает, какие есть разделы и куда их
-/// показывать, и ничего — про их содержимое. Страницы независимы; иначе окно
-/// станет god-object'ом, ради избавления от которого затевался блок B, только
-/// теперь на другом языке.
+/// <b>The window only routes.</b> It knows which sections exist and where
+/// to show them, and nothing about their contents. Pages are independent;
+/// otherwise the window becomes the god object that block B was started to
+/// get rid of, only now in another language.
 /// </para>
 /// <para>
-/// Пять разделов — решение <c>4.0-R04</c>, а не восемь вкладок 3.1.0.
-/// «История» поглощена «Диалогом», «Горячие клавиши» ушли в «Настройки»,
-/// «О программе» — в подвал колонки.
+/// Five sections is the <c>4.0-R04</c> decision, not 3.1.0's eight tabs.
+/// "History" was absorbed by "Dialogue", "Hotkeys" went into "Settings",
+/// and "About" into the foot of the column.
 /// </para>
 /// </remarks>
 public partial class MainWindow : Window
 {
-    /// <summary>Разделы в том порядке, в каком они стоят в колонке.</summary>
+    /// <summary>The sections in the order they stand in the column.</summary>
     private static readonly (string Name, string Title)[] SectionList =
     [
         ("dialog", Word("Диалог")),
@@ -37,13 +38,13 @@ public partial class MainWindow : Window
 
     private readonly Dictionary<string, Func<UIElement>> _pages;
 
-    //: Разделы включённых плагинов: `plugin:<id>` → как назвать.
+    //: Sections of switched-on plugins: `plugin:<id>` → what to call it.
     //:
-    //: Замечание человека: в 3.1.0 плагин со своей вкладкой получал место
-    //: в колонке, после переезда его страница жила внутри списка плагинов.
-    //: Разница существенная: раздел — это «я этим пользуюсь», карточка в
-    //: списке — «я это установил». Заметки открывают каждый день, список
-    //: плагинов — раз в месяц.
+    //: Noted by a person: in 3.1.0 a plugin with a tab of its own got a
+    //: place in the column; after the move its page lived inside the plugin
+    //: list. The difference matters: a section says "I use this", a card in
+    //: a list says "I installed this". Notes are opened every day, the
+    //: plugin list once a month.
     private readonly List<(string Name, string Title)> _pluginSections = [];
 
     public MainWindow()
@@ -51,12 +52,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         Pane.RenderTransform = _paneRise;
 
-        // Страницы заводятся отложенно: раздел, на который не заходили, не
-        // должен ничего строить. Это же и место, куда F04 подставит
-        // настоящие страницы, не трогая окно.
-        // Страницы строятся отложенно и получают связь, а не окно: раздел,
-        // дотянувшийся до родителя, — первый шаг к god-object'у, ради
-        // избавления от которого затевался блок B.
+        // Pages are created lazily and are handed a link, not the window:
+        // a section that reaches up to its parent is the first step towards
+        // the god object that block B was started to get rid of.
         _pages = new Dictionary<string, Func<UIElement>>
         {
             ["dialog"] = () => new Pages.DialoguePage(Link),
@@ -75,14 +73,14 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Пересобрать интерфейс на новом языке.
+    /// Rebuild the interface in the new language.
     /// </summary>
     /// <remarks>
-    /// Страницы строятся заново, а не правятся по строчке: подписи живут в
-    /// разметке, в коде страниц и в раскладке настроек, и обойти их все
-    /// значило бы завести четвёртый список тех же строк. Открытый раздел
-    /// при этом остаётся открытым — человек менял язык, а не место, где
-    /// стоял.
+    /// Pages are built afresh rather than patched line by line: labels live
+    /// in the markup, in the pages' code and in the settings layout, and
+    /// walking them all would mean a fourth list of the same strings. The
+    /// open section stays open — the person changed the language, not the
+    /// place they were standing.
     /// </remarks>
     private void OnLanguageChanged()
     {
@@ -91,9 +89,9 @@ public partial class MainWindow : Window
         _section = "";
         ShowSection(open);
 
-        // И подвал: он переводит при вызове, но после смены языка его никто
-        // не звал заново — строка оставалась той, что написали в прошлый
-        // раз. Перевод, случающийся один раз, — это не перевод.
+        // And the footer: it translates when called, but after a language
+        // change nobody called it again — the line stayed as it was written
+        // last time. A translation that happens once is not a translation.
         ShowCoreState(_coreState, _coreReason);
     }
 
@@ -116,10 +114,10 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>Что сейчас показано — для проверок.</summary>
+    /// <summary>What is shown right now — for the checks.</summary>
     public object? CurrentPage => Pane.Content;
 
-    /// <summary>Открыть раздел снаружи — для снимков и проверок.</summary>
+    /// <summary>Open a section from outside — for screenshots and checks.</summary>
     public void ShowSectionFor(string section) => ShowSection(section);
 
     private void ShowSection(string section)
@@ -128,16 +126,16 @@ public partial class MainWindow : Window
         _section = section;
         Pane.Content = build();
 
-        // Переход между разделами — 220 мс (SYSTEM §7). Появление, а не
-        // «выезд»: движение обязано отвечать на вопрос «что изменилось»,
-        // и здесь изменилось содержимое, а не его положение. Панель
-        // прибора не ездит.
-        // `From` указан нарочно. Без него анимация начинается с текущего
-        // значения свойства — а его удерживает **предыдущая** анимация,
-        // завершившаяся на единице (`HoldEnd`). Присвоение `Opacity = 0`
-        // меняет базовое значение, которое удерживаемая анимация
-        // перебивает, и потому дипа не происходило: первый переход после
-        // запуска был виден, все следующие — нет.
+        // A transition between sections is 220 ms (SYSTEM §7). An
+        // appearance, not a "slide-in": movement is obliged to answer the
+        // question "what changed", and here the contents changed, not their
+        // position. An instrument panel does not travel.
+        // `From` is given deliberately. Without it the animation starts
+        // from the property's current value — and that is held by the
+        // **previous** animation, which finished at one (`HoldEnd`).
+        // Assigning `Opacity = 0` changes the base value, which the held
+        // animation overrides, and that is why no dip happened: the first
+        // transition after startup was visible, every later one was not.
         var span = (Duration)FindResource("Motion.Panel");
         var ease = (System.Windows.Media.Animation.IEasingFunction)
             FindResource("Ease.In");
@@ -151,12 +149,13 @@ public partial class MainWindow : Window
                 EasingFunction = ease,
             });
 
-        // Одной прозрачности мало, чтобы переход **читался**. Кривая
-        // системы (`0.2, 0, 0, 1`) резко стартует: к трети времени панель
-        // уже на восемьдесят процентов видна, и глаз принимает это за
-        // мгновенную подмену. Небольшой подъём — шесть точек — говорит
-        // «содержимое пришло», не превращая панель в едущую карусель:
-        // движется содержимое раздела, а не сам прибор.
+        // Opacity alone is not enough for the transition to **read**. The
+        // system's curve (`0.2, 0, 0, 1`) starts sharply: by a third of the
+        // way the panel is already eighty per cent visible, and the eye
+        // takes that for an instant substitution. A small rise — six points
+        // — says "the contents have arrived" without turning the panel into
+        // a travelling carousel: what moves is the section's contents, not
+        // the instrument itself.
         _paneRise.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty,
             new System.Windows.Media.Animation.DoubleAnimation
             {
@@ -171,24 +170,24 @@ public partial class MainWindow : Window
                 child.IsChecked = true;
     }
 
-    /// <summary>Сдвиг, которым содержимое раздела «приходит».</summary>
+    /// <summary>The shift by which a section's contents "arrive".</summary>
     private readonly System.Windows.Media.TranslateTransform _paneRise = new();
 
-    /// <summary>Прозрачность панели раздела — для проверки движения.</summary>
+    /// <summary>The section panel's opacity — for the motion check.</summary>
     public double PaneOpacity => Pane.Opacity;
 
-    /// <summary>Насколько содержимое ещё не доехало — для проверки.</summary>
+    /// <summary>How far the contents still have to travel — for the check.</summary>
     public double PaneRise => _paneRise.Y;
 
-    /// <summary>Связь с ядром; ставится при запуске (<c>4.0-F07</c>, <c>F12</c>).</summary>
+    /// <summary>The link to the core; set at startup (<c>4.0-F07</c>, <c>F12</c>).</summary>
     public CoreLink? Link
     {
         get => _link;
         set
         {
             _link = value;
-            // Раздел, показанный до появления связи, надо построить заново:
-            // он уже сообщил человеку, что ядра нет.
+            // A section shown before the link appeared has to be built
+            // again: it has already told the person there is no core.
             ShowSection(_section);
         }
     }
@@ -198,29 +197,30 @@ public partial class MainWindow : Window
 
     private string _finish = "black";
 
-    /// <summary>Что окно показывает про связь — для самопроверки.</summary>
+    /// <summary>What the window says about the link — for the self-check.</summary>
     public string CoreStateTextValue => CoreStateText.Text;
 
-    /// <summary>Какая отделка сейчас показана — для самопроверки.</summary>
+    /// <summary>Which finish is showing now — for the self-check.</summary>
     public string FinishValue => _finish;
 
-    /// <summary>Состояние сменилось. Слушает самопроверка.</summary>
+    /// <summary>The state changed. The self-check listens.</summary>
     public event Action<CoreState>? CoreStateShown;
 
     /// <summary>
-    /// Показать состояние связи с ядром (<c>4.0-F12</c>).
+    /// Show the state of the link to the core (<c>4.0-F12</c>).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Состояние видно всегда, а не по запросу: §13 требует, чтобы окно не
-    /// выглядело зависшим, и человек должен понимать, что происходит, не
-    /// нажимая ничего.
+    /// The state is always visible rather than shown on request: §13
+    /// requires that the window not look frozen, and a person must
+    /// understand what is happening without pressing anything.
     /// </para>
     /// <para>
-    /// Неполадка окрашивается акцентом, а не красным. Красного в палитре нет
-    /// вовсе (§2 дизайн-системы): цвет опасности размывается от повторения,
-    /// и там, где им красят каждую неприятность, он перестаёт значить
-    /// «осторожно». «Ядро не отвечает» — это ошибка, а не опасность.
+    /// A fault is coloured with the accent, not with red. There is no red
+    /// in the palette at all (§2 of the design system): the colour of
+    /// danger wears out through repetition, and where every unpleasantness
+    /// is painted with it, it stops meaning "careful". "The core does not
+    /// answer" is an error, not a danger.
     /// </para>
     /// </remarks>
     private CoreState _coreState = CoreState.Stopped;
@@ -236,18 +236,20 @@ public partial class MainWindow : Window
             CoreState.Failed => S("ядро не отвечает"),
             _ => S("ядро не запускалось"),
         };
-        // Запоминаем: после смены языка подвал надо переписать, а
-        // состояние к тому времени уже никто не пришлёт заново.
+        // Remembered: after a language change the footer has to be
+        // rewritten, and by then nobody will send the state again.
         _coreState = state;
         _coreReason = reason;
-        // Причина приходит из `Rina.Protocol` — библиотеки без переводов, и
-        // это правильно: её дело провод, а не язык. Самую частую фразу окно
-        // собирает само; остальное показывает как есть — техническая
-        // подробность на языке журнала честнее её кривого перевода.
-        // Слова собирает окно, а не надзор: `Rina.Protocol` не знает языка
-        // интерфейса (F08), и раньше он присылал готовую русскую фразу —
-        // она попадала в подвал мимо таблицы переводов и оставалась
-        // русской при английском интерфейсе.
+        // The reason comes from `Rina.Protocol` — a library with no
+        // translations, and rightly so: its business is the wire, not
+        // language. The window assembles the commonest phrase itself; the
+        // rest it shows as it is — a technical detail in the log's language
+        // is more honest than a crooked translation of it.
+        // The words are assembled by the window, not by the supervisor:
+        // `Rina.Protocol` does not know the interface's language (F08), and
+        // it used to send a ready-made Russian phrase — which reached the
+        // footer past the translation table and stayed Russian under an
+        // English interface.
         var about = state switch
         {
             CoreState.Ready when reason.Length > 0 => S("ядро {0}", reason),
@@ -264,12 +266,12 @@ public partial class MainWindow : Window
         CoreStateShown?.Invoke(state);
     }
 
-    /// <summary>Событие ядра. Пока — только полоса уровня.</summary>
+    /// <summary>An event from the core. For now — only the level strip.</summary>
     public void OnCoreEvent(Envelope message)
     {
-        // Разбор событий по разделам — 4.0-F04. Здесь остаётся то, что
-        // принадлежит прибору целиком, а не разделу: полоса уровня и то,
-        // что видно поверх экрана.
+        // Sorting events out by section is 4.0-F04. What stays here is
+        // what belongs to the instrument as a whole rather than to a
+        // section: the level strip and what is seen on top of the screen.
         if (message.Method is "listening.capturing")
             ShowLevel(message.Payload["active"]?.GetValue<bool>() == true
                       ? 0.4f : 0f);
@@ -278,22 +280,23 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Показать уровень микрофона с послесвечением.
+    /// Show the microphone level with an afterglow.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Подпись направления, а не украшение</b> (`DIRECTION` §4). Полоса
-    /// не переключается между «выключено» и «включено»: после услышанной
-    /// фразы след гаснет примерно за секунду, и по панели видно не только
-    /// то, что Рина слушает <i>сейчас</i>, но и то, что она только что
-    /// слышала. Мгновенное переключение — прямое «не в стиле» по
-    /// двенадцати вопросам §6, и до этой правки полоса именно скакала.
+    /// <b>A sign of direction, not a decoration</b> (`DIRECTION` §4). The
+    /// strip does not switch between "off" and "on": after a phrase has
+    /// been heard the trace fades over about a second, and the panel shows
+    /// not only that Rina is listening <i>now</i> but also that she has
+    /// just been hearing something. Instant switching is a straight "not in
+    /// the style" by the twelve questions of §6, and before this change the
+    /// strip did exactly that — it jumped.
     /// </para>
     /// <para>
-    /// <b>Вверх — быстро, вниз — медленно.</b> Рост показывает то, что
-    /// происходит сейчас, и опаздывать ему нельзя; спад показывает то, что
-    /// уже прошло, и торопиться ему некуда. Одна длительность на оба
-    /// направления дала бы либо вялую реакцию, либо мигание.
+    /// <b>Fast up, slow down.</b> The rise shows what is happening now, and
+    /// it must not be late; the fall shows what has already passed, and it
+    /// has nowhere to hurry. One duration for both directions would give
+    /// either a sluggish reaction or a flicker.
     /// </para>
     /// </remarks>
     public void ShowLevel(float level)
@@ -301,8 +304,8 @@ public partial class MainWindow : Window
         var wanted = Math.Clamp(level, 0f, 1f) * ActualWidth;
         var now = Level.ActualWidth;
 
-        // Рост — отклик на нажатие по длительности: полоса и есть
-        // микрофон, и её движение вверх это то же «сейчас», что у кнопки.
+        // The rise takes the press duration: the strip is the microphone,
+        // and its upward movement is the same "now" as a button's.
         var rising = wanted > now;
         var span = rising ? (Duration)FindResource("Motion.Press")
                           : (Duration)FindResource("Motion.Afterglow");
@@ -320,31 +323,33 @@ public partial class MainWindow : Window
         LevelShown = level;
     }
 
-    /// <summary>Какой уровень показан последним — для сквозной проверки.</summary>
+    /// <summary>Which level was shown last — for the end-to-end check.</summary>
     public float LevelShown { get; private set; }
 
-    /// <summary>Что видно поверх экрана: реплика и плашка «слушаю».</summary>
+    /// <summary>What is seen on top of the screen: a line and the "listening" plaque.</summary>
     public Overlays.Toast? Toast { get; set; }
 
-    /// <summary>Плашка слушания.</summary>
+    /// <summary>The listening plaque.</summary>
     public Overlays.Listening? Plaque { get; set; }
 
-    /// <summary>Показывать ли реплики поверх экрана (настройка).</summary>
+    /// <summary>Whether to show lines on top of the screen (a setting).</summary>
     public bool ShowToasts { get; set; } = true;
 
     /// <summary>
-    /// Событие ядра — в окна поверх экрана.
+    /// An event from the core — into the windows on top of the screen.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Реплика показывается, когда окна не видно.</b> Если человек
-    /// смотрит на диалог, ответ уже перед ним, и дублировать его карточкой
-    /// в углу — значит показывать одно и то же дважды.
+    /// <b>A line is shown when the window is not visible.</b> If the person
+    /// is looking at the dialogue, the answer is already in front of them,
+    /// and duplicating it with a card in the corner means showing one and
+    /// the same thing twice.
     /// </para>
     /// <para>
-    /// <b>Плашка «слушаю» показывается всегда.</b> Здесь наоборот: право
-    /// знать, что микрофон работает, не зависит от того, открыто ли окно, —
-    /// именно при закрытом окне это и важно.
+    /// <b>The "listening" plaque is always shown.</b> Here it is the other
+    /// way round: the right to know that the microphone is working does not
+    /// depend on whether the window is open — it is precisely when the
+    /// window is closed that this matters.
     /// </para>
     /// </remarks>
     private void Overlay(Envelope message)
@@ -380,16 +385,17 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Обновить разделы плагинов.
+    /// Refresh the plugin sections.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Раздел получает только <b>включённый</b> плагин со своей страницей:
-    /// выключенный не загружен, и спрашивать его страницу не у кого.
+    /// Only a <b>switched-on</b> plugin with a page of its own gets a
+    /// section: one that is off is not loaded, and there is nobody to ask
+    /// for its page.
     /// </para>
     /// <para>
-    /// Открытый раздел сохраняется, если он ещё существует. Иначе
-    /// выключение одного плагина выбрасывало бы человека из другого.
+    /// The open section is kept if it still exists. Otherwise switching one
+    /// plugin off would throw the person out of another.
     /// </para>
     /// </remarks>
     public void ShowPluginSections(
@@ -420,32 +426,32 @@ public partial class MainWindow : Window
         ShowSection(_pages.ContainsKey(open) ? open : "dialog");
     }
 
-    /// <summary>Какие разделы есть сейчас — для сквозной проверки.</summary>
+    /// <summary>Which sections exist right now — for the end-to-end check.</summary>
     public string[] SectionNames() => Sections.Children
         .OfType<System.Windows.Controls.RadioButton>()
         .Select(item => (string)item.Tag)
         .ToArray();
 
-    /// <summary>Отделка, которую показывает окно.</summary>
+    /// <summary>The finish the window is showing.</summary>
     public void ShowFinish(string finish) => _finish = finish;
 
     private async void OnSwitchFinish(object sender, RoutedEventArgs e)
     {
-        // Две отделки равноправны (4.0-R08), поэтому переключатель, а не
-        // список: выбирать не из чего, кроме как между ними.
+        // The two finishes are equal (4.0-R08), so a toggle rather than a
+        // list: there is nothing to choose from but between them.
         _finish = _finish == "black" ? "silver" : "black";
         if (Link is not null) await Link.SetFinishAsync(_finish);
         else App.ApplyFinish(_finish);
     }
 
     /// <summary>
-    /// «О программе» — раздел, а не всплывающее окно.
+    /// "About" is a section, not a pop-up window.
     /// </summary>
     /// <remarks>
-    /// В колонке его нет: туда ходят редко, и постоянное место он не
-    /// заслуживает. Но и модальное окно ему не годится — там ссылки, по
-    /// которым ходят, и версии, которые переписывают в сообщение о
-    /// неполадке.
+    /// It is not in the column: people go there rarely, and it does not
+    /// deserve a permanent place. But a modal window will not do for it
+    /// either — it holds links that are followed and versions that are
+    /// copied into a fault report.
     /// </remarks>
     private void OnAbout(object sender, MouseButtonEventArgs e)
         => ShowSection("about");
@@ -457,28 +463,30 @@ public partial class MainWindow : Window
         WindowState = WindowState == WindowState.Maximized
             ? WindowState.Normal : WindowState.Maximized;
 
-    /// <summary>Значок в трее; ставится при запуске (<c>4.0-F05</c>).</summary>
+    /// <summary>The tray icon; set at startup (<c>4.0-F05</c>).</summary>
     public Tray? Tray { get; set; }
 
-    /// <summary>Сворачивать в трей вместо выхода. Решает человек.</summary>
+    /// <summary>Minimise to the tray instead of quitting. The person decides.</summary>
     public bool MinimiseToTray { get; set; } = true;
 
     /// <summary>
-    /// Крестик: свернуть или выйти.
+    /// The close button: minimise or quit.
     /// </summary>
     /// <remarks>
-    /// Программа, не закрывающаяся по крестику вопреки ожиданию,
-    /// воспринимается как сломанная, — поэтому поведение выбирает человек, а
-    /// не мы за него. Из трея выйти можно всегда.
+    /// A program that does not close on the close button against
+    /// expectation is taken for a broken one — so the behaviour is chosen
+    /// by the person, not by us on their behalf. Quitting from the tray is
+    /// always possible.
     /// </remarks>
     private void OnClose(object sender, RoutedEventArgs e) => OnCloseButton();
 
-    /// <summary>То же, что нажать крестик. Отдельно — ради проверки.</summary>
+    /// <summary>The same as pressing the close button. Separate for the check's sake.</summary>
     /// <remarks>
-    /// Прятать окно можно только если значок в трее действительно заведён:
-    /// иначе вернуть окно будет нечем и программа останется работать
-    /// невидимой и недостижимой. Поэтому спрашивается не «есть ли объект
-    /// трея», а «получилось ли завести значок» — объект есть всегда.
+    /// The window may only be hidden if the tray icon was actually created:
+    /// otherwise there is nothing to bring it back with, and the program
+    /// keeps running invisible and unreachable. So what is asked is not "is
+    /// there a tray object" but "did the icon get created" — the object is
+    /// always there.
     /// </remarks>
     public void OnCloseButton()
     {
@@ -486,17 +494,17 @@ public partial class MainWindow : Window
         else System.Windows.Application.Current.Shutdown();
     }
 
-    /// <summary>Нажато основное сочетание (<c>4.0-F06</c>).</summary>
+    /// <summary>The main hotkey was pressed (<c>4.0-F06</c>).</summary>
     public void OnMainHotkey()
     {
         Tray?.Show();
         ShowSection("dialog");
-        // Слушать по нажатию — то, ради чего сочетание и нужно: помощника
-        // вызывают, когда есть что сказать.
+        // Listening on a keypress is what the hotkey is for: an assistant
+        // is summoned when there is something to say.
         _ = Link?.ListenOnceAsync();
     }
 
-    /// <summary>Короткое сообщение человеку в подвале колонки.</summary>
+    /// <summary>A short message to the person in the foot of the column.</summary>
     public void ShowNote(string text)
     {
         CoreStateText.Text = text;

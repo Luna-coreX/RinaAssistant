@@ -7,31 +7,31 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell;
 
 /// <summary>
-/// Значок в трее: окно можно закрыть, не выключив Рину.
+/// The tray icon: the window can be closed without switching Rina off.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F05</c>.
+/// Plan item <c>4.0-F05</c>.
 /// </para>
 /// <para>
-/// <b>Зачем это вообще.</b> Голосовой помощник, живущий только пока открыто
-/// окно, — не помощник, а программа. Напоминание, поставленное голосом,
-/// обязано сработать при закрытом окне (<c>4.0-E05</c>), и хоткей обязан
-/// работать оттуда же (<c>4.0-F06</c>). Трей — то место, где программа
-/// остаётся, не занимая экрана.
+/// <b>Why this exists at all.</b> A voice assistant that lives only while
+/// a window is open is not an assistant but a program. A reminder set by
+/// voice is obliged to go off with the window closed (<c>4.0-E05</c>), and
+/// the hotkey is obliged to work from there too (<c>4.0-F06</c>). The tray
+/// is the place where a program stays without taking up the screen.
 /// </para>
 /// <para>
-/// <b>Крестик сворачивает, а не выключает</b> — но только если так велено
-/// настройкой. Программа, которая не закрывается по крестику вопреки
-/// ожиданию, воспринимается как сломанная; поэтому поведение выбирает
-/// человек, а по умолчанию оно то же, что в 3.1.0.
+/// <b>The close button minimises rather than switches off</b> — but only
+/// if a setting says so. A program that does not close on the close button
+/// against expectation is taken for a broken one; so the behaviour is
+/// chosen by the person, and by default it is the same as in 3.1.0.
 /// </para>
 /// <para>
-/// <b>Значок рисуется, а не берётся из файла.</b> Ресурс-иконку пришлось бы
-/// держать в четырёх размерах ради разных плотностей экрана, а здесь нужен
-/// один знак: точка цвета акцента на тёмном. Единственный фирменный знак
-/// живёт в подвале колонки (<c>4.0-R09</c>), и тащить его в трей значило бы
-/// заводить второй.
+/// <b>The icon is drawn, not taken from a file.</b> A resource icon would
+/// have to be kept in four sizes for different screen densities, whereas
+/// what is needed here is one mark: a dot in the accent colour on dark.
+/// The single brand mark lives in the foot of the column (<c>4.0-R09</c>),
+/// and dragging it into the tray would mean having a second one.
 /// </para>
 /// </remarks>
 public sealed class Tray : IDisposable
@@ -41,17 +41,18 @@ public sealed class Tray : IDisposable
     private Icon? _drawn;
 
     /// <summary>
-    /// Получилось ли завести значок.
+    /// Whether the icon was created.
     /// </summary>
     /// <remarks>
-    /// Спрашивать обязательно: если значка нет, прятать окно нельзя —
-    /// вернуть его будет нечем, и программа станет недостижимой, оставаясь
-    /// живой. Из двух неприятностей «крестик закрыл, хотя просили свернуть»
-    /// лучше, чем «программа исчезла».
+    /// Asking is obligatory: with no icon the window must not be hidden —
+    /// there would be nothing to bring it back with, and the program would
+    /// become unreachable while staying alive. Of two unpleasantnesses,
+    /// "the close button closed it although we asked to minimise" is better
+    /// than "the program vanished".
     /// </remarks>
     public bool Created { get; private set; }
 
-    /// <summary>Человек попросил выйти совсем.</summary>
+    /// <summary>The person asked to quit for good.</summary>
     public event Action? ExitRequested;
 
     public Tray(Window window, string title = "Rina Assistant")
@@ -76,22 +77,24 @@ public sealed class Tray : IDisposable
         {
             if (e.MouseEvent == MouseEvent.IconLeftMouseUp) Show();
         };
-        // Окно значка создаётся явно, и без этой строки значка не было
-        // вовсе. `Create()` у значка заводит запись в области уведомлений,
-        // но окно, которому система шлёт нажатия, остаётся несозданным —
-        // дескриптор нулевой, нажатия уходят в никуда. Снаружи это выглядит
-        // как «трей не работает», а изнутри — как будто всё сделано.
+        // The icon's window is created explicitly, and without this line
+        // there was no icon at all. The icon's `Create()` adds an entry to
+        // the notification area, but the window the system sends clicks to
+        // stays uncreated — the handle is zero and the clicks go nowhere.
+        // From the outside this looks like "the tray does not work", and
+        // from the inside as if everything had been done.
         _icon.MessageWindow.Create();
         _icon.Create();
         Created = _icon.MessageWindow.IsCreated;
     }
 
     /// <summary>
-    /// Значок: точка акцента на тёмном.
+    /// The icon: an accent dot on dark.
     /// </summary>
     /// <remarks>
-    /// Цвет берётся из ресурсов — тех же токенов, что и всё остальное.
-    /// Второй источник правды о фирменном цвете разошёлся бы с первым.
+    /// The colour is taken from the resources — the same tokens as
+    /// everything else. A second source of truth about the brand colour
+    /// would part company with the first.
     /// </remarks>
     private static Icon Draw()
     {
@@ -111,10 +114,10 @@ public sealed class Tray : IDisposable
         return Icon.FromHandle(bitmap.GetHicon());
     }
 
-    /// <summary>Окно, которому система шлёт нажатия по значку.</summary>
+    /// <summary>The window the system sends icon clicks to.</summary>
     /// <remarks>
-    /// Наружу — ради проверки: значок это прежде всего окно, и важно, на
-    /// каком потоке оно качает свою очередь сообщений.
+    /// Exposed for the check's sake: an icon is first of all a window, and
+    /// what matters is which thread pumps its message queue.
     /// </remarks>
     public IntPtr MessageWindowHandle => _icon.MessageWindow.Handle;
 
@@ -129,13 +132,13 @@ public sealed class Tray : IDisposable
     public void Hide() => _window.Hide();
 
     /// <summary>
-    /// Сказать человеку то, чего он не видит.
+    /// Tell the person what they cannot see.
     /// </summary>
     /// <remarks>
-    /// Уведомление показывается, только когда окно не на виду: всплывающее
-    /// сообщение о том, что и так написано в открытом окне, — это шум, и
-    /// человек учится его не читать. Настройка `notifications` при этом
-    /// главнее: выключил — значит не показывать вовсе.
+    /// A notification is shown only when the window is not in view: a
+    /// pop-up about something already written in an open window is noise,
+    /// and a person learns not to read it. The `notifications` setting
+    /// outranks this: switched off means do not show it at all.
     /// </remarks>
     public void Notify(string title, string message)
     {
@@ -146,8 +149,9 @@ public sealed class Tray : IDisposable
         }
         catch
         {
-            // Windows вправе не показать: тихий час, политика, переполненная
-            // очередь. Это не повод падать — уведомление не обязательство.
+            // Windows is within its rights not to show it: quiet hours,
+            // policy, a full queue. That is no reason to fall over — a
+            // notification is not an obligation.
         }
     }
 

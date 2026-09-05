@@ -59,9 +59,9 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
 
-      <!-- Что Рина умеет без всяких настроек. У нового человека своих
-           команд нет, и без этого раздела страница отвечала бы «пусто» на
-           вопрос «а что она вообще умеет». -->
+      <!-- What Rina can do with no setting up at all. A new person has no
+           commands of their own, and without this section the page would
+           answer "empty" to the question "what can she actually do". -->
       <StackPanel x:Name="BuiltinBox" Margin="0,24,0,0">
         <TextBlock x:Name="BuiltinLegend" Text="{loc:S 'УМЕЕТ СРАЗУ'}"
                    Style="{StaticResource Text.Section}" Margin="0,0,0,12" />

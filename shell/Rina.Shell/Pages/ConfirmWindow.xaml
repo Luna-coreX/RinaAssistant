@@ -9,14 +9,16 @@
         MinWidth="520" MinHeight="0" ResizeMode="NoResize">
 
   <!--
-    Единая точка для всех опасных действий (4.0-F11, §11).
+    One point for every dangerous action (4.0-F11, §11).
 
-    Опасность обозначена штриховкой, а не цветом: цвет опасности размывается
-    от повторения, а штриховка встречается в одном месте и потому всегда
-    значит одно и то же. Красного в палитре нет вовсе.
+    Danger is marked by hatching, not by colour: the colour of danger wears
+    out through repetition, whereas hatching occurs in one place and
+    therefore always means one and the same thing. There is no red in the
+    palette at all.
 
-    Второе средство — пустота: необратимое отделено просветом вдвое большим
-    обычного. Оно работает и для того, кто узора не различает.
+    The second device is emptiness: what is irreversible is set apart by a
+    gap twice the usual one. It works for someone who cannot make out the
+    pattern too.
   -->
   <Grid Margin="32">
     <Grid.RowDefinitions>
@@ -32,7 +34,7 @@
     <TextBlock Grid.Row="1" x:Name="Reason" Style="{StaticResource Text.Meta}"
                TextWrapping="Wrap" Margin="0,12,0,0" />
 
-    <!-- Просвет 64: необратимое отделяется пустотой (§4 дизайн-системы) -->
+    <!-- A gap of 64: the irreversible is set apart by emptiness (§4 of the design system) -->
     <Grid Grid.Row="2" Margin="0,64,0,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto" />

@@ -24,7 +24,7 @@
           <StackPanel x:Name="Items" />
         </Border>
 
-        <!-- Страница плагина: то, что он сам о себе рассказал. -->
+        <!-- The plugin's page: what it told about itself. -->
         <StackPanel x:Name="PageBox" Margin="0,24,0,0" Visibility="Collapsed">
           <TextBlock x:Name="PageLegend" Style="{StaticResource Text.Section}"
                      Margin="0,0,0,12" />

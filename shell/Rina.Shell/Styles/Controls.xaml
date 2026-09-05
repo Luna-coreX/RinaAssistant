@@ -1,41 +1,42 @@
 <!--
-  Органы управления. Написаны, а не взяты из библиотеки — ADR 0005.
+  The controls. Written, not taken from a library — ADR 0005.
 
-  Второстепенная кнопка не нарисована коробкой: она заподлицо с панелью и
-  проявляется при наведении. Заметность даёт единственная первичная кнопка,
-  залитая чернилами, — иерархия без второго акцента. Акцент в системе один,
-  и означает он «здесь внимание», а не «это важная кнопка».
+  A secondary button is not drawn as a box: it is flush with the panel and
+  shows itself on hover. Prominence comes from the single primary button,
+  filled with ink — a hierarchy without a second accent. There is one accent
+  in the system, and it means "attention here", not "this is an important
+  button".
 
-  Теней нет нигде. Возвышение выражается ступенью значения и волосяным швом:
-  у приборной панели нет источника света, и тень имитировала бы то, чего
-  не существует.
+  There are no shadows anywhere. Elevation is expressed by a step in value
+  and a hairline seam: an instrument panel has no light source, and a shadow
+  would imitate something that does not exist.
 -->
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:ui="clr-namespace:Rina.Shell.Styles"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!--
-    Кисти подсветки. Своя у каждого места, где она нужна.
+    The highlight brushes. Each place that needs one has its own.
 
-    `x:Shared="False"` обязателен: значение из словаря иначе одно на всех,
-    и оно заморожено — анимировать его нельзя, а если бы было можно,
-    подсветилась бы разом вся таблица.
+    `x:Shared="False"` is mandatory: a value from a dictionary is otherwise
+    one for everybody, and it is frozen — it cannot be animated, and if it
+    could, the whole table would light up at once.
 
-    Объявлены **в начале словаря**: `StaticResource` ищет объявленное
-    выше, и ссылка на ресурс из нижней половины файла падает во время
-    работы, а сборку проходит.
+    Declared **at the start of the dictionary**: `StaticResource` looks for
+    what is declared above, and a reference to a resource from the bottom
+    half of the file fails at run time while passing the build.
 
-    Кистей две, потому что подсветка обязана отличаться от того, **на чём
-    лежит**, а лежат они на разном. Строка списка — на приподнятом
-    (`FACE_HIGH`) и темнеет до `FACE_LOW`. Раскрытый список — тоже
-    приподнятый, поэтому его вариант темнеет до `FACE`: шаг вниз, но
-    другой, потому что и подложка другая.
+    There are two brushes, because a highlight is obliged to differ from
+    **what it lies on**, and they lie on different things. A list row lies
+    on the raised surface (`FACE_HIGH`) and darkens to `FACE_LOW`. An opened
+    list is raised too, so its option darkens to `FACE`: a step down, but a
+    different one, because what is underneath is different too.
 
-    Первая редакция брала `FACE_HIGH` для варианта — цвет самой подложки.
-    Прозрачность честно уезжала в единицу, анимация шла, проверка
-    зеленела, а видно не было ничего: подсветка совпадала с фоном. Отсюда
-    проверка «подсветка отличается от подложки» — она сравнивает цвета, а
-    не факт движения.
+    The first edition took `FACE_HIGH` for the option — the colour of the
+    surface itself. Opacity honestly travelled to one, the animation ran,
+    the check went green, and nothing was visible: the highlight coincided
+    with the background. Hence the check "the highlight differs from what is
+    underneath" — it compares colours, not the fact of movement.
   -->
   <SolidColorBrush x:Key="Row.Warm" x:Shared="False" Opacity="0"
                    Color="{DynamicResource Color.FaceLow}" />
@@ -58,9 +59,10 @@
         <ControlTemplate TargetType="Button">
           <Grid>
             <!--
-              Слой подсветки поверх лица. Анимируется его прозрачность, а
-              не цвет кисти: кисти из словаря общие и заморожены, и
-              анимация цвета уронила бы приложение на первом наведении.
+              The highlight layer over the face. What is animated is its
+              opacity, not the brush's colour: brushes from the dictionary
+              are shared and frozen, and animating the colour would drop the
+              application on the first hover.
             -->
             <Border x:Name="Face" Background="{TemplateBinding Background}"
                     CornerRadius="{StaticResource Radius.Max}" />
@@ -78,7 +80,7 @@
             </Border>
           </Grid>
           <ControlTemplate.Triggers>
-            <!-- Наведение — смена состояния: 160 мс (SYSTEM §7). -->
+            <!-- Hover is a change of state: 160 ms (SYSTEM §7). -->
             <Trigger Property="IsMouseOver" Value="True">
               <Trigger.EnterActions>
                 <BeginStoryboard>
@@ -103,8 +105,9 @@
                 </BeginStoryboard>
               </Trigger.ExitActions>
             </Trigger>
-            <!-- Нажатие — отклик: 90 мс. Быстрее наведения нарочно: палец
-                 уже нажал, и ждать от прибора нечего. -->
+            <!-- A press is a response: 90 ms. Faster than hover on purpose:
+                 the finger has already pressed, and there is nothing to wait
+                 for from the instrument. -->
             <Trigger Property="IsPressed" Value="True">
               <Trigger.EnterActions>
                 <BeginStoryboard>
@@ -129,8 +132,9 @@
                 </BeginStoryboard>
               </Trigger.ExitActions>
             </Trigger>
-            <!-- Фокус рамкой, а не подсветкой фона: пользователь клавиатуры
-                 должен видеть, где он, не гадая, выделено это или наведено. -->
+            <!-- Focus by a border, not by a background highlight: a keyboard
+                 user has to see where they are without guessing whether this
+                 is selected or hovered. -->
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="Ring" Property="BorderBrush"
                       Value="{DynamicResource C.Signal}" />
@@ -146,14 +150,16 @@
   </Style>
 
   <!--
-    Штриховка необратимого. Единственный признак опасности в системе, и
-    встречается ровно в одном месте — потому и значит всегда одно и то же.
+    The hatching of the irreversible. The only sign of danger in the system,
+    and it occurs in exactly one place — which is why it always means one and
+    the same thing.
 
-    Цветом опасность не обозначается: он размывается от повторения, и там,
-    где красным красят каждую неприятность, красный перестаёт значить
-    «осторожно». Красного в палитре нет вовсе.
+    Danger is not marked by colour: colour wears out through repetition, and
+    where every unpleasantness is painted red, red stops meaning "careful".
+    There is no red in the palette at all.
 
-    Угол, толщина, шаг и прозрачность — из tokens.json.
+    The angle, the thickness, the pitch and the opacity come from
+    tokens.json.
   -->
   <DrawingBrush x:Key="Hatch" TileMode="Tile" Stretch="None"
                 Viewport="0,0,7,7" ViewportUnits="Absolute"
@@ -171,22 +177,23 @@
   </DrawingBrush>
 
   <!--
-    Кнопка необратимого действия. Не залита акцентом и не красная: она
-    заштрихована. Второе средство — просвет вокруг неё, вдвое больше
-    обычного; оно работает и для того, кто узора не различает.
+    The button of an irreversible action. It is neither filled with the
+    accent nor red: it is hatched. The second device is the gap around it,
+    twice the usual one; that works for someone who cannot make out the
+    pattern too.
   -->
   <Style x:Key="Btn.Danger" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Background" Value="{StaticResource Hatch}" />
     <Setter Property="Padding" Value="20,0" />
   </Style>
 
-  <!-- Первичная: одна на экран. Залита чернилами, а не акцентом. -->
+  <!-- Primary: one per screen. Filled with ink, not with the accent. -->
   <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Background" Value="{DynamicResource C.Ink}" />
     <Setter Property="Foreground" Value="{DynamicResource C.Face}" />
   </Style>
 
-  <!-- Управление окном: знаки, а не слова. Это соглашение системы. -->
+  <!-- Window controls: marks, not words. That is the system's convention. -->
   <Style x:Key="Btn.Window" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Width" Value="44" />
     <Setter Property="Height" Value="{StaticResource Size.Row}" />
@@ -196,7 +203,7 @@
     <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
   </Style>
 
-  <!-- Раздел в колонке. Отметка активного — единственный акцент. -->
+  <!-- A section in the column. The active mark is the only accent. -->
   <Style x:Key="Nav.Item" TargetType="RadioButton">
     <Setter Property="Height" Value="{StaticResource Size.Row}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
@@ -211,8 +218,8 @@
               <ColumnDefinition Width="2" />
               <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
-            <!-- Подсветка наведения — отдельным слоем: цвет общей кисти
-                 анимировать нельзя, она заморожена. -->
+            <!-- The hover highlight as a separate layer: a shared brush's
+                 colour cannot be animated, it is frozen. -->
             <Border x:Name="Warm" Grid.ColumnSpan="2" Opacity="0"
                     Background="{DynamicResource C.FaceHigh}" />
             <Rectangle x:Name="Mark" Grid.Column="0" Fill="Transparent" />
@@ -257,7 +264,7 @@
     </Setter>
   </Style>
 
-  <!-- Поле: утоплено, без рамки. Граница нарисована ступенью значения. -->
+  <!-- A field: sunk, without a border. The boundary is drawn by a step in value. -->
   <Style x:Key="Field" TargetType="TextBox">
     <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
@@ -275,8 +282,8 @@
                   CornerRadius="{StaticResource Radius.Max}"
                   Padding="{TemplateBinding Padding}">
             <Grid>
-              <!-- Подсказка под содержимым: она гаснет, как только в поле
-                   появляется текст, и никогда не становится значением. -->
+              <!-- The hint sits under the content: it goes out as soon as
+                   text appears in the field, and never becomes a value. -->
               <TextBlock x:Name="Hint" VerticalAlignment="Center"
                          IsHitTestVisible="False"
                          Foreground="{DynamicResource C.InkFaint}"
@@ -312,21 +319,17 @@
   </Style>
 
   <!--
-    Переключатель. Включённое положение — отметка акцентом: это состояние
-    «выбрано» из таблицы §6, а не второй смысл акцента.
-  -->
-  <!--
-    Выпадающий список.
+    The dropdown.
 
-    Своего стиля у него не было, и WPF рисовал свой: белое поле с синей
-    рамкой посреди чёрной отделки. Это ровно тот случай, ради которого
-    ADR 0005 отказался от чужой библиотеки в пользу своих стилей поверх
-    стандартных контролов, — и напоминание, что «стандартный контрол»
-    значит «выглядит стандартно», пока его не одеть.
+    It had no style of its own, and WPF drew its own: a white field with a
+    blue border in the middle of a black finish. This is exactly the case
+    ADR 0005 turned down somebody else's library for, in favour of our own
+    styles over the standard controls — and a reminder that "a standard
+    control" means "looks standard" until it is dressed.
 
-    Недоступный вариант гаснет, но остаётся: человек должен видеть, что
-    такой движок бывает, — иначе он будет искать его там, где мы его
-    спрятали.
+    An unavailable option goes dim but stays: a person has to see that such
+    an engine exists — otherwise they will go looking for it where we hid
+    it.
   -->
   <Style TargetType="ComboBoxItem">
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
@@ -342,13 +345,14 @@
           </Border>
           <ControlTemplate.Triggers>
             <!--
-              Вариант под курсором подсвечивается тем же движением, что и
-              строка списка: 160 мс. Раньше здесь стояла мгновенная смена
-              цвета — единственное место, где состояние переключалось, а
-              не менялось.
+              The option under the cursor is highlighted by the same motion
+              as a list row: 160 ms. What used to stand here was an instant
+              colour change — the one place where a state was switched
+              rather than changed.
 
-              Кисть своя у каждого варианта (`Row.Warm`, `x:Shared="False"`):
-              общая заморожена, и анимировать её нельзя.
+              Each option has a brush of its own (`Row.Warm`,
+              `x:Shared="False"`): the shared one is frozen and cannot be
+              animated.
             -->
             <Trigger Property="IsHighlighted" Value="True">
               <Trigger.EnterActions>
@@ -385,16 +389,16 @@
   </Style>
 
   <!--
-    Ползунок.
+    The slider.
 
-    Заводится там, где ядро назвало **обе** границы: «громкость от нуля до
-    ста» — это приглашение тянуть, а не набирать. Правило общее, а не
-    список ключей: настройка, у которой появятся границы, получит ползунок
-    сама, и никто не забудет её сюда вписать.
+    It is created where the core named **both** bounds: "volume from zero to
+    a hundred" is an invitation to drag rather than to type. The rule is
+    general rather than a list of keys: a setting that gains bounds will get
+    a slider by itself, and nobody will forget to write it in here.
 
-    Значение показано рядом всегда. Ползунок без числа отвечает на вопрос
-    «примерно сколько», а на «ровно сколько» не отвечает — и человек,
-    которому надо выставить восемьдесят, обречён возить мышью.
+    The value is always shown alongside. A slider without a number answers
+    the question "roughly how much" and does not answer "exactly how much" —
+    and a person who needs to set eighty is doomed to push a mouse around.
   -->
   <Style x:Key="Slide" TargetType="Slider">
     <Setter Property="Height" Value="{StaticResource Size.Control}" />
@@ -404,8 +408,9 @@
       <Setter.Value>
         <ControlTemplate TargetType="Slider">
           <Grid VerticalAlignment="Center">
-            <!-- Дорожка утоплена, пройденное — акцентом: «сколько уже» и
-                 «сколько всего» должны различаться без подписи. -->
+            <!-- The track is sunk and what has been covered is in the accent:
+                 "how much already" and "how much in all" must differ without
+                 a caption. -->
             <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
                     Background="{DynamicResource C.FaceSunk}" />
             <Border x:Name="PART_SelectionRange" Height="4" CornerRadius="2"
@@ -478,9 +483,9 @@
                       </Grid.ColumnDefinitions>
                       <ContentPresenter Grid.Column="0" Margin="12,0,0,0"
                                         VerticalAlignment="Center" />
-                      <!-- Стрелка нарисована, а не набрана символом: шрифт
-                           может её не содержать, и тогда список выглядел бы
-                           сломанным на чужой машине. -->
+                      <!-- The arrow is drawn, not typed as a character: a
+                           font may not contain it, and then the list would
+                           look broken on somebody else's machine. -->
                       <Path Grid.Column="1" Margin="8,0,14,0"
                             VerticalAlignment="Center"
                             Data="M0,0 L8,0 L4,5 Z"
@@ -507,10 +512,10 @@
                    Placement="Bottom" Focusable="False"
                    IsOpen="{TemplateBinding IsDropDownOpen}"
                    PopupAnimation="Fade">
-              <!-- Приподнятая поверхность, а не утопленная: список лежит
-                   поверх панели. Заодно это единственная подложка, на
-                   которой погашенный вариант читается в обеих отделках
-                   (2.90 против нужных 3.0 на утопленной в «серебре»). -->
+              <!-- A raised surface, not a sunk one: the list lies over the
+                   panel. It is also the only surface on which a dimmed
+                   option is readable in both finishes (2.90 against the 3.0
+                   needed on a sunk one in "silver"). -->
               <Border Background="{DynamicResource C.FaceHigh}"
                       BorderBrush="{DynamicResource C.Seam}"
                       BorderThickness="1"
@@ -533,11 +538,16 @@
     </Setter>
   </Style>
 
+  <!--
+    The toggle. The on position is a mark in the accent: this is the
+    "selected" state from the table in §6, not a second meaning of the
+    accent.
+  -->
   <Style x:Key="Toggle" TargetType="CheckBox">
     <Setter Property="Cursor" Value="Hand" />
-    <!-- Подпись у органа управления обязательна (направление), и цвет ей
-         даёт система, а не умолчание WPF: иначе она окажется той серой,
-         которую никто не выбирал. -->
+    <!-- A label by a control is mandatory (direction), and its colour is
+         given by the system rather than by WPF's default: otherwise it ends
+         up the grey nobody chose. -->
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Body.Size}" />
@@ -545,25 +555,24 @@
       <Setter.Value>
         <ControlTemplate TargetType="CheckBox">
           <StackPanel Orientation="Horizontal">
-            <!-- Тумблер, а не пилюля. Радиус 11 делал из него кнопку
-                 телефона; у приборов углы тугие, и предел радиуса — 3
-                 (DIRECTION §2). Заодно так он честнее: это переключатель
-                 на панели, а не мягкий значок в списке. -->
+            <!-- A toggle switch, not a pill. A radius of 11 made a phone
+                 button of it; instruments have tight corners, and the radius
+                 limit is 3 (DIRECTION §2). It is also more honest this way:
+                 this is a switch on a panel, not a soft icon in a list. -->
             <Grid Width="40" Height="22" VerticalAlignment="Center">
               <Border x:Name="Track"
                       CornerRadius="{StaticResource Radius.Max}"
                       Background="{DynamicResource C.FaceSunk}" />
-              <!-- Включённое положение — отдельным слоем поверх: цвет
-                   общей кисти анимировать нельзя, она заморожена. -->
+              <!-- The on position as a separate layer over the top: a shared
+                   brush's colour cannot be animated, it is frozen. -->
               <Border x:Name="On" Opacity="0"
                       CornerRadius="{StaticResource Radius.Max}"
                       Background="{DynamicResource C.Signal}" />
               <!--
-                Бегунок ездит сдвигом, а не сменой выравнивания:
-                выравнивание переключается мгновенно, а состояние в системе
-                меняется за 160 мс (SYSTEM §7). Тумблер, у которого
-                бегунок телепортируется, читается как картинка, а не как
-                орган управления.
+                The knob travels by a shift, not by a change of alignment:
+                alignment switches instantly, whereas a state in the system
+                changes over 160 ms (SYSTEM §7). A toggle whose knob
+                teleports reads as a picture rather than as a control.
               -->
               <Border x:Name="Knob" Width="14" Height="14"
                       CornerRadius="{StaticResource Radius.Tight}"
@@ -583,8 +592,8 @@
               <Trigger.EnterActions>
                 <BeginStoryboard>
                   <Storyboard>
-                    <!-- 40 ширина дорожки − 14 бегунок − 4 отступ слева
-                         − 4 справа = 18 точек хода. -->
+                    <!-- 40 track width − 14 knob − 4 gap on the left
+                         − 4 on the right = 18 points of travel. -->
                     <DoubleAnimation Storyboard.TargetName="Shift"
                                      Storyboard.TargetProperty="X"
                                      To="18"
@@ -621,7 +630,7 @@
     </Setter>
   </Style>
 
-  <!-- Стеклянное поле: единственная светящаяся поверхность прибора. -->
+  <!-- The glass field: the instrument's only glowing surface. -->
   <Style x:Key="Glass" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.Glass}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
@@ -629,12 +638,12 @@
   </Style>
 
   <!--
-    Полоса прокрутки. Своя, потому что стоковая приносит палитру Windows на
-    панель, у которой она своя, — и в чёрной отделке светло-серая полоса
-    видна первой, раньше содержимого.
+    The scrollbar. Our own, because the stock one brings Windows' palette
+    onto a panel that has its own — and in the black finish a light grey bar
+    is seen first, before the contents.
 
-    Без стрелок: они принадлежат другому времени и занимают место, ничего не
-    добавляя. Ползунок — ступень значения, как и всё возвышение в системе.
+    Without arrows: they belong to another era and take up room while adding
+    nothing. The thumb is a step in value, like all elevation in the system.
   -->
   <Style x:Key="ScrollThumb" TargetType="Thumb">
     <Setter Property="Template">
@@ -662,8 +671,8 @@
             <Track.Thumb>
               <Thumb Style="{StaticResource ScrollThumb}" />
             </Track.Thumb>
-            <!-- Кнопки страницы обязаны существовать, но видимыми им быть
-                 незачем: полоса и есть орган управления. -->
+            <!-- The page buttons are obliged to exist, but there is no need
+                 for them to be visible: the bar is the control. -->
             <Track.IncreaseRepeatButton>
               <RepeatButton Command="ScrollBar.PageDownCommand"
                             Opacity="0" Focusable="False" />
@@ -678,13 +687,12 @@
     </Setter>
   </Style>
 
-  <!-- Карточка: приподнята ступенью значения, без рамки и без тени. -->
   <!--
-    Блок списка: одна приподнятая ступень на весь список.
+    A list block: one raised step for the whole list.
 
-    Не стопка карточек: «окно — это лицевая панель, а не набор карточек на
-    фоне» (DIRECTION §3). Строки списка — части одного предмета, и зазор
-    между ними превращал бы их в пять предметов.
+    Not a stack of cards: "a window is a front panel, not a set of cards on a
+    background" (DIRECTION §3). The rows of a list are parts of one object,
+    and a gap between them would turn them into five objects.
   -->
   <Style x:Key="Rows" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
@@ -693,8 +701,8 @@
   </Style>
 
   <!--
-    Строка внутри блока. Отделена от соседней волосяным швом — тем же
-    средством, что и области панели, и никогда тенью.
+    A row inside a block. Separated from its neighbour by a hairline seam —
+    the same device as the areas of the panel, and never by a shadow.
   -->
   <Style x:Key="Rows.Item" TargetType="Border">
     <Setter Property="Background" Value="{StaticResource Row.Warm}" />
@@ -704,11 +712,11 @@
     <Setter Property="MinHeight" Value="{StaticResource Size.Row}" />
     <Style.Triggers>
       <!--
-        Наведение на строку — та же смена состояния, что у кнопки: 160 мс.
-        Строка списка не орган управления, но она **отзывается**, и по
-        отклику видно, к чему относятся кнопки справа. Без отклика
-        человек целится в кнопку, не понимая, какой строке она
-        принадлежит.
+        Hovering over a row is the same change of state as a button's: 160
+        ms. A list row is not a control, but it **responds**, and the
+        response shows what the buttons on the right belong to. Without a
+        response a person aims at a button without understanding which row it
+        belongs to.
       -->
       <Trigger Property="IsMouseOver" Value="True">
         <Trigger.EnterActions>
@@ -735,6 +743,7 @@
     </Style.Triggers>
   </Style>
 
+  <!-- A card: raised by a step in value, without a border and without a shadow. -->
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.FaceHigh}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />

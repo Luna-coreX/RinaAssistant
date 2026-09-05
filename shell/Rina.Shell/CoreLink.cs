@@ -8,25 +8,27 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell;
 
 /// <summary>
-/// Связь окна с ядром: состояние, отделка, события.
+/// The window's link to the core: state, finish, events.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задачи плана <c>4.0-F07</c> (темы) и <c>4.0-F12</c> (индикация связи).
+/// Plan items <c>4.0-F07</c> (themes) and <c>4.0-F12</c> (showing the
+/// link).
 /// </para>
 /// <para>
-/// <b>Всё, что приходит от ядра, переносится в поток окна.</b> Насос чтения
-/// живёт в своём потоке, а трогать элементы можно только из потока
-/// интерфейса. Это ровно та причина, по которой в 3.1.0 существовал
-/// Qt-адаптер: ядро всегда работало в фоне, менялось лишь то, что теперь
-/// оно в другом процессе.
+/// <b>Everything that comes from the core is carried into the window's
+/// thread.</b> The reading pump lives in a thread of its own, and elements
+/// may only be touched from the interface thread. This is exactly the
+/// reason a Qt adapter existed in 3.1.0: the core always worked in the
+/// background, and all that changed is that it now sits in another
+/// process.
 /// </para>
 /// <para>
-/// <b>Отделку выбирает человек, а хранит ядро.</b> Оболочка не читает файл
-/// настроек — она спрашивает (<c>4.0-B06</c>, ADR 0006). Пока ядро не
-/// ответило, окно уже нарисовано с той отделкой, что стоит по умолчанию:
-/// ждать ядра, чтобы показать окно, значило бы сделать запуск заложником
-/// чужого процесса.
+/// <b>The finish is chosen by the person and stored by the core.</b> The
+/// shell does not read the settings file — it asks (<c>4.0-B06</c>,
+/// ADR 0006). Until the core answers, the window is already drawn with the
+/// default finish: waiting for the core in order to show the window would
+/// make startup a hostage of another process.
 /// </para>
 /// </remarks>
 public sealed class CoreLink : IAsyncDisposable
@@ -44,11 +46,11 @@ public sealed class CoreLink : IAsyncDisposable
         _boss.StateChanged += (state, why) => OnUi(() =>
             _window.ShowCoreState(state, why));
 
-        // Не `OnUi(async () => ...)`: перегрузка по `Func<Task>` вызывала
-        // саму себя, потому что `() => _ = work()` — тоже `Func<Task>`.
-        // Переполнение стека при первом же подключении. Перегрузки больше
-        // нет: асинхронное запускает вызывающий, а перенос в поток окна
-        // делает одна и та же простая функция.
+        // Not `OnUi(async () => ...)`: the `Func<Task>` overload called
+        // itself, because `() => _ = work()` is a `Func<Task>` too. A stack
+        // overflow on the very first connection. The overload is gone: the
+        // caller starts anything asynchronous, and one and the same simple
+        // function does the carrying into the window's thread.
         _boss.Connected += connection => OnUi(
             () => { _ = LoadFinishAsync(connection); });
 
@@ -65,27 +67,28 @@ public sealed class CoreLink : IAsyncDisposable
             connection.RequestReceived += request => OnUi(
                 () => { _ = OnCoreRequestAsync(connection, request); });
 
-        // Звук заводится вместе со связью. До этого его в живой программе
-        // не было вовсе: `AudioLink` существовал, был проверен и не создан
-        // никем, кроме самой проверки. Ядро исправно синтезировало и слало
-        // речь в канал данных, который никто не читал, — Рина отвечала
-        // текстом и молчала.
+        // Sound is set up together with the link. Before that it was
+        // absent from the live program altogether: `AudioLink` existed, was
+        // checked, and was created by nobody but the check itself. The core
+        // dutifully synthesised and sent speech into a data channel nobody
+        // read — Rina answered in text and stayed silent.
         _boss.Connected += connection => OnUi(() => StartVoice(connection));
 
-        // Разделы плагинов появляются, когда ядро на связи: до этого
-        // спрашивать не у кого.
+        // Plugin sections appear once the core is connected: before that
+        // there is nobody to ask.
         _boss.Connected += connection => OnUi(
             () => { _ = RefreshPluginSectionsAsync(); });
     }
 
     /// <summary>
-    /// Спросить, у каких плагинов есть своя страница, и дать им раздел.
+    /// Ask which plugins have a page of their own and give them a section.
     /// </summary>
     /// <remarks>
-    /// Зовётся и после включения плагина: раздел обязан появиться сразу,
-    /// а не после перезапуска. Список приходит от ядра целиком, и оболочка
-    /// сверяет его со своим — так выключение уносит раздел без отдельного
-    /// сообщения об этом.
+    /// Called after a plugin is switched on as well: the section must
+    /// appear at once rather than after a restart. The list comes from the
+    /// core whole, and the shell compares it with its own — that way
+    /// switching off takes the section away without a separate message
+    /// about it.
     /// </remarks>
     public async Task RefreshPluginSectionsAsync()
     {
@@ -113,23 +116,24 @@ public sealed class CoreLink : IAsyncDisposable
         }
         catch
         {
-            // Не спросили — колонка осталась как была. Раздел плагина не то,
-            // ради чего стоит показывать человеку ошибку.
+            // We did not get to ask — the column stays as it was. A
+            // plugin's section is not worth showing a person an error for.
         }
     }
 
     private Audio.Speaker? _speaker;
     private Audio.AudioLink? _voice;
 
-    /// <summary>Динамик и канал звука; `null`, пока нет связи.</summary>
+    /// <summary>The speaker and the sound channel; `null` while there is no link.</summary>
     public Audio.AudioLink? Voice => _voice;
 
     /// <summary>
-    /// Завести звук на новой связи.
+    /// Set up sound on a new link.
     /// </summary>
     /// <remarks>
-    /// Старое хозяйство выбрасывается: связь новая — значит ядро другое, и
-    /// поток речи прежнего ядра не продолжается, а начинается заново.
+    /// The old household is thrown away: a new link means a different core,
+    /// and the previous core's speech stream is not continued but begun
+    /// afresh.
     /// </remarks>
     private void StartVoice(CoreConnection connection)
     {
@@ -140,13 +144,13 @@ public sealed class CoreLink : IAsyncDisposable
         _voice = new Audio.AudioLink(connection, connection.Data,
                                      new Audio.Microphone(), _speaker);
 
-        // Полоса показывает настоящий уровень, а не одно и то же число:
-        // прибор, у которого стрелка знает два положения, — это лампочка.
+        // The strip shows a real level rather than one and the same
+        // number: an instrument whose needle knows two positions is a lamp.
         _voice.Level += level => OnUi(() => _window.ShowLevel(level));
         _ = ApplyAudioSettingsAsync();
     }
 
-    /// <summary>Выбранные человеком устройства — из настроек ядра.</summary>
+    /// <summary>The devices the person chose — from the core's settings.</summary>
     private async Task ApplyAudioSettingsAsync()
     {
         var values = await GetAsync("input_device", "output_device");
@@ -157,22 +161,23 @@ public sealed class CoreLink : IAsyncDisposable
 
     public CoreState State => _boss.State;
 
-    /// <summary>Какая по счёту попытка поднять ядро идёт сейчас.</summary>
+    /// <summary>Which attempt at raising the core is under way.</summary>
     public int Attempt => _boss.Attempt;
 
-    /// <summary>Текущая связь; `null`, пока её нет.</summary>
+    /// <summary>The current link; `null` while there is none.</summary>
     public CoreConnection? Connection => _boss.Connection;
 
-    /// <summary>События ядра для страниц. Уже в потоке окна.</summary>
+    /// <summary>Core events for the pages. Already in the window's thread.</summary>
     public event Action<Envelope>? CoreEvent;
 
     public Task StartAsync() => _boss.StartAsync();
 
-    /// <summary>Спросить у ядра язык интерфейса и применить его.</summary>
+    /// <summary>Ask the core for the interface language and apply it.</summary>
     /// <remarks>
-    /// Настройка одна на программу и живёт в ядре, а переводит себя каждая
-    /// сторона сама ([ADR 0007](../../docs/adr/0007-localisation.md)):
-    /// слова интерфейса — оболочка, реплики Рины — ядро.
+    /// There is one setting for the whole program and it lives in the core,
+    /// while each side translates itself
+    /// ([ADR 0007](../../docs/adr/0007-localisation.md)): the interface's
+    /// words belong to the shell, Rina's lines to the core.
     /// </remarks>
     private async Task LoadLanguageAsync(CoreConnection connection)
     {
@@ -187,14 +192,15 @@ public sealed class CoreLink : IAsyncDisposable
         }
         catch
         {
-            // Не спросили — остаёмся на языке оригинала. Программа на
-            // русском лучше, чем программа, не открывшаяся из-за языка.
+            // We did not get to ask — we stay in the original language. A
+            // program in Russian is better than a program that did not open
+            // because of a language.
         }
     }
 
     private const string LanguageKey = "ui_language";
 
-    /// <summary>Спросить у ядра выбранную отделку и применить её.</summary>
+    /// <summary>Ask the core for the chosen finish and apply it.</summary>
     private async Task LoadFinishAsync(CoreConnection connection)
     {
         try
@@ -209,25 +215,26 @@ public sealed class CoreLink : IAsyncDisposable
             if (finish is not null) OnUi(() =>
             {
                 App.ApplyFinish(finish);
-                // Акцент — после отделки: он подменяет её цвета, и
-                // обратный порядок вернул бы исходный на первый же кадр.
+                // The accent after the finish: it replaces the finish's
+                // colours, and the reverse order would bring the original
+                // back for the very first frame.
                 App.ApplyAccent(finish, accent ?? App.DefaultAccent);
                 _window.ShowFinish(finish);
             });
         }
         catch
         {
-            // Не смогли спросить — остаёмся с той, что уже нарисована.
-            // Отделка не то, ради чего стоит показывать человеку ошибку.
+            // We could not ask — we stay with the one already drawn. A
+            // finish is not worth showing a person an error for.
         }
     }
 
-    /// <summary>Прочитать настройки, которыми распоряжается оболочка.</summary>
+    /// <summary>Read the settings the shell is in charge of.</summary>
     /// <remarks>
-    /// Трей, автозапуск и хоткеи хранятся в ядре, а исполняются оболочкой:
-    /// ядро хранит намерение, оболочка приводит систему в соответствие.
-    /// Реестр и клавиатура — система, а системный слой в 4.0 принадлежит
-    /// оболочке.
+    /// The tray, autostart and hotkeys are stored in the core and carried
+    /// out by the shell: the core holds the intent, the shell brings the
+    /// system into line. The registry and the keyboard are the system, and
+    /// in 4.0 the system layer belongs to the shell.
     /// </remarks>
     public async Task<JsonObject?> GetAsync(params string[] keys)
     {
@@ -245,7 +252,7 @@ public sealed class CoreLink : IAsyncDisposable
         catch { return null; }
     }
 
-    /// <summary>Сменить отделку и запомнить выбор в ядре.</summary>
+    /// <summary>Change the finish and remember the choice in the core.</summary>
     public async Task SetFinishAsync(string finish)
     {
         App.ApplyFinish(finish);
@@ -259,30 +266,32 @@ public sealed class CoreLink : IAsyncDisposable
         }
         catch
         {
-            // Показали уже; не запомнилось — узнаем при следующем запуске.
+            // Already shown; if it was not remembered we shall find out at the next start.
         }
     }
 
     /// <summary>
-    /// Ядро просит разрешения — спросить человека (<c>4.0-F11</c>, §11).
+    /// The core asks for permission — ask the person (<c>4.0-F11</c>, §11).
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Окно одно на всё опасное: два одновременных вопроса о необратимом —
-    /// это два способа согласиться не глядя.
+    /// One window for everything dangerous: two simultaneous questions
+    /// about something irreversible are two ways of agreeing without
+    /// looking.
     /// </para>
     /// <para>
-    /// <b>Отказ по умолчанию.</b> Что бы ни случилось — закрыли окно, истёк
-    /// срок, оболочка не поняла запрос — ответ «нет». Согласие бывает только
-    /// явным.
+    /// <b>Refusal by default.</b> Whatever happens — the window was closed,
+    /// the deadline passed, the shell did not understand the request — the
+    /// answer is "no". Consent is only ever explicit.
     /// </para>
     /// </remarks>
     private async Task OnCoreRequestAsync(CoreConnection connection,
                                           Envelope request)
     {
-        // --- системный слой (ADR 0009) ---------------------------------
-        // Ядро решило, что сделать; трогает машину оболочка. Ответ —
-        // факт, а не предложение: слова говорит ядро.
+        // --- the system layer (ADR 0009) -------------------------------
+        // The core decided what to do; the shell touches the machine. The
+        // answer is a fact, not a suggestion: the words are the core's to
+        // say.
         if (request.Method == "system.do")
         {
             var action = request.Payload["action"]?.GetValue<string>() ?? "";
@@ -308,8 +317,9 @@ public sealed class CoreLink : IAsyncDisposable
             var kind = request.Payload["kind"]?.GetValue<string>() ?? "file";
             var outcome = Platform.Launcher.Start(launch, kind, trusted: false);
 
-            // Неподписанное при первом запуске требует согласия. Спрашивает
-            // оболочка, а не ядро: у неё окно, и она же видит подпись.
+            // Something unsigned needs consent on its first launch. The
+            // shell asks, not the core: the shell has the window, and the
+            // shell is what sees the signature.
             if (outcome.NeedsTrust)
                 outcome = await AskTrustAsync(launch, kind);
 
@@ -321,15 +331,15 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
-        // Ядро открывает поток речи своим запросом: у звука есть формат, и
-        // частоту объявляют, а не угадывают. Ответить обязательно — иначе
-        // ядро ждёт и молчит.
+        // The core opens a speech stream with a request of its own: sound
+        // has a format, and the rate is declared rather than guessed. An
+        // answer is obligatory — otherwise the core waits in silence.
         if (request.Method == Methods.StreamOpen)
         {
             var kind = request.Payload["kind"]?.GetValue<string>() ?? "";
             var rate = request.Payload["format"]?["rate"]?.GetValue<int>()
                        ?? Audio.Microphone.SampleRate;
-            // Ядро кладёт номер потока в конверт; без него открывать нечего.
+            // The core puts the stream number in the envelope; without it there is nothing to open.
             var stream = request.StreamId
                          ?? request.Payload["stream_id"]?.GetValue<int>() ?? 0;
             var credit = stream == 0
@@ -354,12 +364,13 @@ public sealed class CoreLink : IAsyncDisposable
 
         if (request.Method != Methods.PermissionRequest)
         {
-            // Метод, которого оболочка не знает, — не повод молчать: ядро
-            // ждёт ответа, и молчание превратится в его таймаут.
+            // A method the shell does not know is no reason to stay
+            // silent: the core is waiting for an answer, and silence turns
+            // into its timeout.
             await connection.ReplyAsync(request, new JsonObject
             {
                 ["granted"] = false,
-                // Причина уезжает в ядро и в журнал, а не человеку.
+                // The reason goes to the core and to the log, not to the person.
                 ["reason"] = "the shell does not know this request", // not UI
             });
             return;
@@ -399,10 +410,10 @@ public sealed class CoreLink : IAsyncDisposable
 
     private Pages.ConfirmWindow? _asking;
 
-    /// <summary>Сказать Рине то, что набрано.</summary>
+    /// <summary>Say to Rina what was typed.</summary>
     /// <remarks>
-    /// Ответ придёт событием, а не этим вызовом: команда может думать
-    /// секундами и сказать по дороге несколько вещей.
+    /// The answer will come as an event rather than from this call: a
+    /// command may think for seconds and say several things along the way.
     /// </remarks>
     public async Task HandleAsync(string text, string source = "typed")
     {
@@ -419,7 +430,7 @@ public sealed class CoreLink : IAsyncDisposable
         catch { /* ядро занято или ушло */ }
     }
 
-    /// <summary>Переключить настройку, которой распоряжается человек.</summary>
+    /// <summary>Toggle a setting the person is in charge of.</summary>
     public async Task<bool> SetAsync(string key, JsonNode value)
     {
         if (_boss.Connection is not { Ready: true } connection) return false;
@@ -435,7 +446,7 @@ public sealed class CoreLink : IAsyncDisposable
         catch { return false; }
     }
 
-    /// <summary>Послушать один раз — по сочетанию клавиш.</summary>
+    /// <summary>Listen once — on a hotkey.</summary>
     public async Task ListenOnceAsync()
     {
         if (_boss.Connection is not { Ready: true } connection) return;
@@ -449,12 +460,13 @@ public sealed class CoreLink : IAsyncDisposable
     }
 
     /// <summary>
-    /// Отдать ядру индекс программ.
+    /// Hand the core the program index.
     /// </summary>
     /// <remarks>
-    /// Собирается в фоновом потоке: обход меню «Пуск» и проверка подписей
-    /// занимают секунды, и делать это в потоке окна значит подвесить окно
-    /// ровно там, где человек ждёт ответа.
+    /// Assembled in a background thread: walking the Start menu and
+    /// checking signatures takes seconds, and doing that in the window's
+    /// thread means freezing the window exactly where the person is waiting
+    /// for an answer.
     /// </remarks>
     private async Task ReplyIndexAsync(CoreConnection connection,
                                        Envelope request)
@@ -489,12 +501,12 @@ public sealed class CoreLink : IAsyncDisposable
     }
 
     /// <summary>
-    /// Спросить про неподписанное и запустить, если разрешили.
+    /// Ask about something unsigned and launch it if permission was given.
     /// </summary>
     /// <remarks>
-    /// Показывается всё, чем можно решать: имя, полный путь, отсутствие
-    /// подписи. «Всегда доверять» запоминается и снимается в настройках
-    /// (<c>4.0-G10</c>).
+    /// Everything one can decide by is shown: the name, the full path, the
+    /// absence of a signature. "Always trust" is remembered and is taken
+    /// back in settings (<c>4.0-G10</c>).
     /// </remarks>
     private async Task<Platform.Launcher.Outcome> AskTrustAsync(string launch,
                                                                 string kind)
@@ -541,7 +553,7 @@ public sealed class CoreLink : IAsyncDisposable
 
     public ValueTask DisposeAsync() => _boss.DisposeAsync();
 
-    /// <summary>Где лежит ядро относительно оболочки.</summary>
+    /// <summary>Where the core lies relative to the shell.</summary>
     public static CoreLaunch FindCore()
     {
         var dir = AppContext.BaseDirectory;
@@ -553,22 +565,24 @@ public sealed class CoreLink : IAsyncDisposable
     }
 
     /// <summary>
-    /// Каким Python запускать ядро.
+    /// Which Python to run the core with.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Окружение проекта, если оно есть, — и только потом тот `python`,
-    /// который найдётся в `PATH`. Разница не косметическая: голоса, модели
-    /// распознавания и звук стоят <b>в окружении</b>, а не в системном
-    /// интерпретаторе. Запущенное «просто питоном» ядро поднимается, отвечает
-    /// на всё и честно сообщает, что ни одного движка синтеза и ни одного
-    /// движка распознавания нет, — программа выглядит работающей и не делает
-    /// ровно того, ради чего она есть.
+    /// The project's environment, if there is one — and only then whatever
+    /// `python` turns up in `PATH`. The difference is not cosmetic: the
+    /// voices, the recognition models and the sound are installed <b>in the
+    /// environment</b>, not in the system interpreter. A core started with
+    /// "just python" comes up, answers everything, and honestly reports
+    /// that there is not one synthesis engine and not one recognition
+    /// engine — the program looks as if it works and does exactly none of
+    /// what it exists for.
     /// </para>
     /// <para>
-    /// В 3.1.0 вопроса не было: программу запускали тем же интерпретатором,
-    /// в котором она жила. Разделив процессы, мы отдали выбор интерпретатора
-    /// оболочке — и обязаны выбирать осознанно.
+    /// In 3.1.0 the question did not arise: the program was started with
+    /// the same interpreter it lived in. By splitting the processes we
+    /// handed the choice of interpreter to the shell — and we are obliged
+    /// to choose deliberately.
     /// </para>
     /// </remarks>
     public static string Interpreter(string root)
