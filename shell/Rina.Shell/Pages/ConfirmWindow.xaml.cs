@@ -3,39 +3,41 @@ using System.Windows.Threading;
 
 namespace Rina.Shell.Pages;
 
-/// <summary>Что человек решил.</summary>
+/// <summary>What the person decided.</summary>
 public enum Consent
 {
-    /// <summary>Согласился явно.</summary>
+    /// <summary>Agreed explicitly.</summary>
     Granted,
-    /// <summary>Отказался явно.</summary>
+    /// <summary>Refused explicitly.</summary>
     Refused,
-    /// <summary>Не ответил в срок — то же, что отказ.</summary>
+    /// <summary>Did not answer in time — the same as a refusal.</summary>
     Expired,
 }
 
 /// <summary>
-/// Окно подтверждения: единая точка для всех опасных действий.
+/// The confirmation window: one point for every dangerous action.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F11</c>; §11 спецификации.
+/// Plan item <c>4.0-F11</c>; §11 of the spec.
 /// </para>
 /// <para>
-/// <b>Показывается предпросмотр, а не название действия.</b> «Компьютер
-/// будет выключен немедленно» человек успевает осознать; <c>power_action</c>
-/// не значит ничего. Это прямое требование §11, и текст приходит от ядра:
-/// только оно знает, что именно произойдёт.
+/// <b>A preview is shown, not the name of the action.</b> "The computer
+/// will be shut down immediately" is something a person has time to take
+/// in; <c>power_action</c> means nothing. This is a direct requirement of
+/// §11, and the text comes from the core: only it knows what will actually
+/// happen.
 /// </para>
 /// <para>
-/// <b>Отказ по умолчанию.</b> Не ответили в срок — значит «нет». Не «ждём
-/// дальше» и не «раз молчит, значит согласен»: молчание может означать, что
-/// окна вообще никто не увидел.
+/// <b>Refusal by default.</b> No answer in time means "no". Not "keep
+/// waiting" and not "silence means consent": silence may mean nobody saw
+/// the window at all.
 /// </para>
 /// <para>
-/// <b>Закрыть окно — то же, что отказаться.</b> Крестик, Escape и «Отмена»
-/// делают одно и то же, потому что человек, закрывающий окно с вопросом об
-/// опасном действии, совершенно точно не соглашается.
+/// <b>Closing the window is the same as refusing.</b> The close button,
+/// Escape and "Cancel" do one and the same thing, because a person who
+/// closes a window asking about a dangerous action is quite certainly not
+/// agreeing.
 /// </para>
 /// </remarks>
 public partial class ConfirmWindow : Window
@@ -46,28 +48,31 @@ public partial class ConfirmWindow : Window
     };
     private DateTimeOffset _deadline;
 
-    /// <summary>Решение человека. До ответа — отказ.</summary>
+    /// <summary>The person's decision. Refusal until they answer.</summary>
     public Consent Result { get; private set; } = Consent.Expired;
 
-    /// <summary>Есть ли у вопроса срок. Без срока окно ждёт сколько угодно.</summary>
+    /// <summary>Whether the question has a deadline. Without one the window waits as long as it takes.</summary>
     public bool Timed { get; }
 
     /// <param name="ttlSeconds">
-    /// Сколько секунд ждать ответа. <b>Ноль или меньше — ждать без срока.</b>
+    /// How many seconds to wait for an answer. <b>Zero or less — wait
+    /// without a deadline.</b>
     /// </param>
     /// <remarks>
     /// <para>
-    /// Срок нужен не всякому вопросу. Он существует для того, что затеяно
-    /// <b>голосом</b>: человек сказал «выключи компьютер», отошёл, и окно
-    /// не должно висеть до утра — молчание тогда значит «нет».
+    /// Not every question needs a deadline. It exists for what was started
+    /// <b>by voice</b>: the person said "shut down the computer", walked
+    /// away, and the window must not hang there until morning — silence
+    /// then means "no".
     /// </para>
     /// <para>
-    /// Вопрос, который человек открыл сам нажатием, — другое дело: он
-    /// сидит перед экраном и уже смотрит на окно. Срок здесь означал бы,
-    /// что окно исчезнет, пока он читает, — и это ровно то, что случилось
-    /// со «Сбросить настройки»: `Math.Max(ttl, 1)` превращал переданный
-    /// ноль в одну секунду, и окно пропадало раньше, чем его успевали
-    /// прочесть.
+    /// A question the person opened themselves by pressing something is a
+    /// different matter: they are sitting in front of the screen and
+    /// already looking at the window. A deadline here would mean the window
+    /// disappearing while they read — and that is exactly what happened
+    /// with "Reset settings": `Math.Max(ttl, 1)` turned the zero that was
+    /// passed into one second, and the window vanished before it could be
+    /// read.
     /// </para>
     /// </remarks>
     public ConfirmWindow(string preview, string reason, int ttlSeconds)
@@ -86,17 +91,19 @@ public partial class ConfirmWindow : Window
         }
         else
         {
-            // Показания нет — и место под него не занимаем: пустая ячейка
-            // на месте счётчика читалась бы как «сейчас что-то появится».
+            // There is no reading, so we do not hold space for one: an
+            // empty cell where the counter goes would read as "something is
+            // about to appear here".
             Countdown.Visibility = Visibility.Collapsed;
-            // Без срока «не ответили» невозможно, поэтому и отказ по
-            // умолчанию другой: закрыли окно — отказались.
+            // Without a deadline "did not answer" is impossible, so the
+            // default refusal is a different one: the window was closed —
+            // they refused.
             Result = Consent.Refused;
         }
 
-        // Опасное не подтверждают по инерции: фокус на отказе, а не на
-        // действии. Пробел и Enter тогда отказывают, и случайное нажатие
-        // ничего не ломает.
+        // Dangerous things are not confirmed out of momentum: focus is on
+        // the refusal, not on the action. Space and Enter then refuse, and
+        // an accidental press breaks nothing.
         Loaded += (_, _) => Refuse.Focus();
         Closed += (_, _) => _timer.Stop();
     }
@@ -113,8 +120,8 @@ public partial class ConfirmWindow : Window
             Close();
             return;
         }
-        // Моноширинные цифры и постоянная ширина: показание прибора не
-        // должно дёргаться раз в секунду (§3 дизайн-системы).
+        // Monospaced digits and a constant width: an instrument reading
+        // must not twitch once a second (§3 of the design system).
         Countdown.Text = $"{(int)left.TotalMinutes:00}:{left.Seconds:00}";
     }
 
@@ -130,7 +137,7 @@ public partial class ConfirmWindow : Window
         Close();
     }
 
-    /// <summary>Вопрос закрылся сам: человек ответил голосом.</summary>
+    /// <summary>The question closed itself: the person answered by voice.</summary>
     public void Withdraw()
     {
         Result = Consent.Expired;

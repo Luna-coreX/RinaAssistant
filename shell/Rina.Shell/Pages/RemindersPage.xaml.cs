@@ -8,17 +8,18 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Pages;
 
-/// <summary>Запланированное, как его видит человек.</summary>
+/// <summary>Something planned, as a person sees it.</summary>
 public sealed record Planned(string Id, string Kind, string Text, string When);
 
 /// <summary>
-/// Напоминания: что запланировано и как это снять.
+/// Reminders: what is planned and how to take it off.
 /// </summary>
 /// <remarks>
-/// Список приходит от ядра, и сработавшее тоже: планировщик живёт там
-/// (<c>4.0-E05</c>), а страница лишь показывает. Поэтому она подписана на
-/// <c>reminder.fired</c> — иначе сработавший таймер остался бы в списке до
-/// следующего захода в раздел, и человек увидел бы неправду.
+/// The list comes from the core, and so does what has fired: the scheduler
+/// lives there (<c>4.0-E05</c>), and the page only shows things. That is
+/// why it subscribes to <c>reminder.fired</c> — otherwise a timer that had
+/// gone off would stay in the list until the next visit to the section,
+/// and the person would be shown an untruth.
 /// </remarks>
 public partial class RemindersPage : UserControl
 {
@@ -45,7 +46,7 @@ public partial class RemindersPage : UserControl
 
     private void OnCoreEvent(Envelope message)
     {
-        // Сработало — значит в списке его больше нет.
+        // It fired — so it is no longer in the list.
         if (message.Method is Events.ReminderFired) _ = ReloadAsync();
     }
 
@@ -81,11 +82,11 @@ public partial class RemindersPage : UserControl
     }
 
     /// <summary>
-    /// Показать пустое состояние вместо списка или убрать его.
+    /// Show the empty state instead of the list, or take it away.
     /// </summary>
     /// <remarks>
-    /// Они делят одно место, а не соседствуют: список и объяснение, почему
-    /// список пуст, одновременно не бывают верны.
+    /// They share one place rather than sitting side by side: a list and an
+    /// explanation of why the list is empty are never both true at once.
     /// </remarks>
     private void Show(FrameworkElement? nothing)
     {
@@ -96,11 +97,11 @@ public partial class RemindersPage : UserControl
                                           : Visibility.Collapsed;
     }
 
-    /// <summary>Готовые отсрочки: минуты от «сейчас».</summary>
+    /// <summary>Ready-made delays: minutes from "now".</summary>
     /// <remarks>
-    /// Список короткий нарочно. Напоминание «через сколько-то» человек
-    /// ставит на бегу, и выбор из пяти строк быстрее, чем поле, куда надо
-    /// вписать число и выбрать единицу.
+    /// The list is short on purpose. A "in so many minutes" reminder is set
+    /// on the run, and picking one of five lines is faster than a field
+    /// where a number has to be typed and a unit chosen.
     /// </remarks>
     private static readonly (int Minutes, string Title)[] Delays =
     [
@@ -124,13 +125,14 @@ public partial class RemindersPage : UserControl
     }
 
     /// <summary>
-    /// Завести напоминание.
+    /// Set up a reminder.
     /// </summary>
     /// <remarks>
-    /// Время уходит в ядро **меткой**, а не словами: у окна есть часы, и
-    /// составлять фразу «напомни через пятнадцать минут» ради того, чтобы
-    /// ядро разобрало её обратно, значило бы проверять разбор вместо
-    /// намерения. Разбор остаётся там, где он нужен, — в голосе.
+    /// The time goes to the core as a **stamp**, not as words: the window
+    /// has a clock, and composing the phrase "remind me in fifteen minutes"
+    /// just so the core could parse it back would mean testing the parser
+    /// instead of the intent. Parsing stays where it is needed — in the
+    /// voice.
     /// </remarks>
     private async void OnCreate(object sender, RoutedEventArgs e)
     {
@@ -145,9 +147,9 @@ public partial class RemindersPage : UserControl
         var typed = AtTime.Text.Trim();
         if (typed.Length > 0)
         {
-            // «19:30» — сегодня, а если время уже прошло, то завтра:
-            // человек, ставящий напоминание на утро вечером, имеет в виду
-            // завтрашнее утро, а не прошедшее.
+            // "19:30" means today, and tomorrow if the time has already
+            // passed: a person setting an evening reminder for the morning
+            // means tomorrow morning, not the one gone by.
             if (!TimeSpan.TryParse(typed, out var at))
             {
                 Note.Text = S("Время пишется как 19:30.");
@@ -176,11 +178,11 @@ public partial class RemindersPage : UserControl
         await ReloadAsync();
     }
 
-    /// <summary>Сколько напоминаний показано — для сквозной проверки.</summary>
+    /// <summary>How many reminders are shown — for the end-to-end check.</summary>
     public int PlannedCount => _items.Count;
 
     /// <summary>
-    /// Завести напоминание снаружи — для сквозной проверки.
+    /// Set up a reminder from outside — for the end-to-end check.
     /// </summary>
     public async Task<bool> CreateAsync(string text, int minutes)
     {
@@ -196,12 +198,12 @@ public partial class RemindersPage : UserControl
     }
 
     /// <summary>
-    /// Сколько осталось.
+    /// How much is left.
     /// </summary>
     /// <remarks>
-    /// Показания прибора не должны дёргаться при смене значения, поэтому
-    /// цифры моноширинные (§3), а формат — постоянной ширины: «09:59» и
-    /// «10:00» занимают одинаковое место.
+    /// An instrument reading must not twitch when the value changes, so the
+    /// digits are monospaced (§3) and the format is of constant width:
+    /// "09:59" and "10:00" take up the same room.
     /// </remarks>
     private static string Until(double fireAt)
     {

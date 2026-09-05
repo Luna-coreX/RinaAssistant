@@ -6,28 +6,30 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Overlays;
 
 /// <summary>
-/// Плашка «слушаю» поверх экрана.
+/// The "listening" plaque, on top of the screen.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замечание человека: в 3.1.0 включённое «всегда слушать» и вызов
-/// сочетанием были видны на экране, после переезда — нет.
+/// Noted by a person: in 3.1.0 both "always listen" being on and a call by
+/// hotkey were visible on screen; after the move they were not.
 /// </para>
 /// <para>
-/// <b>Микрофон, работающий незаметно, — это не мелочь интерфейса.</b>
-/// Человек имеет право видеть, что его слушают, не открывая окна и не
-/// вспоминая, нажимал ли он что-то полчаса назад. Поэтому плашка
-/// появляется на всё время слушания, а не мигает на секунду.
+/// <b>A microphone working unnoticed is not an interface detail.</b> A
+/// person has the right to see that they are being listened to without
+/// opening a window and without recalling whether they pressed something
+/// half an hour ago. So the plaque stays up for the whole time of
+/// listening rather than blinking for a second.
 /// </para>
 /// <para>
-/// <b>Два состояния, а не одно.</b> «Слушаю» разовое — по сочетанию, на
-/// несколько секунд; «всегда слушаю» — режим, включённый до отмены. Они
-/// выглядят по-разному, потому что значат разное: первое кончится само,
-/// второе — нет.
+/// <b>Two states, not one.</b> A one-off "listening" comes from a hotkey
+/// and lasts a few seconds; "always listening" is a mode, on until it is
+/// cancelled. They look different because they mean different things: the
+/// first ends by itself, the second does not.
 /// </para>
 /// <para>
-/// Сверху по центру, а не в углу: там её видно, не отводя глаз от того,
-/// чем человек занят, и она не спорит с уведомлениями внизу справа.
+/// Top centre, not a corner: there it is seen without looking away from
+/// whatever the person is doing, and it does not argue with notifications
+/// in the bottom right.
 /// </para>
 /// </remarks>
 public partial class Listening : Window
@@ -40,24 +42,24 @@ public partial class Listening : Window
     }
 
     /// <summary>
-    /// Режим «всегда слушаю».
+    /// The "always listening" mode.
     /// </summary>
     /// <remarks>
-    /// Нужен снаружи: разовое слушание кончается событием
-    /// `listening.stopped`, и по нему плашку надо убрать — но не тогда,
-    /// когда включён режим. Иначе первая же распознанная фраза погасила бы
-    /// признак того, что микрофон продолжает работать.
+    /// Needed from outside: one-off listening ends with a
+    /// `listening.stopped` event, and the plaque has to go on it — but not
+    /// while the mode is on. Otherwise the first recognised phrase would
+    /// put out the sign that the microphone is still working.
     /// </remarks>
     public bool Always => _always && IsVisible;
 
-    /// <summary>Видна ли плашка — для сквозной проверки.</summary>
+    /// <summary>Is the plaque visible — for the end-to-end check.</summary>
     public bool Visible => IsVisible && Card.Opacity > 0.5;
 
-    /// <summary>Что на ней написано — для сквозной проверки.</summary>
+    /// <summary>What it says — for the end-to-end check.</summary>
     public string Caption => Label.Text;
 
     /// <summary>
-    /// Показать. <paramref name="always"/> — режим, а не разовое слушание.
+    /// Show it. <paramref name="always"/> is the mode, not one-off listening.
     /// </summary>
     public void Appear(bool always)
     {
@@ -71,7 +73,7 @@ public partial class Listening : Window
         Pulse();
     }
 
-    /// <summary>Спрятать. Режим «всегда» так не гасится — только отменой.</summary>
+    /// <summary>Hide it. The "always" mode is not put out this way — only by cancelling.</summary>
     public void Vanish()
     {
         _always = false;
@@ -83,11 +85,11 @@ public partial class Listening : Window
     }
 
     /// <summary>
-    /// Точка дышит, пока слушают.
+    /// The dot breathes while listening goes on.
     /// </summary>
     /// <remarks>
-    /// В режиме «всегда» медленнее: быстрое мигание час подряд —
-    /// раздражитель, а не сообщение.
+    /// Slower in "always" mode: fast blinking for an hour on end is an
+    /// irritant, not a message.
     /// </remarks>
     private void Pulse()
     {

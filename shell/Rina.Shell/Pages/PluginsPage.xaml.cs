@@ -8,32 +8,33 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Плагины: что установлено, что включено и что плагин говорит о себе.
+/// Plugins: what is installed, what is on, and what a plugin says about
+/// itself.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F04</c>, последняя её часть.
+/// Plan item <c>4.0-F04</c>, its last part.
 /// </para>
 /// <para>
-/// <b>Страницу плагина рисует оболочка, а описывает плагин.</b> Это решение
-/// 3.1.0 (<c>plugins/page_spec.py</c>), принятое ещё до разделения
-/// процессов: плагин перестал возвращать готовый виджет и стал возвращать
-/// список элементов. Тогда это было предусмотрительностью, сейчас — тем
-/// единственным, благодаря чему страница плагина, написанного на Python,
-/// рисуется в другом процессе на другом языке без единой правки в самом
-/// плагине.
+/// <b>A plugin's page is drawn by the shell and described by the
+/// plugin.</b> This was a 3.1.0 decision (<c>plugins/page_spec.py</c>),
+/// taken before the processes were split: a plugin stopped returning a
+/// ready-made widget and began returning a list of elements. Back then it
+/// was foresight; now it is the one thing thanks to which the page of a
+/// plugin written in Python is drawn in another process in another
+/// language without a single change to the plugin itself.
 /// </para>
 /// <para>
-/// <b>Незнакомый элемент показывается, а не пропускается.</b> То же правило
-/// с зубами, что и для незнакомой настройки в
-/// [ADR 0006](../../../docs/adr/0006-settings-ownership.md): плагин
-/// использовал элемент, которого оболочка не знает, — и молчаливый пропуск
-/// сделал бы часть его страницы невидимой без единого следа.
+/// <b>An unfamiliar element is shown, not skipped.</b> The same rule with
+/// teeth as for an unfamiliar setting in
+/// [ADR 0006](../../../docs/adr/0006-settings-ownership.md): the plugin
+/// used an element the shell does not know — and skipping it in silence
+/// would make part of its page invisible without a single trace.
 /// </para>
 /// <para>
-/// <b>Сбойный плагин остаётся в списке.</b> Человек поставил его сам и
-/// должен увидеть причину; исчезнувший плагин выглядит как «я его не
-/// ставил».
+/// <b>A broken plugin stays in the list.</b> A person installed it
+/// themselves and must see the reason; a plugin that vanished looks like
+/// "I never installed it".
 /// </para>
 /// </remarks>
 public partial class PluginsPage : UserControl
@@ -42,10 +43,10 @@ public partial class PluginsPage : UserControl
     private readonly Dictionary<string, string> _names = [];
     private string _open = "";
 
-    /// <summary>Сколько плагинов показано — для сквозной проверки.</summary>
+    /// <summary>How many plugins are shown — for the end-to-end check.</summary>
     public int PluginCount => Items.Children.Count;
 
-    /// <summary>Список получен и разложен.</summary>
+    /// <summary>The list has arrived and been laid out.</summary>
     public event Action? Ready;
 
     public PluginsPage(CoreLink? link)
@@ -65,23 +66,23 @@ public partial class PluginsPage : UserControl
     }
 
     /// <summary>
-    /// Включить первый плагин со своей страницей и открыть её.
+    /// Switch on the first plugin that has a page of its own and open it.
     /// </summary>
     /// <remarks>
-    /// Для сквозной проверки: щёлкать по карточкам она не умеет, а пройти
-    /// весь круг — список, включение, страница — обязана.
+    /// For the end-to-end check: it cannot click on cards, but it is
+    /// obliged to go the whole round — the list, switching on, the page.
     ///
-    /// <b>И вернуть как было.</b> Проверка идёт на настоящем ядре, то есть
-    /// на настройках человека; оставить после себя включённые плагины она
-    /// права не имеет. Ровно то же правило, по которому проверка автозапуска
-    /// возвращает запись в реестре.
+    /// <b>And put things back.</b> The check runs against the real core,
+    /// that is, against a person's settings; it has no right to leave
+    /// plugins switched on behind it. Exactly the same rule by which the
+    /// autostart check puts the registry entry back.
     /// </remarks>
-    /// <returns>Сколько элементов было на странице, пока она была открыта.</returns>
+    /// <returns>How many elements the page had while it was open.</returns>
     /// <param name="keepOpen">
-    /// Оставить включённым и раскрытым. Нужно снимку: он делается **после**
-    /// вызова, и вернуть всё как было значило бы снять пустой список.
-    /// Настройки человека при этом всё равно возвращаются — включённым
-    /// остаётся плагин, но не запись о нём.
+    /// Leave it switched on and open. The screenshot needs this: it is
+    /// taken **after** the call, and putting everything back would mean
+    /// photographing an empty list. The person's settings are restored all
+    /// the same — what stays on is the plugin, not the record of it.
     /// </param>
     public async Task<int> OpenFirstPageAsync(bool keepOpen = false)
     {
@@ -102,8 +103,8 @@ public partial class PluginsPage : UserControl
                 if (id.Length == 0 || plugin["broken"]?.GetValue<bool>() == true)
                     continue;
 
-                // Страница есть только у включённого: выключенный плагин не
-                // загружен, и спрашивать его не о чем.
+                // Only a plugin that is on has a page: a plugin that is
+                // off is not loaded, and there is nothing to ask it.
                 await SetEnabledAsync(id, true);
                 var after = await Ask(Methods.PluginsList);
                 var hasPage = after?["items"]?.AsArray()
@@ -114,17 +115,18 @@ public partial class PluginsPage : UserControl
 
                 _open = id;
                 await ShowPageAsync();
-                // Считаем сейчас: возврат состояния ниже страницу закроет,
-                // и спрашивать после было бы поздно.
+                // Count now: restoring the state below will close the
+                // page, and asking afterwards would be too late.
                 return PageElementCount;
             }
             return 0;
         }
         finally
         {
-            // При `keepOpen` возврат откладывается до `RestoreAsync`: снимок
-            // делается после, и вернуть состояние здесь значило бы снять
-            // пустой список.
+            // With `keepOpen` the restore is put off until
+            // `RestoreAsync`: the screenshot is taken afterwards, and
+            // restoring the state here would mean photographing an empty
+            // list.
             var now = keepOpen ? null : await Ask(Methods.PluginsList);
             foreach (var plugin in now?["items"]?.AsArray()
                                    ?.OfType<JsonObject>() ?? [])
@@ -137,7 +139,7 @@ public partial class PluginsPage : UserControl
         }
     }
 
-    /// <summary>Какие плагины включены сейчас — для сквозной проверки.</summary>
+    /// <summary>Which plugins are on right now — for the end-to-end check.</summary>
     public async Task<string[]> EnabledAsync()
     {
         var now = await Ask(Methods.PluginsList);
@@ -149,17 +151,17 @@ public partial class PluginsPage : UserControl
             .ToArray();
     }
 
-    /// <summary>Что было включено до того, как мы вмешались.</summary>
+    /// <summary>What was on before we interfered.</summary>
     private HashSet<string> _wasEnabled = [];
 
     /// <summary>
-    /// Вернуть включённое как было.
+    /// Put back what was switched on.
     /// </summary>
     /// <remarks>
-    /// Нужно снимку: он раскрывает страницу плагина, а значит включает
-    /// плагин — и обязан выключить обратно. Настройки под проверкой
-    /// настоящие, человеческие; то же правило, по которому проверка
-    /// автозапуска возвращает запись в реестре.
+    /// The screenshot needs this: it opens a plugin's page, which means
+    /// switching the plugin on — and it is obliged to switch it back off.
+    /// The settings under a check are real, a person's own; the same rule
+    /// by which the autostart check puts the registry entry back.
     /// </remarks>
     public async Task RestoreAsync()
     {
@@ -176,12 +178,13 @@ public partial class PluginsPage : UserControl
     }
 
     /// <summary>
-    /// Поставить плагин из распакованной папки.
+    /// Install a plugin from an unpacked folder.
     /// </summary>
     /// <remarks>
-    /// Окно выбора показывает оболочка, ставит ядро: диалог — интерфейс, а
-    /// распаковка и проверка манифеста — работа с данными. Она же и
-    /// откажет, если в папке нет `plugin.json` или `main.py`.
+    /// The shell shows the picker, the core installs: a dialogue is
+    /// interface, while unpacking and checking the manifest are work with
+    /// data. It is also what refuses when the folder has no `plugin.json`
+    /// or `main.py`.
     /// </remarks>
     private async void OnInstallFolder(object sender, RoutedEventArgs e)
     {
@@ -214,9 +217,10 @@ public partial class PluginsPage : UserControl
         if (answer is null) return;          // причину уже сказали в Note
 
         var id = answer["plugin_id"]?.GetValue<string>() ?? "";
-        // Заменённый плагин ядро принудительно выключает: код нового
-        // плагина выполняется при включении, и наследовать чужое «включено»
-        // значит запустить подсунутый архив без ведома человека.
+        // The core forcibly switches a replaced plugin off: a new
+        // plugin's code runs when it is switched on, and inheriting
+        // somebody else's "on" means running a slipped-in archive without
+        // the person knowing.
         Note.Text = answer["replaced"]?.GetValue<bool>() == true
             ? S("Заменён: {0}. Он выключен — включите, если доверяете.", id)
             : S("Поставлен: {0}. Включите его, чтобы начал работать.", id);
@@ -224,12 +228,12 @@ public partial class PluginsPage : UserControl
     }
 
     /// <summary>
-    /// Перечитать каталог плагинов.
+    /// Re-read the plugin catalogue.
     /// </summary>
     /// <remarks>
-    /// Папку кладут руками, и Рина об этом не узнаёт: следить за каталогом
-    /// постоянно значит держать наблюдателя ради события, которое случается
-    /// раз в месяц. Кнопка честнее.
+    /// A folder is put there by hand, and Rina does not find out about it:
+    /// watching the catalogue all the time means keeping a watcher for an
+    /// event that happens once a month. A button is more honest.
     /// </remarks>
     private async void OnRefresh(object sender, RoutedEventArgs e)
     {
@@ -253,8 +257,8 @@ public partial class PluginsPage : UserControl
             Items.Children.Add(BuildRow(item));
         }
 
-        // Последняя строка без шва: он совпал бы с краем блока и
-        // перечеркнул бы скругление.
+        // The last row has no seam: it would coincide with the edge of the
+        // block and cross out the rounding.
         if (Items.Children.Count > 0
             && Items.Children[^1] is Border tail)
             tail.BorderThickness = new Thickness(0);
@@ -305,8 +309,9 @@ public partial class PluginsPage : UserControl
             Style = (Style)FindResource("Text.Body"),
         });
 
-        // Сбой — вместо описания, а не рядом с ним: причина важнее того,
-        // что плагин о себе рассказывал, когда работал.
+        // The failure goes instead of the description, not next to it: the
+        // reason matters more than what the plugin said about itself while
+        // it worked.
         var note = broken
             ? plugin["error"]?.GetValue<string>() ?? S("плагин не загрузился")
             : Describe(plugin);
@@ -345,8 +350,9 @@ public partial class PluginsPage : UserControl
         {
             Style = (Style)FindResource("Toggle"),
             IsChecked = enabled,
-            // Сбойный включить нельзя: включение ничего не изменит, а
-            // переключатель, возвращающийся обратно, выглядит поломкой.
+            // A broken one cannot be switched on: switching would change
+            // nothing, and a toggle that springs back looks like a
+            // breakage.
             IsEnabled = !broken,
             VerticalAlignment = VerticalAlignment.Center,
         };
@@ -379,8 +385,8 @@ public partial class PluginsPage : UserControl
         });
         if (answer?["plugin"] is not JsonObject plugin) return;
 
-        // Ядро вернуло состояние **после** изменения: плагин мог отказаться
-        // загружаться, и «включено» было бы неправдой.
+        // The core returned the state **after** the change: the plugin
+        // could have refused to load, and "on" would have been an untruth.
         var now = plugin["enabled"]?.GetValue<bool>() ?? false;
         var shown = plugin["name"]?.GetValue<string>() ?? id;
         Note.Text = now == enabled
@@ -393,28 +399,29 @@ public partial class PluginsPage : UserControl
         if (!now && _open == id) _open = "";
         await ShowPageAsync();
         await LoadAsync();
-        // Раздел плагина в колонке появляется и исчезает вместе с ним, а
-        // не после перезапуска: человек включил заметки — он ждёт их слева.
+        // A plugin's section in the column appears and disappears together
+        // with it, not after a restart: the person switched notes on — they
+        // expect them on the left.
         if (_link is not null) await _link.RefreshPluginSectionsAsync();
     }
 
-    /// <summary>Показать страницу открытого плагина.</summary>
+    /// <summary>Show the open plugin's page.</summary>
     private async Task ShowPageAsync()
     {
         Draw();
-        // Ждём отрисовку, а не полагаемся на `Loaded`: сразу после этого
-        // вызова считают элементы, и «ноль» означал бы не пустую страницу,
-        // а то, что её ещё не спросили.
+        // Wait for the draw rather than relying on `Loaded`: elements are
+        // counted right after this call, and "zero" would mean not an empty
+        // page but a page nobody has asked for yet.
         if (_view is not null) await _view.ReloadAsync();
     }
 
     /// <summary>
-    /// Показать страницу открытого плагина.
+    /// Show the open plugin's page.
     /// </summary>
     /// <remarks>
-    /// Рисует <see cref="PluginView"/> — тот же, что и в собственном
-    /// разделе плагина. Своя копия рендерера была бы вторым местом, где
-    /// схема версии 2 понимается по-своему.
+    /// Drawn by <see cref="PluginView"/> — the same one as in the plugin's
+    /// own section. A copy of the renderer here would be a second place
+    /// where the version 2 schema is understood in its own way.
     /// </remarks>
     private void Draw()
     {
@@ -426,8 +433,8 @@ public partial class PluginsPage : UserControl
         }
 
         PageBox.Visibility = Visibility.Visible;
-        // Имя, а не номер: «NOTES» — то, как плагин называется в файловой
-        // системе, а человек знает его как «Заметки».
+        // The name, not the number: "NOTES" is what the plugin is called
+        // in the file system, and a person knows it as "Notes".
         PageLegend.Text = (_names.GetValueOrDefault(_open) ?? _open)
             .ToUpperInvariant();
 
@@ -439,7 +446,7 @@ public partial class PluginsPage : UserControl
 
     private PluginView? _view;
 
-    /// <summary>Сколько элементов на открытой странице — для проверки.</summary>
+    /// <summary>How many elements the open page has — for the check.</summary>
     public int PageElementCount => _view?.ElementCount ?? 0;
 
     private async Task<JsonObject?> Ask(string method, JsonObject? payload = null)

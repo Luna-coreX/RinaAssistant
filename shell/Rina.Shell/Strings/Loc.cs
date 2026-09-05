@@ -4,64 +4,69 @@ using System.Windows.Markup;
 namespace Rina.Shell.Strings;
 
 /// <summary>
-/// Строки интерфейса на выбранном языке.
+/// Interface strings in the chosen language.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F08</c>, решение — [ADR 0007](../../../docs/adr/0007-localisation.md):
-/// <b>слова интерфейса живут в оболочке, реплики Рины — в ядре.</b>
+/// Plan item <c>4.0-F08</c>, decided by
+/// [ADR 0007](../../../docs/adr/0007-localisation.md):
+/// <b>the words of the interface live in the shell, Rina's lines in the
+/// core.</b>
 /// </para>
 /// <para>
-/// <b>Ключ — это русская строка.</b> Соглашение унаследовано от 3.1.0 и
-/// выбрано не из лени: непереведённое место показывает осмысленный русский
-/// оригинал, а не <c>settings.voice.title</c> и не пустоту. Пропущенный
-/// перевод портит один ярлык, а не ломает экран.
+/// <b>The key is a Russian string.</b> The convention is inherited from
+/// 3.1.0 and was not chosen out of laziness: an untranslated place shows a
+/// meaningful Russian original rather than <c>settings.voice.title</c> or
+/// nothing at all. A missing translation spoils one label instead of
+/// breaking a screen.
 /// </para>
 /// <para>
-/// <b>Язык хранится в ядре, а применяется здесь.</b> Настройка одна на
-/// программу (`ui_language`), и держать её копию в оболочке значило бы
-/// завести второй источник правды. Ядро хранит намерение, оболочка
-/// приводит себя в соответствие — то же правило, что у автозапуска и трея.
+/// <b>The language is stored in the core and applied here.</b> There is
+/// one setting for the whole program (`ui_language`), and keeping a copy
+/// of it in the shell would mean a second source of truth. The core holds
+/// the intent, the shell brings itself into line — the same rule as for
+/// autostart and the tray.
 /// </para>
 /// </remarks>
 public static partial class Loc
 {
-    /// <summary>Язык оригинала: для него переводов не ищут.</summary>
+    /// <summary>The original language: no translations are looked up for it.</summary>
     public const string Source = "Русский";
 
     private static string _language = Source;
 
-    /// <summary>Выбранный язык. Меняется по настройке из ядра.</summary>
+    /// <summary>The chosen language. Changes with the setting from the core.</summary>
     public static string Language => _language;
 
-    /// <summary>Язык сменился — тем, кто уже нарисован, надо перерисоваться.</summary>
+    /// <summary>The language changed — whatever is already drawn has to redraw.</summary>
     public static event Action? Changed;
 
-    /// <summary>Языки, на которых у оболочки есть хоть что-то.</summary>
+    /// <summary>Languages in which the shell has anything at all.</summary>
     public static IEnumerable<string> Languages =>
         new[] { Source }.Concat(Table.Values.SelectMany(row => row.Keys)
                                      .Distinct().OrderBy(name => name,
                                                          StringComparer.Ordinal));
 
-    /// <summary>Переключить язык. Ничего не делает, если он тот же.</summary>
+    /// <summary>Switch language. Does nothing if it is the same one.</summary>
     public static void Use(string language)
     {
         if (string.IsNullOrWhiteSpace(language) || language == _language) return;
         _language = language;
-        // Сначала привязки, потом подписчики: строка в разметке обновится
-        // сама, а тот, кто пересобирает страницы, увидит уже новый язык.
+        // Bindings first, subscribers second: a string in the markup
+        // updates by itself, and whoever rebuilds pages will already see
+        // the new language.
         Live.Refresh();
         Changed?.Invoke();
     }
 
     /// <summary>
-    /// Перевести строку. Нет перевода — вернётся она же.
+    /// Translate a string. No translation — the string itself comes back.
     /// </summary>
     /// <remarks>
-    /// Молча вернуть оригинал — сознательный выбор: строка без перевода
-    /// должна выглядеть непереведённой, а не отсутствующей. Ругаться в
-    /// журнал на каждую такую строку значило бы шуметь ровно там, где
-    /// поведение задумано.
+    /// Returning the original in silence is a deliberate choice: a string
+    /// without a translation should look untranslated, not missing.
+    /// Complaining to the log about every such string would mean making
+    /// noise exactly where the behaviour is intended.
     /// </remarks>
     public static string S(string key)
     {
@@ -72,24 +77,24 @@ public static partial class Loc
     }
 
     /// <summary>
-    /// Пометить строку как переводимую, не переводя её здесь.
+    /// Mark a string as translatable without translating it here.
     /// </summary>
     /// <remarks>
-    /// Для мест, где перевод обязан случиться позже: статическая таблица
-    /// застыла бы на языке, который был в момент загрузки типа. Возвращает
-    /// строку как есть — вся работа в том, что её видят сборщик таблицы
-    /// переводов и проверка.
+    /// For places where the translation must happen later: a static table
+    /// would freeze on the language of the moment the type was loaded. It
+    /// returns the string as it is — all the work is in being seen by the
+    /// translation-table collector and by the check.
     /// </remarks>
     public static string Word(string key) => key;
 
     /// <summary>
-    /// Указатель переводов для привязок из разметки.
+    /// A translation lookup for bindings from the markup.
     /// </summary>
     /// <remarks>
-    /// Один на всё приложение. Смена языка объявляет, что изменились
-    /// **все** его значения (`Item[]`), и каждая привязка перечитывает
-    /// свой ключ. Дешевле, чем пересобирать окна, и надёжнее, чем помнить,
-    /// какие из них надо пересобрать.
+    /// One for the whole application. A language change announces that
+    /// **all** of its values have changed (`Item[]`), and every binding
+    /// re-reads its key. Cheaper than rebuilding windows, and more reliable
+    /// than remembering which of them need rebuilding.
     /// </remarks>
     public sealed class Lookup : System.ComponentModel.INotifyPropertyChanged
     {
@@ -102,10 +107,10 @@ public static partial class Loc
             this, new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
     }
 
-    /// <summary>Указатель переводов; источник привязок `{loc:S …}`.</summary>
+    /// <summary>The translation lookup; the source for `{loc:S …}` bindings.</summary>
     public static Lookup Live { get; } = new();
 
-    /// <summary>Перевести и подставить: <c>S("Осталось {0}", n)</c>.</summary>
+    /// <summary>Translate and substitute: <c>S("Осталось {0}", n)</c>.</summary>
     public static string S(string key, params object?[] arguments)
     {
         try
@@ -114,16 +119,17 @@ public static partial class Loc
         }
         catch (FormatException)
         {
-            // Перевод с испорченной подстановкой не повод показать пустоту:
-            // оригинал с правильными местами лучше, чем исключение.
+            // A translation with a broken substitution is no reason to
+            // show nothing: the original with the right places is better
+            // than an exception.
             return string.Format(key, arguments);
         }
     }
 
-    /// <summary>Сколько строк переведено на язык, от общего числа.</summary>
+    /// <summary>How many strings are translated into a language, out of the total.</summary>
     /// <remarks>
-    /// Честная мера покрытия: язык, переведённый на треть, лучше называть
-    /// третью, чем «поддерживаемым».
+    /// An honest measure of coverage: a language translated by a third is
+    /// better called a third than "supported".
     /// </remarks>
     public static double Coverage(string language) =>
         language == Source || Table.Count == 0 ? 1.0
@@ -132,12 +138,12 @@ public static partial class Loc
 }
 
 /// <summary>
-/// Разметка: <c>Text="{loc:S Настройки}"</c>.
+/// Markup: <c>Text="{loc:S Настройки}"</c>.
 /// </summary>
 /// <remarks>
-/// Нужна потому, что половина строк интерфейса живёт в XAML, а не в коде.
-/// Оставить их литералами значило бы перевести программу наполовину —
-/// и заметить это только на чужом языке.
+/// Needed because half the interface strings live in XAML rather than in
+/// code. Leaving them as literals would mean translating the program
+/// halfway — and noticing it only in another language.
 /// </remarks>
 [MarkupExtensionReturnType(typeof(string))]
 public sealed class SExtension : MarkupExtension
@@ -150,18 +156,19 @@ public sealed class SExtension : MarkupExtension
     public string Key { get; set; } = "";
 
     /// <summary>
-    /// Привязка к переводу, а не разовая подстановка.
+    /// A binding to the translation, not a one-off substitution.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Разметка разбирается один раз. Возвращая здесь строку, мы получали
-    /// перевод, который дальше не менялся никогда: страницы это скрывали —
-    /// они пересобираются при смене языка, — а окно нет, и подвал колонки
-    /// оставался на прежнем языке.
+    /// Markup is parsed once. Returning a string here got us a translation
+    /// that never changed afterwards: pages hid this — they are rebuilt on
+    /// a language change — but the window did not, and the footer of the
+    /// column stayed in the previous language.
     /// </para>
     /// <para>
-    /// Привязка к <see cref="Loc.Live"/> обновляется сама, где бы строка
-    /// ни стояла, и не требует помнить, что именно надо пересобрать.
+    /// A binding to <see cref="Loc.Live"/> updates by itself wherever the
+    /// string stands, and does not require remembering what exactly needs
+    /// rebuilding.
     /// </para>
     /// </remarks>
     public override object ProvideValue(IServiceProvider provider)
@@ -172,9 +179,9 @@ public sealed class SExtension : MarkupExtension
             Mode = System.Windows.Data.BindingMode.OneWay,
         };
 
-        // Не всякая цель — свойство зависимости: `ToolTip` в атрибуте,
-        // например, приходит объектом. Там, где привязка невозможна,
-        // возвращаем строку, как раньше.
+        // Not every target is a dependency property: `ToolTip` in an
+        // attribute, for one, arrives as an object. Where a binding is
+        // impossible we return a string, as before.
         if (provider?.GetService(typeof(IProvideValueTarget))
             is IProvideValueTarget target
             && target.TargetProperty is not DependencyProperty)

@@ -7,26 +7,28 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Поле сочетания клавиш: его нажимают, а не набирают.
+/// A hotkey field: it is pressed, not typed.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замечание человека. Сочетание, набранное строкой, — это просьба к
-/// человеку знать, как мы его пишем: «Ctrl» или «Control», «Win» или
-/// «Super», в каком порядке. Он ошибётся, сочетание не займётся, и
-/// причину он узнает только по тому, что клавиши не работают.
+/// Noted by a person. A combination typed as text is a request that the
+/// person know how we spell it: "Ctrl" or "Control", "Win" or "Super", in
+/// what order. They will get it wrong, the combination will not be
+/// registered, and they will learn the reason only from the keys not
+/// working.
 /// </para>
 /// <para>
-/// <b>Записывается то, что нажали.</b> Поле переходит в режим ожидания,
-/// ловит следующую комбинацию и показывает её так, как её понимает
-/// <see cref="Hotkeys.TryParse"/> — то есть ровно в том виде, в каком она
-/// потом займётся.
+/// <b>What gets recorded is what was pressed.</b> The field goes into a
+/// waiting state, catches the next combination and shows it the way
+/// <see cref="Hotkeys.TryParse"/> understands it — that is, exactly as it
+/// will be registered afterwards.
 /// </para>
 /// <para>
-/// <b>Модификатор обязателен, и об этом говорят сразу.</b> Сочетание без
-/// модификатора заняло бы клавишу во всей системе: человек нажал бы «R» в
-/// чужом редакторе и вызвал Рину. Раньше это выяснялось при попытке
-/// занять; теперь — в тот момент, когда он отпустил клавиши.
+/// <b>A modifier is required, and that is said right away.</b> A
+/// combination without a modifier would take the key over the whole
+/// system: a person would press "R" in someone else's editor and summon
+/// Rina. Before, this came out at registration time; now it comes out the
+/// moment they let go of the keys.
 /// </para>
 /// </remarks>
 public sealed class HotkeyBox : StackPanel
@@ -35,10 +37,10 @@ public sealed class HotkeyBox : StackPanel
     private readonly Button _record;
     private bool _listening;
 
-    /// <summary>Человек записал новое сочетание.</summary>
+    /// <summary>A person recorded a new combination.</summary>
     public event Action<string>? Changed;
 
-    /// <summary>Что записано сейчас.</summary>
+    /// <summary>What is recorded right now.</summary>
     public string Combination { get; private set; }
 
     public HotkeyBox(string current)
@@ -75,9 +77,9 @@ public sealed class HotkeyBox : StackPanel
         Children.Add(_record);
         Children.Add(clear);
 
-        // Ловим до того, как клавишу увидит поле: иначе Tab уйдёт на
-        // переход по фокусу, а Alt — в меню окна, и записать их будет
-        // нельзя ровно потому, что они полезные.
+        // Catch it before the field sees the key: otherwise Tab would go to
+        // focus navigation and Alt into the window menu, and recording them
+        // would be impossible for exactly the reason they are useful.
         _shown.PreviewKeyDown += OnKey;
         _shown.LostKeyboardFocus += (_, _) => Stop();
     }
@@ -107,8 +109,8 @@ public sealed class HotkeyBox : StackPanel
         var key = e.Key == Key.System ? e.SystemKey : e.Key;
         if (key == Key.Escape) { Stop(); return; }
 
-        // Одни модификаторы — ещё не сочетание: человек держит Ctrl и
-        // думает, какую букву нажать.
+        // Modifiers alone are not a combination yet: the person is holding
+        // Ctrl and thinking about which letter to press.
         if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift
                 or Key.RightShift or Key.LeftAlt or Key.RightAlt
                 or Key.LWin or Key.RWin)
@@ -130,9 +132,9 @@ public sealed class HotkeyBox : StackPanel
         parts.Add(key.ToString());
         var combination = string.Join("+", parts);
 
-        // Проверяем разбором тем же кодом, который потом займёт сочетание:
-        // показать человеку то, что мы сами не сумеем прочитать, — способ
-        // соврать ему в лицо.
+        // Check by parsing with the same code that will register the
+        // combination later: showing a person something we cannot read
+        // ourselves is a way of lying to their face.
         if (!Hotkeys.TryParse(combination, out _, out _))
         {
             _shown.Text = S("такое сочетание не подойдёт");

@@ -2,48 +2,51 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Pages;
 
-/// <summary>Как настройка называется и в какой секции живёт.</summary>
+/// <summary>What a setting is called and which section it lives in.</summary>
 public sealed record Labelled(string Key, string Title, string Hint = "");
 
-/// <summary>Секция экрана настроек: заголовок и то, что в ней.</summary>
+/// <summary>A section of the settings screen: a heading and what is in it.</summary>
 public sealed record Section(string Title, Labelled[] Keys);
 
 /// <summary>
-/// Раскладка экрана настроек — целиком забота оболочки.
+/// The layout of the settings screen — entirely the shell's business.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Это и есть [ADR 0006](../../../docs/adr/0006-settings-ownership.md) в
-/// коде. Ядро отдаёт <b>смысл</b>: тип, умолчание, допустимые значения,
-/// зависимости, предупреждения. Здесь лежит <b>вид</b>: подписи, порядок,
-/// десять секций из <c>4.0-R04</c>.
+/// This is [ADR 0006](../../../docs/adr/0006-settings-ownership.md) in
+/// code. The core hands over <b>meaning</b>: the type, the default, the
+/// allowed values, the dependencies, the warnings. What lies here is
+/// <b>appearance</b>: the labels, the order, the ten sections of
+/// <c>4.0-R04</c>.
 /// </para>
 /// <para>
-/// Подписи не могут жить в ядре, потому что <c>4.0-F08</c> уже решил:
-/// строки интерфейса — в оболочке, реплики Рины — в ядре. «Слова активации» —
-/// строка интерфейса.
+/// Labels cannot live in the core, because <c>4.0-F08</c> already decided
+/// it: interface strings belong to the shell, Rina's lines to the core.
+/// "Activation words" is an interface string.
 /// </para>
 /// <para>
-/// <b>Незнакомый ключ показывается, а не прячется.</b> Это правило с зубами
-/// из того же решения: ядро заводит настройку, оболочку не обновляют, и
-/// спрятанный ключ становится недостижимым, а заметить это нечем. Показанный
-/// в общей секции — всего лишь некрасив, а некрасивое чинят.
+/// <b>An unfamiliar key is shown, not hidden.</b> This is the rule with
+/// teeth from that same decision: the core adds a setting, the shell is
+/// not updated, and a hidden key becomes unreachable with nothing to
+/// notice it by. Shown in the general section it is merely ugly, and what
+/// is ugly gets fixed.
 /// </para>
 /// </remarks>
 public static class SettingsLayout
 {
-    /// <summary>Куда девать то, чего оболочка не знает.</summary>
+    /// <summary>Where to put what the shell does not know.</summary>
     public static string Other => S("Прочее");
 
     /// <summary>
-    /// Раскладка: ключи, а не переводы.
+    /// The layout: keys, not translations.
     /// </summary>
     /// <remarks>
-    /// <b>Здесь `Word`, а не `S`.</b> Статическое поле вычисляется один раз
-    /// — при первом обращении к типу — и навсегда запоминает язык, который
-    /// был в тот момент. Из-за этого при английском интерфейсе настройки
-    /// оставались русскими: их перевели однажды и больше не спрашивали.
-    /// Переводит тот, кто рисует: `TitleOf`, `HintOf` и заголовок секции.
+    /// <b>`Word` here, not `S`.</b> A static field is evaluated once — on
+    /// the first use of the type — and remembers the language of that
+    /// moment forever. Because of this, settings stayed Russian under an
+    /// English interface: they were translated once and never asked again.
+    /// Whoever draws is who translates: `TitleOf`, `HintOf` and the
+    /// section heading.
     /// </remarks>
     public static readonly Section[] Sections =
     [
@@ -110,9 +113,9 @@ public static class SettingsLayout
         ]),
         new(Word("Обновления"),
         [
-            // Настройка есть, а обновлений ещё нет: подсказка говорит об
-            // этом прямо. Переключатель без подсказки обещал бы поведение,
-            // которого не будет до блока U.
+            // The setting is there, and updates are not yet: the hint
+            // says so outright. A toggle without a hint would promise
+            // behaviour that will not exist until block U.
             new("check_updates", Word("Проверять обновления"),
                 Word("Появится вместе с обновлениями")),
         ]),
@@ -157,14 +160,14 @@ public static class SettingsLayout
     ];
 
     /// <summary>
-    /// Настройки, которые оболочка показывает не здесь.
+    /// Settings the shell shows somewhere other than here.
     /// </summary>
     /// <remarks>
-    /// «Отвечать голосом» и «всегда слушать» стоят у строки ввода
-    /// (<c>4.0-R04</c>): это не настройка, а режим работы прибора, и
-    /// переключают его в процессе разговора. Они не «неизвестные» — они
-    /// известны и показаны в другом месте, и правило про незнакомый ключ к
-    /// ним не относится.
+    /// "Answer by voice" and "always listen" stand by the input line
+    /// (<c>4.0-R04</c>): these are not settings but the instrument's mode
+    /// of work, and they are switched in the middle of a conversation. They
+    /// are not "unknown" — they are known and shown elsewhere, and the rule
+    /// about unfamiliar keys does not apply to them.
     /// </remarks>
     public static readonly HashSet<string> Elsewhere =
     [
@@ -173,32 +176,35 @@ public static class SettingsLayout
     ];
 
     /// <summary>
-    /// Ключи, чей список значений знает оболочка, а не ядро.
+    /// Keys whose list of values is known by the shell, not the core.
     /// </summary>
     /// <remarks>
-    /// Устройства ввода и вывода — свойство звуковой подсистемы, а она в 4.0
-    /// принадлежит оболочке (<c>4.0-F09</c>). Ядро их не видит вовсе и
-    /// перечислить не может; оно лишь хранит выбранное имя. Это не исключение
-    /// из [ADR 0006](../../../docs/adr/0006-settings-ownership.md), а его
-    /// прямое следствие: смысл у того, кто знает.
+    /// Input and output devices are a property of the audio subsystem, and
+    /// in 4.0 that belongs to the shell (<c>4.0-F09</c>). The core does not
+    /// see them at all and cannot enumerate them; it only stores the chosen
+    /// name. This is not an exception to
+    /// [ADR 0006](../../../docs/adr/0006-settings-ownership.md) but a
+    /// direct consequence of it: meaning belongs to whoever knows.
     /// </remarks>
     public static readonly HashSet<string> ShellKnows =
     [
         "input_device",
         "output_device",
-        // Набор акцентов зависит от отделки, а отделка — дело оболочки:
-        // одна и та же краска на светлом и на тёмном читается по-разному.
+        // The set of accents depends on the finish, and the finish is the
+        // shell's business: one and the same paint reads differently on
+        // light and on dark.
         "accent",
     ];
 
     /// <summary>
-    /// Что показать в пустом поле настройки.
+    /// What to show in an empty settings field.
     /// </summary>
     /// <remarks>
-    /// Не пояснение, а **пример**: пояснение говорит, зачем настройка, а
-    /// подсказка — в каком виде туда пишут. «Адрес модели» и
-    /// «http://localhost:11434» отвечают на разные вопросы, и второй ответ
-    /// нужен ровно в тот момент, когда поле пустое.
+    /// Not an explanation but an **example**: an explanation says what a
+    /// setting is for, while a hint says in what form to write into it.
+    /// "Model address" and "http://localhost:11434" answer different
+    /// questions, and the second answer is needed at exactly the moment the
+    /// field is empty.
     /// </remarks>
     public static string HintInField(string key) => key switch
     {
@@ -212,13 +218,13 @@ public static class SettingsLayout
     };
 
     /// <summary>
-    /// Как называется «стереть всё» для конкретного ключа.
+    /// What "erase everything" is called for a particular key.
     /// </summary>
     /// <remarks>
-    /// Выученные соответствия <b>забывают</b>, назначенные сочетания
-    /// <b>сбрасывают</b>. Одно слово на оба случая было бы неправдой в
-    /// одном из них: забытое Рина выучит заново сама, сброшенное придётся
-    /// назначать руками.
+    /// Learned associations are <b>forgotten</b>, assigned hotkeys are
+    /// <b>reset</b>. One word for both cases would be an untruth in one of
+    /// them: what was forgotten Rina will learn again by herself, what was
+    /// reset has to be assigned by hand.
     /// </remarks>
     public static string ClearWordOf(string key) => key switch
     {
@@ -227,7 +233,7 @@ public static class SettingsLayout
         _ => S("Очистить"),
     };
 
-    /// <summary>Все ключи, которые оболочка знает по имени.</summary>
+    /// <summary>Every key the shell knows by name.</summary>
     public static readonly HashSet<string> Known =
         Sections.SelectMany(s => s.Keys).Select(k => k.Key).ToHashSet();
 

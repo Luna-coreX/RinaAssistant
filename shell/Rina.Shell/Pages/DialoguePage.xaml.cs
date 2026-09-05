@@ -10,26 +10,27 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Pages;
 
-/// <summary>Одна реплика на стекле.</summary>
-/// <param name="Who">Время для человека, имя для Рины.</param>
-/// <param name="Said">Что сказано.</param>
+/// <summary>One line on the glass.</summary>
+/// <param name="Who">A time for the person, a name for Rina.</param>
+/// <param name="Said">What was said.</param>
 public sealed record Turn(string Who, string Said);
 
 /// <summary>
-/// Диалог: главный экран. Разговор, строка ввода, два режима.
+/// Dialogue: the main screen. The conversation, the input line, two modes.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Страница ничего не знает про окно.</b> Она получает связь и работает
-/// с ядром сама; окно только решает, какую страницу показать. Это условие
-/// <c>4.0-F03</c>, и нарушить его легко — достаточно один раз дотянуться до
-/// родителя за чем-нибудь мелким.
+/// <b>The page knows nothing about the window.</b> It is handed a link and
+/// works with the core itself; the window only decides which page to show.
+/// This is a condition of <c>4.0-F03</c>, and it is easy to break — one
+/// reach up to the parent for some small thing is enough.
 /// </para>
 /// <para>
-/// <b>Ответ приходит событием, а не ответом на запрос.</b> На
-/// <c>command.handle</c> ядро отвечает «принято»; сам ответ появляется
-/// событием <c>assistant.response</c>, когда появится. Поэтому строка ввода
-/// очищается сразу, а на стекле сначала возникает сказанное человеком.
+/// <b>The answer arrives as an event, not as a reply to a request.</b> To
+/// <c>command.handle</c> the core answers "accepted"; the answer itself
+/// turns up as an <c>assistant.response</c> event, when it turns up. That
+/// is why the input line is cleared at once, and what the person said
+/// appears on the glass first.
 /// </para>
 /// </remarks>
 public partial class DialoguePage : UserControl
@@ -45,8 +46,8 @@ public partial class DialoguePage : UserControl
 
         if (_link is null)
         {
-            // Не репликой: строка в ленте разговора читается как сказанное
-            // Риной, а это говорит окно о самом себе.
+            // Not as a line: text in the conversation feed reads as
+            // something Rina said, and this is the window talking about itself.
             Empty.Content = EmptyState.For(
                 S("Ядро не на связи"),
                 S("Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."),
@@ -59,7 +60,7 @@ public partial class DialoguePage : UserControl
         Loaded += async (_, _) => await LoadAsync();
     }
 
-    /// <summary>Показать разговор, который уже был.</summary>
+    /// <summary>Show the conversation that has already happened.</summary>
     private async Task LoadAsync()
     {
         var told = await Ask(Methods.HistoryList,
@@ -115,12 +116,13 @@ public partial class DialoguePage : UserControl
     }
 
     /// <summary>
-    /// Объяснить пустое стекло.
+    /// Explain the empty glass.
     /// </summary>
     /// <remarks>
-    /// Разговор, которого ещё не было, — не поломка и не «загружается».
-    /// Пустое стекло без объяснения читается именно так, особенно на первом
-    /// запуске, когда человек ещё не знает, что сюда можно писать.
+    /// A conversation that has not happened yet is neither a breakage nor
+    /// "loading". Empty glass without an explanation reads as exactly that,
+    /// especially on the first run, when the person does not yet know they
+    /// can write here.
     /// </remarks>
     private void ShowEmpty()
     {
@@ -151,8 +153,9 @@ public partial class DialoguePage : UserControl
         var text = Input.Text.Trim();
         if (text.Length == 0) return;
 
-        // Сказанное появляется на стекле сразу, не дожидаясь ядра: человек
-        // должен видеть, что его услышали, а не гадать, дошло ли.
+        // What was said appears on the glass at once, without waiting for
+        // the core: a person has to see they were heard, not guess whether
+        // it got through.
         Add(When(Clock.Now()), text);
         Input.Clear();
 
@@ -186,8 +189,8 @@ public partial class DialoguePage : UserControl
 
     private async void OnExport(object sender, RoutedEventArgs e)
     {
-        // Файл выбирает и пишет оболочка: диалог выбора места — её работа,
-        // а ядро отдаёт содержимое (§6 спецификации).
+        // The shell picks the file and writes it: the save dialogue is its
+        // job, and the core hands over the content (§6 of the spec).
         var told = await Ask(Methods.HistoryExport);
         if (told?["items"] is not JsonArray items) return;
 

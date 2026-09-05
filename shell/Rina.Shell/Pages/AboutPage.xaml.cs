@@ -9,32 +9,34 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// О программе: из чего собрана и куда идти.
+/// About: what it is built from and where to go.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замечание человека: «о программе» в подвале было текстом, по которому
-/// нельзя нажать.
+/// Noted by a person: "about" in the footer was text that could not be
+/// clicked.
 /// </para>
 /// <para>
-/// <b>Версий четыре, и показаны все четыре.</b> Это прямое следствие
-/// [ADR 0004](../../../docs/adr/0004-versioning-and-compatibility.md):
-/// оболочка, ядро, протокол и схема данных обновляются порознь, и вопрос
-/// «какая у меня версия» без уточнения «чего» больше не имеет одного
-/// ответа. Человеку, который пришёл сюда из-за неполадки, нужны все
-/// четыре — иначе он назовёт одну, а спросят другую.
+/// <b>There are four versions, and all four are shown.</b> This follows
+/// directly from
+/// [ADR 0004](../../../docs/adr/0004-versioning-and-compatibility.md): the
+/// shell, the core, the protocol and the data schema are updated
+/// separately, and the question "what version do I have" without saying
+/// "of what" no longer has a single answer. Someone who came here because
+/// of a fault needs all four — otherwise they will name one and be asked
+/// about another.
 /// </para>
 /// <para>
-/// <b>Ссылка открывается в браузере, а не внутри окна.</b> Своего браузера
-/// у Рины нет и не будет: страница, открытая внутри помощника, — это чужой
-/// код, которому мы дали своё окно.
+/// <b>A link opens in the browser, not inside the window.</b> Rina has no
+/// browser of her own and never will: a page opened inside an assistant is
+/// somebody else's code that we handed our own window to.
 /// </para>
 /// </remarks>
 public partial class AboutPage : UserControl
 {
     private readonly CoreLink? _link;
 
-    /// <summary>Сколько строк «из чего собрана» — для сквозной проверки.</summary>
+    /// <summary>How many "built from" rows — for the end-to-end check.</summary>
     public int PartCount => Parts.Children.Count;
 
     public AboutPage(CoreLink? link)
@@ -48,23 +50,24 @@ public partial class AboutPage : UserControl
         Loaded += async (_, _) => await ShowPartsAsync();
     }
 
-    /// <summary>Что сказала последняя проверка — для сквозной проверки.</summary>
+    /// <summary>What the last check said — for the end-to-end check.</summary>
     public string UpdateSaid => UpdateState.Text;
 
     /// <summary>
-    /// Спросить, есть ли новее.
+    /// Ask whether there is anything newer.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Задача плана <c>4.0-U03</c>. Клиент живёт в оболочке
-    /// ([ADR 0009](../../../docs/adr/0009-system-layer.md)): скачать файл и
-    /// положить на диск — работа системного слоя, а заменять файлы ядра
-    /// может только тот, кто ядро останавливает.
+    /// Plan item <c>4.0-U03</c>. The client lives in the shell
+    /// ([ADR 0009](../../../docs/adr/0009-system-layer.md)): downloading a
+    /// file and putting it on disk is the system layer's work, and only
+    /// whoever stops the core may replace the core's files.
     /// </para>
     /// <para>
-    /// <b>Кнопка есть всегда, даже когда автопроверка выключена.</b>
-    /// Настройка `check_updates` управляет тем, спрашиваем ли мы сами;
-    /// человек, пришедший спросить руками, уже ответил на этот вопрос.
+    /// <b>The button is always there, even when the automatic check is
+    /// off.</b> The `check_updates` setting governs whether we ask on our
+    /// own; a person who came to ask by hand has already answered that
+    /// question.
     /// </para>
     /// </remarks>
     private async void OnCheckUpdates(object sender, RoutedEventArgs e)
@@ -98,25 +101,26 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
-    /// Версия ядра: она названа в рукопожатии.
+    /// The core's version: it is named in the handshake.
     /// </summary>
     /// <remarks>
-    /// Ноль значит «ядра нет на связи». Проверять обновления при этом
-    /// можно: оболочка обновляется отдельно от ядра, в этом и смысл
-    /// раздельных версий (ADR 0004).
+    /// Zero means "the core is not connected". Checking for updates is
+    /// still allowed then: the shell updates separately from the core, and
+    /// that is the whole point of separate versions (ADR 0004).
     /// </remarks>
     private string CoreVersion
         => _link?.Connection is { Ready: true, CoreVersion.Length: > 0 } live
             ? live.CoreVersion : "0.0.0";
 
     /// <summary>
-    /// Версия схемы данных на диске.
+    /// The version of the data schema on disk.
     /// </summary>
     /// <remarks>
-    /// Спрашивается у ядра, потому что на диск пишет оно. Ноль значит «не
-    /// знаем» — и тогда откат по схеме не запрещается, а не запрещается
-    /// молча: неизвестное число не повод отказать, но и не повод
-    /// разрешить, поэтому проверка схемы просто не срабатывает.
+    /// Asked of the core, because the core is what writes to disk. Zero
+    /// means "we do not know" — and then a rollback is not forbidden by
+    /// schema, and not forbidden in silence either: an unknown number is no
+    /// reason to refuse, but no reason to allow either, so the schema check
+    /// simply does not fire.
     /// </remarks>
     private async Task<int> DataSchemaAsync()
     {
@@ -138,16 +142,16 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
-    /// Чем заменить неизвестную версию.
+    /// What to put in place of an unknown version.
     /// </summary>
     /// <remarks>
-    /// Не через `S(...)`: тире — это знак, а не слово, и переводить его
-    /// незачем. Строка, попавшая в таблицу переводов зря, требует потом
-    /// внимания на каждом языке.
+    /// Not through `S(...)`: a dash is a mark, not a word, and there is no
+    /// point translating it. A string that ends up in the translation table
+    /// for nothing demands attention in every language afterwards.
     /// </remarks>
     private const string Unknown = "—";
 
-    /// <summary>Версия оболочки — из сборки, а не из строки в коде.</summary>
+    /// <summary>The shell's version — from the assembly, not from a string in the code.</summary>
     private static string ShellVersion =>
         typeof(AboutPage).Assembly.GetName().Version is { } v
             ? $"{v.Major}.{v.Minor}.{v.Build}" : "4.0.0";
@@ -166,8 +170,8 @@ public partial class AboutPage : UserControl
                 ? ready.NegotiatedVersion.ToString() : Unknown,
             S("на чём они разговаривают"));
 
-        // Схема данных — из рукопожатия: файл на диске принадлежит ядру,
-        // и как настройка наружу не отдаётся.
+        // The data schema comes from the handshake: the file on disk
+        // belongs to the core, and it is not handed out as a setting.
         Add(S("Данные на диске"),
             connection is { Ready: true, DataVersion: > 0 } data
                 ? data.DataVersion.ToString() : Unknown,
@@ -224,15 +228,16 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
-    /// Где лежат данные, журналы и плагины.
+    /// Where the data, the logs and the plugins live.
     /// </summary>
     /// <remarks>
-    /// Это первое, что спрашивают при разборе неполадки, и последнее, что
-    /// человек может найти сам: каталог приложения спрятан в `AppData`, и
-    /// путь к нему нельзя ни угадать, ни продиктовать по телефону.
+    /// This is the first thing asked when a fault is being sorted out, and
+    /// the last thing a person can find on their own: the application
+    /// directory is hidden away in `AppData`, and the path to it can
+    /// neither be guessed nor dictated over the phone.
     ///
-    /// Папка открывается проводником — тем же способом, каким её открыл бы
-    /// человек, если бы знал дорогу.
+    /// The folder is opened by the file manager — the same way a person
+    /// would open it if they knew the road.
     /// </remarks>
     private void BuildPlaces()
     {
@@ -297,7 +302,7 @@ public partial class AboutPage : UserControl
             tail.BorderThickness = new Thickness(0);
     }
 
-    /// <summary>Путь покороче: домашний каталог заменяется на «~».</summary>
+    /// <summary>A shorter path: the home directory is replaced by "~".</summary>
     private static string Short(string path)
     {
         try
@@ -338,13 +343,14 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
-    /// Открыть ссылку браузером человека.
+    /// Open a link in the person's browser.
     /// </summary>
     /// <remarks>
-    /// <c>UseShellExecute</c> — то же, что двойной щелчок по ссылке в
-    /// проводнике: открывает браузер, который человек выбрал сам. Не
-    /// вышло — говорим об этом, а не молчим: неработающая кнопка выглядит
-    /// как поломка программы, а не как отсутствие браузера.
+    /// <c>UseShellExecute</c> is the same as double-clicking a link in the
+    /// file manager: it opens the browser the person chose themselves. If
+    /// it did not work, we say so instead of keeping quiet: a button that
+    /// does nothing looks like a broken program rather than a missing
+    /// browser.
     /// </remarks>
     private void Open(string url)
     {

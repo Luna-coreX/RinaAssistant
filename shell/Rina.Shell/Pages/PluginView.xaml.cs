@@ -8,19 +8,19 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Страница одного плагина: то, что он о себе рассказал.
+/// One plugin's page: what it told about itself.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Рендерер схемы версии 2 (<c>4.0-H02</c>) живёт здесь один на всех: его
-/// показывает и список плагинов, и собственный раздел плагина в колонке.
-/// Два рендерера одной схемы разъехались бы на первой же правке — один
-/// научился бы новому виду, другой нет.
+/// The version 2 schema renderer (<c>4.0-H02</c>) lives here, one for
+/// everyone: both the plugin list and the plugin's own section in the
+/// column show it. Two renderers of one schema would drift apart on the
+/// first change — one would learn a new element kind, the other would not.
 /// </para>
 /// <para>
-/// <b>Плагин не рисует — он описывает.</b> Всё, что здесь строится,
-/// собрано из данных, пришедших из другого процесса; ни одной строки
-/// плагина в этом процессе не выполняется.
+/// <b>A plugin does not draw — it describes.</b> Everything built here is
+/// assembled from data that came from another process; not one line of the
+/// plugin runs in this one.
 /// </para>
 /// </remarks>
 public partial class PluginView : UserControl
@@ -28,7 +28,7 @@ public partial class PluginView : UserControl
     private readonly CoreLink? _link;
     private readonly string _plugin;
 
-    /// <summary>Что-то пошло не так — сказать это странице-хозяйке.</summary>
+    /// <summary>Something went wrong — tell the host page about it.</summary>
     public event Action<string>? Noted;
 
     public PluginView(CoreLink? link, string pluginId)
@@ -36,16 +36,16 @@ public partial class PluginView : UserControl
         InitializeComponent();
         _link = link;
         _plugin = pluginId;
-        // Своя загрузка — только если хозяин не попросил её сам: страница
-        // в списке плагинов рисуется по требованию, и второй заход стоил бы
-        // лишнего круга по проводу.
+        // Load on our own only if the host has not asked for it: the page
+        // in the plugin list is drawn on demand, and a second pass would
+        // cost an extra round over the wire.
         Loaded += async (_, _) => { if (!_drawn) await ReloadAsync(); };
     }
 
-    /// <summary>Сколько элементов нарисовано — для сквозной проверки.</summary>
+    /// <summary>How many elements are drawn — for the end-to-end check.</summary>
     public int ElementCount => Body.Children.Count;
 
-    /// <summary>Перечитать страницу у плагина.</summary>
+    /// <summary>Re-read the page from the plugin.</summary>
     public async Task ReloadAsync()
     {
         var got = await Ask(Methods.PluginsPage, new JsonObject
@@ -68,25 +68,25 @@ public partial class PluginView : UserControl
     }
 
     /// <summary>
-    /// Докуда рендерер спускается по вложенности.
+    /// How far down the nesting the renderer goes.
     /// </summary>
     /// <remarks>
-    /// То же число, что в <c>plugins/page_spec.py</c>. Ограничение не про
-    /// красоту: описание страницы приходит из другого процесса, и «сколько
-    /// угодно вложенных карточек» — способ занять оболочку рисованием
-    /// вместо ответа человеку.
+    /// The same number as in <c>plugins/page_spec.py</c>. The limit is not
+    /// about beauty: the page description comes from another process, and
+    /// "as many nested cards as you like" is a way to keep the shell busy
+    /// drawing instead of answering a person.
     /// </remarks>
     private const int MaxDepth = 4;
 
-    /// <summary>Сколько элементов нарисовано — для сквозной проверки.</summary>
+    /// <summary>How many elements are drawn — for the end-to-end check.</summary>
     public int DrawnElements { get; private set; }
 
     /// <summary>
-    /// Содержимое контейнера.
+    /// The contents of a container.
     /// </summary>
     /// <remarks>
-    /// Пустой контейнер не рисуется вовсе: карточка без содержимого — это
-    /// рамка вокруг ничего, и выглядит она как поломка, которой нет.
+    /// An empty container is not drawn at all: a card with no contents is a
+    /// frame around nothing, and it looks like a breakage that is not there.
     /// </remarks>
     private List<FrameworkElement> BuildChildren(JsonObject element, int depth)
     {
@@ -98,12 +98,13 @@ public partial class PluginView : UserControl
     }
 
     /// <summary>
-    /// Один элемент описания страницы.
+    /// One element of a page description.
     /// </summary>
     /// <remarks>
-    /// Виды взяты из <c>plugins/page_spec.py</c>. Незнакомый вид не
-    /// пропускается: плагин что-то сказал, и оболочка обязана это показать,
-    /// даже если не знает как, — иначе часть страницы исчезнет без следа.
+    /// The kinds are taken from <c>plugins/page_spec.py</c>. An unfamiliar
+    /// kind is not skipped: the plugin said something, and the shell is
+    /// obliged to show it even when it does not know how — otherwise part
+    /// of the page vanishes without a trace.
     /// </remarks>
     private FrameworkElement BuildElement(JsonObject element, int depth)
     {
@@ -111,8 +112,8 @@ public partial class PluginView : UserControl
         var text = element["text"]?.GetValue<string>() ?? "";
         DrawnElements++;
 
-        // Глубже не спускаемся, и говорим об этом вслух: молча обрезанная
-        // страница выглядит как страница, которую плагин так и задумал.
+        // We go no deeper, and we say so out loud: a page cut short in
+        // silence looks like a page the plugin meant to be that way.
         if (depth >= MaxDepth)
             return new TextBlock
             {
@@ -122,7 +123,7 @@ public partial class PluginView : UserControl
 
         switch (kind)
         {
-            // --- контейнеры (схема версии 2, 4.0-H01) ---
+            // --- containers (schema version 2, 4.0-H01) ---
             case "card":
                 var inside = BuildChildren(element, depth);
                 if (inside.Count == 0) return Nothing();
@@ -160,8 +161,9 @@ public partial class PluginView : UserControl
             case "row":
                 var side = BuildChildren(element, depth);
                 if (side.Count == 0) return Nothing();
-                // «Рядом» — просьба, а не приказ: `WrapPanel` сам поставит
-                // содержимое столбиком, когда рядом уже не помещается.
+                // "Side by side" is a request, not an order: `WrapPanel`
+                // will stack the contents into a column by itself once
+                // side by side no longer fits.
                 var row = new WrapPanel
                 {
                     Orientation = Orientation.Horizontal,
@@ -240,8 +242,8 @@ public partial class PluginView : UserControl
                     Style = (Style)FindResource("Field"),
                     Width = 220,
                     Text = element["value"]?.GetValue<string>() ?? "",
-                    // Подсказка внутри поля — это подсказка, а не значение:
-                    // введённое пустым не отправляется вовсе.
+                    // A hint inside a field is a hint, not a value: what
+                    // was left empty is not sent at all.
                     Tag = text,
                 };
                 var send = new Button
@@ -260,8 +262,9 @@ public partial class PluginView : UserControl
                     await ActAsync(typedAction, written);
                 }
                 send.Click += async (_, _) => await SendAsync();
-                // Enter — то же, что нажать кнопку: человек, набравший
-                // строку, жмёт Enter, а не ищет глазами кнопку.
+                // Enter is the same as pressing the button: a person who
+                // has typed a line presses Enter rather than hunting for a
+                // button with their eyes.
                 typed.KeyDown += async (_, key) =>
                 {
                     if (key.Key == System.Windows.Input.Key.Return)
@@ -277,8 +280,8 @@ public partial class PluginView : UserControl
                 return field;
 
             case "badge":
-                // Метка состояния. Цвет здесь решает оболочка: плагин
-                // сказал «предупреждение», а не «оранжевый».
+                // A state label. The colour is the shell's decision here:
+                // the plugin said "warning", not "orange".
                 var tone = element["variant"]?.GetValue<string>() ?? "normal";
                 return new Border
                 {
@@ -387,10 +390,11 @@ public partial class PluginView : UserControl
                 return grid;
 
             default:
-                // Незнакомый вид показывается заметно и с именем: плагин
-                // собран под схему новее оболочки, и молчаливый пропуск
-                // сделал бы часть его страницы невидимой без следа. Чинят
-                // некрасивое; незаметное не чинят.
+                // An unfamiliar kind is shown conspicuously and by name:
+                // the plugin was built against a schema newer than the
+                // shell, and skipping it in silence would make part of its
+                // page invisible without a trace. What is ugly gets fixed;
+                // what goes unnoticed does not.
                 return new TextBlock
                 {
                     Text = $"[{kind}] {text}",
@@ -401,18 +405,18 @@ public partial class PluginView : UserControl
         }
     }
 
-    /// <summary>Ничего не рисуем: пустой контейнер — рамка вокруг ничего.</summary>
+    /// <summary>Draw nothing: an empty container is a frame around nothing.</summary>
     private static FrameworkElement Nothing()
         => new StackPanel { Visibility = Visibility.Collapsed };
 
 
     /// <summary>
-    /// Нажали кнопку или отправили строку.
+    /// A button was pressed or a line was submitted.
     /// </summary>
     /// <remarks>
-    /// Ответ несёт новую страницу целиком: кнопка меняет то, что нарисовано
-    /// рядом с ней, и спрашивать второй раз значило бы показать её
-    /// устаревшей ровно на один круг.
+    /// The answer carries a whole new page: a button changes what is drawn
+    /// next to it, and asking a second time would mean showing it stale by
+    /// exactly one round.
     /// </remarks>
     private async Task ActAsync(string action, string? value = null)
     {

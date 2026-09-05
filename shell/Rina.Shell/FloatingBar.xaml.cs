@@ -6,24 +6,25 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell;
 
 /// <summary>
-/// Плавающая строка команд: сказать Рине, не открывая окна.
+/// The floating command bar: say something to Rina without opening a window.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F04</c> — настройка `floating_command_bar`
-/// существовала с 3.1.0 и в 4.0 не делала ничего. Переключатель, который
-/// ничего не переключает, хуже отсутствующего: человек считает, что
-/// включил, и ждёт поведения.
+/// Plan item <c>4.0-F04</c> — the `floating_command_bar` setting had
+/// existed since 3.1.0 and did nothing in 4.0. A switch that switches
+/// nothing is worse than a missing one: a person believes they turned it
+/// on and waits for the behaviour.
 /// </para>
 /// <para>
-/// <b>Строка живёт поверх окон и не занимает панель задач.</b> В этом весь
-/// смысл: набрать команду посреди чужой работы, не переключаясь. Поэтому
-/// же у неё нет рамки и заголовка — перетаскивается за себя саму.
+/// <b>The bar lives above other windows and takes no taskbar slot.</b>
+/// That is the whole point: type a command in the middle of someone
+/// else's work without switching away. For the same reason it has no
+/// border and no title — it is dragged by itself.
 /// </para>
 /// <para>
-/// <b>Esc прячет, а не закрывает.</b> Закрытая строка потребовала бы снова
-/// идти в настройки; спрятанная возвращается тем же сочетанием, которым
-/// вызвана.
+/// <b>Esc hides, it does not close.</b> A closed bar would mean going back
+/// into settings; a hidden one comes back with the same hotkey that
+/// summoned it.
 /// </para>
 /// </remarks>
 public partial class FloatingBar : Window
@@ -35,14 +36,14 @@ public partial class FloatingBar : Window
         InitializeComponent();
         _link = link;
 
-        // Снизу по центру основного экрана: там, где её ждут глаза, и там,
-        // где она не накрывает то, с чем человек работает.
+        // Bottom centre of the main screen: where the eyes expect it, and
+        // where it does not cover what the person is working with.
         var screen = SystemParameters.WorkArea;
         Left = screen.Left + (screen.Width - Width) / 2;
         Top = screen.Bottom - 96;
     }
 
-    /// <summary>Показать и отдать ей ввод.</summary>
+    /// <summary>Show it and give it the input.</summary>
     public void Summon()
     {
         Show();
@@ -65,8 +66,9 @@ public partial class FloatingBar : Window
         if (text.Length == 0) return;
         Input.Clear();
 
-        // Ответ придёт событием и покажется в окне разговора или
-        // уведомлением: строка — это способ сказать, а не место для беседы.
+        // The answer comes as an event and is shown in the conversation
+        // window or as a notification: the bar is a way to speak, not a
+        // place to converse.
         State.Text = S("Отправлено");
         await (_link?.HandleAsync(text) ?? Task.CompletedTask);
         State.Text = S("Enter — отправить, Esc — скрыть");

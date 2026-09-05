@@ -6,55 +6,59 @@ using System.Windows.Threading;
 namespace Rina.Shell.Overlays;
 
 /// <summary>
-/// Ответ Рины поверх экрана — своим окном, а не уведомлением системы.
+/// Rina's reply on top of the screen — in a window of its own, not a
+/// system notification.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Замечание человека: в 3.1.0 ответ показывался своим окном, после
-/// переезда — системным уведомлением. Разница не косметическая.
+/// Noted by a person: in 3.1.0 the reply was shown in its own window;
+/// after the move, in a system notification. The difference is not
+/// cosmetic.
 /// </para>
 /// <para>
-/// <b>Системное уведомление — это почта, а не разговор.</b> Оно ложится в
-/// центр уведомлений, ждёт там, показывается по правилам Windows (включая
-/// «не беспокоить», при котором его не увидят вовсе) и выглядит как
-/// сообщение от программы. Ответ на «который час» — не сообщение от
-/// программы, а реплика в разговоре: он нужен сейчас, две секунды, и
-/// хранить его незачем.
+/// <b>A system notification is mail, not conversation.</b> It goes to the
+/// notification centre, waits there, is shown by Windows' rules (including
+/// "do not disturb", under which it is not seen at all) and looks like a
+/// message from an application. An answer to "what time is it" is not a
+/// message from an application but a line in a conversation: it is needed
+/// now, for two seconds, and there is no point keeping it.
 /// </para>
 /// <para>
-/// <b>Окно не забирает фокус.</b> <c>ShowActivated=false</c> обязателен:
-/// человек говорит с Риной, не отрываясь от своей работы, и окно, которое
-/// перехватывает набор текста в чужом редакторе, хуже молчания.
+/// <b>The window does not take focus.</b> <c>ShowActivated=false</c> is
+/// mandatory: a person talks to Rina without breaking off their own work,
+/// and a window that intercepts typing in someone else's editor is worse
+/// than silence.
 /// </para>
 /// <para>
-/// <b>Одно окно, а не по одному на реплику.</b> Вторая реплика подменяет
-/// текст в том же окне и продлевает срок: стопка карточек в углу — это
-/// шум, а не разговор.
+/// <b>One window, not one per line.</b> A second line replaces the text in
+/// the same window and extends its life: a stack of cards in the corner is
+/// noise, not conversation.
 /// </para>
 /// </remarks>
 public partial class Toast : Window
 {
     private readonly DispatcherTimer _hide = new();
 
-    /// <summary>Сколько живёт обычная реплика.</summary>
+    /// <summary>How long an ordinary line lives.</summary>
     public static readonly TimeSpan Normal = TimeSpan.FromSeconds(6);
 
-    /// <summary>Короткая — для «слушаю», «готово» и прочего мимолётного.</summary>
+    /// <summary>A short one — for "listening", "done" and the like.</summary>
     public static readonly TimeSpan Short = TimeSpan.FromSeconds(2.6);
 
     public Toast()
     {
         InitializeComponent();
         _hide.Tick += (_, _) => FadeOut();
-        // Клик прячет: реплика прочитана, и ждать её ухода незачем.
+        // A click hides it: the line has been read, and there is no point
+        // waiting for it to go.
         MouseLeftButtonDown += (_, _) => FadeOut();
     }
 
-    /// <summary>Что показано сейчас — для сквозной проверки.</summary>
+    /// <summary>What is shown right now — for the end-to-end check.</summary>
     public string Shown => Body.Text;
 
     /// <summary>
-    /// Показать реплику. Повторный вызов подменяет текст, а не плодит окна.
+    /// Show a line. A repeat call replaces the text rather than breeding windows.
     /// </summary>
     public void Say(string text, TimeSpan? life = null)
     {
@@ -74,7 +78,7 @@ public partial class Toast : Window
         _hide.Start();
     }
 
-    /// <summary>Убрать немедленно: разговор продолжился в окне.</summary>
+    /// <summary>Remove at once: the conversation continued in the window.</summary>
     public void Dismiss()
     {
         _hide.Stop();
@@ -93,12 +97,12 @@ public partial class Toast : Window
     }
 
     /// <summary>
-    /// Правый нижний угол рабочей области.
+    /// The bottom right corner of the working area.
     /// </summary>
     /// <remarks>
-    /// Рабочей, а не экрана: иначе окно ляжет под панель задач. Отступ
-    /// такой же, как у системных уведомлений, — человек уже знает, куда
-    /// смотреть.
+    /// The working area, not the screen: otherwise the window lands under
+    /// the taskbar. The margin is the same as for system notifications —
+    /// a person already knows where to look.
     /// </remarks>
     private void Place()
     {

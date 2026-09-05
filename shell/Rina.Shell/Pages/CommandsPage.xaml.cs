@@ -9,18 +9,19 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Pages;
 
-/// <summary>Своя команда, как её видит человек.</summary>
+/// <summary>A command of one's own, as a person sees it.</summary>
 public sealed record UserCommand(string Id, string Name, string What,
                                  bool Enabled);
 
 /// <summary>
-/// Команды: то, чему человек научил Рину сам.
+/// Commands: what a person has taught Rina themselves.
 /// </summary>
 /// <remarks>
-/// Раздел стал возможен только после того, как в протоколе появились методы
-/// (<c>4.0-F04</c>): до этого у него было место в архитектуре и ни одного
-/// способа что-либо сделать. Выключение отдельно от удаления — это разные
-/// намерения, и в инвентаре поверхности они записаны отдельными строками.
+/// The section became possible only once the protocol had methods
+/// (<c>4.0-F04</c>): before that it had a place in the architecture and no
+/// way of doing anything. Switching off is separate from deleting because
+/// these are different intents, and in the surface inventory they are
+/// written down as separate lines.
 /// </remarks>
 public partial class CommandsPage : UserControl
 {
@@ -44,18 +45,19 @@ public partial class CommandsPage : UserControl
         Loaded += async (_, _) =>
         {
             await ReloadAsync();
-            // Встроенное перечитывается один раз: оно не меняется от того,
-            // что человек завёл свою команду.
+            // The built-in list is re-read once: it does not change
+            // because the person added a command of their own.
             await ShowBuiltinAsync();
         };
     }
 
     private async Task ReloadAsync()
     {
-        // Виды спрашиваются до списка: иначе первая отрисовка успевает
-        // показать «app» вместо «Программа». Так и было — и увидел это не
-        // прогон проверки, а снимок: проверка щёлкала конструктор раньше и
-        // получала виды заодно, а человек просто открывает страницу.
+        // Kinds are asked for before the list: otherwise the first draw
+        // manages to show "app" instead of "Program". And so it did — and
+        // what saw it was not a check run but a screenshot: the check
+        // clicked the editor open earlier and got the kinds along the way,
+        // whereas a person simply opens the page.
         await KindsAsync();
         var told = await Ask(Methods.CommandsList);
         _items.Clear();
@@ -74,8 +76,9 @@ public partial class CommandsPage : UserControl
         }
 
         Legend.Text = S("МОИ КОМАНДЫ · {0}", _items.Count);
-        // Здесь пустое состояние не занимает страницу: ниже перечень того,
-        // что Рина умеет и без своих команд, и он куда полезнее пустоты.
+        // Here the empty state does not take over the page: below it is a
+        // list of what Rina can do without any commands of one's own, and
+        // that is far more useful than emptiness.
         Empty.Content = _items.Count == 0
             ? EmptyState.For(
                 S("Своих команд пока нет"),
@@ -86,13 +89,13 @@ public partial class CommandsPage : UserControl
     }
 
     /// <summary>
-    /// Как назвать команду в списке.
+    /// What to call a command in the list.
     /// </summary>
     /// <remarks>
-    /// Имени у команды нет: есть фразы, по которым она срабатывает, — и
-    /// первая из них и есть то, чем человек её называет. Поле «имя»
-    /// оболочка сначала спрашивала у ядра и получала пустоту: ядро хранит
-    /// `triggers`, и имени в нём никогда не было.
+    /// A command has no name: it has the phrases it fires on — and the
+    /// first of them is what the person calls it by. The shell first asked
+    /// the core for a "name" field and got emptiness back: the core stores
+    /// `triggers`, and a name was never in there.
     /// </remarks>
     private static string NameOf(JsonObject command)
     {
@@ -101,11 +104,11 @@ public partial class CommandsPage : UserControl
         return string.IsNullOrWhiteSpace(first) ? S("без имени") : first;
     }
 
-    /// <summary>Из чего команда состоит — словами, а не полями.</summary>
+    /// <summary>What a command is made of — in words, not in fields.</summary>
     /// <remarks>
-    /// Виды называются так же, как их называет ядро (`commands.kinds`):
-    /// оболочка знала свои — `url`, `path` — и не узнавала ни одного
-    /// настоящего. Незнакомый вид показывается как есть, а не прячется.
+    /// Kinds are named the way the core names them (`commands.kinds`): the
+    /// shell knew its own — `url`, `path` — and recognised not a single
+    /// real one. An unfamiliar kind is shown as it is rather than hidden.
     /// </remarks>
     private string Describe(JsonNode? item)
     {
@@ -122,18 +125,18 @@ public partial class CommandsPage : UserControl
         return target.Length > 0 ? $"{title} · {target}" : title;
     }
 
-    /// <summary>Как описана первая команда — для сквозной проверки.</summary>
+    /// <summary>How the first command is described — for the end-to-end check.</summary>
     public string FirstDescription() =>
         _items.Count > 0 ? _items[0].What : "";
 
     /// <summary>
-    /// Завести команду так же, как её заводит человек.
+    /// Set up a command the same way a person sets one up.
     /// </summary>
     /// <remarks>
-    /// Проверка не умеет печатать в поля и нажимать кнопки, но обязана
-    /// пройти тот же путь: конструктор собирает карточку, ядро назначает
-    /// номер, список перечитывается. Обход этого пути проверял бы
-    /// протокол, а не страницу.
+    /// The check cannot type into fields and press buttons, but it must go
+    /// the same way: the editor assembles the card, the core assigns a
+    /// number, the list is re-read. Going around that path would be testing
+    /// the protocol rather than the page.
     /// </remarks>
     public async Task<bool> CreateForCheckAsync(string phrase, string kind,
                                                 string target)
@@ -159,7 +162,7 @@ public partial class CommandsPage : UserControl
         return true;
     }
 
-    /// <summary>Виды шагов последней последовательности — для проверки.</summary>
+    /// <summary>Step kinds of the last saved sequence — for the check.</summary>
     public string StepsOfLastSaved()
     {
         var sequence = _raw.Values.LastOrDefault(
@@ -172,29 +175,31 @@ public partial class CommandsPage : UserControl
     private readonly Dictionary<string, JsonObject> _raw = [];
     private JsonObject? _kinds;
 
-    /// <summary>Открытый конструктор — для сквозной проверки.</summary>
+    /// <summary>The open editor — for the end-to-end check.</summary>
     public CommandEditor? Editor => EditorBox.Content as CommandEditor;
 
-    /// <summary>Показан ли сейчас конструктор — для сквозной проверки.</summary>
+    /// <summary>Whether the editor is showing right now — for the end-to-end check.</summary>
     public bool EditorOpen => EditorBox.Content is not null;
 
-    /// <summary>Сколько команд в списке — для сквозной проверки.</summary>
+    /// <summary>How many commands are in the list — for the end-to-end check.</summary>
     public int CommandCount => _items.Count;
 
     /// <summary>
-    /// Встроенные умения и сколько программ нашлось.
+    /// Built-in skills, and how many programs were found.
     /// </summary>
     /// <remarks>
-    /// Перечень приходит от ядра: это фразы, которые ей говорят, то есть
-    /// её словарь (`4.0-F08`). А число программ оболочка считает сама —
-    /// индекс живёт у неё (ADR 0009), и спрашивать его у ядра, которое
-    /// само спрашивало у оболочки, значит гонять по проводу число.
+    /// The list comes from the core: these are the phrases people say to
+    /// her, that is, her vocabulary (`4.0-F08`). The number of programs the
+    /// shell counts itself — the index lives with it (ADR 0009), and asking
+    /// the core, which asked the shell in the first place, would mean
+    /// driving a number over the wire.
     /// </remarks>
     private async Task ShowBuiltinAsync()
     {
-        // Счёт программ — первым делом: он читается из кэша и приходит
-        // мгновенно, а список встроенного ждёт ответа ядра. Обратный
-        // порядок оставлял бы заголовок без числа на всё время ожидания.
+        // The program count first: it is read from the cache and comes
+        // instantly, while the built-in list waits for the core's answer.
+        // The other order would leave the heading without its number for
+        // the whole wait.
         var found = await Task.Run(() => Platform.AppIndex.Get().Count);
         BuiltinLegend.Text = found > 0
             ? S("УМЕЕТ СРАЗУ · программ найдено: {0}", found)
@@ -227,8 +232,8 @@ public partial class CommandsPage : UserControl
             Builtin.Children.Add(card);
         }
 
-        // Последняя строка без шва: он совпал бы с краем блока и
-        // перечеркнул бы скругление.
+        // The last row has no seam: it would coincide with the edge of the
+        // block and cross out the rounding.
         if (Builtin.Children.Count > 0
             && Builtin.Children[^1] is Border tail)
             tail.BorderThickness = new Thickness(0);
@@ -236,7 +241,7 @@ public partial class CommandsPage : UserControl
         BuiltinCount = Builtin.Children.Count;
     }
 
-    /// <summary>Сколько встроенных умений показано — для проверки.</summary>
+    /// <summary>How many built-in skills are shown — for the check.</summary>
     public int BuiltinCount { get; private set; }
 
     private async Task<JsonObject?> KindsAsync()
@@ -252,13 +257,13 @@ public partial class CommandsPage : UserControl
     }
 
     /// <summary>
-    /// Открыть конструктор — на пустом месте или над существующей.
+    /// Open the editor — on a blank slate or over an existing command.
     /// </summary>
     /// <remarks>
-    /// Создание и правка — одно окно и один метод у ядра
-    /// (`commands.save`): для человека это одно действие, он правит
-    /// карточку и сохраняет. Разделять их значит заставить его помнить,
-    /// заведена команда или ещё нет.
+    /// Creating and editing are one window and one core method
+    /// (`commands.save`): for a person this is one action — they edit the
+    /// card and save it. Separating them would mean making them remember
+    /// whether the command exists yet.
     /// </remarks>
     public async Task<bool> OpenEditorAsync(JsonObject? existing)
     {
@@ -345,8 +350,9 @@ public partial class CommandsPage : UserControl
             });
             var added = done?["added"]?.GetValue<int>() ?? 0;
             var skipped = done?["skipped"]?.GetValue<int>() ?? 0;
-            // «Пропущено» названо отдельно: человек должен понимать, что уже
-            // настроенное не затёрли, а не гадать, куда делись команды.
+            // "Skipped" is named separately: a person has to understand
+            // that what was already set up was not overwritten, rather than
+            // guess where their commands went.
             Note.Text = S("Добавлено {0}, пропущено как уже известные {1}.",
                           added, skipped);
             await ReloadAsync();

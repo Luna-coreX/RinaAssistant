@@ -6,50 +6,52 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// «Эта программа не подписана» — спросить перед первым запуском.
+/// "This program is not signed" — ask before the first launch.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-G10</c>.
+/// Plan item <c>4.0-G10</c>.
 /// </para>
 /// <para>
-/// <b>Показывается всё, чем можно решать</b>: имя, полный путь, источник
-/// индекса. Вопрос «доверяете ли вы этой программе» без пути — это вопрос
-/// без ответа: половина неподписанного лежит в папках, куда человек её сам
-/// и положил, а вторая половина — там, куда её положил кто-то другой.
+/// <b>Everything one can decide by is shown</b>: the name, the full path,
+/// the source of the index. The question "do you trust this program"
+/// without a path is a question with no answer: half of the unsigned
+/// software lives in folders the person put it in themselves, and the
+/// other half is where somebody else put it.
 /// </para>
 /// <para>
-/// <b>Три ответа, а не два.</b> «Один раз» существует потому, что «нет» и
-/// «навсегда да» — плохая пара: человек, которому нужно запустить это
-/// сейчас, выберет «навсегда» просто чтобы продолжить.
+/// <b>Three answers, not two.</b> "Once" exists because "no" and "yes,
+/// forever" are a bad pair: a person who needs to run this now will pick
+/// "forever" simply to get on with it.
 /// </para>
 /// <para>
-/// <b>Рамка акцентом, а не красным.</b> Красного в палитре нет вовсе
-/// (<c>4.0-R07</c>): цвет опасности размывается от повторения. Здесь он и
-/// не нужен — вопрос задан словами.
+/// <b>An accent border, not a red one.</b> There is no red in the palette
+/// at all (<c>4.0-R07</c>): the colour of danger wears out through
+/// repetition. It is not needed here either — the question is asked in
+/// words.
 /// </para>
 /// </remarks>
 public partial class TrustWindow : Window
 {
-    /// <summary>Что ответил человек.</summary>
+    /// <summary>What the person answered.</summary>
     public enum Reply
     {
-        /// <summary>Не запускать.</summary>
+        /// <summary>Do not launch.</summary>
         Never,
 
-        /// <summary>Запустить сейчас, но не запоминать.</summary>
+        /// <summary>Launch now, but do not remember it.</summary>
         Once,
 
-        /// <summary>Запускать всегда без вопросов.</summary>
+        /// <summary>Always launch without asking.</summary>
         Always,
     }
 
     /// <summary>
-    /// Ответ. По умолчанию — отказ.
+    /// The answer. Refusal by default.
     /// </summary>
     /// <remarks>
-    /// Закрытое окно значит «нет», а не «да»: молчание не согласие, тем
-    /// более на запуск неподписанного.
+    /// A closed window means "no", not "yes": silence is not consent, all
+    /// the less so for launching something unsigned.
     /// </remarks>
     public Reply Answer { get; private set; } = Reply.Never;
 

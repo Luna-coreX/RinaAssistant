@@ -7,41 +7,43 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Pages;
 
 /// <summary>
-/// Конструктор команды: фразы, действие, ответ.
+/// The command editor: phrases, action, answer.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-F04</c>. Страница команд умела показывать, включать,
-/// выполнять и удалять — но не заводить, и потому у нового человека была
-/// пуста навсегда: первую команду взять было неоткуда.
+/// Plan item <c>4.0-F04</c>. The commands page could show, switch on, run
+/// and delete — but not create, and so for a new person it was empty
+/// forever: there was nowhere to get a first command from.
 /// </para>
 /// <para>
-/// <b>Виды действий приходят от ядра</b> (<c>commands.kinds</c>), а не
-/// написаны здесь. Выполнять их ядру, и список у него; оболочка, знающая
-/// его наизусть, разошлась бы молча — показала бы действие, которого нет,
-/// или спрятала бы новое. То же правило, что у списков в настройках.
+/// <b>Action kinds come from the core</b> (<c>commands.kinds</c>) rather
+/// than being written down here. The core is what runs them, and it has
+/// the list; a shell that knew the list by heart would drift apart from it
+/// in silence — showing an action that does not exist, or hiding a new
+/// one. The same rule as for the lists in settings.
 /// </para>
 /// <para>
-/// <b>Необратимое помечено ещё в конструкторе.</b> Подтверждение спросит
-/// ядро при срабатывании (§11), но узнать, что «выключить компьютер»
-/// необратимо, человек должен здесь — а не в тот раз, когда фраза совпала
-/// случайно.
+/// <b>What is irreversible is marked in the editor already.</b>
+/// Confirmation will be asked for by the core when it fires (§11), but
+/// finding out that "shut down the computer" is irreversible has to happen
+/// here — not on the occasion when the phrase matched by accident.
 /// </para>
 /// </remarks>
 public partial class CommandEditor : UserControl
 {
     private readonly List<string> _triggers = [];
-    //: Шаги последовательности, по порядку. Порядок и есть смысл: «открой
-    //: браузер, потом папку» и наоборот — разные команды.
+    //: Steps of the sequence, in order. The order is the meaning: "open
+    //: the browser, then the folder" and the reverse are different
+    //: commands.
     private readonly List<JsonObject> _steps = [];
     private readonly List<(string Value, string Title, bool Destructive)>
         _actions = [];
     private string _id = "";
 
-    /// <summary>Человек сохранил команду; страница перечитывает список.</summary>
+    /// <summary>The person saved the command; the page re-reads the list.</summary>
     public event Action<JsonObject>? Saved;
 
-    /// <summary>Человек передумал.</summary>
+    /// <summary>The person changed their mind.</summary>
     public event Action? Cancelled;
 
     public CommandEditor(JsonObject kinds, JsonObject? existing = null)
@@ -105,13 +107,13 @@ public partial class CommandEditor : UserControl
         (Kind.SelectedItem as ComboBoxItem)?.Tag as string ?? "app";
 
     /// <summary>
-    /// Поле цели меняется вместе с видом.
+    /// The target field changes together with the kind.
     /// </summary>
     /// <remarks>
-    /// У «программы» это путь, у «сайта» — адрес, у «системного действия» —
-    /// выбор из списка, а «озвучить» вообще не про цель, а про текст.
-    /// Одно поле «цель» на все случаи заставило бы человека знать, что
-    /// именно в него положено вписать.
+    /// For "program" it is a path, for "site" an address, for "system
+    /// action" a choice from a list, and "say out loud" is not about a
+    /// target at all but about text. One "target" field for every case
+    /// would make a person work out what exactly belongs in it.
     /// </remarks>
     private void OnKindChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -125,9 +127,9 @@ public partial class CommandEditor : UserControl
         Target.Visibility = system ? Visibility.Collapsed : Visibility.Visible;
         Browse.Visibility = picks ? Visibility.Visible : Visibility.Collapsed;
 
-        // Подсказка меняется вместе с видом: в одно и то же поле кладут
-        // то путь, то адрес, то фразу, и «Что открыть» на все случаи
-        // заставляло бы человека догадываться, в каком виде.
+        // The hint changes with the kind: one and the same field takes now
+        // a path, now an address, now a phrase, and "What to open" for
+        // every case would leave a person guessing in what form.
         Styles.Ui.SetHint(Target, kind switch
         {
             "app" => S(@"например, C:\Program Files\App\app.exe"),
@@ -204,13 +206,13 @@ public partial class CommandEditor : UserControl
     }
 
     /// <summary>
-    /// Виды шага — те же, что у команды, кроме самой последовательности.
+    /// Step kinds — the same as a command's, minus the sequence itself.
     /// </summary>
     /// <remarks>
-    /// Последовательность внутри последовательности не запрещена ядром, но
-    /// в конструкторе её нет: «шаг, который сам список шагов» превращает
-    /// понятную цепочку в дерево, а человек, собирающий «открой браузер и
-    /// сверни окно», дерева не имел в виду.
+    /// A sequence inside a sequence is not forbidden by the core, but it is
+    /// absent from the editor: "a step that is itself a list of steps"
+    /// turns a plain chain into a tree, and a person assembling "open the
+    /// browser and minimise the window" did not have a tree in mind.
     /// </remarks>
     private void FillStepKinds()
     {
@@ -274,8 +276,9 @@ public partial class CommandEditor : UserControl
             return;
         }
 
-        // У шага нет ни фраз, ни своего ответа: срабатывает и отвечает
-        // команда целиком, а шаг — то, что она делает по дороге.
+        // A step has neither phrases nor an answer of its own: the command
+        // as a whole is what fires and what answers, and a step is what it
+        // does along the way.
         _steps.Add(new JsonObject
         {
             ["type"] = kind,
@@ -291,7 +294,7 @@ public partial class CommandEditor : UserControl
         DrawSteps();
     }
 
-    /// <summary>Показать шаги с их порядком и кнопками.</summary>
+    /// <summary>Show the steps with their order and buttons.</summary>
     private void DrawSteps()
     {
         Steps.Children.Clear();
@@ -317,8 +320,8 @@ public partial class CommandEditor : UserControl
                     Width = GridLength.Auto,
                 });
 
-            // Номер, а не маркер: человек читает «сначала первый, потом
-            // второй», и порядок должен быть виден, а не подразумеваться.
+            // A number, not a bullet: a person reads "first this, then
+            // that", and the order has to be visible, not implied.
             var number = new TextBlock
             {
                 Text = $"{index + 1}.",
@@ -380,7 +383,7 @@ public partial class CommandEditor : UserControl
         DrawSteps();
     }
 
-    /// <summary>Шаг человеческими словами: вид и что именно.</summary>
+    /// <summary>A step in human words: the kind and what exactly.</summary>
     private string DescribeStep(JsonObject step)
     {
         var kind = step["type"]?.GetValue<string>() ?? "";
@@ -389,8 +392,8 @@ public partial class CommandEditor : UserControl
             .FirstOrDefault(item => (string?)item.Tag == kind)
             ?.Content?.ToString() ?? kind;
 
-        // У системного действия цель — код из перечня, и показывать его
-        // человеку незачем: у действия есть название.
+        // A system action's target is a code from a list, and there is no
+        // point showing it to a person: the action has a name.
         if (kind == "system")
         {
             var named = _actions.FirstOrDefault(a => a.Value == target);
@@ -449,8 +452,9 @@ public partial class CommandEditor : UserControl
             ["steps"] = new JsonArray(
                 _steps.Select(step => step.DeepClone()).ToArray()),
         };
-        // Номер назначает ядро; свой посылаем только когда правим уже
-        // заведённую — иначе правка превратилась бы в создание двойника.
+        // The number is assigned by the core; we send our own only when
+        // editing one that already exists — otherwise editing would turn
+        // into creating a twin.
         if (_id.Length > 0) command["id"] = _id;
 
         Saved?.Invoke(command);
@@ -459,12 +463,12 @@ public partial class CommandEditor : UserControl
     private void OnCancel(object sender, RoutedEventArgs e) => Cancelled?.Invoke();
 
     /// <summary>
-    /// Собрать последовательность из шагов — для сквозной проверки.
+    /// Assemble a sequence out of steps — for the end-to-end check.
     /// </summary>
     /// <remarks>
-    /// Проверка не умеет щёлкать по кнопкам, а собранная руками команда
-    /// проверяла бы не конструктор, а `JsonObject`. Здесь проходит тот же
-    /// путь: выбрать вид, добавить шаги, сохранить.
+    /// The check cannot click buttons, and a command assembled by hand
+    /// would be testing `JsonObject` rather than the editor. Here it goes
+    /// the same way: pick the kind, add the steps, save.
     /// </remarks>
     public bool BuildSequenceForCheck(string phrase,
                                       IEnumerable<(string Kind, string Target)> steps)
@@ -482,9 +486,9 @@ public partial class CommandEditor : UserControl
             StepKind.SelectedItem = StepKind.Items.OfType<ComboBoxItem>()
                 .FirstOrDefault(item => (string?)item.Tag == kind);
 
-            // У системного шага цель выбирают из списка, а не набирают:
-            // первая редакция проверки набирала — и системный шаг молча не
-            // добавлялся, потому что список оставался пустым.
+            // A system step's target is picked from a list, not typed: the
+            // first edition of the check typed it — and the system step
+            // silently failed to be added, because the list stayed empty.
             if (kind == "system")
                 StepAction.SelectedItem = StepAction.Items
                     .OfType<ComboBoxItem>()
@@ -496,7 +500,7 @@ public partial class CommandEditor : UserControl
         }
         if (_steps.Count == 0) return false;
 
-        // И порядок: последний шаг поднимаем наверх и опускаем обратно.
+        // And the order: lift the last step to the top and put it back.
         var wasFirst = _steps[0]["target"]?.GetValue<string>();
         Move(_steps.Count - 1, -1);
         Move(_steps.Count - 2, +1);
@@ -506,6 +510,6 @@ public partial class CommandEditor : UserControl
         return true;
     }
 
-    /// <summary>Сколько шагов собрано — для проверки.</summary>
+    /// <summary>How many steps were assembled — for the check.</summary>
     public int StepCount => _steps.Count;
 }
