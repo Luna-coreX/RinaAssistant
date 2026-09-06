@@ -1,21 +1,22 @@
 """
-Хранилище настроек приложения — разделённое на несколько файлов.
+The application's settings store — split across several files.
 
-Данные физически лежат в нескольких JSON в пользовательской папке:
+Physically the data lies in several JSON files in the user's folder:
   Windows: %APPDATA%/RinaAssistant/
   Linux:   ~/.config/RinaAssistant/
   macOS:   ~/Library/Application Support/RinaAssistant/
 
-Файлы:
-  settings.json  — настройки приложения и страницы «Рина»
-  commands.json  — пользовательские команды и статистика запусков
-  plugins.json   — включённые плагины и их настройки
-  history.json   — журнал взаимодействий
+The files:
+  settings.json  — the application's settings and the "Rina" page
+  commands.json  — the user's commands and launch statistics
+  plugins.json   — switched-on plugins and their settings
+  history.json   — the journal of interactions
 
-Снаружи это по-прежнему ОДИН объект `settings` с get/set/save — код,
-который читает settings.get("history") и т.п., менять не нужно. Роутинг ключа
-в нужный файл происходит внутри. При первом запуске после обновления старый
-монолитный settings.json автоматически мигрирует в новые файлы.
+From outside this is still ONE `settings` object with get/set/save — code
+that reads settings.get("history") and the like need not change. The routing
+of a key into the right file happens inside. On the first start after an
+update, the old monolithic settings.json migrates into the new files
+automatically.
 """
 
 import contextlib
@@ -29,18 +30,19 @@ import threading
 
 APP_NAME = "RinaAssistant"
 
-# Версия схемы конфига. Растёт, когда меняется ФОРМА данных (а не набор
-# настроек): добавление нового ключа с дефолтом миграции не требует.
-#   0 — конфиги до 2.0 (версия не записывалась)
-#   1 — язык распознавания объединён с языком интерфейса (ui_language)
-#   2 — app_aliases хранит словарь {path, kind, name}, а не строку пути
+# The config schema's version. It grows when the SHAPE of the data changes
+# (not the set of settings): adding a new key with a default needs no
+# migration.
+#   0 — configs before 2.0 (the version was not written down)
+#   1 — the recognition language merged with the interface language (ui_language)
+#   2 — app_aliases stores a dict {path, kind, name} rather than a path string
 CONFIG_VERSION = 2
 
 
-# Значения по умолчанию, сгруппированные по файлам.
+# Default values, grouped by file.
 GROUPS = {
     "settings": {
-        # --- страница «Рина» ---
+        # --- the "Rina" page ---
         "voice": "default",
         "wake_word": "Рина",
         "wake_words": ["Рина", "Rina"],
@@ -55,14 +57,14 @@ GROUPS = {
         "vosk_model": "",
         "whisper_model": "base",
         "piper_model": "",
-        # --- приложение ---
-        # Отделка 4.0 (4.0-R08, F07). Две равноправные, и «чёрное» здесь не
-    # потому, что лучше, а потому, что все пять палитр 3.1.0 были тёмными:
-    # человек, обновившийся с 3.1.0, увидит то же, что видел вчера.
+        # --- the application ---
+        # The 4.0 finish (4.0-R08, F07). Two equals, and "black" here is not
+    # because it is better but because all five 3.1.0 palettes were dark: a
+    # person upgrading from 3.1.0 will see what they saw yesterday.
     "finish": "black",
-    # Тема и акцент 3.1.0 остаются в хранилище, но больше не участвуют:
-    # дизайн-система заменила пять заимствованных палитр двумя отделками.
-    # Стереть их значило бы уничтожить данные ради опрятности файла.
+    # 3.1.0's theme and accent stay in the store but no longer take part:
+    # the design system replaced five borrowed palettes with two finishes.
+    # Erasing them would mean destroying data for the sake of a tidy file.
     "theme": "Catppuccin Mocha",
         "accent": "Mauve",
         "ui_language": "Русский",
@@ -82,15 +84,15 @@ GROUPS = {
         "app_aliases": {},
         "wake_sensitivity": 0.8,
         "listen_seconds": 8,
-        # локальная языковая модель (Ollama). Выключена по умолчанию:
-        # это тяжёлая возможность, которая требует установленного сервера.
+        # the local language model (Ollama). Off by default: this is a heavy
+        # capability that requires an installed server.
         "llm_enabled": False,
         "llm_url": "http://localhost:11434",
         "llm_model": "",
         "llm_persona": "",
         "llm_timeout": 30,
-        # журналирование. Тексты реплик — содержимое разговора, поэтому
-        # пишутся только при явном согласии и только на уровне DEBUG.
+        # journalling. The text of lines is the content of a conversation, so
+        # it is written only with explicit consent and only at DEBUG level.
         "log_level": "INFO",
         "log_texts": False,
         "config_version": 0,
@@ -112,17 +114,17 @@ GROUPS = {
     },
 }
 
-# Плоский словарь всех дефолтов (для обратной совместимости API).
+# A flat dictionary of every default (for API backward compatibility).
 #
-# ВАЖНО: половина значений здесь — изменяемые (списки и словари), и они
-# общие с GROUPS. Копировать их можно только глубоко: поверхностная копия
-# отдавала бы приложению тот же самый объект, и первая же настройка плагина
-# меняла бы «значение по умолчанию». Для этого есть defaults_for().
+# IMPORTANT: half the values here are mutable (lists and dicts), and they are
+# shared with GROUPS. They may only be copied deeply: a shallow copy would
+# hand the application the very same object, and the first plugin setting
+# would change the "default value". That is what defaults_for() is for.
 DEFAULTS = {}
 for _grp in GROUPS.values():
     DEFAULTS.update(_grp)
 
-# Обратный индекс: ключ -> имя файла/группы.
+# The reverse index: key -> file/group name.
 _KEY_TO_GROUP = {}
 for _name, _grp in GROUPS.items():
     for _k in _grp:
@@ -130,12 +132,12 @@ for _name, _grp in GROUPS.items():
 
 
 def default_value(key):
-    """Заводское значение ключа — всегда отдельный объект."""
+    """A key's factory value — always a separate object."""
     return copy.deepcopy(DEFAULTS[key])
 
 
 def defaults_for(group=None):
-    """Заводские значения группы (или все) — всегда отдельные объекты."""
+    """A group's factory values (or all of them) — always separate objects."""
     source = GROUPS[group] if group is not None else DEFAULTS
     return copy.deepcopy(source)
 
@@ -155,58 +157,58 @@ def _config_dir() -> str:
 
 
 def config_dir() -> str:
-    """Папка с данными приложения (настройки, кэши). Создаётся при обращении."""
+    """The folder with the application's data (settings, caches). Created on demand."""
     return _config_dir()
 
 
 class SettingsStore:
     def __init__(self):
-        # к настройкам обращаются из нескольких потоков (см. save)
+        # the settings are accessed from several threads (see save)
         self._lock = threading.RLock()
         self._dir = _config_dir()
         self._data = defaults_for()
-        self._dirty = set()      # какие группы изменились (для точечной записи)
+        self._dirty = set()      # which groups changed (for a targeted write)
         self._loaded = False
         self._loading = False
 
-    # ---------- атомарные изменения ----------
+    # ---------- atomic changes ----------
     @contextlib.contextmanager
     def transaction(self):
         """
-        Блокировка на всю последовательность «прочитать — изменить — записать».
+        A lock over the whole "read — change — write" sequence.
 
-        set() и save() по отдельности потокобезопасны, а такая
-        последовательность — нет: два потока читают одно состояние, и второй
-        затирает изменения первого. Так пропадали записи истории, когда ответ
-        Рины и сработавшее напоминание писались одновременно.
+        set() and save() are thread-safe separately, but such a sequence is
+        not: two threads read one state, and the second overwrites the
+        first's changes. That is how history entries went missing when
+        Rina's answer and a fired reminder were written at the same time.
 
-        Блокировка та же самая (RLock), поэтому вложенные set()/save()
-        внутри блока работают как обычно.
+        The lock is the same one (RLock), so nested set()/save() inside the
+        block work as usual.
         """
         with self._lock:
             yield self
 
-    # ---------- пути файлов ----------
+    # ---------- file paths ----------
     def _group_path(self, group):
         return os.path.join(self._dir, f"{group}.json")
 
     @property
     def path(self):
-        # для обратной совместимости: путь основного файла
+        # for backward compatibility: the path of the main file
         return self._group_path("settings")
 
-    # ---------- загрузка ----------
+    # ---------- loading ----------
     def load(self):
         self._data = defaults_for()
 
-        # миграция: если новые файлы ещё не созданы, а старый монолит есть —
-        # раскидать его по группам и сохранить.
+        # migration: if the new files have not been created yet and the old
+        # monolith exists — scatter it across the groups and save.
         migrated = self._maybe_migrate()
 
         for group in GROUPS:
             self._load_group(group)
 
-        # обновление формы данных до текущей версии схемы
+        # bringing the data's shape up to the current schema version
         migrated = self._migrate_schema() or migrated
 
         if migrated:
@@ -214,9 +216,9 @@ class SettingsStore:
         self._loaded = True
         return self._data
 
-    # ---------- миграция схемы ----------
+    # ---------- schema migration ----------
     def _raw_group(self, group):
-        """Сырое содержимое файла группы (включая ключи, которых уже нет)."""
+        """The raw content of a group's file (including keys that no longer exist)."""
         try:
             with open(self._group_path(group), "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -226,14 +228,14 @@ class SettingsStore:
 
     def _backup_config(self, from_version):
         """
-        Копия конфигов перед первой миграцией.
+        A copy of the configs before the first migration.
 
-        Пользовательские команды и история накапливаются годами — если
-        миграция окажется неудачной, должно остаться к чему вернуться.
+        The user's commands and history accumulate over years — if the
+        migration turns out badly, there must be something to go back to.
         """
         backup_dir = os.path.join(self._dir, f"backup-v{from_version}")
         if os.path.isdir(backup_dir):
-            return          # копия уже есть, второй раз не перезаписываем
+            return          # the copy already exists; we do not overwrite it twice
         try:
             os.makedirs(backup_dir, exist_ok=True)
             for group in GROUPS:
@@ -245,10 +247,10 @@ class SettingsStore:
                               "w", encoding="utf-8") as f:
                         f.write(content)
         except OSError:
-            pass            # не смогли сделать копию — миграцию всё равно проводим
+            pass            # could not make a copy: we migrate all the same
 
     def _migrate_schema(self):
-        """Приводит данные к текущей CONFIG_VERSION. True, если что-то меняли."""
+        """Brings the data up to the current CONFIG_VERSION. True if anything was changed."""
         stored = self._data.get("config_version", 0)
         try:
             stored = int(stored)
@@ -257,7 +259,7 @@ class SettingsStore:
         if stored >= CONFIG_VERSION:
             return False
 
-        # конфиг существует (а не создаётся с нуля) — бэкапим перед правками
+        # the config exists (rather than being created from scratch) — we back it up before editing
         if os.path.isfile(self._group_path("settings")):
             self._backup_config(stored)
 
@@ -271,12 +273,13 @@ class SettingsStore:
 
     def _migrate_to_v1(self):
         """
-        Язык распознавания речи объединён с языком интерфейса.
+        The speech recognition language has been merged with the interface
+        language.
 
-        Раньше «Язык» на вкладке Рины (ключ language) управлял только
-        распознаванием. Если пользователь его менял, а язык интерфейса не
-        трогал — переносим его выбор, чтобы распознавание не «переехало»
-        молча на другой язык.
+        Previously "Language" on Rina's tab (the `language` key) governed
+        recognition alone. If the user changed it and left the interface
+        language alone, we carry their choice over, so that recognition does
+        not silently "move" to another language.
         """
         old = self._raw_group("settings")
         legacy_lang = str(old.get("language", "")).strip()
@@ -288,7 +291,7 @@ class SettingsStore:
             self._data["ui_language"] = legacy_lang
 
     def _migrate_to_v2(self):
-        """app_aliases: строка с путём -> словарь {path, kind, name}."""
+        """app_aliases: a path string -> a dict {path, kind, name}."""
         aliases = self._data.get("app_aliases") or {}
         if not isinstance(aliases, dict):
             self._data["app_aliases"] = {}
@@ -300,7 +303,7 @@ class SettingsStore:
                 upgraded[key] = {"path": value, "kind": "file", "name": name}
             elif isinstance(value, dict) and value.get("path"):
                 upgraded[key] = value
-            # прочее (битые записи) отбрасываем
+            # the rest (broken entries) we discard
         self._data["app_aliases"] = upgraded
 
     def _load_group(self, group):
@@ -313,16 +316,16 @@ class SettingsStore:
                     if k in GROUPS[group]:
                         self._data[k] = v
         except (FileNotFoundError, json.JSONDecodeError, OSError):
-            pass  # нет файла/битый — остаются дефолты этой группы
+            pass  # no file or a broken one: this group's defaults remain
 
     def _maybe_migrate(self):
-        """Старый settings.json содержал ВСЕ ключи. Если новые файлы групп
-        (commands/plugins/history) отсутствуют, а в settings.json лежат их
-        данные — переносим их в память, чтобы затем сохранить по группам."""
+        """The old settings.json contained EVERY key. If the new group files
+        (commands/plugins/history) are absent and settings.json holds their
+        data — we carry it into memory, to save it by group afterwards."""
         settings_path = self._group_path("settings")
         if not os.path.isfile(settings_path):
             return False
-        # признак «старого» файла: наличие ключей из других групп внутри settings.json
+        # the mark of an "old" file: keys from other groups present inside settings.json
         others_exist = any(
             os.path.isfile(self._group_path(g))
             for g in ("commands", "plugins", "history"))
@@ -335,18 +338,18 @@ class SettingsStore:
             return False
         if not isinstance(old, dict):
             return False
-        # есть ли в старом файле ключи не из группы settings?
+        # are there keys in the old file that are not from the settings group?
         foreign = [k for k in old
                    if k in DEFAULTS and _KEY_TO_GROUP.get(k) != "settings"]
         if not foreign:
             return False
-        # переносим все известные ключи в память
+        # we carry every known key into memory
         for k, v in old.items():
             if k in DEFAULTS:
                 self._data[k] = v
         return True
 
-    # ---------- сохранение ----------
+    # ---------- saving ----------
     def _save_group(self, group):
         path = self._group_path(group)
         payload = {k: self._data.get(k, DEFAULTS[k]) for k in GROUPS[group]}
@@ -357,8 +360,8 @@ class SettingsStore:
             os.replace(tmp, path)
             return True
         except OSError as e:
-            # молчаливая потеря настроек — худший из отказов: пользователь
-            # думает, что сохранил, а после перезапуска всё вернулось
+            # a silent loss of settings is the worst of failures: the user
+            # thinks they saved, and after a restart everything is back
             from core.logging_setup import get_logger
             get_logger("settings").error(
                 "Не удалось записать группу «%s» в %s: %s", group, path, e)
@@ -366,20 +369,22 @@ class SettingsStore:
 
     def save(self):
         """
-        Сохраняет только изменённые группы (или все, если неизвестно).
+        Saves only the groups that changed (or all, if that is unknown).
 
-        **Записывать можно только прочитанное.** Хранилище, которое не
-        читали, держит умолчания, и запись затирает файл человека ими —
-        причём не тем ключом, который меняли, а всей группой целиком. Так и
-        пропали настройки: ядро не звало `load()`, оболочка записала одну
-        отделку, и вместе с ней на диск уехали умолчания вместо голоса,
-        движка распознавания и темы.
+        **Only what has been read may be written.** A store that has not
+        been read holds the defaults, and a write overwrites a person's file
+        with them — and not by the key that was changed but by the whole
+        group. That is how the settings went missing: the core did not call
+        `load()`, the shell wrote down one finish, and along with it the
+        defaults went to disk instead of the voice, the recognition engine
+        and the theme.
         """
         self._ensure_loaded()
-        # Настройки пишут несколько потоков сразу: команда из окна, ответ из
-        # потока распознавания, сработавшее напоминание. Раньше save() шёл
-        # прямо по self._dirty, и добавление ключа в другом потоке роняло
-        # перебор («Set changed size during iteration»).
+        # Several threads write settings at once: a command from the
+        # window, an answer from the recognition thread, a fired reminder.
+        # save() used to walk self._dirty directly, and adding a key in
+        # another thread dropped the walk ("Set changed size during
+        # iteration").
         with self._lock:
             groups = set(self._dirty) if self._dirty else set(GROUPS.keys())
             self._dirty.clear()
@@ -395,19 +400,20 @@ class SettingsStore:
                 self._save_group(g)
             self._dirty.clear()
 
-    # ---------- доступ ----------
+    # ---------- access ----------
     def _ensure_loaded(self):
         """
-        Прочитать файлы, если этого ещё никто не сделал.
+        Read the files, if nobody has done so yet.
 
-        Загрузка была обязанностью того, кто первым обратится, — и в 3.1.0
-        это делало окно, единственный вход в программу. В 4.0 входов стало
-        два: окно уехало в другой процесс, а ядро запускается само. Ядро
-        `load()` не звало, и работало на умолчаниях: настройки читались не
-        те, что человек когда-то выбрал, а записывались поверх его файла.
+        Loading used to be the duty of whoever accessed the store first —
+        and in 3.1.0 that was the window, the program's only entrance. In
+        4.0 there are two entrances: the window moved to another process,
+        and the core starts by itself. The core did not call `load()` and
+        worked on the defaults: the settings read were not the ones the
+        person had once chosen, and they were written over their file.
 
-        Поэтому загрузка теперь не поручение, а свойство хранилища: первое
-        же обращение её вызывает. Забыть нельзя.
+        So loading is no longer an errand but a property of the store: the
+        very first access brings it about. It cannot be forgotten.
         """
         with self._lock:
             if self._loaded or self._loading:
@@ -423,7 +429,7 @@ class SettingsStore:
         return self._data.get(key, DEFAULTS.get(key, default))
 
     def set(self, key, value):
-        # Записать, не прочитав, значило бы затереть файл умолчаниями.
+        # Writing without having read would mean overwriting the file with defaults.
         self._ensure_loaded()
         with self._lock:
             self._data[key] = value
@@ -441,13 +447,13 @@ class SettingsStore:
 
     def reset(self, groups=("settings",)):
         """
-        Сбрасывает к значениям по умолчанию только указанные группы.
+        Resets only the groups named to their default values.
 
-        По умолчанию сбрасываются ТОЛЬКО пользовательские настройки
-        (группа "settings"): тема, поведение окна, голос, приватность и т.д.
-        Пользовательские команды, история и плагины сохраняются — их удаление
-        должно быть отдельным осознанным действием, а не побочным эффектом
-        «Сбросить настройки».
+        By default ONLY the user's settings are reset (the "settings"
+        group): the theme, the window's behaviour, the voice, privacy and so
+        on. The user's commands, history and plugins are kept — deleting
+        those must be a separate deliberate action rather than a side effect
+        of "Reset settings".
         """
         for grp in groups:
             for k in GROUPS.get(grp, {}):
@@ -456,10 +462,10 @@ class SettingsStore:
         self.save()
 
     def reset_all(self):
-        """Полный заводской сброс: обнуляет ВСЕ группы (команды, историю и т.д.)."""
+        """A full factory reset: zeroes EVERY group (commands, history and so on)."""
         self._data = defaults_for()
         self.save_all()
 
 
-# единый экземпляр на всё приложение
+# one instance for the whole application
 settings = SettingsStore()

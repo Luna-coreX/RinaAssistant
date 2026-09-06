@@ -1,31 +1,31 @@
 """
-Исполнение инструментов: единственный путь, по которому что-либо происходит.
+Running tools: the only path by which anything happens at all.
 
-Задача плана 4.0-C03. Реестр (core/toolbox.py) описывает, что Рина умеет;
-здесь это выполняется — и только здесь.
+Plan item 4.0-C03. The registry (core/toolbox.py) describes what Rina can
+do; here it is performed — and only here.
 
-Каждый вызов проходит четыре ворот в неизменном порядке:
+Every call passes four gates in an unchanging order:
 
-    1. существует ли такой инструмент          -> tool.unknown
-    2. годятся ли аргументы                    -> tool.invalid_arguments
-    3. подтверждено ли опасное действие        -> confirmation.*
-    4. и лишь потом — исполнение
+    1. does such a tool exist                 -> tool.unknown
+    2. are the arguments suitable             -> tool.invalid_arguments
+    3. is the dangerous action confirmed      -> confirmation.*
+    4. and only then — execution
 
-Порядок не случаен. Проверка аргументов стоит раньше подтверждения, чтобы
-человека не спрашивали про вызов, который всё равно не состоится. Проверка
-подтверждения стоит раньше исполнения — иначе она бессмысленна.
+The order is not accidental. The argument check comes before confirmation so
+that a person is not asked about a call that will not take place anyway. The
+confirmation check comes before execution — otherwise it is meaningless.
 
-**Почему реализации живут здесь, а не в исполнителе.** Критерий задачи —
-«исполнитель не имеет ни одного пути в обход реестра». Пока побочный эффект
-можно вызвать напрямую, запрет держится на дисциплине. Собранные в одном
-модуле и достижимые только через `ToolRunner.call`, они держатся на
-устройстве кода: чтобы обойти ворота, надо не забыть, а специально написать
-обход.
+**Why the implementations live here rather than in the executor.** The
+task's criterion is "the executor has not one path around the registry".
+While a side effect can be called directly, the prohibition rests on
+discipline. Gathered in one module and reachable only through
+`ToolRunner.call`, they rest on the way the code is built: to get around the
+gates one must not merely forget but deliberately write a way around.
 
-Зависимости приходят снаружи одним объектом контекста — поэтому инструменты
-проверяются с подставными хранилищами, не поднимая приложение.
+The dependencies come from outside as one context object — which is why the
+tools are checked with stand-in stores, without raising the application.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 import time
@@ -46,7 +46,7 @@ log = get_logger("tools")
 
 @dataclass
 class ToolContext:
-    """Всё, чем инструменты пользуются. Передаётся снаружи."""
+    """Everything the tools use. Passed in from outside."""
 
     settings: Any = None
     reminders: Any = None
@@ -54,26 +54,28 @@ class ToolContext:
     plugins: Any = None
     emit: Callable = None
     host: Any = None
-    #: Запомнить выбор программы под сказанное слово.
+    #: Remember the choice of program under the word that was said.
     on_alias: Callable = None
-    #: Кто трогает машину: громкость, медиа, питание, снимок.
-    #: В 4.0 это оболочка (ADR 0009); в 3.1.0 было пусто и ядро делало само.
+    #: Who touches the machine: volume, media, power, a screenshot.
+    #: In 4.0 that is the shell (ADR 0009); in 3.1.0 it was empty and the
+    #: core did it itself.
     system_out: Callable = None
-    #: Кто запускает программы. Там же, где системный слой, и по той же
-    #: причине: между намерением и созданием процесса должен стоять кто-то
-    #: ещё, и этот кто-то — не тот, кто слушает микрофон.
+    #: Who launches programs. The same place as the system layer, and for
+    #: the same reason: somebody else must stand between an intent and the
+    #: creation of a process, and that somebody is not whoever listens to the
+    #: microphone.
     launch_app: Callable = None
-    #: Откуда брать индекс программ.
+    #: Where to get the program index from.
     #:
-    #: Появилось потому, что без этого инструменты искали в **другом**
-    #: списке, чем роутер: роутер спрашивал оболочку (4.0-G06), а они —
-    #: кэш сканера, который в 4.0 никто не наполняет. Рина предлагала
-    #: выбрать из трёх и отвечала, что не нашла ни одной.
+    #: It appeared because without it the tools searched a **different** list
+    #: from the router's: the router asked the shell (4.0-G06), and they
+    #: asked the scanner's cache, which in 4.0 nobody fills. Rina offered a
+    #: choice of three and then answered that she had found none.
     apps: Callable = None
 
 
 class ToolResult:
-    """Что вернул инструмент."""
+    """What a tool returned."""
 
     __slots__ = ("ok", "value", "message", "error_code")
 
@@ -97,14 +99,14 @@ class ToolResult:
 
 
 # ---------------------------------------------------------------------------
-# Реализации. Достижимы только через ToolRunner.call.
+# The implementations. Reachable only through ToolRunner.call.
 # ---------------------------------------------------------------------------
 def _index(ctx):
     """
-    Индекс программ — тот же, что видит роутер.
+    The program index — the same one the router sees.
 
-    Ровно один источник: два списка, отвечающие на один вопрос, однажды
-    ответят по-разному, и это уже случилось.
+    Exactly one source: two lists answering one question will one day answer
+    differently, and that has already happened.
     """
     source = getattr(ctx, "apps", None)
     if source is not None:
@@ -128,10 +130,11 @@ def _launch_app(ctx, args):
         return ToolResult.failed(
             tr("Не нашла программу «{name}».", name=name), "app.not_found")
 
-    # Запускает оболочка (ADR 0009): она же проверит канонический путь,
-    # запрещённый каталог и подпись, и она же спросит человека, если файл
-    # неподписанный (4.0-G10). Ядро сюда доходит, уже **решив**, что
-    # запускать; «можно ли» — не его вопрос.
+    # The shell launches (ADR 0009): it is also what checks the canonical
+    # path, the forbidden directory and the signature, and it is what asks
+    # the person if the file is unsigned (4.0-G10). The core reaches this
+    # point having already **decided** what to launch; "may I" is not its
+    # question.
     launch = getattr(ctx, "launch_app", None)
     if launch is None:
         started, why = app_index.launch(entry), ""
@@ -175,16 +178,17 @@ _MEDIA = {"next": "media_next", "previous": "media_prev",
 
 def _run_system(ctx, action_id):
     """
-    Сделать системное действие — руками оболочки (ADR 0009).
+    Perform a system action — by the shell's hands (ADR 0009).
 
-    Ядро решает **что** сделать и **как об этом сказать**; трогает машину
-    оболочка. Слово остаётся здесь не из упрямства: «Прибавила громкость» —
-    реплика Рины, и её язык задаёт ядро (`4.0-F08`); оболочка отвечает
-    фактом «получилось».
+    The core decides **what** to do and **how to say so about it**; the
+    shell touches the machine. The word stays here not out of stubbornness:
+    "Volume turned up" is Rina's line, and its language is set by the core
+    (`4.0-F08`); the shell answers with the fact "it worked".
 
-    Своего пути в обход нет и в запасе: ядро, умеющее выключить компьютер
-    само, тем и опасно, что умеет. Без оболочки действие не делается — и
-    это верно, потому что без неё его и попросить некому.
+    There is no way around it, not even in reserve: a core that can shut the
+    computer down itself is dangerous precisely because it can. Without the
+    shell the action is not performed — and that is right, because without
+    it there is nobody to ask for it either.
     """
     from voice import system_control
 
@@ -221,11 +225,12 @@ def _power_action(ctx, args):
 
 
 def _take_screenshot(ctx, args):
-    # Раньше снимок просили событием `window.action`: захват экрана был
-    # операцией Qt и работал только из потока интерфейса. Теперь это
-    # обычное системное действие — оболочка снимает экран сама и отвечает
-    # путём к файлу, а событие «сделай что-нибудь с окном» осталось для
-    # того, чем оно и было, — для окна.
+    # A screenshot used to be asked for with the `window.action` event:
+    # capturing the screen was a Qt operation and worked only from the
+    # interface thread. Now it is an ordinary system action — the shell
+    # takes the screenshot itself and answers with a path to the file — and
+    # the "do something with the window" event stayed for what it always
+    # was: for the window.
     return _run_system(ctx, "screenshot")
 
 
@@ -293,7 +298,7 @@ def _run_user_command(ctx, args):
 
     ctx.commands.bump_stat(command_id)
     if command.get("type") == "sequence":
-        # Между шагами бывает пауза; вызывающий поток блокировать нельзя.
+        # There is sometimes a pause between steps; the calling thread must not be blocked.
         def worker():
             execute(command, ctx.host, ctx.emit)
 
@@ -311,7 +316,7 @@ def _dispatch_plugin_command(ctx, args):
     try:
         taken = bool(ctx.plugins.dispatch_command(args["text"]))
     except Exception:
-        # Плагин — чужой код. Его сбой не рвёт конвейер, но и не пропадает.
+        # A plugin is somebody else's code. Its failure does not tear the pipeline, nor does it vanish.
         log.exception("Сбой плагина при разборе команды")
         return ToolResult.done(value=False)
     return ToolResult.done(value=taken)
@@ -379,7 +384,7 @@ IMPLEMENTATIONS = {
 
 # ---------------------------------------------------------------------------
 class ToolRunner:
-    """Единственный способ что-либо выполнить."""
+    """The only way to perform anything."""
 
     def __init__(self, context, registry=None, confirmations=None,
                  features=None, audit=None):
@@ -387,15 +392,15 @@ class ToolRunner:
         self._registry = registry or default_registry()
         self._confirmations = confirmations or ConfirmationLedger()
         self._features = features
-        # Журнал вызовов (4.0-C06). Пишется здесь, потому что это
-        # единственное место, где разом известны все шесть полей: время,
-        # инструмент, аргументы, инициатор, разрешения и результат.
+        # The call journal (4.0-C06). Written here, because this is the only
+        # place where all six fields are known at once: the time, the tool,
+        # the arguments, the initiator, the permissions and the result.
         self._audit = audit if audit is not None else AuditLog()
 
-        #: Реализации инструментов плагинов (`4.0-H03`). У экземпляра, а
-        #: не в модульном словаре: два ядра в одном процессе не должны
-        #: делить инструменты чужих плагинов (`4.0-B05`), и снятый плагин
-        #: обязан уносить свои инструменты с собой.
+        #: The implementations of plugins' tools (`4.0-H03`). On the
+        #: instance rather than in a module dictionary: two cores in one
+        #: process must not share other plugins' tools (`4.0-B05`), and a
+        #: plugin that is removed is obliged to take its tools with it.
         self._added = {}
 
         missing = set(self._registry.names()) - set(IMPLEMENTATIONS)
@@ -405,20 +410,21 @@ class ToolRunner:
 
     def add_tool(self, tool, run):
         """
-        Добавить инструмент плагина в реестр.
+        Add a plugin's tool to the registry.
 
-        Плагин объявляет, а не делает (ADR 0010): объявленный инструмент
-        проходит тот же путь, что встроенный, — проверку разрешений,
-        подтверждение необратимого, запись в журнал с указанием, кто это
-        затеял. Плагин, зовущий `subprocess` сам, обошёл бы всё это, и
-        тогда согласие человека на «запуск программ» было бы самообманом.
+        A plugin declares rather than does (ADR 0010): a declared tool goes
+        the same path as a built-in one — the permission check, the
+        confirmation of the irreversible, the journal entry saying who
+        started this. A plugin calling `subprocess` itself would get around
+        all of that, and then a person's consent to "launching programs"
+        would be self-deception.
         """
         self._registry.register(tool)
         self._added[tool.name] = run
         return tool
 
     def drop_tools(self, prefix):
-        """Снять инструменты выключенного плагина."""
+        """Remove the tools of a switched-off plugin."""
         gone = [name for name in self._added if name.startswith(prefix)]
         for name in gone:
             self._added.pop(name, None)
@@ -443,10 +449,10 @@ class ToolRunner:
 
     def request_confirmation(self, name, args=None, preview="", ttl=None):
         """
-        Выдать подтверждение на конкретный вызов.
+        Issue a confirmation for a particular call.
 
-        Вызывается, когда человеку задают вопрос: идентификатор кладётся
-        в заданный вопрос и предъявляется, когда человек согласится.
+        Called when a person is asked a question: the identifier is put into
+        the question asked and presented when the person agrees.
         """
         tool = self._registry.get(name)
         checked = self._registry.validate(name, args)
@@ -460,12 +466,12 @@ class ToolRunner:
     def call(self, name, args=None, confirmation_id=None,
              source="typed", trace_id=""):
         """
-        Выполнить инструмент. Единственная дверь.
+        Perform a tool. The only door.
 
-        Ошибки ворот возвращаются как ToolResult с кодом, а не бросаются:
-        вызывающему всё равно нужно что-то сказать человеку, а исключение
-        на каждый неверный аргумент превратило бы конвейер в лестницу
-        try/except.
+        Gate errors are returned as a ToolResult with a code rather than
+        raised: the caller has to say something to the person anyway, and an
+        exception per wrong argument would turn the pipeline into a
+        staircase of try/except.
         """
         started = time.perf_counter()
 
@@ -473,8 +479,9 @@ class ToolRunner:
             tool = self._registry.get(name)
         except UnknownTool as e:
             log.warning("Неизвестный инструмент: %s", name)
-            # Записываем даже это: попытка вызвать несуществующее — след
-            # чужой ошибки, и позже так будет видно промахи модели.
+            # We record even this: an attempt to call something that does
+            # not exist is a trace of somebody's mistake, and later it will
+            # show the model's misses.
             self._write(name, args, source, (), False, e.code,
                         started, confirmation_id, trace_id)
             return ToolResult.failed(e.message, e.code)
@@ -519,7 +526,7 @@ class ToolRunner:
 
     def _write(self, tool, args, source, permissions, ok, error_code,
                started, confirmation_id, trace_id):
-        """Запись в журнал вызовов. Сбой журнала не мешает работе."""
+        """An entry in the call journal. A journal failure does not get in the way of work."""
         if self._audit is None:
             return
         try:
@@ -536,7 +543,7 @@ class ToolRunner:
 
     # ------------------------------------------------------------------
     def describe(self):
-        """Реестр словарями — для протокола и для оболочки."""
+        """The registry as dicts — for the protocol and for the shell."""
         return self._registry.describe()
 
     def permissions_of(self, name):

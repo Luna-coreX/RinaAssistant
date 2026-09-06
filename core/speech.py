@@ -1,36 +1,38 @@
 # -*- coding: utf-8 -*-
 """
-Речь в ядре: распознать присланное, синтезировать отвечаемое.
+Speech in the core: recognise what was sent, synthesise what is answered.
 
-Задачи плана `4.0-E03` (распознавание) и `4.0-E04` (синтез).
+Plan items `4.0-E03` (recognition) and `4.0-E04` (synthesis).
 
-**Что здесь меняется по сравнению с 3.1.0.** Там движки распознавания сами
-писали с микрофона (`listen_once`), а движки синтеза сами играли звук
-(`speak`). В разделённой программе и то и другое принадлежит оболочке: у неё
-устройства и низкая задержка. Ядру остаётся то, ради чего оно и ядро, —
-модели.
+**What changes here compared with 3.1.0.** There the recognition engines
+recorded from the microphone themselves (`listen_once`), and the synthesis
+engines played the sound themselves (`speak`). In the split program both
+belong to the shell: it has the devices and the low latency. What is left to
+the core is what makes it the core — the models.
 
-Отсюда две новые границы, и обе узкие:
+Hence two new boundaries, and both are narrow:
 
-    Recogniser    байты PCM  ->  текст
-    Synthesiser   текст      ->  байты PCM
+    Recogniser    PCM bytes  ->  text
+    Synthesiser   text       ->  PCM bytes
 
-Ни одна из них не знает ни про устройства, ни про каналы. Это позволяет
-проверить их синтетическим звуком, а заодно означает, что распознать можно и
-запись из файла — например, разбирая жалобу.
+Neither of them knows anything about devices or about channels. That makes
+it possible to check them with synthetic sound, and it also means a
+recording from a file can be recognised — while looking into a complaint,
+for instance.
 
-**Микрофон приходит в 16 кГц, моно, 16 бит** — том формате, что понимают и
-Vosk, и Whisper, и в котором оболочка захватывает (`4.0-F09`).
+**The microphone arrives at 16 kHz, mono, 16 bit** — the format both Vosk
+and Whisper understand, and the one the shell captures in (`4.0-F09`).
 
-**Синтез объявляет свою частоту, а не подгоняется.** Модели говорят на
-разных: у поля `format` в `stream.open` (§8) ровно это назначение. Пересчёт
-без фильтра даёт призвуки, а с фильтром — это работа ради того, чтобы не
-заполнить одно поле.
+**Synthesis declares its own rate rather than being adjusted.** The models
+speak at different ones: that is exactly what the `format` field in
+`stream.open` (§8) is for. Resampling without a filter gives artefacts, and
+with a filter it is work done in order to avoid filling in one field.
 
-**Нарезка на фразы живёт здесь, а не в оболочке.** Оболочка считает уровень
-для полосы прибора, но решение «речь кончилась» принимается рядом с
-распознаванием: только здесь известно, сколько тишины считать паузой в
-предложении, а сколько — концом фразы, и это зависит от модели.
+**Slicing into phrases lives here, not in the shell.** The shell counts the
+level for the instrument strip, but the decision "speech has ended" is taken
+next to recognition: only here is it known how much silence counts as a
+pause inside a sentence and how much as the end of a phrase, and that
+depends on the model.
 """
 
 import array
@@ -38,7 +40,7 @@ import math
 import struct
 from typing import Protocol
 
-#: Формат, в котором звук ходит между оболочкой и ядром.
+#: The format sound travels in between the shell and the core.
 RATE = 16000
 CHANNELS = 1
 BITS = 16
@@ -46,7 +48,7 @@ SAMPLE_BYTES = 2
 
 
 class Heard:
-    """Что услышали. Пустой текст при `ok` значит «тишина, но всё в порядке»."""
+    """What was heard. Empty text with `ok` means "silence, but all is well"."""
 
     __slots__ = ("text", "ok", "error")
 
@@ -61,21 +63,22 @@ class Heard:
 
 class Segmenter:
     """
-    Режет непрерывный поток на фразы по тишине.
+    Cuts a continuous stream into phrases by silence.
 
-    Простой энергетический порог с задержкой отпускания — не потому, что
-    лучше нейросетевого, а потому, что честнее: настоящий VAD появится в
-    5.0 вместе со стримингом, а до тех пор притворяться, что он есть,
-    незачем.
+    A plain energy threshold with a release delay — not because it is better
+    than a neural one but because it is more honest: a real VAD will appear
+    in 5.0 along with streaming, and until then there is no point pretending
+    there is one.
 
-    **Задержка отпускания обязательна.** Без неё фраза рвётся на каждой
-    паузе между словами: «поставь… таймер» превращается в две фразы, и
-    вторая приходит без первой. Полсекунды тишины — это пауза, полторы —
-    конец фразы.
+    **The release delay is obligatory.** Without it a phrase tears at every
+    pause between words: "set… a timer" turns into two phrases, and the
+    second arrives without the first. Half a second of silence is a pause, a
+    second and a half is the end of a phrase.
 
-    **Начало фразы не теряется.** Кусок, на котором звук впервые превысил
-    порог, уже содержит начало слова, поэтому в фразу он входит целиком, а
-    не с того места, где сработал порог.
+    **The beginning of a phrase is not lost.** The chunk on which the sound
+    first crossed the threshold already contains the beginning of a word, so
+    it goes into the phrase whole rather than from the point where the
+    threshold fired.
     """
 
     def __init__(self, rate: int = RATE, threshold: float = 0.02,
@@ -94,12 +97,13 @@ class Segmenter:
     @staticmethod
     def level(pcm: bytes) -> float:
         """
-        Среднеквадратичная громкость 0..1.
+        Root-mean-square loudness, 0..1.
 
-        Считается вручную, а не `audioop.rms`: модуль объявлен устаревшим и
-        **удалён в Python 3.13**. Ядро переживёт эту версию, и обнаружить
-        такое при обновлении интерпретатора — худший момент из возможных.
-        Считать здесь нечего: полторы тысячи образцов на кусок.
+        Computed by hand rather than with `audioop.rms`: the module is
+        declared obsolete and **removed in Python 3.13**. The core will
+        outlive that version, and discovering such a thing while upgrading
+        the interpreter is the worst possible moment. There is nothing to
+        compute here: fifteen hundred samples per chunk.
         """
         if len(pcm) < SAMPLE_BYTES:
             return 0.0
@@ -111,7 +115,7 @@ class Segmenter:
         return math.sqrt(total / len(samples)) / 32768.0
 
     def feed(self, pcm: bytes) -> list[bytes]:
-        """Принять кусок и вернуть завершившиеся фразы."""
+        """Take a chunk and return the phrases that have finished."""
         if not pcm:
             return []
         seconds = len(pcm) / (self.rate * SAMPLE_BYTES)
@@ -124,8 +128,8 @@ class Segmenter:
             self._speech += seconds
             self._buffer.extend(pcm)
         elif self._speaking:
-            # Тишина внутри фразы всё равно записывается: вырезать её значит
-            # склеить слова и получить «поставьтаймер».
+            # Silence inside a phrase is recorded all the same: cutting it
+            # out means gluing the words together and getting "setatimer".
             self._buffer.extend(pcm)
             self._quiet += seconds
             if self._quiet >= self.silence:
@@ -134,15 +138,15 @@ class Segmenter:
                     done.append(phrase)
 
         if self._speaking and self._speech >= self.max_speech:
-            # Слишком длинная фраза — не повод копить бесконечно: человек мог
-            # оставить микрофон у работающего телевизора.
+            # Too long a phrase is no reason to accumulate endlessly: the
+            # person may have left the microphone by a working television.
             phrase = self.flush()
             if phrase is not None:
                 done.append(phrase)
         return done
 
     def flush(self) -> bytes | None:
-        """Закончить фразу принудительно. `None` — там нечего слушать."""
+        """End the phrase by force. `None` means there is nothing to listen to."""
         phrase = bytes(self._buffer)
         speech = self._speech
         self._buffer.clear()
@@ -154,10 +158,10 @@ class Segmenter:
 
 
 # ---------------------------------------------------------------------------
-# Распознавание (4.0-E03)
+# Recognition (4.0-E03)
 # ---------------------------------------------------------------------------
 class Recogniser(Protocol):
-    """Байты PCM на входе, текст на выходе."""
+    """PCM bytes in, text out."""
 
     name: str
 
@@ -168,10 +172,10 @@ class Recogniser(Protocol):
 
 class DisabledRecogniser:
     """
-    Распознавания нет, и об этом говорится прямо.
+    There is no recognition, and that is said outright.
 
-    Молчаливое «ничего не услышала» здесь было бы худшим ответом: человек
-    решил бы, что его не слышно, и стал бы говорить громче.
+    A silent "I heard nothing" would be the worst answer here: the person
+    would decide they cannot be heard and start speaking louder.
     """
 
     name = "disabled"
@@ -185,11 +189,12 @@ class DisabledRecogniser:
 
 class VoskRecogniser:
     """
-    Vosk по присланным байтам, без микрофона.
+    Vosk over the bytes that were sent, without a microphone.
 
-    Vosk умеет принимать поток кусками, и это ровно то, что нужно: звук
-    приходит от оболочки по каналу данных, а не с устройства. Модель
-    держится открытой между фразами — её загрузка занимает секунды.
+    Vosk can take a stream in chunks, and that is exactly what is needed:
+    the sound comes from the shell over the data channel rather than from a
+    device. The model is kept open between phrases — loading it takes
+    seconds.
     """
 
     name = "vosk"
@@ -232,7 +237,7 @@ class VoskRecogniser:
 
 
 def recogniser_for(settings) -> Recogniser:
-    """Какое распознавание выбрано в настройках."""
+    """Which recognition is chosen in the settings."""
     engine = str(settings.get("stt_engine", "disabled") or "disabled")
     if engine == "vosk":
         return VoskRecogniser(str(settings.get("vosk_model", "") or ""))
@@ -240,15 +245,15 @@ def recogniser_for(settings) -> Recogniser:
 
 
 # ---------------------------------------------------------------------------
-# Синтез (4.0-E04)
+# Synthesis (4.0-E04)
 # ---------------------------------------------------------------------------
 class Synthesiser(Protocol):
     """
-    Текст на входе, байты PCM на выходе.
+    Text in, PCM bytes out.
 
-    `sample_rate` объявляется, а не подразумевается: разные модели говорят
-    на разных частотах, и поле `format` в `stream.open` существует ровно для
-    того, чтобы об этом сказать, а не догадываться.
+    `sample_rate` is declared rather than assumed: different models speak at
+    different rates, and the `format` field in `stream.open` exists
+    precisely to say so rather than to be guessed at.
     """
 
     name: str
@@ -260,7 +265,7 @@ class Synthesiser(Protocol):
 
 
 class SilentSynthesiser:
-    """Синтеза нет: ответ остаётся текстом. Это законный режим, а не поломка."""
+    """There is no synthesis: the answer stays text. A lawful mode, not a breakage."""
 
     name = "silent"
     sample_rate = RATE
@@ -274,10 +279,11 @@ class SilentSynthesiser:
 
 class PiperSynthesiser:
     """
-    Piper: свой голос Рины, локально.
+    Piper: Rina's own voice, locally.
 
-    Отдаёт сырые образцы, а не файл: файл пришлось бы записать на диск,
-    прочитать и удалить — три операции ради того, что и так уже в памяти.
+    It gives out raw samples rather than a file: a file would have to be
+    written to disk, read and deleted — three operations for the sake of
+    what is already in memory.
     """
 
     name = "piper"
@@ -305,12 +311,13 @@ class PiperSynthesiser:
     @property
     def sample_rate(self) -> int:
         """
-        Частота, в которой говорит модель.
+        The rate the model speaks at.
 
-        Не пересчитывается к частоте микрофона: у потока данных есть поле
-        `format` (§8), и объявить свою частоту дешевле и честнее, чем
-        пересчитывать. Пересчёт без фильтра даёт призвуки, а с фильтром —
-        это работа, которую делают ради того, чтобы не заполнить одно поле.
+        Not resampled to the microphone's rate: the data stream has a
+        `format` field (§8), and declaring one's own rate is cheaper and
+        more honest than resampling. Resampling without a filter gives
+        artefacts, and with a filter it is work done in order to avoid
+        filling in one field.
         """
         if self._voice is None:
             return RATE
@@ -327,20 +334,21 @@ class PiperSynthesiser:
 
 def pcm_from_file(path: str) -> tuple[bytes, int]:
     """
-    Прочитать звуковой файл как PCM 16 бит моно. Возвращает байты и частоту.
+    Read a sound file as 16-bit mono PCM. Returns the bytes and the rate.
 
-    Движки 3.1.0 отдают файл — mp3 у сетевых, wav у системных, — а провод
-    несёт сырые образцы (§8). Пересчёта частоты здесь нет намеренно: она
-    объявляется в `format` при открытии потока, и сказать «я говорю на
-    24000» дешевле и честнее, чем пересчитывать без фильтра.
+    The 3.1.0 engines give out a file — mp3 for the network ones, wav for
+    the system one — while the wire carries raw samples (§8). There is
+    deliberately no resampling here: the rate is declared in `format` when
+    the stream is opened, and saying "I speak at 24000" is cheaper and more
+    honest than resampling without a filter.
     """
     try:
         import numpy
         import soundfile
 
         data, rate = soundfile.read(path, dtype="int16", always_2d=True)
-        # Моно: провод и динамик оболочки договорились об одном канале.
-        # Смешивать в int16 нельзя — переполнится; считаем в широком типе.
+        # Mono: the wire and the shell's speaker agreed on one channel.
+        # Mixing in int16 will not do — it overflows; we count in a wide type.
         if data.shape[1] > 1:
             data = data.mean(axis=1).astype(numpy.int16)
         else:
@@ -349,9 +357,9 @@ def pcm_from_file(path: str) -> tuple[bytes, int]:
     except Exception:                                   # noqa: BLE001
         pass
 
-    # Запасной путь без сторонних пакетов — только для wav. Сетевые движки
-    # отдают mp3, и для них soundfile обязателен; сказать об этом честнее,
-    # чем молча промолчать голосом.
+    # A fallback path without third-party packages — for wav only. The
+    # network engines give out mp3, and for them soundfile is obligatory;
+    # saying so is more honest than staying silent by voice.
     import wave
 
     with wave.open(path, "rb") as source:
@@ -367,17 +375,18 @@ def pcm_from_file(path: str) -> tuple[bytes, int]:
 
 class EngineSynthesiser:
     """
-    Синтез движками 3.1.0: edge, gtts, pyttsx3, piper.
+    Synthesis by the 3.1.0 engines: edge, gtts, pyttsx3, piper.
 
-    Движки писались под «сказать вслух здесь же»: каждый делал временный
-    файл и сам его проигрывал. В 4.0 играет оболочка, поэтому берётся файл
-    (`TTSEngine.render`), а не звук из динамика ядра. Ядро без оболочки
-    молчит — и это верно: у процесса, который может работать сервисом, не
-    должно быть своего голоса.
+    The engines were written for "say it out loud right here": each made a
+    temporary file and played it itself. In 4.0 the shell plays, so a file
+    is taken (`TTSEngine.render`) rather than sound from the core's speaker.
+    A core without a shell stays silent — and that is right: a process that
+    can run as a service must not have a voice of its own.
 
-    Своего класса на каждый движок здесь нет: разница между ними —
-    внутри `voice/tts.py`, а для ядра все они одно и то же — текст на входе,
-    файл на выходе. Второй список движков разошёлся бы с первым.
+    There is no class of its own per engine here: the difference between
+    them is inside `voice/tts.py`, and to the core they are all one and the
+    same — text in, a file out. A second list of engines would part company
+    with the first.
     """
 
     def __init__(self, engine_id: str, settings=None):
@@ -400,7 +409,7 @@ class EngineSynthesiser:
 
     @property
     def sample_rate(self) -> int:
-        """Частота последнего синтеза; до первого — частота микрофона."""
+        """The rate of the last synthesis; before the first, the microphone's rate."""
         return self._rate
 
     def synthesize(self, text: str, voice: str = "", rate: int = 100) -> bytes:
@@ -428,7 +437,7 @@ class EngineSynthesiser:
             self.last_error = str(exc)
             return b""
         finally:
-            # Временный файл — наш: движок его создал по нашей просьбе.
+            # The temporary file is ours: the engine created it at our request.
             if path:
                 try:
                     os.remove(path)
@@ -438,32 +447,33 @@ class EngineSynthesiser:
 
 def synthesiser_for(settings) -> Synthesiser:
     """
-    Какой синтез выбран в настройках.
+    Which synthesis is chosen in the settings.
 
-    Раньше здесь узнавался один Piper, а всё остальное молча становилось
-    тишиной: человек выбирал Edge, ядро отвечало текстом и не говорило.
-    Молчание вместо голоса — худший вид отказа, потому что выглядит как
-    работающая программа.
+    This used to recognise Piper alone, and everything else silently became
+    silence: a person picked Edge, the core answered in text and did not
+    speak. Silence instead of a voice is the worst kind of failure, because
+    it looks like a working program.
     """
     engine = str(settings.get("tts_engine", "silent") or "silent")
     if engine in ("", "silent"):
         return SilentSynthesiser()
     if engine == "piper" and settings.get("piper_model"):
-        # Своя дорога: Piper отдаёт образцы прямо в память, без файла.
+        # A road of its own: Piper gives samples straight into memory, without a file.
         return PiperSynthesiser(str(settings.get("piper_model", "") or ""))
     return EngineSynthesiser(engine, settings)
 
 
 # ---------------------------------------------------------------------------
-# Общее
+# Common
 # ---------------------------------------------------------------------------
 def tone(seconds: float, hertz: float = 440.0, rate: int = RATE) -> bytes:
     """
-    Синтетический звук для проверок.
+    Synthetic sound for the checks.
 
-    Живёт в ядре, а не в тесте, потому что нужен обеим сторонам: тест ядра
-    проверяет им нарезку, тест оболочки — очередь воспроизведения, и две
-    копии одной синусоиды разошлись бы по громкости.
+    It lives in the core rather than in a test, because both sides need it:
+    the core's test checks the slicing with it, the shell's test the
+    playback queue, and two copies of one sine wave would part company in
+    loudness.
     """
     samples = int(rate * seconds)
     return b"".join(
