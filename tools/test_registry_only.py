@@ -200,5 +200,59 @@ result = runner.call("set_volume", {"action": "up"})
 check("громкость работает без подтверждения", result.ok, f"| {result.message}")
 
 print()
+print("=== без оболочки: запуск свой, машина — ничья ===")
+# Two answers to "there is no shell", and they differ deliberately.
+#
+# Launching a program was always the core's own; the shell took it over
+# along with the signature check (4.0-G10), so without a shell the core
+# launches it itself — that is the 3.1.0 path, one process and no shell at
+# all. A system action has no reserve on purpose: a core that can shut the
+# computer down itself is dangerous precisely because it can.
+#
+# The check exists because both branches had died in silence.
+# `ToolContext.launch_app` is always a callable, so the `launch is None`
+# fallback was never entered, and a core without a shell answered "the
+# program was removed or moved" — blaming the person's disk for our own
+# missing half. Two of the seven recorded sessions had been red because of
+# it, and nothing said why.
+from core.apps import AppEntry
+from core.toolrunner import NO_SHELL
+from voice.reminders import ReminderStore
+from voice.user_commands import UserCommandStore
+
+# A fixed index: the check must give one answer on any machine, whatever is
+# installed on it.
+NOTEPAD = AppEntry("Блокнот", r"C:\fake\notepad.exe", "file", "start_menu")
+
+alone = MemorySettings()
+lonely = ToolRunner(ToolContext(
+    settings=alone,
+    reminders=ReminderStore(alone),
+    commands=UserCommandStore(alone),
+    emit=lambda name, **data: None,
+    apps=lambda: [NOTEPAD],
+    system_out=lambda action: (False, NO_SHELL),
+    launch_app=lambda launch, kind: (False, NO_SHELL),
+))
+
+box.launched.clear()
+result = lonely.call("launch_app", {"name": "Блокнот"}, source="typed")
+check("без оболочки программа всё равно запускается",
+      result.ok and box.launched == ["Блокнот"],
+      f"| {result.error_code or result.message} | {box.launched}")
+
+box.actions.clear()
+confirmation = lonely.request_confirmation("power_action",
+                                           {"action": "shutdown"})
+result = lonely.call("power_action", {"action": "shutdown"},
+                     confirmation_id=confirmation.id)
+check("без оболочки машину не трогаем",
+      not result.ok and not box.actions, f"| {result.message} | {box.actions}")
+# And it says why. "It did not work" would send the search for the reason to
+# the disk, the drivers and the permissions — anywhere but the missing half.
+check("и сказано, почему именно",
+      "оболочк" in result.message, f"| {result.message}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

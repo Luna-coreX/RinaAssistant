@@ -101,6 +101,19 @@ class ToolResult:
 # ---------------------------------------------------------------------------
 # The implementations. Reachable only through ToolRunner.call.
 # ---------------------------------------------------------------------------
+#: "There is no shell on the line" — a code, not a phrase.
+#:
+#: The core reaches the shell through a callable that is always present:
+#: whether the shell exists is known only at call time, because it connects
+#: later than the tools are assembled. So "there is nobody to ask" is
+#: reported the same way as any other failure — by a returned answer — and
+#: has to be told apart from "the shell was asked and it refused".
+#:
+#: A code rather than prose for the same reason as `refused`: matching on a
+#: substring of a sentence broke the moment the shell was translated.
+NO_SHELL = "no_shell"
+
+
 def _index(ctx):
     """
     The program index — the same one the router sees.
@@ -136,10 +149,26 @@ def _launch_app(ctx, args):
     # point having already **decided** what to launch; "may I" is not its
     # question.
     launch = getattr(ctx, "launch_app", None)
-    if launch is None:
+    started, why = launch(entry.launch, entry.kind) if launch else (False,
+                                                                    NO_SHELL)
+
+    # Without a shell we launch it ourselves. That is the 3.1.0 path: one
+    # process, no shell at all, and a core that refuses to launch anything
+    # there is simply broken. Unlike a system action, which has deliberately
+    # no reserve (see `_run_system`), launching a program was always the
+    # core's own — the shell took it over along with the signature check.
+    #
+    # Only on `NO_SHELL`, never on a refusal or a failure: a shell that was
+    # asked and said no has answered, and asking around it would turn the
+    # question into a formality.
+    #
+    # This branch was unreachable for a while: `ToolContext.launch_app` is
+    # always a callable, so `launch is None` was never true, and a core
+    # without a shell answered "the program was removed or moved" — blaming
+    # the person's disk for our own missing half. Two of the seven recorded
+    # sessions had been red because of it.
+    if not started and why == NO_SHELL:
         started, why = app_index.launch(entry), ""
-    else:
-        started, why = launch(entry.launch, entry.kind)
 
     if not started:
         # "The person refused" is not a fault: they answered, and the
@@ -193,12 +222,16 @@ def _run_system(ctx, action_id):
     from voice import system_control
 
     do = getattr(ctx, "system_out", None)
-    if do is None:
+    ok, detail = do(action_id) if do else (False, NO_SHELL)
+
+    # "There is nobody to ask" and "we asked and it did not work" are
+    # different things, and a person is told different things. The first
+    # used to be unreachable for the same reason as in `_launch_app`, and
+    # the answer named a failure that never happened.
+    if not ok and detail == NO_SHELL:
         return ToolResult.failed(
             tr("Системные действия делает оболочка, а связи с ней нет."),
             "internal")
-
-    ok, detail = do(action_id)
     if not ok:
         return ToolResult.failed(tr("Не получилось выполнить действие."),
                                  "internal")

@@ -241,6 +241,32 @@ def build_engine():
     })
     engine = RinaEngine(event_bus=EventBus(), settings=settings)
     engine._speak_blocking = lambda text: None
+
+    # The shell, which is not here. Since 4.0-G01 the core asks it to perform
+    # a system action and to launch a program (ADR 0009) instead of doing so
+    # itself, and the sandbox's substitutes — which stand where the core used
+    # to touch the machine — stopped being reached at all.
+    #
+    # The recorded sessions did not notice: they were recorded before that
+    # move, and their expectations are right. What broke is the harness, and
+    # `confirm-yes` had been red because of it — "shut down the computer",
+    # confirmed, ran into a core with nobody to ask.
+    #
+    # The same stub as the golden runner's, for the same reason: what is
+    # checked is that the core **decided** correctly, not that Windows can
+    # shut itself down.
+    def as_shell_do(action):
+        box.actions.append(action)
+        return True, ""
+
+    def as_shell_launch(launch, kind="file"):
+        entry = next((e for e in app_index.cached_index()
+                      if e.launch == launch), None)
+        box.launched.append(entry.name if entry else launch)
+        return True, ""
+
+    engine.system_out = as_shell_do
+    engine.launch_out = as_shell_launch
     return engine, box
 
 

@@ -26,7 +26,7 @@ from core import router as router_mod
 from core import dialog as dialog_mod
 from core.dialog import Dialog, Question
 from core.executor import Executor
-from core.toolrunner import ToolContext, ToolRunner
+from core.toolrunner import NO_SHELL, ToolContext, ToolRunner
 from voice.wake import get_wake_words
 from voice.reminders import ReminderStore
 from core.logging_setup import get_logger, safe, security_log
@@ -128,12 +128,15 @@ class RinaEngine:
                 on_alias=self._remember_choice,
                 # Through a lambda for the same reason as speech: the shell
                 # appears later than the tools are assembled.
+                # `NO_SHELL` is a code rather than a phrase: the registry
+                # branches on it, and prose would have to be matched by
+                # substring — which breaks on the first translation.
                 system_out=lambda action: (self.system_out(action)
                                            if self.system_out else
-                                           (False, "нет связи с оболочкой")),
+                                           (False, NO_SHELL)),
                 launch_app=lambda launch, kind: (
                     self.launch_out(launch, kind) if self.launch_out
-                    else (False, "нет связи с оболочкой")),
+                    else (False, NO_SHELL)),
                 # The same list as the router's: see `_apps`.
                 apps=self._apps,
             ),
