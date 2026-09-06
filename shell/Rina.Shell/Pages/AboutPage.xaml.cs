@@ -229,6 +229,56 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
+    /// Собрать диагностический пакет и показать, куда он лёг.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Куда сохранить — спрашиваем окном: архив уедет из программы, и место
+    /// для него выбирает человек (§6, ADR 0009). Предлагается имя со
+    /// временем — второй пакет не должен затирать первый, когда просят
+    /// «соберите ещё раз после того, как повторится».
+    /// </para>
+    /// <para>
+    /// Папка открывается сразу: пакет собирают, чтобы отправить, а перед
+    /// отправкой в него стоит заглянуть — что там внутри, написано в нём
+    /// самом первой строкой.
+    /// </para>
+    /// </remarks>
+    private async void OnCollectDiagnostics(object sender, RoutedEventArgs e)
+    {
+        CollectDiagnostics.IsEnabled = false;
+        DiagnosticsState.Text = S("Собираю…");
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = Platform.Diagnostics.SuggestedName(),
+                Filter = S("Архив (*.zip)|*.zip"),
+                Title = S("Куда сохранить диагностический пакет"),
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                DiagnosticsState.Text = "";
+                return;
+            }
+
+            var result = await Platform.Diagnostics.CollectAsync(
+                dialog.FileName, _link);
+            DiagnosticsState.Text = result.Ok
+                ? S("Готово: {0}", Short(result.Path))
+                : S("Не вышло: {0}", result.Problem);
+            DiagnosticsState.SetResourceReference(ForegroundProperty,
+                result.Ok ? "C.InkFaint" : "C.Signal");
+            if (result.Ok)
+                Open(System.IO.Path.GetDirectoryName(result.Path) ?? "");
+        }
+        finally
+        {
+            CollectDiagnostics.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
     /// Where the data, the logs and the plugins live.
     /// </summary>
     /// <remarks>

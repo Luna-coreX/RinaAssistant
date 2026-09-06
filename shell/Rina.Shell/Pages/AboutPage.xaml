@@ -61,6 +61,23 @@
         <StackPanel x:Name="Places" />
       </Border>
 
+      <!-- Собрать всё это в архив одним нажатием. Человек, пришедший с
+           неполадкой, не обязан знать, какие журналы нам нужны и где они
+           лежат; а мы не обязаны просить его открывать десять папок. -->
+      <TextBlock Text="{loc:S 'ДИАГНОСТИКА'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+        <Button x:Name="CollectDiagnostics" Style="{StaticResource Btn}"
+                Content="{loc:S 'Собрать пакет'}"
+                Click="OnCollectDiagnostics" />
+        <TextBlock x:Name="DiagnosticsState" Style="{StaticResource Text.Meta}"
+                   VerticalAlignment="Center" Margin="12,0,0,0"
+                   TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                 Margin="0,0,0,16"
+                 Text="{loc:S 'Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло.'}" />
+
       <TextBlock Text="{loc:S 'ССЫЛКИ'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <StackPanel x:Name="Links" Orientation="Horizontal" Margin="0,0,0,16" />

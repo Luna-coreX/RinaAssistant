@@ -53,6 +53,9 @@
   "Акцент": {
     "English": "Accent"
   },
+  "Архив (*.zip)|*.zip": {
+    "English": "Archive (*.zip)|*.zip"
+  },
   "Архив с плагином": {
     "English": "Plugin archive"
   },
@@ -149,11 +152,17 @@
   "Готово": {
     "English": "Done"
   },
+  "Готово: {0}": {
+    "English": "Done: {0}"
+  },
   "Громкость": {
     "English": "Volume",
     "Українська": "Гучність",
     "Español": "Volumen",
     "Deutsch": "Lautstärke"
+  },
+  "ДИАГНОСТИКА": {
+    "English": "DIAGNOSTICS"
   },
   "Данные на диске": {
     "English": "Data on disk"
@@ -214,6 +223,9 @@
   },
   "Журналы": {
     "English": "Logs"
+  },
+  "Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло.": {
+    "English": "Logs, versions and the link's state. The conversation history and your commands are not taken; what went in is written inside."
   },
   "ЗАПЛАНИРОВАНО": {
     "English": "SCHEDULED"
@@ -359,6 +371,9 @@
   "Куда говорить": {
     "English": "Where to speak"
   },
+  "Куда сохранить диагностический пакет": {
+    "English": "Where to save the diagnostic package"
+  },
   "МОИ КОМАНДЫ": {
     "English": "MY COMMANDS"
   },
@@ -444,7 +459,7 @@
     "English": "Couldn’t open the link: {0}"
   },
   "Не вышло: {0}": {
-    "English": "Didn’t work: {0}"
+    "English": "Didn't work: {0}"
   },
   "Не прочиталось: {0}": {
     "English": "Couldn’t read it: {0}"
@@ -793,6 +808,12 @@
   },
   "Слышно: {0}%. Микрофон работает.": {
     "English": "Heard: {0}%. The microphone works."
+  },
+  "Собираю…": {
+    "English": "Collecting…"
+  },
+  "Собрать пакет": {
+    "English": "Collect package"
   },
   "Сообщить о неполадке": {
     "English": "Report a problem"

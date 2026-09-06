@@ -104,6 +104,11 @@ public static partial class Loc
                 {
                     ["English"] = "Accent",
                 },
+            ["Архив (*.zip)|*.zip"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Archive (*.zip)|*.zip",
+                },
             ["Архив с плагином"] =
                 new Dictionary<string, string>
                 {
@@ -284,6 +289,11 @@ public static partial class Loc
                 {
                     ["English"] = "Done",
                 },
+            ["Готово: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Done: {0}",
+                },
             ["Громкость"] =
                 new Dictionary<string, string>
                 {
@@ -296,6 +306,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Data on disk",
+                },
+            ["ДИАГНОСТИКА"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "DIAGNOSTICS",
                 },
             ["Диалог"] =
                 new Dictionary<string, string>
@@ -383,6 +398,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Logs",
+                },
+            ["Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Logs, versions and the link's state. The conversation history and your commands are not taken; what went in is written inside.",
                 },
             ["Забыть"] =
                 new Dictionary<string, string>
@@ -637,6 +657,11 @@ public static partial class Loc
                 {
                     ["English"] = "Where to speak",
                 },
+            ["Куда сохранить диагностический пакет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to save the diagnostic package",
+                },
             ["метаданные версии {0}, а мы умеем 1"] =
                 new Dictionary<string, string>
                 {
@@ -807,7 +832,7 @@ public static partial class Loc
             ["Не вышло: {0}"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Didn’t work: {0}",
+                    ["English"] = "Didn't work: {0}",
                 },
             ["не назначено"] =
                 new Dictionary<string, string>
@@ -1455,6 +1480,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Heard: {0}%. The microphone works.",
+                },
+            ["Собираю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Collecting…",
+                },
+            ["Собрать пакет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Collect package",
                 },
             ["Сообщить о неполадке"] =
                 new Dictionary<string, string>

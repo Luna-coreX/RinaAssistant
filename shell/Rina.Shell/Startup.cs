@@ -102,6 +102,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-diagnostics"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckDiagnosticsAsync();
+            return;
+        }
+
         if (args.Contains("--check-hover"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -838,6 +845,175 @@ public partial class App
     /// day go outside where it was not invited.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// I03: диагностический пакет собирается и не увозит лишнего.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// На живом ядре: пакет собирают ради версий и состояния связи, а их
+    /// неоткуда взять, пока ядра нет. Проверка на подставном ядре
+    /// проверяла бы, что мы умеем писать zip.
+    /// </para>
+    /// <para>
+    /// Главное здесь — не «архив собрался», а **чего в нём нет**. Пакет
+    /// человек отправляет чужим людям, и обещание «историю разговора не
+    /// берём» стоит ровно столько, сколько стоит его проверка: в настройки
+    /// кладётся приметное слово, и проверка ищет его во всём архиве
+    /// целиком.
+    /// </para>
+    /// </remarks>
+    private async Task CheckDiagnosticsAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        var folder = Path.Combine(Path.GetTempPath(),
+                                  "rina-diagnostics-" + Guid.NewGuid()
+                                      .ToString("N")[..8]);
+        try
+        {
+            Console.WriteLine("=== I03: диагностический пакет ===");
+
+            var window = new MainWindow();
+            var link = new CoreLink(window, CoreLink.FindCore());
+            window.Link = link;
+            await link.StartAsync();
+            for (var i = 0; i < 400
+                     && link.State != Rina.Protocol.CoreState.Ready; i++)
+                await Task.Delay(100);
+            Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
+                  $"| {link.State}");
+
+            // Приметное слово в настройку со свободным текстом. Оно обязано
+            // не доехать: путь к модели — это путь на диске человека, и в
+            // нём стоит его имя.
+            const string secretish = "СЕКРЕТНАЯ-ТРОПИНКА-42";
+            if (link.Connection is { Ready: true } live)
+            {
+                await live.CallAsync(Rina.Protocol.Methods.SettingsSet,
+                    new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["values"] = new System.Text.Json.Nodes.JsonObject
+                        {
+                            ["piper_model"] = secretish,
+                        },
+                    }, TimeSpan.FromSeconds(10));
+            }
+
+            Directory.CreateDirectory(folder);
+            var zip = Path.Combine(folder, "package.zip");
+            var made = await Platform.Diagnostics.CollectAsync(zip, link);
+            Check("пакет собрался", made.Ok && File.Exists(zip),
+                  $"| {made.Problem}");
+
+            if (!made.Ok)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {++fails}");
+                Environment.ExitCode = 1;
+                Shutdown();
+                return;
+            }
+
+            var inside = new Dictionary<string, string>();
+            using (var archive = System.IO.Compression.ZipFile.OpenRead(zip))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    using var stream = entry.Open();
+                    using var reader = new StreamReader(stream);
+                    inside[entry.FullName] = reader.ReadToEnd();
+                }
+            }
+
+            Check("пояснение внутри", inside.ContainsKey("README.txt"));
+            Check("версии внутри", inside.ContainsKey("versions.txt"));
+            Check("состояние внутри", inside.ContainsKey("state.txt"));
+            Check("настройки внутри", inside.ContainsKey("settings.txt"));
+            Check("журналы внутри",
+                  inside.Keys.Any(k => k.StartsWith("logs/")),
+                  "| " + string.Join(", ", inside.Keys.Where(
+                      k => k.StartsWith("logs/"))));
+
+            var versions = inside.GetValueOrDefault("versions.txt", "");
+            Check("версия ядра названа, а не прочерк",
+                  versions.Contains("ядро: ") && !versions.Contains("нет связи"),
+                  $"| {versions.Split('\n').FirstOrDefault(l => l.StartsWith("ядро"))}");
+            Check("версия протокола названа",
+                  !versions.Contains("протокол: —"));
+
+            // То, ради чего проверка и написана.
+            var everything = string.Join("\n", inside.Values);
+            Check("свободный текст настройки не уехал",
+                  !everything.Contains(secretish),
+                  "| приметное слово нашлось в пакете");
+            Check("и вместо него — длина",
+                  inside.GetValueOrDefault("settings.txt", "")
+                        .Contains("piper_model = (текст,"),
+                  "| " + inside.GetValueOrDefault("settings.txt", "")
+                      .Split('\n').FirstOrDefault(l => l.StartsWith("piper_model")));
+            Check("число уехало как есть",
+                  inside.GetValueOrDefault("settings.txt", "")
+                        .Contains("volume = "));
+            // Ни одного файла хранилища: пакет — это пояснения и журналы, а
+            // не копия данных. Утверждение шире, чем «нет истории», и не
+            // называет файлов по именам: имя, написанное здесь, пришлось бы
+            // помнить и здесь, и в хранилище.
+            Check("файлов хранилища в пакете нет",
+                  !inside.Keys.Any(k => k.EndsWith(".json")),
+                  "| " + string.Join(", ", inside.Keys.Where(
+                      k => k.EndsWith(".json"))));
+            Check("текста разговора в пакете нет",
+                  !everything.Contains("\"kind\": \"assistant\""));
+
+            // Человек обязан узнать про запись текстов до отправки, а не
+            // после: в журнале они могут быть, и это его решение.
+            Check("про запись текстов сказано в пояснении",
+                  inside.GetValueOrDefault("README.txt", "")
+                        .Contains("текстов реплик"));
+
+            await live_reset(link);
+            Console.WriteLine();
+            Console.WriteLine($"Ошибок: {fails}");
+            Environment.ExitCode = fails == 0 ? 0 : 1;
+        }
+        catch (Exception error)
+        {
+            Console.WriteLine($"  FAIL  проверка упала | {error.Message}");
+            Environment.ExitCode = 1;
+        }
+        finally
+        {
+            try { Directory.Delete(folder, recursive: true); }
+            catch (IOException) { }
+            Shutdown();
+        }
+
+        // Настройки под проверкой настоящие: приметное слово надо убрать за
+        // собой. То же правило, по которому проверка автозапуска возвращает
+        // запись в реестре.
+        static async Task live_reset(CoreLink link)
+        {
+            if (link.Connection is not { Ready: true } live) return;
+            await live.CallAsync(Rina.Protocol.Methods.SettingsSet,
+                new System.Text.Json.Nodes.JsonObject
+                {
+                    ["values"] = new System.Text.Json.Nodes.JsonObject
+                    {
+                        ["piper_model"] = "",
+                    },
+                }, TimeSpan.FromSeconds(10));
+        }
+    }
+
     private async Task CheckUpdatesAsync()
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
