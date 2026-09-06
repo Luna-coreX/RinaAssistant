@@ -1,23 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-Сверка дизайна с инвентарём поверхности и с направлением.
+Comparing the design with the surface inventory and with the direction.
 
-Задача плана 4.0-R11. У интерфейса нет аналога golden-набора: после редизайна
-всё отличается намеренно, и автоматически отличить «так задумано» от
-«потеряли» нечем. Роль критерия играет эта сверка.
+Plan item 4.0-R11. An interface has no equivalent of the golden suite: after
+a redesign everything differs deliberately, and there is nothing to tell
+"that was intended" from "we lost it" automatically. This comparison plays
+the part of the criterion.
 
-Проверяется двумя способами:
+Two things are checked:
 
-    1. Каждое действие из раздела «Доступно только отсюда» инвентаря
-       поверхности имеет адрес в новой информационной архитектуре.
-       Потерянная кнопка — потерянная возможность, и ядро об этом
-       не узнает: golden-набор проверяет ядро, а не окно.
+    1. Every action from the surface inventory's "Available only from here"
+       section has an address in the new information architecture. A lost
+       button is a lost capability, and the core will not learn of it: the
+       golden suite checks the core, not the window.
 
-    2. Токены и макет отвечают «нет» на двенадцать вопросов направления.
-       Система построена так, чтобы честное следование ей давало это
-       автоматически; проверка ловит отступления.
+    2. The tokens and the layout answer "no" to the twelve questions of the
+       direction. The system is built so that honestly following it gives
+       that automatically; the check catches the departures.
 
-Запуск:
+To run:
     python tools/check_design.py
 """
 
@@ -51,10 +52,10 @@ def read(path):
 
 
 # ---------------------------------------------------------------------------
-# 1. Каждое действие имеет адрес
+# 1. Every action has an address
 # ---------------------------------------------------------------------------
 def only_here_actions():
-    """Строки таблицы «Доступно только отсюда» из инвентаря поверхности."""
+    """The rows of the "Available only from here" table from the surface inventory."""
     text = read(SURFACE)
     start = text.index("## 3. Доступно только отсюда")
     end = text.index("## 4.", start)
@@ -69,7 +70,7 @@ def only_here_actions():
     return rows
 
 
-#: Куда переехал каждый экран 3.1.0. Ключ — как раздел назывался в инвентаре.
+#: Where each 3.1.0 screen moved to. The key is what the section was called in the inventory.
 HOMES = {
     "Команды": "Команды",
     "История": "Диалог",
@@ -89,7 +90,7 @@ ia = read(IA)
 ia_low = ia.lower()
 homeless = []
 for action, address in actions:
-    # Адрес бывает составным: «Настройки → Голос» и «Настройки, Рина».
+    # An address is sometimes compound: "Настройки → Голос" and "Настройки, Рина".
     screens = [part.strip()
                for chunk in address.split("→")[0].split(",")
                for part in [chunk] if part.strip()]
@@ -116,13 +117,13 @@ print("=== направление: двенадцать вопросов ===")
 tokens = json.load(open(TOKENS, encoding="utf-8"))
 mockups = read(MOCKUPS) if os.path.isfile(MOCKUPS) else ""
 
-# радиус
+# the radius
 check("радиус не больше 3",
       max(tokens["radius"].values()) <= 3, f"| {tokens['radius']}")
 
-# ...и не только в токенах. Первая редакция смотрела сюда и была зелёной,
-# пока в разметке стоял тумблер радиусом 11: правило сторожили в
-# источнике, а нарушали у потребителя.
+# ...and not only in the tokens. The first edition looked here and was green
+# while the markup held a toggle with a radius of 11: the rule was guarded at
+# the source and broken at the consumer.
 LIMIT = max(tokens["radius"].values())
 SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
 too_round = []
@@ -144,14 +145,14 @@ for base, dirs, files in os.walk(SHELL):
 check("и в разметке с кодом тоже", not too_round,
       f"| {too_round}" if too_round else f"| предел {LIMIT}")
 
-# один акцент
+# one accent
 for key, finish in tokens["finishes"].items():
     colors = finish["color"]
     accents = [k for k in colors if k.startswith("SIGNAL")]
     check(f"[{key}] акцент один (плюс его нажатое состояние)",
           set(accents) == {"SIGNAL", "SIGNAL_SUNK"}, f"| {accents}")
 
-# красного нет
+# there is no red
 def is_reddish(hex_color):
     h = hex_color.lstrip("#")
     r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
@@ -161,14 +162,14 @@ for key, finish in tokens["finishes"].items():
     reds = [k for k, v in finish["color"].items() if is_reddish(v)]
     check(f"[{key}] красного в палитре нет", not reds, f"| {reds}")
 
-# опасность — штриховкой
+# danger by hatching
 check("опасность обозначена штриховкой",
       tokens["states"]["danger"].get("hatch") is True
       and "hatch" in tokens)
 check("у ошибки и опасности разные средства",
       tokens["states"]["error"].get("hatch") is not True)
 
-# тени и размытия нет
+# no shadows and no blurs
 check("в токенах нет теней и размытий",
       not any(k in tokens for k in ("shadow", "blur", "elevation")))
 if mockups:
@@ -176,31 +177,31 @@ if mockups:
            if w in mockups]
     check("в макете нет теней и размытий", not bad, f"| {bad}")
 
-# градиент ровно один — полоса уровня
+# exactly one gradient — the level strip
 if mockups:
     gradients = re.findall(r"linear-gradient", mockups)
-    # repeating-linear-gradient штриховки считается отдельно
+    # the hatching's repeating-linear-gradient is counted separately
     plain = len(gradients) - mockups.count("repeating-linear-gradient")
     check("градиент ровно один (полоса уровня)", plain == 1, f"| {plain}")
 
-# табличные цифры
+# tabular figures
 check("цифры моноширинные",
       tokens["typography"]["role"]["figure"]["family"] == "mono"
       and tokens["typography"]["role"]["figure"].get("tabular") is True)
 
-# послесвечение
+# the afterglow
 check("состояние гаснет, а не переключается",
       tokens["motion"]["afterglow"] >= 500,
       f"| {tokens['motion']['afterglow']} мс")
 
-# --- движение объявлено и **применено** -------------------------------------
+# --- motion is declared and **applied** --------------------------------------
 #
-# Токен, которым никто не пользуется, — это намерение, а не решение.
-# Система движения (SYSTEM §7) была порождена в `Motion.*` и не
-# использовалась нигде: состояния переключались мгновенно, а полоса уровня
-# скакала между нулём и сорока процентами. Двенадцать вопросов направления
-# называют это прямым «не в стиле», и проверка на токены его не поймала —
-# значение-то в файле было.
+# A token nobody uses is an intention rather than a decision. The motion
+# system (SYSTEM §7) was generated into `Motion.*` and used nowhere: states
+# switched instantly, and the level strip jumped between zero and forty per
+# cent. The twelve questions of the direction call that a plain "not in the
+# style", and a check on the tokens did not catch it — the value was in the
+# file, after all.
 SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
 used = []
 for base, dirs, files in os.walk(SHELL):
@@ -220,7 +221,7 @@ check("послесвечение висит на полосе уровня", on
       "" if on_strip else "| «полоса не переключается между выключено и "
                           "включено» (DIRECTION §4)")
 
-# просвет вокруг опасного вдвое больше обычного
+# the gap around the dangerous is twice the usual
 check("опасное отделено пустотой",
       tokens["space"]["danger"] >= tokens["space"]["between"] * 2,
       f"| {tokens['space']['danger']} против {tokens['space']['between']}")

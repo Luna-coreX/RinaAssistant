@@ -1,12 +1,13 @@
 """
-C07: реестр — единственный путь исполнения. Проверка архитектурного инварианта.
+C07: the registry is the only path of execution. A check of an
+architectural invariant.
 
-C03 проверял один файл — исполнитель. Здесь инвариант проверяется по всему
-ядру: побочные эффекты выполняются только внутри `core/toolrunner.py`, и
-никакой другой модуль ядра до них не дотягивается.
+C03 checked one file — the executor. Here the invariant is checked across
+the whole core: side effects are performed only inside `core/toolrunner.py`,
+and no other module of the core reaches them.
 
-Проверка по синтаксическому дереву, а не поиском по тексту: комментарии и
-строки документации описывают код, но кодом не являются.
+The check is over the syntax tree rather than by searching the text:
+comments and documentation strings describe the code but are not code.
 """
 import ast
 import io
@@ -29,7 +30,7 @@ def check(label, cond, detail=""):
 
 
 # ---------------------------------------------------------------------------
-# Что считается побочным эффектом
+# What counts as a side effect
 # ---------------------------------------------------------------------------
 FORBIDDEN_CALLS = {
     ("os", "startfile"),
@@ -45,24 +46,26 @@ FORBIDDEN_CALLS = {
     ("execute", None),          # from voice.user_commands import execute
 }
 
-#: Модуль ядра, которому побочные эффекты разрешены. Ровно один.
+#: The core module allowed side effects. Exactly one.
 ALLOWED = "toolrunner.py"
 
-#: Второй — и с оговоркой, которая проверяется ниже.
+#: The second — and with a proviso that is checked below.
 #:
-#: `plugin_host.py` поднимает процессы плагинов (`4.0-H07`). Инвариант
-#: сторожит, чтобы **умения Рины** не проходили мимо реестра: запуск
-#: программы, открытие браузера, вопрос модели. Загрузка плагина — не
-#: умение, а способ его загрузить; решает это человек, включая плагин.
+#: `plugin_host.py` raises the plugins' processes (`4.0-H07`). The invariant
+#: guards that **Rina's skills** do not go past the registry: launching a
+#: program, opening the browser, asking the model. Loading a plugin is not a
+#: skill but a way of loading one; that is decided by a person, by switching
+#: the plugin on.
 #:
-#: Послабление без проверки — способ размыть инвариант, поэтому ниже
-#: отдельно утверждается: запускается только наш собственный launcher, без
-#: путей от человека, без строк от плагина и без оболочки системы.
+#: A concession without a check is a way of blurring the invariant, so below
+#: it is separately asserted: only our own launcher is started, without paths
+#: from a person, without strings from a plugin and without the system's
+#: shell.
 LAUNCHER_ONLY = "plugin_host.py"
 
 
 def calls_in(path):
-    """Все вызовы вида `модуль.функция` в файле."""
+    """Every call of the form `module.function` in a file."""
     tree = ast.parse(io.open(path, encoding="utf-8").read())
     found = []
     for node in ast.walk(tree):
@@ -94,7 +97,7 @@ check("ядро не делает побочных эффектов мимо р�
 print(f"     проверено файлов ядра: {len(core_files)}, "
       f"разрешён только {ALLOWED}")
 
-# Оговорка про plugin_host: запускается только свой launcher.
+# The proviso about plugin_host: only our own launcher is started.
 host_source = io.open(os.path.join("core", LAUNCHER_ONLY),
                       encoding="utf-8").read()
 host_tree = ast.parse(host_source)
@@ -115,7 +118,7 @@ check("и без оболочки системы",
 
 print()
 print("=== инвариант: у каждого вызова назван инициатор ===")
-# Без инициатора запись в журнале бесполезна: «кто-то выключил компьютер».
+# Without an initiator a journal entry is useless: "somebody shut the computer down".
 tree = ast.parse(io.open("core/executor.py", encoding="utf-8").read())
 missing = []
 for node in ast.walk(tree):
@@ -174,7 +177,7 @@ from voice.user_commands import UserCommandStore
 
 settings = MemorySettings()
 audit = AuditLog(path=":memory:")
-# Оболочка-заглушка: системное действие с 4.0-G01 делает она.
+# A stub shell: since 4.0-G01 it is what performs a system action.
 runner = ToolRunner(ToolContext(
     settings=settings, reminders=ReminderStore(settings),
     commands=UserCommandStore(settings), emit=lambda n, **d: None,
@@ -182,10 +185,10 @@ runner = ToolRunner(ToolContext(
     audit=audit)
 
 before = audit.count()
-runner.call("set_volume", {"action": "up"}, source="voice")          # успех
-runner.call("power_action", {"action": "shutdown"}, source="voice")  # отказ
-runner.call("set_volume", {"action": "выдумка"}, source="typed")     # отказ
-runner.call("нет_такого", {}, source="typed")                        # отказ
+runner.call("set_volume", {"action": "up"}, source="voice")          # success
+runner.call("power_action", {"action": "shutdown"}, source="voice")  # refused
+runner.call("set_volume", {"action": "выдумка"}, source="typed")     # refused
+runner.call("нет_такого", {}, source="typed")                        # refused
 check("записаны все четыре вызова", audit.count() - before == 4,
       f"| {audit.count() - before}")
 
@@ -202,15 +205,16 @@ check("у записей есть разрешения инструмента",
 print()
 print("=== инвариант: журнал не превращается в стенограмму ===")
 
-# Условие задаётся здесь, а не берётся из настроек машины: инвариант верен
-# при выключенной записи текстов, и проверка обязана это сказать, а не
-# унаследовать. Первая редакция краснела на машине, где `log_texts`
-# включён, — то есть проверяла оператора, а не программу.
+# The condition is set here rather than taken from the machine's settings:
+# the invariant holds with text recording switched off, and the check is
+# obliged to say so rather than inherit it. The first edition went red on a
+# machine where `log_texts` is on — that is, it checked the operator rather
+# than the program.
 from core.settings_store import settings as real_settings
 
 real_settings.load()
 was_verbatim = bool(real_settings.get("log_texts", False))
-real_settings._data["log_texts"] = False        # только в памяти: не пишем
+real_settings._data["log_texts"] = False        # in memory only: we do not write
 
 runner.call("web_search", {"query": "как приготовить борщ"}, source="typed")
 row = audit.recent(1)[0]
@@ -230,9 +234,9 @@ check("текст напоминания скрыт, а срок виден",
       row["args"]["text"].startswith("<") and row["args"]["seconds"] == 600,
       f"| {row['args']}")
 
-# И обратное: включённая запись текстов действительно пишет их. Настройка,
-# которая ничего не меняет, — худшее, что может случиться с настройкой
-# приватности: человек думает, что разрешил, а журнал пуст.
+# And the reverse: text recording switched on really does write them. A
+# setting that changes nothing is the worst thing that can happen to a
+# privacy setting: a person thinks they allowed it, and the journal is empty.
 real_settings._data["log_texts"] = True
 runner.call("web_search", {"query": "как приготовить борщ"}, source="typed")
 verbatim_row = audit.recent(1)[0]

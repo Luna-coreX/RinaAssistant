@@ -1,27 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-Порождение контракта для оболочки из снимка протокола.
+Generating the contract for the shell from the protocol's snapshot.
 
-Задача плана 4.0-F02.
+Plan item 4.0-F02.
 
-Оболочка пишется на другом языке, и у неё неизбежно появятся имена методов,
-событий и кодов ошибок. Написать их руками — значит завести **третий**
-список: спецификация, ядро, оболочка. Первые два уже сверяются (4.0-D05,
-D11, D17); третий разошёлся бы с ними при первом же добавлении, причём
-незаметно — опечатка в имени метода выглядит как метод.
+The shell is written in another language, and it will inevitably have the
+names of methods, events and error codes. Writing them by hand means
+starting a **third** list: the specification, the core, the shell. The first
+two are already compared (4.0-D05, D11, D17); the third would part company
+with them at the very first addition, and unnoticeably at that — a typo in a
+method's name looks like a method.
 
-Поэтому C#-часть порождается из `docs/protocol/contract-v1.json` — того же
-снимка, с которым сверяется код ядра. Один источник, две стороны.
+So the C# part is generated from `docs/protocol/contract-v1.json` — the same
+snapshot the core's code is compared with. One source, two sides.
 
-Порождаются только **имена и свойства**: методы, события, коды ошибок с их
-категорией и повторяемостью, возможности, виды потоков. Поведение не
-порождается: сгенерированный код, который что-то делает, читать труднее, чем
-написанный, а выгоды здесь никакой — вся логика и так одинакова с обеих
-сторон только по смыслу, но не по устройству.
+Only **names and properties** are generated: the methods, the events, the
+error codes with their category and retryability, the capabilities, the
+kinds of stream. Behaviour is not generated: generated code that does
+something is harder to read than written code, and there is no gain here —
+all the logic is the same on both sides only in meaning, not in structure.
 
-Запуск:
-    python tools/gen_csharp_contract.py            записать
-    python tools/gen_csharp_contract.py --check    сверить, не переписывая
+To run:
+    python tools/gen_csharp_contract.py            write
+    python tools/gen_csharp_contract.py --check    compare without rewriting
 """
 
 import json

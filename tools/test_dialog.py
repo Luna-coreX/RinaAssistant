@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-B03: машина состояний диалога. Проверяется без приложения.
+B03: the dialogue's state machine. Checked without the application.
 
-Критерий приёмки задачи: состояние можно сохранить и восстановить.
+The task's acceptance criterion: the state can be saved and restored.
 """
 import json
 import sys

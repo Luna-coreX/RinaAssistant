@@ -1,10 +1,10 @@
 """
-C03 и C05: реестр — единственный путь, подтверждение обязательно.
+C03 and C05: the registry is the only path, confirmation is obligatory.
 
-Два критерия приёмки, оба проверяются буквально:
+Two acceptance criteria, both checked literally:
 
-    C03  исполнитель не имеет ни одного пути исполнения в обход реестра
-    C05  power_action без подтверждения падает с явной ошибкой
+    C03  the executor has not one path of execution around the registry
+    C05  power_action without confirmation fails with an explicit error
 """
 import ast
 import io
@@ -43,10 +43,11 @@ def make_runner():
     from voice.user_commands import UserCommandStore
 
     settings = MemorySettings()
-    # Оболочка, которой здесь нет: ядро просит сделать системное действие
-    # (ADR 0009), а не делает само. Записываем просьбу и отвечаем
-    # «получилось» — проверяется, что ворота подтверждений на месте, а не
-    # что Windows умеет прибавлять громкость.
+    # The shell, which is not here: the core asks for a system action to be
+    # performed (ADR 0009) rather than performing it itself. We record the
+    # request and answer "it worked" — what is checked is that the
+    # confirmation gates are in place, not that Windows can turn the volume
+    # up.
     return ToolRunner(ToolContext(
         settings=settings,
         reminders=ReminderStore(settings),
@@ -56,17 +57,17 @@ def make_runner():
     ))
 
 
-#: Что «оболочка» сделала по просьбе ядра.
+#: What "the shell" did at the core's request.
 DONE = []
 
 
 print("=== C03: обходных путей нет ===")
 
-# Побочные эффекты, которые исполнитель не имеет права делать сам.
+# Side effects the executor has no right to perform itself.
 #
-# Проверяется по синтаксическому дереву, а не поиском по тексту: первая
-# редакция ловила строку документации, где как раз описано, чего исполнитель
-# больше не делает. Проза о коде — не код.
+# Checked over the syntax tree rather than by searching the text: the first
+# edition caught a documentation string where exactly what the executor no
+# longer does is described. Prose about code is not code.
 FORBIDDEN_CALLS = {
     ("os", "startfile"),
     ("webbrowser", "open"),
@@ -77,8 +78,8 @@ FORBIDDEN_CALLS = {
     ("subprocess", "Popen"),
     ("subprocess", "run"),
 }
-#: Методы хранилищ, меняющие состояние. Исполнитель обязан ходить в них
-#: только через инструменты.
+#: The stores' methods that change state. The executor is obliged to reach
+#: them only through tools.
 FORBIDDEN_METHODS = {"add", "clear_active", "bump_stat", "remove", "save"}
 
 tree = ast.parse(io.open("core/executor.py", encoding="utf-8").read())
@@ -92,7 +93,7 @@ for node in ast.walk(tree):
     owner = func.value
     if isinstance(owner, ast.Name) and (owner.id, func.attr) in FORBIDDEN_CALLS:
         offenders.append(f"{owner.id}.{func.attr} (строка {node.lineno})")
-    # self._reminders.add(...) и подобное
+    # self._reminders.add(...) and the like
     if (isinstance(owner, ast.Attribute)
             and isinstance(owner.value, ast.Name)
             and owner.value.id == "self"
@@ -134,8 +135,9 @@ confirmation = runner.request_confirmation(
 result = runner.call("power_action", {"action": "shutdown"},
                      confirmation_id=confirmation.id)
 check("с подтверждением выполняется", result.ok, f"| {result.message}")
-# Смотрим на просьбу к оболочке, а не на песочницу: ядро больше не
-# трогает машину само, и `box.actions` теперь пуст по существу (ADR 0009).
+# We look at the request to the shell rather than at the sandbox: the core no
+# longer touches the machine itself, and `box.actions` is now empty in
+# substance (ADR 0009).
 check("действие произошло", DONE == ["shutdown"], f"| {DONE}")
 
 box.actions.clear()
@@ -144,8 +146,8 @@ result = runner.call("power_action", {"action": "shutdown"},
 check("повторное предъявление отклонено",
       not result.ok and result.error_code == "confirmation.invalid",
       f"| {result.error_code}")
-# Просьба к оболочке была ровно одна: второе предъявление отклонили до
-# того, как инструмент дошёл до системного слоя.
+# There was exactly one request to the shell: the second presentation was
+# rejected before the tool reached the system layer.
 check("второй раз не выключилось", DONE == ["shutdown"], f"| {DONE}")
 
 print()
@@ -179,8 +181,8 @@ except Exception as e:
 
 print()
 print("=== ворота стоят в правильном порядке ===")
-# Неверный аргумент отбивается ДО того, как спросят подтверждение:
-# человека не должны спрашивать про вызов, который всё равно не состоится.
+# A wrong argument is rebuffed BEFORE confirmation is asked for: a person
+# must not be asked about a call that will not take place anyway.
 result = runner.call("power_action", {"action": "выдумка"})
 check("аргументы проверяются раньше подтверждения",
       result.error_code == "tool.invalid_arguments", f"| {result.error_code}")

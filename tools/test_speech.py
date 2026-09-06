@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-E03, E04: распознавание и синтез в ядре, звук — в оболочке.
+E03, E04: recognition and synthesis in the core, the sound in the shell.
 
-Настоящие модели ставятся не на всякой машине, а провод обязан проверяться
-везде. Поэтому распознавание и синтез подменяются: их **границы** узкие
-(байты → текст, текст → байты) ровно для того, чтобы это было возможно.
-Проверяется путь, а не модель.
+Real models are not installed on every machine, and the wire is obliged to
+be checked everywhere. So recognition and synthesis are substituted: their
+**boundaries** are narrow (bytes -> text, text -> bytes) precisely so that
+this is possible. The path is checked, not the model.
 
-Нарезка на фразы проверяется по-настоящему: это наш код, и он не зависит ни
-от какой библиотеки.
+The slicing into phrases is checked for real: it is our code, and it depends
+on no library.
 
-Запуск:
+To run:
     python tools/test_speech.py
 """
 
@@ -63,8 +63,8 @@ def cut(stream, segmenter=None):
 phrases, _ = cut(speech.tone(0.6) + speech.silence(1.0))
 check("фраза кончается по тишине", len(phrases) == 1, f"| {len(phrases)}")
 
-# Пауза между словами не рвёт фразу — иначе «поставь… таймер» приедет двумя,
-# и вторая половина придёт без первой.
+# A pause between words does not tear a phrase — otherwise "поставь… таймер"
+# arrives as two, and the second half comes without the first.
 phrases, _ = cut(speech.tone(0.5) + speech.silence(0.3)
                  + speech.tone(0.4) + speech.silence(1.0))
 check("пауза между словами не рвёт фразу", len(phrases) == 1,
@@ -109,7 +109,7 @@ print("=== E03/E04: путь через провод ===")
 
 
 class FakeRecogniser:
-    """Подмена: важно, что путь дошёл, а не что услышано."""
+    """A stand-in: what matters is that the path arrived, not what was heard."""
 
     name = "подменённое"
 
@@ -126,7 +126,7 @@ class FakeRecogniser:
 
 
 class FakeSynthesiser:
-    """Подмена: отдаёт тон вместо голоса, чтобы было что отправить."""
+    """A stand-in: gives out a tone instead of a voice, so there is something to send."""
 
     name = "подменённое"
     sample_rate = speech.RATE
@@ -156,7 +156,7 @@ check("голос ядра забрала серверная сторона", en
 heard_events = []
 engine.bus.on("speech.recognized", lambda data: heard_events.append(data["text"]))
 
-# Звук приходит так же, как от оболочки: кусками по сто миллисекунд.
+# The sound arrives the same way as from the shell: in hundred-millisecond chunks.
 server.incoming[11] = {"kind": "audio.input", "format": {}, "bytes": 0,
                        "frames": 0}
 stream = speech.tone(0.8) + speech.silence(1.2)
@@ -173,13 +173,13 @@ check("фраза дошла до распознавания", ears.calls, f"| {
 check("распознанное объявлено событием",
       heard_events == ["поставь таймер на 5 секунд"], f"| {heard_events}")
 
-# Ответ Рины уходит звуком в оболочку, а не в местный динамик.
+# Rina's answer goes to the shell as sound rather than to a local speaker.
 server.data.open_stream(21, "audio.output")
 server.data.grant(21, 512 * 1024)
 server._speech_stream = 21
 server.send_speech(speech.tone(0.3), speech.RATE)
 
-# Байты ушли в трубу оболочки — читаем её так же, как читала бы оболочка.
+# The bytes went into the shell's pipe — we read it as the shell would.
 chunks = []
 while True:
     piece = shell_data.recv()
@@ -193,8 +193,9 @@ engine.say("готово")
 _time.sleep(0.4)
 check("синтез позвали на настоящий ответ", "готово" in voice.said,
       f"| {voice.said}")
-# Круг замкнулся: распознанная фраза дошла до конвейера команд, и Рина
-# ответила на неё сама — «Засекла 5 с.» в списке синтезированного.
+# The round is closed: the recognised phrase reached the command pipeline,
+# and Rina answered it herself — "Засекла 5 с." in the list of what was
+# synthesised.
 check("распознанное исполнилось, и ответ тоже озвучен",
       any("Засекла" in said for said in voice.said), f"| {voice.said}")
 check("местный динамик при этом молчал", box.spoken == [], f"| {box.spoken}")

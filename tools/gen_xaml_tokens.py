@@ -1,30 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Порождение ресурсов оболочки из tokens.json.
+Generating the shell's resources from tokens.json.
 
-Задача плана 4.0-F03; решение — [ADR 0005](../docs/adr/0005-control-library.md),
-где это записано как часть самого решения, а не как примечание под ним.
+Plan item 4.0-F03; the decision is
+[ADR 0005](../docs/adr/0005-control-library.md), where this is written down
+as part of the decision itself rather than as a note under it.
 
-Библиотеки контролов нет, значит стили пишем сами, значит значения окажутся
-в XAML. Переписать их руками — завести вторую копию палитры, отступов и
-типографики; она разойдётся с `tokens.json` на первой же правке, причём
-молча: расхождение в два пикселя не видно, а расхождение в цвет видно не
-сразу и не всем.
+There is no control library, so we write the styles ourselves, so the values
+end up in XAML. Rewriting them by hand means keeping a second copy of the
+palette, the spacing and the typography; it will part company with
+`tokens.json` at the very first change, and in silence at that: a divergence
+of two pixels is not visible, and a divergence in colour is not visible at
+once and not to everyone.
 
-Поэтому XAML порождается. Ровно так же, как `Contract.g.cs` порождается из
-снимка протокола: один источник, две стороны.
+So the XAML is generated. In exactly the same way as `Contract.g.cs` is
+generated from the protocol's snapshot: one source, two sides.
 
-Порождаются **значения**, а не стили. Стиль — это решение о том, как
-выглядит кнопка; его пишет человек и читает человек. Здесь только числа и
-цвета, которым место в одном файле.
+What is generated is **values**, not styles. A style is a decision about how
+a button looks; a person writes it and a person reads it. Here there are
+only numbers and colours, which belong in one file.
 
-Три файла: общий с размерами и типографикой и по одному на отделку. Отделки
-равноправны (`4.0-R08`), и делить их на «основную» и «инверсию» значило бы
-соврать в устройстве кода о том, что записано в дизайн-системе.
+Three files: a common one with the sizes and the typography, and one per
+finish. The finishes are equal (`4.0-R08`), and dividing them into "the main
+one" and "the inversion" would mean lying in the code's structure about what
+is written in the design system.
 
-Запуск:
-    python tools/gen_xaml_tokens.py            записать
-    python tools/gen_xaml_tokens.py --check    сверить, не переписывая
+To run:
+    python tools/gen_xaml_tokens.py            write
+    python tools/gen_xaml_tokens.py --check    compare without rewriting
 """
 
 import json
@@ -88,8 +91,9 @@ def common_xaml(tokens: dict) -> str:
     lines.append("  <!-- Размеры -->")
     for name, value in size.items():
         lines.append(f'  <sys:Double x:Key="Size.{key(name)}">{value}</sys:Double>')
-        # GridLength отдельно: в Width колонки Double не приводится, а
-        # писать число в разметке значило бы завести вторую копию значения.
+        # GridLength separately: a Double is not coerced in a column's
+        # Width, and writing the number in the markup would mean keeping a
+        # second copy of the value.
         lines.append(f'  <GridLength x:Key="Col.{key(name)}">{value}</GridLength>')
 
     lines.append("")
@@ -112,8 +116,8 @@ def common_xaml(tokens: dict) -> str:
         lines.append(f'  <sys:Double x:Key="Type.{r}.Size">{spec["size"]}</sys:Double>')
         lines.append(f'  <FontWeight x:Key="Type.{r}.Weight">{spec["weight"]}</FontWeight>')
         tracking = spec.get("tracking", 0)
-        # В WPF трекинг задаётся в единицах em через Typography/RenderOptions
-        # не напрямую; здесь отдаём долю, а применяет её стиль.
+        # In WPF, tracking is set in em units through Typography/RenderOptions
+        # rather than directly; here we give out the fraction, and a style applies it.
         lines.append(f'  <sys:Double x:Key="Type.{r}.Tracking">{tracking}</sys:Double>')
         if "leading" in spec:
             lines.append(f'  <sys:Double x:Key="Type.{r}.Leading">'
@@ -129,11 +133,11 @@ def common_xaml(tokens: dict) -> str:
         lines.append(f'  <Duration x:Key="Motion.{key(name)}">'
                      f'0:0:{value / 1000:.3f}</Duration>')
 
-    # Смягчения — тоже токен, а не число, набранное в каждом стиле. WPF
-    # не умеет cubic-bezier, поэтому кривые из токенов выражаются
-    # ближайшими штатными: «появление» — замедление к концу, «затухание» —
-    # ускорение. Замена честная по смыслу: у первой кривой ускорение в
-    # начале, у второй — в конце.
+    # The easings are a token too, not a number typed into every style. WPF
+    # cannot do cubic-bezier, so the curves from the tokens are expressed by
+    # the nearest standard ones: "appearance" is a deceleration towards the
+    # end, "fade" an acceleration. The substitution is honest in meaning: the
+    # first curve accelerates at the start, the second at the end.
     easing = motion.get("easing", {})
     if easing:
         lines.append("")
@@ -156,11 +160,12 @@ def common_xaml(tokens: dict) -> str:
 
 def accents_xaml(tokens) -> str:
     """
-    Наборы акцентов — словарём ресурсов на каждую отделку.
+    The accent sets — as a resource dictionary per finish.
 
-    Кисти, а не строки: оболочка подменяет `C.Signal` и `C.SignalSunk`
-    целиком, и хранить рядом два представления одного цвета значило бы
-    однажды подменить одно, забыв другое.
+    Brushes rather than strings: the shell replaces `C.Signal` and
+    `C.SignalSunk` whole, and keeping two representations of one colour
+    beside each other would mean one day replacing one and forgetting the
+    other.
     """
     lines = [HEADER, "<ResourceDictionary "
              'xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"',

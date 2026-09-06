@@ -1,38 +1,41 @@
 # -*- coding: utf-8 -*-
 """
-Сверка контракта протокола со снимком: что изменилось и можно ли так.
+Comparing the protocol's contract with a snapshot: what changed and whether
+that is allowed.
 
-Задача плана 4.0-D17. Правила совместимости записаны в §4 спецификации
-словами, и словами они и остались бы: человек, добавляющий поле, читает не
-спецификацию, а соседнюю строчку кода. Здесь они становятся проверкой.
+Plan item 4.0-D17. The compatibility rules are written down in §4 of the
+specification in words, and in words they would have stayed: a person adding
+a field reads not the specification but the neighbouring line of code. Here
+they become a check.
 
-Снимок — `docs/protocol/contract-v1.json`: методы, события с полями, коды
-ошибок, возможности, виды потоков. Он не документация, а точка отсчёта:
-сверка отвечает не «правильно ли устроен протокол», а «что изменилось с
-прошлого раза и требует ли это новой версии».
+The snapshot is `docs/protocol/contract-v1.json`: the methods, the events
+with their fields, the error codes, the capabilities, the kinds of stream.
+It is not documentation but a point of reference: the comparison answers not
+"is the protocol built rightly" but "what has changed since last time and
+does it require a new version".
 
-Разрешено без смены версии протокола:
+Allowed without changing the protocol's version:
 
-    добавить метод, событие, код ошибки, возможность, вид потока
-    добавить **необязательное** поле события
-    добавить значение в перечисление
+    adding a method, an event, an error code, a capability, a kind of stream
+    adding an **optional** field to an event
+    adding a value to an enumeration
 
-Требует новой версии:
+Requires a new version:
 
-    удалить или переименовать что угодно из перечисленного
-    удалить поле, изменить его тип, сделать необязательное обязательным
-    убрать значение из перечисления
-    изменить категорию или повторяемость кода ошибки
-    перенести метод в другую возможность
+    deleting or renaming any of the above
+    deleting a field, changing its type, making an optional one required
+    removing a value from an enumeration
+    changing an error code's category or retryability
+    moving a method into another capability
 
-Про категорию и повторяемость стоит пояснить: по ним ветвится оболочка.
-Код, вчера бывший `user` и неповторяемым, а сегодня `system` и повторяемым,
-меняет поведение чужой программы, ничего не сломав синтаксически, — то есть
-худшим из возможных способов.
+The category and retryability are worth explaining: the shell branches on
+them. A code that was `user` and non-retryable yesterday and is `system` and
+retryable today changes another program's behaviour without breaking
+anything syntactically — that is, in the worst possible way.
 
-Запуск:
-    python tools/check_contract.py            сверить
-    python tools/check_contract.py --update   переписать снимок
+To run:
+    python tools/check_contract.py            compare
+    python tools/check_contract.py --update   rewrite the snapshot
 """
 
 import json
@@ -50,7 +53,7 @@ SNAPSHOT = os.path.join(ROOT, "docs", "protocol", "contract-v1.json")
 
 
 def current() -> dict:
-    """Контракт, каким его описывает код прямо сейчас."""
+    """The contract as the code describes it right now."""
     from core.confirmations import SCOPES
     from core.wire.data import KINDS
     from core.wire.errors import CATALOGUE
@@ -89,7 +92,7 @@ def current() -> dict:
 
 
 def diff(old: dict, new: dict) -> tuple[list[str], list[str]]:
-    """Вернуть (разрешённые изменения, ломающие)."""
+    """Return (the permitted changes, the breaking ones)."""
     added, broken = [], []
 
     def compare_set(kind, old_names, new_names):
@@ -105,14 +108,14 @@ def diff(old: dict, new: dict) -> tuple[list[str], list[str]]:
     compare_set("вид потока", old["stream_kinds"], new["stream_kinds"])
     compare_set("область разрешения", old["scopes"], new["scopes"])
 
-    # метод переехал в другую возможность — меняется, когда его можно звать
+    # a method moved into another capability — this changes when it may be called
     for name in sorted(set(old["methods"]) & set(new["methods"])):
         if old["methods"][name] != new["methods"][name]:
             broken.append(
                 f"метод {name} сменил возможность: "
                 f"{old['methods'][name]} -> {new['methods'][name]}")
 
-    # ошибка сменила смысл: по категории и повторяемости ветвится оболочка
+    # an error changed its meaning: the shell branches on the category and retryability
     for code in sorted(set(old["errors"]) & set(new["errors"])):
         was, now = old["errors"][code], new["errors"][code]
         for field in ("category", "retryable"):
@@ -120,7 +123,7 @@ def diff(old: dict, new: dict) -> tuple[list[str], list[str]]:
                 broken.append(f"ошибка {code}: {field} "
                               f"{was[field]!r} -> {now[field]!r}")
 
-    # поля событий
+    # the events' fields
     for name in sorted(set(old["events"]) & set(new["events"])):
         was, now = old["events"][name], new["events"][name]
         for field in sorted(set(now) - set(was)):

@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-Проверка контраста токенов (задача плана 4.0-R03).
+Checking the tokens' contrast (plan item 4.0-R03).
 
-Палитру нельзя утверждать на веру: «выглядит читаемо» на мониторе автора и
-«читаемо» — разные утверждения. Здесь считается контраст по WCAG 2.1 для
-каждой пары «текст на поверхности», которая встречается в системе.
+A palette must not be approved on trust: "looks readable" on the author's
+monitor and "readable" are different statements. Here the WCAG 2.1 contrast
+is computed for every "text on a surface" pair that occurs in the system.
 
-Пороги:
-    4.5   обычный текст
-    3.0   крупный текст (от 18 px, либо от 14 px полужирный) и границы
-          управляющих элементов
+The thresholds:
+    4.5   ordinary text
+    3.0   large text (from 18 px, or from 14 px bold) and the borders of
+          controls
 
-Отключённое состояние по стандарту от требований освобождено, но и оно
-проверяется на 3.0: «выключено» должно читаться как выключенное, а не как
-отсутствующее.
+A disabled state is exempt from the requirements by the standard, but it is
+checked against 3.0 all the same: "off" must read as switched off rather
+than as missing.
 
-Запуск:
+To run:
     python tools/check_contrast.py
 """
 
@@ -49,7 +49,7 @@ def contrast(a, b):
     return (lighter + 0.05) / (darker + 0.05)
 
 
-#: (текст, поверхность, порог, за что отвечает)
+#: (text, surface, threshold, what it is responsible for)
 PAIRS = (
     ("INK",        "FACE",       4.5, "основной текст на панели"),
     ("INK",        "FACE_HIGH",  4.5, "текст на приподнятой секции"),
@@ -57,11 +57,11 @@ PAIRS = (
     ("INK_SOFT",   "FACE",       4.5, "легенды органов управления"),
     ("INK_SOFT",   "FACE_HIGH",  4.5, "легенды на приподнятом"),
     ("INK_FAINT",  "FACE",       3.0, "выключенное состояние"),
-    # Недоступный вариант в раскрытом списке. Он показан нарочно — человек
-    # должен видеть, что такой движок бывает, — и потому обязан читаться,
-    # а не сливаться с подложкой. На утопленной подложке в «серебре» выходило
-    # 2.90, поэтому список лежит на приподнятой: это и семантически верно —
-    # всплывающее окно поверх панели, а не углубление в ней.
+    # An unavailable option in an opened list. It is shown deliberately — a
+    # person must see that such an engine exists — and so is obliged to read
+    # rather than merge with the ground. On the sunk ground in "silver" it
+    # came out at 2.90, so the list lies on the raised one: that is
+    # semantically right too — a popup above the panel, not a hollow in it.
     ("INK_FAINT",  "FACE_HIGH",  3.0, "недоступный вариант в списке"),
     ("GLASS_TEXT", "GLASS",      4.5, "реплики на стекле"),
     ("GLASS_DIM",  "GLASS",      4.5, "время и служебное на стекле"),
@@ -74,12 +74,13 @@ PAIRS = (
 
 def check_accents(tokens, report):
     """
-    Каждый акцент проверяется там же, где проверялся исходный.
+    Every accent is checked in the same place the original was.
 
-    Выбор цвета не должен быть способом сделать признак ошибки нечитаемым.
-    Поэтому непроверенный акцент в набор не попадает: у акцента ровно две
-    обязанности — читаться на панели и читаться на приподнятом, — и обе
-    проверяются для **каждого** варианта, а не для того, что стоит сейчас.
+    Choosing a colour must not be a way of making a sign of error
+    unreadable. So an unchecked accent does not get into the set: an accent
+    has exactly two duties — to read on the panel and to read on the raised
+    surface — and both are checked for **every** variant, not for whichever
+    is set right now.
     """
     failures = 0
     for key, finish in tokens["finishes"].items():

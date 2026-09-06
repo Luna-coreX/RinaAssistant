@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-Сборка макетов экранов (задача плана 4.0-R05).
+Building the screens' mockups (plan item 4.0-R05).
 
-Оболочки на WPF ещё нет, а экраны нужно увидеть и проверить до того, как
-XAML написан. Макет собирается **из tokens.json**, а не рисуется отдельно:
-иначе макет и система разойдутся, и спорить будет не с чем.
+There is no WPF shell yet, and the screens have to be seen and checked
+before the XAML is written. A mockup is assembled **from tokens.json**
+rather than drawn separately: otherwise the mockup and the system part
+company, and there will be nothing to argue with.
 
-Это макет для рассмотрения, а не реализация. HTML взят потому, что его видно
-без сборки; ни одна строка отсюда в оболочку не переедет.
+This is a mockup for consideration, not an implementation. HTML was taken
+because it is visible without a build; not one line from here will move into
+the shell.
 
-Запуск:
+To run:
     python tools/build_mockups.py
     -> docs/design/mockups.html
 """

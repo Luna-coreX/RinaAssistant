@@ -1,24 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-Сверка нарисованного окна с токенами — по пикселям.
+Comparing the drawn window with the tokens — by pixels.
 
-Задача плана 4.0-F03.
+Plan item 4.0-F03.
 
-«Похоже на макет» — не проверка. Окно рисует WPF, стили пишет человек,
-значения приходят из `tokens.json`, и разойтись они могут в любом из трёх
-мест: опечатка в ключе ресурса, забытый `DynamicResource`, стиль, который
-не применился. Ни одно из этих расхождений не заметно на глаз — цвет
-«примерно тот» выглядит как цвет тот.
+"Looks like the mockup" is not a check. The window is drawn by WPF, the
+styles are written by a person, the values come from `tokens.json`, and they
+can part company in any of the three places: a typo in a resource key, a
+forgotten `DynamicResource`, a style that did not apply. Not one of those
+divergences is noticeable by eye — a colour that is "about right" looks like
+the right colour.
 
-Поэтому оболочка умеет нарисовать себя в PNG (`--shot`), а здесь снимок
-разбирается по точкам: колонка разделов, панель, отметка активного раздела,
-полоса уровня, полоса заголовка. Ровно те места, где значение обязано
-совпасть с токеном.
+So the shell can draw itself into a PNG (`--shot`), and here the screenshot
+is taken apart point by point: the column of sections, the panel, the mark
+of the active section, the level strip, the title bar. Exactly those places
+where a value is obliged to match a token.
 
-Проверяется **нарисованное**, а не разметка: разметку можно прочесть глазами,
-и она всё равно ничего не говорит о том, что получилось на экране.
+What is checked is **what was drawn**, not the markup: the markup can be
+read with one's eyes, and it says nothing about what came out on the screen
+anyway.
 
-Запуск (снимки делает сама оболочка):
+To run (the shell takes the screenshots itself):
     dotnet run --project shell/Rina.Shell -- --shot silver.png --finish silver
     python tools/check_shell_render.py silver.png silver
 """
@@ -52,18 +54,19 @@ def rgb(value: str) -> tuple[int, int, int]:
 
 
 def near(a, b, tolerance=2) -> bool:
-    """Совпадение с допуском: сглаживание краёв меняет точку на единицу."""
+    """A match with a tolerance: edge antialiasing changes a point by one."""
     return all(abs(x - y) <= tolerance for x, y in zip(a[:3], b))
 
 
 def check_confirm(image, colors, tokens) -> int:
     """
-    Окно подтверждения (4.0-F11): опасность штриховкой, а не цветом.
+    The confirmation window (4.0-F11): danger by hatching, not by colour.
 
-    Штриховка ищется по разбросу яркости в полосе кнопки: узор — это
-    чередование, и на ровной заливке разброса не будет. Искать конкретную
-    точку узора значило бы проверять, где именно легла линия, а не то, что
-    узор есть.
+    The hatching is found by the spread of brightness in the button's band:
+    a pattern is an alternation, and on an even fill there will be no
+    spread. Looking for a particular point of the pattern would mean
+    checking where exactly a line fell rather than that the pattern is
+    there.
     """
     width, height = image.size
     print(f"=== F11: окно подтверждения, {width}x{height} ===")
@@ -72,7 +75,7 @@ def check_confirm(image, colors, tokens) -> int:
           near(image.getpixel((width // 2, 8)), colors["FACE"]),
           f"| {image.getpixel((width // 2, 8))}")
 
-    # Полоса, где стоит кнопка необратимого.
+    # The band where the button of the irreversible stands.
     row = int(height * 0.66)
     strip = [image.getpixel((x, row)) for x in range(24, 170)]
     greys = sorted({p[0] for p in strip})
@@ -80,9 +83,10 @@ def check_confirm(image, colors, tokens) -> int:
           len(greys) >= 3 and max(greys) - min(greys) > 20,
           f"| оттенков {len(greys)}, размах {max(greys) - min(greys)}")
 
-    # `getdata` объявлен к удалению в Pillow 14. Тот же случай, что и
-    # `audioop` в ядре: узнать об этом при обновлении библиотеки — худший
-    # момент, а `getcolors` делает ровно нужное и заодно считает точки.
+    # `getdata` is declared for removal in Pillow 14. The same case as
+    # `audioop` in the core: learning of it while upgrading the library is
+    # the worst moment, and `getcolors` does exactly what is needed and
+    # counts the points into the bargain.
     everything = {colour for _, colour in image.getcolors(1 << 24)}
     reds = [p for p in everything if p[0] > 150 and p[1] < 60 and p[2] < 60]
     check("красного нет нигде", not reds, f"| {reds[:3]}")
@@ -90,13 +94,13 @@ def check_confirm(image, colors, tokens) -> int:
     check("акцент есть — это рамка фокуса на отказе",
           any(near(p, colors["SIGNAL"], 24) for p in everything))
 
-    # Просвет вокруг необратимого — вдвое больше обычного (§4).
+    # The gap around the irreversible is twice the usual (§4).
     gap = tokens["space"]["danger"]
     check("просвет вокруг необратимого объявлен вдвое большим",
           gap >= tokens["space"]["between"] * 2, f"| {gap}")
 
-    # Верхняя граница выборки не должна задевать саму кнопку: она высотой в
-    # орган управления, и половина её лежит выше середины строки.
+    # The sample's upper bound must not touch the button itself: it is a
+    # control's height, and half of it lies above the middle of the row.
     control = int(tokens["size"]["control"])
     above = [image.getpixel((60, y))
              for y in range(row - gap + 8, row - control // 2 - 4)]
@@ -132,20 +136,23 @@ def main(argv) -> int:
     def at(x, y):
         return image.getpixel((int(x), int(y)))
 
-    # Колонка разделов утоплена относительно панели: это ступень значения,
-    # единственное средство возвышения в системе (теней нет).
+    # The column of sections is sunk relative to the panel: that is a step of
+    # value, the system's only means of raising something (there are no
+    # shadows).
     column = size["legend_column"]
-    # Фон колонки меряется у правого края, а не посередине: посередине лежат
-    # названия разделов, и точка попадает в букву. Сглаженная буква — это
-    # ни фон, ни чернила, а что-то между, и проверка ловила бы её.
+    # The column's background is measured at its right edge rather than in
+    # the middle: in the middle lie the sections' names, and a point lands in
+    # a letter. An antialiased letter is neither background nor ink but
+    # something between, and the check would catch it.
     inside = column - 8
     check("колонка разделов — FACE_LOW",
           near(at(inside, height * 0.55), colors["FACE_LOW"]),
           f"| {at(inside, height * 0.55)} против {colors['FACE_LOW']}")
-    # Панель меряется в поле между колонкой и содержимым раздела, а не
-    # посреди него: раньше там было пусто, а с появлением страниц посреди
-    # раздела лежит стеклянное поле — и проверка ловила бы содержимое,
-    # выдавая это за поломку каркаса.
+    # The panel is measured in the field between the column and the
+    # section's contents rather than in the middle of it: it used to be empty
+    # there, and with the pages appearing, a glass field lies in the middle
+    # of a section — and the check would catch the contents, passing that off
+    # as a broken frame.
     pane_margin = column + tokens["space"]["between"] / 2
     check("панель раздела — FACE",
           near(at(pane_margin, height * 0.5), colors["FACE"]),
@@ -154,10 +161,10 @@ def main(argv) -> int:
           near(at(width * 0.5, size["row"] / 2), colors["FACE_LOW"]),
           f"| {at(width * 0.5, size['row'] / 2)}")
 
-    # Отметка активного раздела — единственный акцент в системе. Какой
-    # раздел открыт, проверка не знает и знать не должна: она ищет отметку
-    # сама. Привязка к первому разделу делала бы её проверкой снимка, а не
-    # проверкой правила.
+    # The mark of the active section is the system's only accent. Which
+    # section is open the check does not know and must not know: it finds the
+    # mark itself. Tying it to the first section would make it a check of a
+    # screenshot rather than a check of a rule.
     row = size["row"]
     marked = [y for y in range(size["row"], height - size["level_strip"])
               if near(at(1, y), colors["SIGNAL"], 6)]
@@ -191,8 +198,9 @@ def main(argv) -> int:
               near(at(inside, other), colors["FACE_LOW"]),
               f"| {at(inside, other)}")
 
-    # Полоса уровня вдоль нижней кромки всего окна: микрофон принадлежит
-    # прибору целиком, а не текущему разделу.
+    # The level strip along the bottom edge of the whole window: the
+    # microphone belongs to the instrument as a whole, not to the current
+    # section.
     strip = size["level_strip"]
     bottom = at(width * 0.5, height - 2)
     check("полоса уровня по нижней кромке — FACE_SUNK",
@@ -206,14 +214,15 @@ def main(argv) -> int:
           not near(at(width * 0.5, height - strip - 4), colors["FACE_SUNK"]),
           f"| над полосой: {at(width * 0.5, height - strip - 4)}")
 
-    # Теней нет: над колонкой не должно быть градиента к тёмному.
+    # There are no shadows: above the column there must be no gradient to dark.
     edge = [at(column + d, height * 0.4) for d in (1, 3, 6, 10)]
     check("между колонкой и панелью нет тени",
           all(near(p, colors["FACE"], 3) for p in edge), f"| {edge}")
 
-    # --- F12: состояние связи видно и окрашено правильно -------------------
-    # Проверяется по области подвала целиком, а не по отдельной точке: текст
-    # сглажен, и попасть точкой в штрих буквы — это проверять удачу, а не цвет.
+    # --- F12: the link's state is visible and coloured correctly ----------
+    # It is checked over the whole footer area rather than by a single point:
+    # the text is antialiased, and hitting a letter's stroke with a point is
+    # checking luck rather than colour.
     if len(argv) > 2:
         wanted_state = argv[2]
         footer = image.crop((0, int(height * 0.86), int(size["legend_column"]),
@@ -231,8 +240,8 @@ def main(argv) -> int:
                   not has(colors["SIGNAL"], 12),
                   "| акцент в подвале быть не должен")
 
-        # Красного в палитре нет вовсе: цвет опасности размывается от
-        # повторения, и неполадка — не опасность.
+        # There is no red in the palette at all: the colour of danger wears
+        # out through repetition, and a fault is not a danger.
         reds = [p for p in painted if p[0] > 150 and p[1] < 60 and p[2] < 60]
         check("красного в подвале нет", not reds, f"| {reds[:3]}")
 

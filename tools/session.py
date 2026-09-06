@@ -1,21 +1,22 @@
 """
-Запись и воспроизведение сессий (задача плана 4.0-A05).
+Recording and replaying sessions (plan item 4.0-A05).
 
-Golden-набор проверяет фразы. Есть вещи, которых он не ловит по устройству:
+The golden suite checks phrases. There are things it does not catch by
+construction:
 
-    * незакрытый вопрос, протухший по времени;
-    * подтверждение, снятое посторонней репликой;
-    * цепочку, где состояние копится через несколько шагов.
+    * an unclosed question that went stale by time;
+    * a confirmation withdrawn by an unrelated line;
+    * a chain where state accumulates over several steps.
 
-Здесь записывается **последовательность** — ввод, решение, ответ и побочные
-эффекты вместе с промежутками между шагами, — и воспроизводится с тем же
-временем. Промежуток записан явно, поэтому воспроизведение не ждёт минуту
-по-настоящему: часы подменяются.
+Here a **sequence** is recorded — the input, the decision, the answer and
+the side effects, along with the intervals between the steps — and replayed
+with the same timing. The interval is recorded explicitly, so replaying does
+not really wait a minute: the clock is substituted.
 
-Записанная сессия — это данные. После переноса ядра на C# тот же файл будет
-воспроизводиться против ядра-сервиса, как и golden-набор.
+A recorded session is data. After the core is ported to C#, the same file
+will be replayed against the core-as-a-service, just like the golden suite.
 
-Запуск:
+To run:
     python tools/session.py --list
     python tools/session.py --replay docs/golden/sessions/confirm-expired.json
     python tools/session.py --replay-all
@@ -37,13 +38,13 @@ SESSIONS_DIR = os.path.join(ROOT, "docs", "golden", "sessions")
 
 
 # ---------------------------------------------------------------------------
-# Приведение к сравнимому виду
+# Bringing things to a comparable form
 # ---------------------------------------------------------------------------
-#: Что в ответе зависит от момента запуска, а не от поведения.
+#: What in an answer depends on the moment of the run rather than on behaviour.
 _VOLATILE = (
-    # Время по часам: «02:15».
+    # The time by the clock: "02:15".
     (re.compile(r"\b\d{1,2}:\d{2}\b"), "ЧЧ:ММ"),
-    # Обратный отсчёт: «9 мин 59 с» — зависит от доли секунды.
+    # A countdown: "9 мин 59 с" — it depends on a fraction of a second.
     (re.compile(r"\b\d+ мин \d+ с\b"), "N мин N с"),
     (re.compile(r"\b\d+ с\b"), "N с"),
 )
@@ -51,11 +52,11 @@ _VOLATILE = (
 
 def normalise(text):
     """
-    Убирает из ответа то, что меняется от прогона к прогону.
+    Removes from an answer what changes from run to run.
 
-    Сессия проверяет поведение: что Рина сказала и сделала. Показания часов
-    и остаток до срабатывания при воспроизведении будут другими всегда, и
-    сравнивать их — значит получить вечно красный тест.
+    A session checks behaviour: what Rina said and did. The clock's reading
+    and the time left until firing will always be different on a replay, and
+    comparing them means getting an eternally red test.
     """
     if not text:
         return text
@@ -65,7 +66,7 @@ def normalise(text):
 
 
 def normalise_effects(effects):
-    """Отметки времени в побочных эффектах — тоже не поведение."""
+    """Timestamps in the side effects are not behaviour either."""
     clean = {}
     for name, items in (effects or {}).items():
         if name == "reminders":
@@ -77,15 +78,15 @@ def normalise_effects(effects):
 
 
 # ---------------------------------------------------------------------------
-# Подменные часы
+# The substitute clock
 # ---------------------------------------------------------------------------
 class FakeClock:
     """
-    Управляемое время для проверки сроков.
+    Controllable time for checking deadlines.
 
-    Подменяет часы там, где ядро смотрит на срок вопроса. Без этого проверка
-    протухания стоила бы минуты ожидания на каждый прогон — то есть её бы
-    просто не было.
+    Substitutes the clock where the core looks at a question's deadline.
+    Without this, a staleness check would cost a minute of waiting on every
+    run — that is, it simply would not exist.
     """
 
     def __init__(self, start=None):
@@ -111,7 +112,7 @@ class FakeClock:
 
 
 class _ClockModule:
-    """Заменитель модуля time с управляемым time()."""
+    """A stand-in for the time module with a controllable time()."""
 
     def __init__(self, clock):
         self._clock = clock
@@ -126,14 +127,14 @@ class _ClockModule:
 
 
 # ---------------------------------------------------------------------------
-# Запись
+# Recording
 # ---------------------------------------------------------------------------
 class SessionRecorder:
     """
-    Пишет всё, что проходит через ядро.
+    Writes down everything that passes through the core.
 
-    Прикрепляется к живому ядру, поэтому годится и для сценария в тесте, и
-    для записи настоящей сессии из приложения.
+    It attaches to a live core, so it suits both a scenario in a test and
+    recording a real session from the application.
     """
 
     def __init__(self, engine, box=None, title=""):
@@ -213,10 +214,10 @@ class SessionRecorder:
 
 
 # ---------------------------------------------------------------------------
-# Воспроизведение
+# Replaying
 # ---------------------------------------------------------------------------
 def build_engine():
-    """Свежее ядро в песочнице, с настройками в памяти."""
+    """A fresh core in the sandbox, with settings in memory."""
     from core import logging_setup
     logging_setup.setup()
 
@@ -228,7 +229,7 @@ def build_engine():
     from core.settings_api import MemorySettings
     from voice import app_index
 
-    # Индекс фиксированный: сессия обязана воспроизводиться на любой машине.
+    # The index is fixed: a session must replay on any machine.
     from golden_runner import FAKE_APPS
     app_index._INDEX = [app_index.AppEntry(*a) for a in FAKE_APPS]
     app_index.cached_index = lambda: app_index._INDEX
@@ -244,7 +245,7 @@ def build_engine():
 
 
 def replay(path, verbose=False):
-    """Воспроизводит сессию и печатает расхождения."""
+    """Replays a session and prints the divergences."""
     data = json.load(open(path, encoding="utf-8"))
     engine, box = build_engine()
 

@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Ядро под песочницей — только для проверок.
+The core under a sandbox — for the checks only.
 
-Отдельный запускатель, а не флаг внутри `rina_core.py`: выключатель побочных
-эффектов, живущий в рабочем коде, однажды окажется включённым у пользователя,
-и Рина перестанет что-либо делать, не сказав почему.
+A separate launcher rather than a flag inside `rina_core.py`: a switch for
+side effects living in working code will one day turn out to be on at a
+user's, and Rina will stop doing anything without saying why.
 """
 import os
 import sys

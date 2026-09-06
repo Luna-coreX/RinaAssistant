@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""B02: роутер — чистая функция. Проверяется без приложения."""
+"""B02: the router is a pure function. Checked without the application."""
 import sys
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
@@ -99,8 +99,8 @@ check("«нет, давай» — отказ (поведение 3.1.0)",
 check("невнятный ответ — не ответ",
       route("какая погода", confirm).name != "system.action")
 
-# Вопрос всегда приходит сериализованным: роутер работает с состоянием,
-# которое можно записать в файл и отправить по протоколу (4.0-B03).
+# The question always arrives serialised: the router works with state that
+# can be written to a file and sent over the protocol (4.0-B03).
 choose = RouterContext(apps=APPS, pending=Question.choose_app(
     APPS[2:4], query="visual studio").to_dict())
 picked = route("второй", choose)

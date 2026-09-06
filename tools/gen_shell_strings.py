@@ -1,14 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Порождает `Strings.g.cs` из `interface.json` (`4.0-F08`).
+Generates `Strings.g.cs` from `interface.json` (`4.0-F08`).
 
-Тот же приём, что у токенов дизайна и снимка контракта: один источник и
-порождённый файл рядом с кодом, который его читает. Руками таблицу в C# не
-пишут — разошлась бы с источником на первой же правке.
+The same device as with the design tokens and the contract's snapshot: one
+source and a generated file next to the code that reads it. The table is not
+written by hand in C# — it would part company with the source at the very
+first change.
 
-Запуск:
-    python tools/gen_shell_strings.py           переписать Strings.g.cs
-    python tools/gen_shell_strings.py --check   сверить, не трогая
+To run:
+    python tools/gen_shell_strings.py           rewrite Strings.g.cs
+    python tools/gen_shell_strings.py --check   compare without touching
 """
 import io
 import json
@@ -55,7 +56,7 @@ def render(table: dict) -> str:
     for key in sorted(table, key=lambda k: (k.lower(), k)):
         row = table[key]
         if not row:
-            continue                # без переводов строка живёт как есть
+            continue                # with no translations the string lives as it is
         lines.append(f'            ["{escape(key)}"] =\n')
         lines.append("                new Dictionary<string, string>\n")
         lines.append("                {\n")

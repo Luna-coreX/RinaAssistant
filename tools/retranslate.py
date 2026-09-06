@@ -1,47 +1,48 @@
 # -*- coding: utf-8 -*-
 """
-Замена блоков комментариев по номерам строк.
+Replacing blocks of comments by line numbers.
 
-Комментарии переводятся человеком (или моделью), а подставляются машиной:
-ручная правка тысячи блоков в сотне файлов — это способ однажды съесть
-строку кода вместе с комментарием.
+The comments are translated by a human (or a model) and put in place by a
+machine: editing a thousand blocks in a hundred files by hand is a way of
+one day eating a line of code along with a comment.
 
-Инструмент **отказывается** трогать блок, в котором есть хоть одна строка,
-не похожая на комментарий. Это и есть его смысл: не «заменить текст», а
-«заменить текст, убедившись, что это комментарий».
+The tool **refuses** to touch a block containing even one line that does not
+look like a comment. That is its whole point: not "replace the text" but
+"replace the text, having made sure it is a comment".
 
-Формат задания — JSON:
+The task format is JSON:
 
-    {"путь/к/файлу.cs": [[12, 18, "new text\\nsecond line", "якорь"], ...]}
+    {"path/to/file.cs": [[12, 18, "new text\nsecond line", "anchor"], ...]}
 
-Номера строк — от единицы, конец включительно, как их показывает `Read`.
-Четвёртый элемент — **якорь**: кусок текста, который обязан встретиться в
-заменяемом блоке. Без него сдвинувшийся на пару строк диапазон молча
-заменит соседний комментарий: проверка «это комментарий» такого не ловит,
-потому что соседний блок тоже комментарий. Так в `Updater.cs` описание
-схемы данных уехало внутрь чужого условия.
+Line numbers start at one, the end is inclusive, as `Read` shows them. The
+fourth element is the **anchor**: a piece of text that must occur in the
+block being replaced. Without it, a range that has shifted by a couple of
+lines will silently replace the neighbouring comment: the "this is a
+comment" check does not catch that, because the neighbouring block is a
+comment too. That is how the description of the data schema in `Updater.cs`
+moved inside somebody else's condition.
 
-Запуск:
-    python tools/retranslate.py задание.json
-    python tools/retranslate.py задание.json --dry   # только показать
+To run:
+    python tools/retranslate.py task.json
+    python tools/retranslate.py task.json --dry   # only show
 """
 
 import io
 import json
 import sys
 
-#: Чем начинается строка комментария в каждом языке. Строка внутри
-#: докстроки не начинается ничем — для неё есть отдельная проверка.
+#: What a comment line begins with in each language. A line inside a
+#: docstring begins with nothing — there is a separate check for that.
 STARTS = ("#", "//", "///", "<!--", "*", "-->", '"""', "'''")
 
 
 def looks_like_comment(line: str, inside_doc: bool) -> bool:
     """
-    Похожа ли строка на часть комментария.
+    Does the line look like part of a comment.
 
-    Внутри докстроки или блочного комментария годится любая строка, кроме
-    пустой: там текст и есть содержимое. Снаружи — только начинающаяся с
-    известного знака.
+    Inside a docstring or a block comment any line will do except an empty
+    one: there the text is the content. Outside — only one beginning with a
+    known mark.
     """
     stripped = line.strip()
     if not stripped:
@@ -52,26 +53,26 @@ def looks_like_comment(line: str, inside_doc: bool) -> bool:
 
 
 def block_is_comment(lines: list[str], start: int, end: int) -> tuple[bool, str]:
-    """Весь ли блок [start, end] — комментарий. Возвращает (да, причина)."""
+    """Is the whole block [start, end] a comment. Returns (yes, the reason)."""
     inside_doc = False
     for number in range(start, end + 1):
         line = lines[number - 1]
         stripped = line.strip()
 
-        # Тройная кавычка открывает и закрывает докстроку; в одной строке
-        # их может быть две — тогда докстрока началась и кончилась тут же.
+        # A triple quote both opens and closes a docstring; there may be
+        # two on one line — then the docstring began and ended right there.
         quotes = stripped.count('"""') + stripped.count("'''")
         if quotes % 2 == 1:
             inside_doc = not inside_doc
             continue
 
-        # Комментарий XML открывается и закрывается разными знаками, и
-        # внутри него строка не начинается ничем: `<!--` на своей строке,
-        # текст на следующих. Без этого многострочный комментарий в XAML
-        # получал отказ на второй же строке — а это ровно тот вид, в
-        # котором в разметке написано всё длинное.
-        # Именно `startswith`: строка вида `<Border/> <!-- пояснение` — это
-        # код с комментарием на хвосте, и пропускать её нельзя.
+        # An XML comment is opened and closed by different marks, and inside
+        # it a line begins with nothing: `<!--` on its own line, the text on
+        # the following ones. Without this a multi-line comment in XAML was
+        # refused on its very second line — and that is exactly the form
+        # everything long is written in inside markup.
+        # `startswith` precisely: a line like `<Border/> <!-- explanation` is
+        # code with a comment on its tail, and it must not be skipped.
         opens = stripped.startswith("<!--") and "-->" not in stripped[4:]
         closes = stripped.endswith("-->")
         if opens:
@@ -91,8 +92,8 @@ def apply(task: dict, dry: bool = False) -> int:
     for path, blocks in task.items():
         lines = io.open(path, encoding="utf-8").read().split("\n")
 
-        # Сзади наперёд: замена меняет нумерацию ниже себя, и правка
-        # сверху вниз сдвинула бы все последующие блоки.
+        # Back to front: a replacement changes the numbering below it, and
+        # editing from the top down would shift every following block.
         for block in sorted(blocks, key=lambda b: -b[0]):
             start, end, text = block[0], block[1], block[2]
             anchor = block[3] if len(block) > 3 else ""
@@ -103,11 +104,12 @@ def apply(task: dict, dry: bool = False) -> int:
                 failed += 1
                 continue
 
-            # Якорь отвечает на второй вопрос: не «комментарий ли это», а
-            # «тот ли». Первый вопрос сам по себе пропускает сдвиг на
-            # соседний блок — он ведь тоже комментарий, и подмена проходит
-            # молча. Так в `Updater.cs` описание схемы данных уехало внутрь
-            # чужого условия.
+            # The anchor answers the second question: not "is this a
+            # comment" but "is it the right one". The first question on its
+            # own lets a shift onto the neighbouring block through — that is
+            # a comment too, after all, and the substitution passes in
+            # silence. That is how the description of the data schema in
+            # `Updater.cs` moved inside somebody else's condition.
             if anchor and anchor not in "\n".join(lines[start - 1:end]):
                 print(f"ОТКАЗ {path}:{start}-{end} — не найден якорь "
                       f"{anchor!r}")

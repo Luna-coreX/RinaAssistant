@@ -1,31 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Прогонщик набора golden utterances (задача плана 4.0-A03).
+The runner for the golden utterances suite (plan item 4.0-A03).
 
-Гоняет набор фраз против ядра и печатает расхождения в виде
-«фраза / ожидалось / получено». Пригоден для запуска после каждого коммита:
-один вызов, понятный отчёт, код возврата 1 при любом расхождении.
+Drives a set of phrases against the core and prints the divergences as
+"phrase / expected / got". Fit for running after every commit: one call, an
+intelligible report, an exit code of 1 on any divergence.
 
-Почему намерение, а не текст ответа. Набор должен пережить перенос ядра на
-C#. Русский текст ответа для этого не годится: он переводится, переформулируется
-и вообще принадлежит представлению. Ожидание записано как namespace-имя
-намерения из `core/intent.py` с аргументами.
+Why the intent rather than the answer's text. The suite must survive the
+core being ported to C#. Russian answer text will not do for that: it is
+translated, reworded and belongs to the presentation anyway. The expectation
+is written down as the namespace name of an intent from `core/intent.py`,
+with arguments.
 
-Почему драйвер. Сегодня ядро в том же процессе, после 4.0-E02 оно будет
-отдельным процессом за протоколом. Набор и сравнение при этом не меняются —
-меняется только способ задать фразу и получить намерение. Это и есть драйвер.
+Why a driver. Today the core is in the same process; after 4.0-E02 it will
+be a separate process behind the protocol. The suite and the comparison do
+not change for that — only the way a phrase is given and an intent received.
+That is what the driver is.
 
-Почему индекс программ подменяется. Набор обязан давать один результат на
-любой машине. Настоящий индекс зависит от того, что установлено.
+Why the program index is substituted. The suite must give one result on any
+machine. A real index depends on what is installed.
 
-Всё, что имеет побочный эффект, подменено: ни одна программа не запускается,
-компьютер не выключается, браузер не открывается.
+Everything with a side effect is substituted: not one program is launched,
+the computer is not shut down, the browser is not opened.
 
-Запуск:
-    python tools/golden_runner.py                 # весь набор
-    python tools/golden_runner.py --verbose       # с прошедшими случаями
+To run:
+    python tools/golden_runner.py                 # the whole suite
+    python tools/golden_runner.py --verbose       # with the cases that passed
     python tools/golden_runner.py --groups app,reminder
-    python tools/golden_runner.py --json out.json # для сборочной линии
+    python tools/golden_runner.py --json out.json # for the build line
 """
 
 import argparse
@@ -38,10 +40,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-# Каталог данных — во временную папку, и это надо сделать до создания первого
-# хранилища. Подмены ниже закрывают то, что видно снаружи: звук, запуск
-# программ, браузер. Хранилище они не закрывали, и набор писал историю
-# разговоров и журнал вызовов в настоящие файлы пользователя.
+# The data directory goes into a temporary folder, and that has to be done
+# before the first store is created. The substitutions below cover what is
+# visible from outside: the sound, launching programs, the browser. They did
+# not cover the store, and the suite wrote the conversation history and the
+# call journal into the user's real files.
 from sandbox import isolate_storage
 isolate_storage()
 
@@ -53,7 +56,7 @@ DEFAULT_SET = os.path.join(ROOT, "docs", "golden", "utterances.json")
 
 
 # ---------------------------------------------------------------------------
-# Синтетический индекс программ
+# The synthetic program index
 # ---------------------------------------------------------------------------
 FAKE_APPS = [
     ("Telegram Desktop", r"C:\Apps\Telegram\Telegram.exe", "file", "start_menu"),
@@ -71,7 +74,7 @@ FAKE_APPS = [
 
 
 class Observed:
-    """Что случилось при обработке одной фразы."""
+    """What happened while one phrase was handled."""
 
     def __init__(self):
         self.said = []
@@ -91,10 +94,10 @@ class Observed:
 
 
 # ---------------------------------------------------------------------------
-# Драйверы
+# The drivers
 # ---------------------------------------------------------------------------
 class Driver:
-    """Способ задать ядру фразу и получить намерение."""
+    """A way of giving the core a phrase and getting an intent."""
 
     name = "?"
 
@@ -102,7 +105,7 @@ class Driver:
         pass
 
     def send(self, text, source="typed", require_wake=False, keep_state=False):
-        """Возвращает Intent."""
+        """Returns an Intent."""
         raise NotImplementedError
 
     def teardown(self):
@@ -111,12 +114,14 @@ class Driver:
 
 class InProcessDriver(Driver):
     """
-    Ядро в том же процессе. Намерение выводится из наблюдаемых последствий.
+    The core in the same process. The intent is derived from the observable
+    consequences.
 
-    Это временная мера, и она честно отмечена: пока конвейер сам не объявляет
-    намерение (4.0-B02 выделяет Router), прогонщик восстанавливает его по
-    тому, что ядро сделало. После B02 драйвер будет брать Intent напрямую,
-    а классификатор ниже исчезнет вместе с этим комментарием.
+    This is a temporary measure, and it is honestly marked as one: until the
+    pipeline declares the intent itself (4.0-B02 separates out the Router),
+    the runner reconstructs it from what the core did. After B02 the driver
+    will take the Intent directly, and the classifier below will disappear
+    along with this comment.
     """
 
     name = "in-process"
@@ -170,12 +175,12 @@ class InProcessDriver(Driver):
         engine = RinaEngine(event_bus=EventBus())
         engine._speak_blocking = lambda text: None
 
-        # Оболочка, которой здесь нет. Ядро с 4.0-G01 просит её сделать
-        # системное действие и запустить программу (ADR 0009), и подменять
-        # надо именно это — функции `system_control.RUNNERS` ядро больше не
-        # зовёт вовсе. Записываем просьбу и отвечаем «получилось»: набор
-        # проверяет, что ядро **решило** правильно, а не что Windows умеет
-        # прибавлять громкость.
+        # The shell, which is not here. Since 4.0-G01 the core asks it to
+        # perform a system action and to launch a program (ADR 0009), and it
+        # is precisely that which has to be substituted — the core no longer
+        # calls the `system_control.RUNNERS` functions at all. We record the
+        # request and answer "it worked": the suite checks that the core
+        # **decided** correctly, not that Windows can turn the volume up.
         def as_shell_do(action):
             obs.actions.append(action)
             return True, ""
@@ -193,9 +198,9 @@ class InProcessDriver(Driver):
             obs.said.append(text), real_say(text, sound=sound))[0]
         self.engine = engine
 
-        # Одна шина — своего ядра. До 4.0-B05 приходилось слушать ещё и
-        # модульный синглтон: system_control слал события мимо ядра.
-        # Подписчик принимает полезную нагрузку одним словарём — см. EventBus.
+        # One bus — our own core's. Before 4.0-B05 the module singleton had
+        # to be listened to as well: system_control sent events past the
+        # core. A subscriber takes the payload as one dict — see EventBus.
         for name in (Events.APP_NOT_FOUND, Events.WINDOW_ACTION):
             engine.bus.on(name, (lambda n: (lambda data: obs.events.append(
                 (n, data))))(name))
@@ -208,7 +213,7 @@ class InProcessDriver(Driver):
         self.obs.clear()
         self.engine.handle_command(text, require_wake=require_wake,
                                    source=source)
-        # Заданный вопрос теперь живёт в core/dialog.py и сериализуем.
+        # The question asked now lives in core/dialog.py and is serialisable.
         question = self.engine._dialog.current()
         self.obs.pending = question.to_dict() if question else None
         return classify(self.obs, text)
@@ -216,13 +221,14 @@ class InProcessDriver(Driver):
 
 class RouterDriver(Driver):
     """
-    Роутер напрямую. Ни ядра, ни настроек, ни Qt, ни единого хранилища.
+    The router directly. No core, no settings, no Qt, not a single store.
 
-    Это критерий приёмки 4.0-B02: набор проверяет разбор, а не последствия.
-    Всё, что роутер знает о мире, собрано здесь руками — поэтому результат
-    одинаков на любой машине и не зависит от установленного софта.
+    This is 4.0-B02's acceptance criterion: the suite checks the parse, not
+    the consequences. Everything the router knows about the world is
+    assembled here by hand — so the result is the same on any machine and
+    does not depend on the software installed.
 
-    Состояние между случаями драйвер ведёт сам: у роутера его нет.
+    The driver keeps the state between cases itself: the router has none.
     """
 
     name = "router"
@@ -251,9 +257,9 @@ class RouterDriver(Driver):
 
         intent = route(text, self.ctx)
 
-        # Последствия, которые меняют состояние следующего шага. Их
-        # применяет исполнитель; здесь воспроизводится ровно столько,
-        # сколько нужно многошаговым случаям набора.
+        # The consequences that change the next step's state. The executor
+        # applies them; reproduced here is exactly as much as the suite's
+        # multi-step cases need.
         if intent.name == "reminder.create":
             self.reminders_active += 1
         elif intent.name == "reminder.cancel":
@@ -273,11 +279,12 @@ class RouterDriver(Driver):
 
 class ProtocolDriver(Driver):
     """
-    Ядро отдельным процессом за именованным каналом.
+    The core as a separate process behind a named pipe.
 
-    Появится вместе с 4.0-E02. Тогда `send` отправит `command.handle` и
-    дождётся намерения ответом, а всё остальное в этом файле — набор,
-    сравнение и отчёт — останется как есть. Ради этого и введён драйвер.
+    It will appear along with 4.0-E02. Then `send` will send
+    `command.handle` and wait for the intent as the answer, and everything
+    else in this file — the suite, the comparison and the report — will stay
+    as it is. That is what the driver was introduced for.
     """
 
     name = "protocol"
@@ -292,10 +299,10 @@ DRIVERS = {d.name: d for d in (InProcessDriver, RouterDriver,
 
 
 # ---------------------------------------------------------------------------
-# Восстановление намерения по последствиям (до 4.0-B02)
+# Reconstructing the intent from the consequences (until 4.0-B02)
 # ---------------------------------------------------------------------------
 def classify(obs, text=""):
-    """Наблюдаемое поведение -> Intent."""
+    """Observable behaviour -> an Intent."""
 
     def intent(name, **args):
         return Intent(name=name, args=args, stage="observed", text=text)
@@ -336,8 +343,8 @@ def classify(obs, text=""):
     if response is None:
         return intent("silence")
 
-    # Опорные строки — это ключи словаря переводов, а не переведённый текст:
-    # они не меняются при смене языка интерфейса.
+    # The reference strings are keys of the translation dictionary rather
+    # than translated text: they do not change with the interface language.
     table = [
         ("Да? Слушаю.", lambda r: intent("ask.wake")),
         ("Хорошо, отменяю.", lambda r: intent("cancelled")),
@@ -377,7 +384,7 @@ def classify(obs, text=""):
 
 
 def matches(expected, got):
-    """Совпало ли ожидание. Проверяются только заявленные аргументы."""
+    """Did the expectation match. Only the arguments stated are checked."""
     if expected.get("intent") != got.name:
         return False
     for key, want in expected.items():
@@ -394,7 +401,7 @@ def matches(expected, got):
 
 # ---------------------------------------------------------------------------
 def load_set(path):
-    """Набор с проверкой имён намерений по каталогу ядра."""
+    """The suite, with the intents' names checked against the core's catalogue."""
     data = json.load(open(path, encoding="utf-8"))
     bad = []
     for case in data["cases"]:

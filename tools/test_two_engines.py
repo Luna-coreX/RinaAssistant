@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-B05: два ядра в одном процессе не мешают друг другу.
+B05: two cores in one process do not get in each other's way.
 
-Критерий приёмки задачи. Скрытое глобальное состояние проявляется именно
-здесь: если где-то остался модульный синглтон, второе ядро либо перехватит
-чужое событие, либо ответит на чужой вопрос, либо оба промолчат.
+The task's acceptance criterion. Hidden global state shows up precisely
+here: if a module singleton is left somewhere, the second core will either
+intercept the other's event, or answer the other's question, or both will
+stay silent.
 """
 import os
 import sys
@@ -20,10 +21,10 @@ settings.load()
 settings.update({"llm_enabled": False, "web_search_fallback": True,
                  "custom_commands": [], "reminders": [], "history": []})
 
-# Все побочные эффекты разом. Перечислять их в каждом тесте вручную —
-# как было в первой редакции — значит однажды забыть один: тогда забылся
-# браузер, и «да» без заданного вопроса ушло в веб-поиск настоящей
-# вкладкой на машине разработчика.
+# Every side effect at once. Listing them by hand in every test — as the
+# first edition did — means forgetting one some day: back then the browser
+# was forgotten, and a "yes" without a question asked went into a web search
+# as a real tab on the developer's machine.
 from tools.sandbox import neutralise
 
 box = neutralise()
@@ -49,9 +50,10 @@ def make():
     events = []
     engine.bus.on("window.action", lambda d: events.append(d.get("action")))
 
-    # Оболочка-заглушка: с 4.0-G01 ядро просит её сделать системное
-    # действие, а не делает само (ADR 0009). Своя у каждого ядра — в этом
-    # весь смысл проверки: просьба не должна уйти чужой.
+    # A stub shell: since 4.0-G01 the core asks it to perform a system
+    # action rather than performing it itself (ADR 0009). One per core — that
+    # is the whole point of the check: a request must not go to the wrong
+    # one.
     done = []
     engine.system_out = lambda action: (done.append(action), (True, ""))[1]
     engine.did = done
@@ -65,9 +67,10 @@ on_global = []
 global_bus.on("window.action", lambda d: on_global.append(d.get("action")))
 
 print("=== события не растекаются ===")
-# Действие окна приходит своей командой: «свернись» — это `window.action`,
-# и оно осталось событием. Снимок экрана для этого больше не годится — с
-# 4.0-G03 его делает оболочка системным вызовом, и события у него нет.
+# A window action comes as a command of its own: "свернись" is
+# `window.action`, and it stayed an event. A screenshot no longer suits that
+# — since 4.0-G03 the shell takes it with a system call, and it has no
+# event.
 settings.set("custom_commands", [{
     "id": "cmd_win", "enabled": True, "type": "system", "target": "minimize",
     "triggers": ["свернись"], "match": "contains", "response": "", "steps": [],

@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 """
-F08: ни одна строка интерфейса не осталась мимо перевода.
+F08: not one interface string was left out of translation.
 
-Правило с зубами. Решение «слова интерфейса живут в оболочке» держится
-ровно до первой строки, написанной литералом: она молча останется русской
-на любом языке, и заметит это только тот, кто переключил язык и посмотрел
-глазами на все пять разделов.
+A rule with teeth. The decision "the words of the interface live in the
+shell" holds exactly until the first string written as a literal: it will
+silently stay Russian in any language, and the only person to notice will be
+whoever switched the language and looked at all five sections with their own
+eyes.
 
-Проверяется три вещи:
+Three things are checked:
 
-* каждый показанный человеку литерал идёт через `S(...)` или `{loc:S ...}`;
-* каждый использованный ключ есть в `interface.json`;
-* в таблице нет ключей, которых нет в коде, — иначе переводчик тратит
-  время на строки, которые никто не покажет.
+* every literal shown to a person goes through `S(...)` or `{loc:S ...}`;
+* every key used is in `interface.json`;
+* the table holds no keys that are absent from the code — otherwise a
+  translator spends time on strings nobody will show.
 
-Запуск:
+To run:
     python tools/check_strings.py
 """
 import io
@@ -31,28 +32,30 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
 TABLE = os.path.join(SHELL, "Strings", "interface.json")
 
-# Startup.cs — подписи самопроверок: они идут в консоль разработчику, а не
-# человеку, и переводить их значило бы переводить свои же логи.
+# Startup.cs — the self-checks' captions: they go to a developer's console
+# rather than to a person, and translating them would mean translating our
+# own logs.
 SKIP_FILES = {"Startup.cs", "Loc.cs"}
 
-#: `Platform` — системный слой: он разговаривает с Windows и с ядром, а не
-#: с человеком. Русские строки там — это имена системных папок
-#: («Загрузки»), слова-фильтры мусорных ярлыков («удалить», «справка») и
-#: причины отказа, уходящие ядру. Переводить их значило бы искать папку
-#: «Downloads» под английским языком интерфейса.
+#: `Platform` is the system layer: it talks to Windows and to the core, not
+#: to a person. The Russian strings there are the names of system folders
+#: ("Загрузки"), filter words for junk shortcuts ("удалить", "справка") and
+#: refusal reasons going to the core. Translating them would mean looking for
+#: a "Downloads" folder under an English interface language.
 SKIP_DIRS = {"obj", "bin", "Generated", "Platform"}
 
-#: Пометка «это не слово интерфейса»: строка не показывается человеку.
-#: Пометка стоит на самой строке, а не в списке исключений где-то ещё:
-#: список пришлось бы держать в согласии с кодом руками, а он расходится
-#: молча — ровно та беда, ради которой затевалась вся проверка.
+#: The mark "this is not an interface word": the string is not shown to a
+#: person. The mark stands on the string itself rather than in a list of
+#: exceptions somewhere else: a list would have to be kept in agreement with
+#: the code by hand, and it drifts in silence — precisely the trouble this
+#: whole check was started for.
 NOT_UI = "// not UI"
 
 RUS = re.compile(r"[А-Яа-яЁё]")
-#: `S(...)` переводит здесь, `Word(...)` помечает строку для перевода
-#: в другом месте — обе формы одинаково законны и обе дают ключ.
+#: `S(...)` translates here, `Word(...)` marks a string for translation
+#: elsewhere — both forms are equally lawful and both give a key.
 CALL = re.compile(r'\b(?:S|Word)\(\s*@?"([^"]*)"')
-#: `S("часть" + "часть")` — фраза, собранная из двух переводов.
+#: `S("часть" + "часть")` — a phrase assembled from two translations.
 GLUE = re.compile(r'(?:S|Word)\(\s*@?"[^"]*"\s*\+')
 XAML_CALL = re.compile(r"\{loc:S '([^']*)'\}")
 CS_LITERAL = re.compile(r'"([^"\n]*[А-Яа-яЁё][^"\n]*)"')
@@ -102,27 +105,31 @@ def main() -> int:
             if stripped.startswith(("//", "///", "*")):
                 continue
 
-            # Вызовы собираются **до** отсева по кириллице: переводимая
-            # строка бывает и без русских букв — адрес, время, имя. Такая
-            # раньше не попадала в «использованные» и выглядела лишней в
-            # таблице, хотя стояла в коде.
+            # The calls are collected **before** the Cyrillic filter: a
+            # translatable string sometimes has no Russian letters — an
+            # address, a time, a name. Such a one used not to get into "the
+            # used" and looked superfluous in the table, although it stood
+            # in the code.
             used.update(CALL.findall(line))
             if not RUS.search(line):
                 continue
             if NOT_UI in line:
                 continue
 
-            # Строка в порядке, если она есть в таблице: значит, её где-то
-            # переводят. Так проходят и ключи, отданные в `S` не соседним
-            # символом — тернарный выбор, список разделов, — и не проходит
-            # новый литерал, которого в таблице нет: его-то и забыли.
+            # A string is in order if it is in the table: that means it is
+            # translated somewhere. That way through go the keys handed to
+            # `S` by something other than the neighbouring symbol — a
+            # ternary choice, a list of sections — and through does not go a
+            # new literal that is not in the table: that is the forgotten
+            # one.
             for body in CS_LITERAL.findall(line):
                 if body not in table:
                     loose.append((f"{short}:{number}", body))
 
-    # Склеенная строка переводится по кускам: в таблице оказываются
-    # обрывки, а человек видит фразу, собранную из двух переводов. Ловим
-    # это прямо, а не по следам в таблице.
+    # A glued string is translated in pieces: the table ends up with
+    # fragments, while a person sees a phrase assembled from two
+    # translations. We catch that directly rather than by its traces in the
+    # table.
     glued = []
     for path, kind in sources():
         if kind == 'xaml':

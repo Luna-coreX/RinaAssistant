@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Блок H: плагин объявляет, а не делает.
+Block H: a plugin declares rather than does.
 
-Проверяется то, что должно случиться, и наравне с ним — то, чего случиться
-не должно: инструмент без разрешения не заводится, старый плагин не
-загружается молча, выключенный не оставляет за собой инструментов.
+What must happen is checked, and on a par with it what must not: a tool
+without a permission is not created, an old plugin does not load in silence,
+a switched-off one leaves no tools behind.
 
-Запуск:
+To run:
     python tools/test_plugins.py
 """
 import io
@@ -24,9 +24,9 @@ os.chdir(ROOT)
 from console import use_utf8
 from sandbox import isolate_storage, neutralise
 
-# Кубик отвечает эмодзи, а на консоли с кодовой страницей Windows это
-# `UnicodeEncodeError` прямо в подписи результата. Проверка, зелёная под
-# одним запуском и красная под другим, хуже отсутствующей.
+# The die answers with an emoji, and on a console with a Windows code page
+# that is a `UnicodeEncodeError` right inside the result's caption. A check
+# that is green under one run and red under another is worse than none.
 use_utf8()
 
 isolate_storage()
@@ -78,10 +78,10 @@ check("чужое в детях не проходит",
       page_to_dict([Card(["строка", None, Note("настоящий")])])[0]
       ["children"] == [{"kind": "note", "text": "настоящий"}])
 
-# Ни одного поля о внешности — правило с зубами из PAGE-SCHEMA-v2: плагин
-# говорит «предупреждение», а не «оранжевый». Смотрим на поля элемента, а
-# не на текст файла: в тексте эти слова как раз и стоят — в объяснении,
-# почему их здесь нет.
+# Not one field about appearance — the rule with teeth from PAGE-SCHEMA-v2: a
+# plugin says "warning", not "orange". We look at an element's fields rather
+# than at the file's text: in the text those very words do appear — in the
+# explanation of why they are not here.
 from plugins.page_spec import Element
 
 looks = [name for name in Element.__dataclass_fields__
@@ -91,12 +91,13 @@ check("в схеме нет полей о внешности", not looks, f"| {l
 check("глубина ограничена", MAX_DEPTH > 0 and MAX_DEPTH <= 8,
       f"| {MAX_DEPTH}")
 
-# Рендерер обязан знать все виды словаря: список сверяется с C#.
+# The renderer is obliged to know every kind in the dictionary: the list is
+# compared with the C# one.
 #
-# Смотрим в `PluginView`: рендерер вынут туда, когда у плагина появился
-# свой раздел в колонке. Один на обе стороны — два рендерера одной схемы
-# разъехались бы на первой правке, и эта проверка ровно на переезд и
-# сработала.
+# We look into `PluginView`: the renderer was moved there when a plugin got a
+# section of its own in the column. One for both sides — two renderers of one
+# schema would part company at the first change, and this check fired on
+# precisely that move.
 renderer = io.open("shell/Rina.Shell/Pages/PluginView.xaml.cs",
                    encoding="utf-8").read()
 unknown = [kind for kind in KINDS if f'case "{kind}"' not in renderer]
@@ -205,8 +206,8 @@ check("и открыть своё окно плагин не может",
       "def open_window" not in io.open("plugins/api.py",
                                        encoding="utf-8").read())
 
-# Настоящий старый плагин на диске: проверка обнаружения, а не только
-# разбора манифеста.
+# A real old plugin on disk: a check of discovery, not only of parsing the
+# manifest.
 sample = os.path.join(plugins_dir(), "проверка_ветхого")
 try:
     os.makedirs(sample, exist_ok=True)
@@ -253,7 +254,7 @@ drawn = page_to_dict(elements)
 check("страница сериализуется без потерь",
       json.loads(json.dumps(drawn, ensure_ascii=False)) == drawn)
 
-# Действие возвращает новую страницу целиком — частичных обновлений нет.
+# An action returns a whole new page — there are no partial updates.
 manager.dispatch_action("notes", "add", "проверка")
 after = page_to_dict(manager.get_plugin_page_spec("notes"))
 check("действие изменило страницу", after != drawn)
@@ -279,8 +280,8 @@ hosted = HostedPlugins(settings=store)
 hosted.discover()
 check("плагины видны до запуска", len(hosted.plugins) >= 4,
       "| список плагинов не должен стоить столько же, сколько их запуск")
-# Поднимается ровно то, что человек включал: обнаружение восстанавливает
-# состояние, а не запускает всё подряд.
+# Exactly what a person switched on comes up: discovery restores the state
+# rather than starting everything in sight.
 was_enabled = set(store.get("enabled_plugins", []) or [])
 check("подняты только те, что были включены",
       {pid for pid, h in hosted.plugins.items() if h.alive} <= was_enabled,
@@ -314,14 +315,14 @@ check("страница приходит по проводу", bool(page),
 check("и это карточка, а не столбик абзацев",
       any(e.kind in CONTAINERS for e in page))
 
-# Настройки плагина хранит ядро: они переживают падение самого плагина.
+# A plugin's settings are kept by the core: they outlive the plugin's own crash.
 check("своя настройка плагина записана ядром",
       bool(store.get("plugin_settings", {}).get("notes", {}).get("items")),
       f"| {store.get('plugin_settings')}")
 hosted.dispatch_action("notes", "clear")
 
 
-# --- зависший -------------------------------------------------------------
+# --- the hung one ---------------------------------------------------------
 sample = os.path.join(plugins_dir(), "проверка_зависшего")
 crashing = os.path.join(plugins_dir(), "проверка_падшего")
 try:
@@ -382,7 +383,7 @@ try:
         time.sleep(0.1)
     check("падший упал", not crash.alive)
 
-    # И главное: ассистент после этого работает.
+    # And the main thing: the assistant works afterwards.
     check("соседний плагин цел",
           third.plugins["clock"].alive and third.plugins["clock"].enabled)
     check("ядро продолжает разбирать команды",

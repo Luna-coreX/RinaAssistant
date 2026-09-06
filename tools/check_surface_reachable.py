@@ -1,23 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-Сверка: каждое действие 3.1.0 достижимо через протокол.
+The comparison: every 3.1.0 action is reachable through the protocol.
 
-Задача плана 4.0-F04, но проверка нужна раньше страниц — без неё страницу
-пишут, упираются в отсутствующий метод и дописывают протокол на ходу.
+Plan item 4.0-F04, but the check is needed before the pages — without it a
+page gets written, runs into a missing method, and the protocol is written
+on the fly.
 
-`tools/check_design.py` уже проверяет, что у каждого действия из инвентаря
-поверхности есть **место** в новой информационной архитектуре. Этого мало.
-Место — это ответ на вопрос «где кнопка», а протокол отвечает на вопрос
-«что произойдёт, когда её нажмут». Между ними умещается целая пропасть:
-кнопка нарисована, раздел есть, а метода, которым оболочка это сделает, нет.
+`tools/check_design.py` already checks that every action from the surface
+inventory has a **place** in the new information architecture. That is not
+enough. A place answers the question "where is the button", while the
+protocol answers the question "what will happen when it is pressed". A whole
+gulf fits between them: the button is drawn, the section exists, and there
+is no method for the shell to do it with.
 
-Первый прогон нашёл ровно такую пропасть в шесть возможностей: список
-пользовательских команд, их создание и правка, включение, импорт и экспорт,
-и вся история — просмотр, очистка, выгрузка. Правило рубежа 4.0-port
-запрещает терять возможности; без этой проверки они терялись бы молча,
-потому что теряется не кнопка, а способность что-либо сделать по нажатию.
+The first run found exactly such a gulf, six capabilities wide: the list of
+user commands, creating and editing them, switching them on, importing and
+exporting, and the whole history — viewing, clearing, exporting. The
+4.0-port boundary rule forbids losing capabilities; without this check they
+would have been lost in silence, because what is lost is not a button but
+the ability to do anything at all on a press.
 
-Запуск:
+To run:
     python tools/check_surface_reachable.py
 """
 
@@ -43,11 +46,12 @@ def check(label, cond, detail=""):
     print(("OK   " if cond else "FAIL "), label, detail)
 
 
-#: Чем оболочка сделает то, что человек нажал. Ключ — начало строки действия
-#: из инвентаря; значение — методы протокола, без которых не обойтись.
+#: What the shell will do the thing a person pressed with. The key is the
+#: beginning of the action's line from the inventory; the value is the
+#: protocol methods without which it cannot be done.
 #:
-#: Пустой список значит, что метод не нужен: действие целиком принадлежит
-#: оболочке. Таких немного, и каждое объяснено.
+#: An empty list means no method is needed: the action belongs entirely to
+#: the shell. There are not many of those, and each is explained.
 NEEDS: dict[str, list[str]] = {
     "Экспорт команд": ["commands.export"],
     "Импорт команд": ["commands.import"],
@@ -60,20 +64,20 @@ NEEDS: dict[str, list[str]] = {
     "Включить или выключить плагин": ["plugins.set_enabled"],
     "Настройки плагина": ["plugins.page", "plugins.action"],
     "Проверить голос": ["speech.say"],
-    "Проверить микрофон": [],           # микрофон у оболочки (4.0-F09)
+    "Проверить микрофон": [],           # the microphone is the shell's (4.0-F09)
     "Проверить связь с моделью": ["settings.set"],
     "Проверить модели Piper": ["settings.get"],
     "Выбрать модель Vosk": ["settings.set"],
     "Добавить папку с программами": ["settings.set"],
     "Обновить список программ": ["apps.index"],
     "Забыть выученные соответствия": ["settings.set"],
-    "Открыть папку журналов": [],       # папку открывает оболочка
+    "Открыть папку журналов": [],       # the shell opens the folder
     "Сбросить настройки": ["settings.set"],
-    "Проверить обновления сейчас": [],  # обновления — блок U, своя дорога
+    "Проверить обновления сейчас": [],  # updates are block U, a road of their own
     "Назначить любую из семи комбинаций": ["settings.set"],
     "Все настройки без исключения": ["settings.describe", "settings.get",
                                      "settings.set"],
-    "Свернуть, развернуть, закрыть окно": [],   # окно принадлежит оболочке
+    "Свернуть, развернуть, закрыть окно": [],   # the window belongs to the shell
 }
 
 

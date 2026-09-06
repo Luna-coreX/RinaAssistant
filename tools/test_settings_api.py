@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-B06: ядро получает настройки через интерфейс, а не через синглтон.
+B06: the core gets its settings through an interface, not through a
+singleton.
 
-Смысл проверки: два ядра с разными настройками ведут себя по-разному, и файл
-пользователя при этом не трогается вовсе.
+The point of the check: two cores with different settings behave
+differently, and the user's file is not touched at all.
 """
 import os
 import sys

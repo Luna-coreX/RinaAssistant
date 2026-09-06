@@ -1,36 +1,38 @@
 # -*- coding: utf-8 -*-
 """
-Вывод проверок не зависит от кодовой страницы консоли.
+The checks' output does not depend on the console's code page.
 
-Найдено проверкой, которая падала не всегда: `test_service.py` печатал
-список языков, среди них «Español», и на консоли с кодовой страницей
-Windows буква «ñ» вызывала `UnicodeEncodeError` — прямо в `print` подписи
-результата. Проверка, зелёная под одним запуском и красная под другим,
-хуже отсутствующей: она учит не верить проверкам.
+Found by a check that failed only sometimes: `test_service.py` printed the
+list of languages, "Español" among them, and on a console with a Windows
+code page the letter "ñ" caused a `UnicodeEncodeError` — right inside the
+`print` of the result's caption. A check that is green under one run and red
+under another is worse than none: it teaches one not to believe checks.
 
-То же и с дочерним процессом: ядро пишет в поток ошибок по-русски, и
-родитель, читающий его как UTF-8, спотыкался о байты кодовой страницы.
-Договорённость одна на всех — UTF-8 везде, и здесь она проводится в жизнь.
+The same with a child process: the core writes to the error stream in
+Russian, and a parent reading it as UTF-8 tripped over code-page bytes.
+There is one understanding for everyone — UTF-8 everywhere — and here it is
+put into effect.
 """
 import os
 import sys
 
 
 def use_utf8() -> None:
-    """Свой вывод — в UTF-8, что бы ни стояло в консоли."""
+    """Our own output — in UTF-8, whatever is set in the console."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
-            # Поток подменён или уже закрыт — не повод падать в проверке.
+            # The stream is substituted or already closed — no reason to fail a check.
             pass
 
 
 def child_env(**extra) -> dict:
     """
-    Окружение для дочернего процесса: он тоже пишет в UTF-8.
+    The environment for a child process: it writes in UTF-8 too.
 
-    Иначе родитель, читающий вывод как UTF-8, получает байты кодовой
-    страницы и падает в потоке чтения — далеко от места, где ошибся.
+    Otherwise the parent, reading the output as UTF-8, gets code-page bytes
+    and fails in the reading thread — far from the place where it went
+    wrong.
     """
     return dict(os.environ, PYTHONIOENCODING="utf-8", **extra)

@@ -1,10 +1,10 @@
 """
-D03, D04: рукопожатие и конверт сообщения.
+D03, D04: the handshake and the message envelope.
 
-Проверяется без транспорта и без приложения. Так и задумано: ADR 0002
-требует, чтобы спецификация не зависела от канала, и conformance-тесты
-(`4.0-D16`) могли гонять её через транспорт внутри процесса. Если бы этому
-файлу понадобился именованный канал, требование было бы нарушено.
+Checked without a transport and without the application. That is the intent:
+ADR 0002 requires the specification not to depend on the channel, so that
+the conformance tests (`4.0-D16`) can drive it over an in-process transport.
+If this file needed a named pipe, the requirement would be broken.
 """
 import os
 import sys
@@ -51,7 +51,7 @@ def check(label, cond, detail=""):
 
 
 def fault(fn, code):
-    """Вызов обязан упасть протокольной ошибкой ровно с этим кодом."""
+    """The call is obliged to fail with a protocol error of exactly this code."""
     try:
         fn()
     except ProtocolFault as exc:
@@ -89,7 +89,7 @@ check("круговой оборот сохраняет trace_id", back.trace_id
 check("необязательные поля не пишутся пустыми",
       "correlation_id" not in req.to_dict() and "stream_id" not in req.to_dict())
 
-# обязательные поля по типу сообщения
+# the fields required by message type
 check("запрос без метода отклонён",
       fault(lambda: Envelope(type="request", id="s-1", timestamp=1.0,
                              trace_id="t-1"), ERROR_INVALID_ENVELOPE)
@@ -119,7 +119,7 @@ check("payload не объект — отклонено",
                              timestamp=1.0, trace_id="t-1", payload=[1, 2]),
             ERROR_INVALID_ENVELOPE) is not None)
 
-# совместимость вперёд: незнакомое поле не мешает
+# forward compatibility: an unfamiliar field does not get in the way
 raw = encode(req).replace(b'{"v":1', b'{"v":1,"weather":"rain"', 1)
 survived = decode(raw)
 check("незнакомое поле конверта пропускается молча",
@@ -133,7 +133,7 @@ check("отсутствие обязательных полей названо �
       {"v", "id", "timestamp", "trace_id", "payload"},
       f"| {err.details if err else ''}")
 
-# наследование трассировки
+# inheriting the trace
 resp = req.reply({"accepted": True}, id="c-0001")
 check("ответ ссылается на запрос", resp.correlation_id == req.id)
 check("ответ наследует trace_id", resp.trace_id == trace)
@@ -169,8 +169,9 @@ got = list(FrameDecoder().feed(two))
 check("два кадра в одном куске разобраны",
       [m.type for m in got] == ["request", "response"])
 
-# Предел проверяется по заявленной длине, до выделения памяти: декодеру
-# скармливается только заголовок, тела нет и не будет.
+# The limit is checked against the declared length, before memory is
+# allocated: the decoder is fed the header alone, and there is no body and
+# never will be.
 header_only = (CONTROL_FRAME_LIMIT + 1).to_bytes(4, "big")
 err = fault(lambda: list(FrameDecoder().feed(header_only)),
             ERROR_FRAME_TOO_LARGE)
@@ -225,7 +226,7 @@ check("до рукопожатия принимается только hello",
 core.check_incoming("hello")
 check("hello до рукопожатия принимается", True)
 
-# сообщения ходят кадрами через два декодера — заготовка транспорта D16
+# messages travel as frames through two decoders — the D16 transport in embryo
 shell_ids, core_ids = IdGenerator("s-"), IdGenerator("c-")
 t = new_trace_id()
 hello = Envelope.request("hello", shell.hello_payload(),
@@ -281,7 +282,7 @@ check("выдуманный метод отклонён",
       fault(lambda: shell.check_outgoing("cook.dinner"),
             ERROR_UNKNOWN_METHOD) is not None)
 
-# ядро без распознавания: оболочка обязана не звать
+# a core without recognition: the shell is obliged not to call
 deaf = Session(side=Side.CORE, capabilities=("tts", "reminders"))
 shell2 = Session(side=Side.SHELL)
 deaf.handle_hello(shell2.hello_payload())
@@ -343,8 +344,8 @@ check("not_ready повторяем, incompatible нет",
 check("просроченное подтверждение не повторяемо тем же вызовом",
       CATALOGUE["confirmation.expired"].retryable is False)
 
-# Сверка с тем, что ядро действительно умеет отправлять. Список, который
-# пишут руками и не сверяют, расходится с кодом на первом же инструменте.
+# Compared with what the core can actually send. A list that is written by
+# hand and never checked parts company with the code at the very first tool.
 from core.toolbox import ALL_TOOLS
 from core.tools import (ERROR_INVALID_ARGUMENTS, ERROR_PERMISSION_DENIED,
                         ERROR_UNKNOWN_TOOL)
@@ -358,11 +359,12 @@ check("каждый код инструментов есть в каталоге
 print(f"     кодов у инструментов: {len(declared)}, "
       f"в каталоге: {len(CATALOGUE)}")
 
-# Сверка с документом: код и спецификация не должны разъезжаться.
+# Compared with the document: the code and the specification must not drift apart.
 spec_text = open("docs/protocol/PROTOCOL-v1.md", encoding="utf-8").read()
 section = spec_text[spec_text.index("Начальный каталог:"):]
-# Резать по "---" нельзя: разделитель шапки таблицы «|---|---|---|» тоже
-# содержит эти символы, и срез пришёлся бы до первой строки данных.
+# Cutting by "---" will not do: a table header's separator "|---|---|---|"
+# also contains those characters, and the slice would land before the first
+# row of data.
 section = section[:section.index(chr(10) + "---" + chr(10))]
 spec_codes = set(re.findall(r"^\| `([a-z_.]+)` \|", section, re.M))
 check("каталог документа непуст", len(spec_codes) >= 15, f"| {len(spec_codes)}")
@@ -389,9 +391,9 @@ with trace_scope() as born:
     check("вход без аргумента начинает цепочку",
           born.startswith("t-") and current_trace() == born)
 
-# Событие рождается глубоко и трассировку не получает параметром.
+# An event is born deep down and does not get the trace as a parameter.
 def deep_event():
-    """Как если бы его поднял реестр инструментов изнутри исполнения."""
+    """As if the tool registry had raised it from inside an execution."""
     return Envelope.event("assistant.response", {"text": "готово"}, id="c-77")
 
 with trace_scope("t-deep"):
@@ -400,7 +402,7 @@ check("событие подхватило трассировку из конт�
 check("вне контекста событие всё равно с трассировкой",
       deep_event().trace_id.startswith("t-"))
 
-# Требование §15.12: trace_id во всей цепочке от запроса до финального события.
+# Requirement §15.12: a trace_id through the whole chain from request to final event.
 with trace_scope() as chain:
     ask = Envelope.request("command.handle", {"text": "выключи компьютер"},
                            id="s-100")
@@ -411,8 +413,8 @@ same = {ask.trace_id, ok.trace_id, note.trace_id, bad.trace_id}
 check("вся цепочка несёт одну трассировку (§15.12)", same == {chain},
       f"| {sorted(same)}")
 
-# Через канал: трассировка переживает сериализацию и продолжается на той
-# стороне — именно так её и подхватывает получатель.
+# Over the channel: the trace survives serialisation and continues on the
+# other side — that is exactly how the receiver picks it up.
 wire = list(FrameDecoder().feed(encode_frame(ask)))[0]
 with trace_scope(wire.trace_id):
     answer = Envelope.event("history.changed", {}, id="c-200")
@@ -440,16 +442,16 @@ check("готовое поле не затирается", kept.trace == "t-св
 print()
 print("=== D11: каталог событий ===")
 
-# Сверка с перечнем 3.1.0: спецификация писалась по нему, и потерянное при
-# переносе событие — это поведение, о котором ядро сообщать перестанет.
+# Compared with the 3.1.0 list: the specification was written from it, and an
+# event lost in the move is behaviour the core will stop reporting.
 from core.protocol import ALL_EVENTS as EVENTS_310
 
 lost = sorted(set(EVENTS_310) - set(EVENTS))
 check("ни одно событие 3.1.0 не потеряно", not lost, f"| потеряно: {lost}")
 print(f"     событий 3.1.0: {len(EVENTS_310)}, в каталоге провода: {len(EVENTS)}")
 
-# Сверка с документом: таблица §6. Потоковые события живут в §7 и в этой
-# таблице отсутствуют законно.
+# Compared with the document: the §6 table. The streaming events live in §7
+# and are lawfully absent from that table.
 section = spec_text[spec_text.index("### Ядро → оболочка (события)"):]
 section = section[:section.index("### Ядро → оболочка (запросы)")]
 spec_events = set()
@@ -459,22 +461,22 @@ for line in section.split("\n"):
         spec_events |= set(re.findall(r"`([a-z]+\.[a-z_]+)`", cell))
 check("таблица событий документа прочитана", len(spec_events) >= 10,
       f"| {len(spec_events)}")
-# Таблица §6 описывает ровно перенос 3.1.0: ничего не потеряно и ничего не
-# придумано. Потоковые события живут в §7, события задач — в §9, и сверять
-# их с этой таблицей значило бы требовать от неё того, чем она не является.
+# The §6 table describes exactly the 3.1.0 port: nothing is lost and nothing
+# is invented. The streaming events live in §7, the task events in §9, and
+# comparing them with this table would mean demanding of it what it is not.
 check("таблица §6 = события 3.1.0", spec_events == set(EVENTS_310),
       f"| только в документе: {sorted(spec_events - set(EVENTS_310))}, "
       f"только в 3.1.0: {sorted(set(EVENTS_310) - spec_events)}")
-# Зато каждое событие каталога обязано быть описано хоть где-то: событие,
-# которого контракт не упоминает, — договорённость, о которой знает одна
-# сторона. Список исключений не ведётся намеренно, иначе он и станет тем
-# местом, где события прячут.
+# But every event in the catalogue is obliged to be described somewhere: an
+# event the contract does not mention is an understanding only one side knows
+# about. A list of exceptions is deliberately not kept, or it will become the
+# very place where events are hidden.
 undocumented = sorted(n for n in EVENTS if n not in spec_text)
 check("каждое событие каталога описано в спецификации", not undocumented,
       f"| нет в документе: {undocumented}")
 
-# То же для методов: метод, о котором документ молчит, — договорённость,
-# известная одной стороне.
+# The same for methods: a method the document says nothing about is an
+# understanding known to one side.
 from core.wire.handshake import BASE_METHODS, CAPABILITIES as CAPS
 
 all_methods = set(BASE_METHODS)
@@ -531,15 +533,16 @@ router.on("assistant.response", lambda p: seen.append(p["text"]))
 check("знакомое событие доставлено", router.dispatch(ev) is True)
 check("нагрузка дошла целиком", seen == ["готово"])
 
-# Незнакомое событие приходит от более новой стороны — и это не ошибка,
-# иначе правило «добавить событие можно, не меняя версию» было бы ложью.
+# An unfamiliar event comes from a newer side — and that is not an error, or
+# the rule "an event may be added without changing the version" would be a
+# lie.
 future = Envelope.event("рина.загрустила", {"уровень": 3}, id="c-501",
                         trace_id="t-1")
 check("незнакомое событие проигнорировано молча",
       router.dispatch(future) is False
       and router.ignored == ["рина.загрустила"])
 
-# Знакомое, но испорченное, роняет только себя.
+# A familiar but spoiled one drops only itself.
 bad_ev = Envelope.event("speech.recognized", {"text": 42}, id="c-502",
                         trace_id="t-1")
 check("испорченное событие не доставлено", router.dispatch(bad_ev) is False)
@@ -584,9 +587,9 @@ check("неизвестная причина закрытия отклонена
       is not None)
 sender.end(sid2, STREAM_FAILED)
 
-# §7: часть потока может прийти раньше ответа, открывшего поток. Приёмник,
-# отбрасывающий ранние части, терял бы начало каждого быстрого ответа —
-# тем чаще, чем быстрее отвечает модель.
+# §7: a part of a stream may arrive before the answer that opened it. A
+# receiver that discards early parts would lose the beginning of every fast
+# answer — the more often the faster the model answers.
 receiver = StreamReceiver()
 wire = b"".join(encode_frame(m) for m in parts + [closing])
 delivered = 0
@@ -633,7 +636,7 @@ finals = [m.method for m in task.events if m.method in
           ("task.done", "task.failed", "task.cancelled")]
 check("ровно одно финальное событие", finals == ["task.done"], f"| {finals}")
 
-# После финала любое сообщение задачи — дефект отправителя.
+# After the final one, any message about the task is a defect of the sender.
 for what, call in (("прогресс", lambda: task.progress("ещё")),
                    ("промежуточный", lambda: task.partial(1)),
                    ("второй done", lambda: task.done(1)),
@@ -656,9 +659,9 @@ check("провал несёт ошибку по §5",
       and bad.payload["error"]["retryable"] is True)
 check("проваленная задача финальна", failing.state == TaskState.FAILED)
 
-# §15.7: задача на шестьдесят секунд. Часы поддельные — требование про форму
-# последовательности, а не про ожидание в реальном времени; держать проверку
-# минуту ради этого значило бы платить минутой за ничто.
+# §15.7: a sixty-second task. The clock is fake — the requirement is about
+# the shape of the sequence rather than about waiting in real time; holding
+# the check for a minute for that would mean paying a minute for nothing.
 clock = [0.0]
 long_task = registry.create()
 events = run(long_task, steps=12, clock=lambda: clock[0],
@@ -694,13 +697,13 @@ check("у отменённой задачи тоже ровно одно фин�
       len([m for m in live.events if m.method in
            ("task.done", "task.failed", "task.cancelled")]) == 1)
 
-# Отмена, доехавшая до задачи посреди работы, останавливает её на границе шага.
+# A cancellation that reached the task mid-work stops it at a step's boundary.
 clock2 = [0.0]
 racing = registry.create()
 racing.start()
 racing.progress("первый шаг")
 racing.request_cancel()
-racing.state = TaskState.ACCEPTED          # вернуть в исходное для run()
+racing.state = TaskState.ACCEPTED          # back to the original for run()
 racing.events.clear()
 stopped = run(racing, steps=10, clock=lambda: clock2[0],
               advance=lambda d: clock2.__setitem__(0, clock2[0] + d),
@@ -710,7 +713,7 @@ check("задача остановилась, не доработав",
       f"| {[m.method for m in stopped]}")
 check("часы почти не сдвинулись", clock2[0] == 0.0, f"| {clock2[0]}")
 
-# Гонка §9: задача успела завершиться сама.
+# The §9 race: the task managed to finish by itself.
 quick = registry.create()
 quick.start()
 quick.done({"итог": "уже"})
@@ -724,7 +727,7 @@ check("отмена неизвестной задачи говорит прав�
       registry.cancel("task-9999") == {"accepted": False,
                                        "status": STATUS_UNKNOWN})
 
-# Возможность: оболочка не зовёт task.cancel у ядра, которое задач не умеет.
+# A capability: the shell does not call task.cancel on a core that cannot do tasks.
 plain = Session(side=Side.SHELL)
 old_core = Session(side=Side.CORE, capabilities=("stt", "tts"))
 old_core.handle_hello(plain.hello_payload())
@@ -759,7 +762,7 @@ check("повторное открытие того же потока откло
       is not None)
 
 sender.grant(11, 100000)
-pcm = bytes(range(256)) * 4          # 1024 байта «звука»
+pcm = bytes(range(256)) * 4          # 1024 bytes of "sound"
 frames = [sender.send(11, pcm) for _ in range(8)]
 
 decoder = DataFrameDecoder()
@@ -770,21 +773,21 @@ for raw in frames:
 check("звук доехал побайтно", bytes(receiver.data[11]) == pcm * 8)
 check("порядковые номера подряд, пропусков нет", receiver.gaps == [])
 
-# Кадр, пришедший по кускам, и два кадра в одном куске.
+# A frame that arrived in pieces, and two frames in one piece.
 split = DataFrameDecoder()
 joined = b"".join(frames[:2])
 check("половина кадра данных не даёт кадра",
       list(split.feed(joined[:5])) == [] and split.pending == 5)
 check("остаток собирает оба кадра", len(list(split.feed(joined[5:]))) == 2)
 
-# Пропуск номера не обрывает приём, но записывается.
+# A gap in the numbering does not break off reception, but is recorded.
 gappy = DataReceiver()
 gappy.accept(DataFrame(7, 1, b"a"))
 gappy.accept(DataFrame(7, 3, b"c"))
 check("пропуск замечен и назван", gappy.gaps == [(7, 2, 3)], f"| {gappy.gaps}")
 check("приём при этом продолжился", bytes(gappy.data[7]) == b"ac")
 
-# Предел — по заявленной длине, до выделения памяти.
+# The limit is by the declared length, before memory is allocated.
 header_only = (DATA_FRAME_LIMIT + 1).to_bytes(4, "big")
 check("огромный кадр данных отвергнут по заголовку",
       fault(lambda: list(DataFrameDecoder().feed(header_only)),
@@ -803,19 +806,19 @@ check("свой кадр сверх предела не отправляется
 print()
 print("=== D07: звук не задерживает управление ===")
 
-# Требование §15.6 — «поток PCM не ухудшает задержку управляющего канала».
-# Настоящую задержку измеряют на живом канале, и это работа D16. Здесь
-# измеряется то, откуда задержка берётся: сколько байт управляющему разбору
-# придётся проглотить, прежде чем он дойдёт до команды. Сравниваются две
-# раскладки одной и той же нагрузки — принятая и отвергнутая (§2, base64
-# внутри JSON), обе собранные настоящим кодом.
+# Requirement §15.6 — "a PCM stream does not worsen the control channel's
+# latency". Real latency is measured on a live channel, and that is D16's
+# work. What is measured here is where the latency comes from: how many bytes
+# the control parse will have to swallow before it reaches the command. Two
+# layouts of one and the same load are compared — the one adopted and the one
+# rejected (§2, base64 inside JSON), both assembled by the real code.
 import base64
 
 BURST = 200
 command = Envelope.request("command.handle", {"text": "стоп", "source": "voice"},
                            id="s-9000", trace_id="t-9000")
 
-# Отвергнутая раскладка: звук едет управляющим каналом как base64.
+# The rejected layout: the sound travels over the control channel as base64.
 rejected = b""
 for i in range(BURST):
     rejected += encode_frame(Envelope.event(
@@ -825,7 +828,7 @@ for i in range(BURST):
 before_rejected = len(rejected)
 rejected += encode_frame(command)
 
-# Принятая: звук в своём канале, команда в своём.
+# The adopted one: the sound in its channel, the command in its own.
 data_bytes = b""
 burst_sender = DataSender()
 burst_sender.open_stream(51, "audio.input")
@@ -835,7 +838,7 @@ for _ in range(BURST):
 accepted = encode_frame(command)
 before_accepted = 0
 
-# Сколько байт управляющий разбор съедает до команды — в обоих случаях.
+# How many bytes the control parse eats before the command — in both cases.
 def bytes_before_command(stream):
     eaten = 0
     decoder = FrameDecoder()
@@ -861,7 +864,7 @@ check("звук из управляющего канала ушёл целико
 print(f"     всплеск {BURST} кадров: до команды {eaten_rejected} байт против "
       f"{eaten_accepted}, звук отдельно — {len(data_bytes)} байт")
 
-# И то, что делает разделение возможным: звук вообще не попадает в JSON.
+# And what makes the split possible: the sound never gets into JSON at all.
 audio_frame = encode_data_frame(DataFrame(11, 1, pcm))
 check("кадр данных не является JSON",
       not audio_frame.lstrip(b"\x00").startswith(b"{"))
@@ -891,8 +894,9 @@ check("кредит исчерпан ровно", fresh.available(21) == 0)
 check("нулевой кредит не выдаётся",
       fault(lambda: fresh.grant(21, 0), ERROR_INVALID_PAYLOAD) is not None)
 
-# Кредит считается по потоку: микрофон и синтез идут одновременно и в разные
-# стороны, и общий счёт связал бы их скорости без всякой причины.
+# Credit is counted per stream: the microphone and synthesis run at the same
+# time and in different directions, and a common tally would tie their speeds
+# together for no reason.
 two = DataSender()
 two.open_stream(31, "audio.input")
 two.open_stream(32, "audio.output")
@@ -900,9 +904,8 @@ two.grant(31, 100)
 check("кредит одного потока не виден другому",
       two.available(31) == 100 and two.available(32) == 0)
 
-# Кредит выдаётся по мере обработки, а не по мере получения: кредит за
-# необработанное — это и есть та неограниченная очередь, ради устранения
-# которой схема существует.
+# Credit is issued as data is handled, not as it is received: credit for what
+# is unhandled is the very unbounded queue the scheme exists to do away with.
 flow = DataSender()
 flow.open_stream(41, "audio.input")
 flow.grant(41, 4096)
@@ -923,8 +926,8 @@ check("закрытый поток не принимает данные",
       and fault(lambda: flow.send(41, b"pozdno"), ERROR_INVALID_STATE)
       is not None)
 
-# Методы управления потоком базовые: сам метод есть всегда, а вид отпирается
-# возможностью собеседника.
+# The stream-control methods are basic: the method itself always exists,
+# while the kind is unlocked by the correspondent's capability.
 pair_shell = Session(side=Side.SHELL)
 pair_core = Session(side=Side.CORE)
 pair_core.handle_hello(pair_shell.hello_payload())
@@ -964,7 +967,8 @@ check("просьба без предпросмотра не заводится"
                                 reason="…", preview="   "),
             ERROR_INVALID_PAYLOAD) is not None)
 
-# Идентификатор выпускает ядро: оболочка отвечает «да», а не приносит номер.
+# The identifier is issued by the core: the shell answers "yes" rather than
+# bringing a number.
 answer = channel.resolve(ask.id, True)
 check("подтверждение выписано ядром", bool(answer["confirmation_id"]))
 check("ответ несёт срок и область",
@@ -974,7 +978,7 @@ check("ответить второй раз нельзя",
       fault(lambda: channel.resolve(ask.id, True), ERROR_INVALID_STATE)
       is not None)
 
-# Подтверждение годится ровно для того вызова, под который выдано.
+# A confirmation is good for exactly the call it was issued for.
 cid = answer["confirmation_id"]
 try:
     channel.ledger.redeem(cid, "power_action", {"action": "sleep"})
@@ -990,7 +994,7 @@ try:
 except ConfirmationError:
     check("однократное сгорело", True)
 
-# Отказ.
+# A refusal.
 denied_ask = channel.ask("power_action", {"action": "reboot"},
                          permission="system.power", reason="…",
                          preview="Компьютер будет перезагружен.")
@@ -999,7 +1003,7 @@ check("отказ не выдаёт подтверждения",
       denied["granted"] is False and denied["confirmation_id"] is None)
 check("отказ назван причиной", denied["reason"] == "denied")
 
-# Отказ по умолчанию: молчание не согласие.
+# Refusal by default: silence is not consent.
 silent = channel.ask("power_action", {"action": "shutdown"},
                      permission="system.power", reason="…",
                      preview="Компьютер будет выключен.", ttl=60)
@@ -1016,7 +1020,7 @@ now[0] += 31
 check("просроченные просьбы убираются", channel.expire() == 1)
 check("после уборки не осталось", channel.pending == 0)
 
-# Опасному действию длительная область не выдаётся.
+# A dangerous action is not granted a lasting scope.
 risky = channel.ask("power_action", {"action": "shutdown"},
                     permission="system.power", reason="…",
                     preview="Компьютер будет выключен.")
@@ -1024,7 +1028,7 @@ got = channel.resolve(risky.id, True, UNTIL)
 check("опасному действию область понижена до одноразовой",
       got["scope"] == ONCE and got["downgraded"] is True)
 
-# Неопасному — выдаётся, и подтверждение переживает предъявление.
+# A non-dangerous one is, and the confirmation survives being presented.
 mild = channel.ask("set_volume", {"level": 30}, permission="system.media",
                    reason="…", preview="Громкость станет 30 %.")
 kept = channel.resolve(mild.id, True, UNTIL)
@@ -1096,14 +1100,14 @@ check("вопрос задан и ждёт ответа", live.awaiting and live
 live.note_pong()
 check("понг снимает счётчик", live.missed == 0 and not live.awaiting)
 
-# Любое сообщение считается за ответ: занятый канал пинговать незачем.
+# Any message counts as an answer: there is no point pinging a busy channel.
 t[0] += 10
 live.sent_ping()
 live.note_traffic()
 check("обычное сообщение засчитано как признак жизни",
       live.missed == 0 and not live.due())
 
-# Три неотвеченных подряд — смерть; двух мало.
+# Three unanswered in a row is death; two is not enough.
 for i in range(MISSED_LIMIT - 1):
     t[0] += SILENCE
     live.sent_ping()
@@ -1163,7 +1167,7 @@ check("сброс отчитался, чего сколько было", was == 
 check("сессия снова требует рукопожатия",
       not link.ready and link.state == SessionState.CLOSED)
 
-# Главное: выданное разрешение не переживает обрыв.
+# The main thing: a granted permission does not survive a break.
 try:
     perm.ledger.redeem(granted["confirmation_id"], "set_volume", {"level": 20})
     check("разрешение, выданное до обрыва, не действует", False)
@@ -1189,8 +1193,9 @@ same_added, same_broken = diff(snapshot, contract_now())
 check("код и снимок сходятся", not same_added and not same_broken,
       f"| можно: {same_added}, ломает: {same_broken}")
 
-# Проверка обязана ловить каждое из ломающих изменений §4 — иначе она
-# декоративна, а декоративная проверка хуже её отсутствия: на неё полагаются.
+# The check is obliged to catch every one of §4's breaking changes —
+# otherwise it is decorative, and a decorative check is worse than none: it
+# gets relied on.
 base = contract_now()
 
 
@@ -1267,14 +1272,14 @@ for what, change in (("новое необязательное поле", add_op
 print()
 print("=== E05: форма сработавшего напоминания ===")
 
-# Хранилищу подсовывается память, а не диск: проверка не должна ничего
-# писать даже во временную папку, если может обойтись.
+# The store is handed memory rather than a disk: a check must write nothing,
+# not even into a temporary folder, if it can do without.
 from core.settings_api import MemorySettings
 from voice.reminders import ReminderStore
 
 fired = ReminderStore(MemorySettings()).add("timer", 9e9, "проверить тесты")
 
-# Форма из §10 спецификации читается прямо оттуда, а не переписывается сюда.
+# The shape from §10 of the specification is read straight from there rather than copied here.
 section10 = spec_text[spec_text.index("### Форма `reminder.fired.item`"):]
 section10 = section10[:section10.index(chr(10) + chr(10) + "**")]
 documented = set(re.findall(r"^\| `([a-z_]+)` \|", section10, re.M))
@@ -1285,7 +1290,7 @@ check("хранилище кладёт ровно описанные поля",
       f"| только в документе: {sorted(documented - set(fired))}, "
       f"только в хранилище: {sorted(set(fired) - documented)}")
 
-# И всё это обязано пережить провод: событие несёт item объектом.
+# And all of it is obliged to survive the wire: the event carries item as an object.
 import json as _json2
 
 check("напоминание сериализуется без потерь",

@@ -1,8 +1,9 @@
 """
-C01, C02, C04: модель инструмента, валидация аргументов, каталог разрешений.
+C01, C02, C04: the tool model, argument validation, the permission
+catalogue.
 
-Проверяется без приложения: реестр — часть ядра и не должен знать ни о Qt,
-ни о настройках.
+Checked without the application: the registry is part of the core and must
+know nothing of Qt or of the settings.
 """
 import os
 import sys
@@ -28,7 +29,7 @@ def check(label, cond, detail=""):
 
 
 def raises(fn, exc):
-    """Вызов обязан бросить именно это исключение."""
+    """The call is obliged to raise precisely this exception."""
     try:
         fn()
         return False

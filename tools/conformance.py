@@ -1,30 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-Conformance-тесты протокола: двенадцать требований §15.
+The protocol's conformance tests: the twelve requirements of §15.
 
-Задача плана 4.0-D16.
+Plan item 4.0-D16.
 
-Чем это отличается от tools/test_wire.py. Тот проверяет части по отдельности,
-вызывая их напрямую. Здесь обе стороны видят **только байты**: каждое
-сообщение проходит encode_frame -> транспорт -> FrameDecoder, и ни одна
-сторона не заглядывает в объекты другой. Требование, выполненное вызовом
-функции, но не выполненное через провод, — не выполнено.
+How this differs from tools/test_wire.py. That one checks the parts
+separately, calling them directly. Here both sides see **only bytes**: every
+message goes through encode_frame -> the transport -> FrameDecoder, and
+neither side looks into the other's objects. A requirement fulfilled by
+calling a function but not fulfilled over the wire is not fulfilled.
 
-Транспорт внутри процесса, а не именованный канал. Так требует ADR 0002:
-протокол не зависит от транспорта, и conformance обязан это доказывать, а не
-предполагать. Заодно набор идёт за миллисекунды и не оставляет за собой
-процессов.
+An in-process transport, not a named pipe. ADR 0002 requires this: the
+protocol does not depend on the transport, and conformance is obliged to
+prove that rather than assume it. The suite also runs in milliseconds and
+leaves no processes behind.
 
-Без потоков. Доставка явная — `deliver()` переносит накопленные байты из
-исходящего буфера одной стороны во входящий разбор другой. Потоки дали бы
-недетерминированный порядок, а conformance обязан падать одинаково.
+No threads. Delivery is explicit — `deliver()` carries the accumulated bytes
+from one side's outgoing buffer into the other's incoming parse. Threads
+would give a non-deterministic order, and conformance is obliged to fail the
+same way every time.
 
-**Ядро настоящее там, где это важно.** Ворота подтверждений — тот самый
-`core/toolrunner.py`, которым пользуется приложение; заглушка на его месте
-проверяла бы заглушку. Оболочка здесь mock: настоящей ещё нет (`4.0-F02`),
-и когда она появится, набор натравливают на неё, не переписывая требований.
+**The core is real where that matters.** The confirmation gates are that
+very `core/toolrunner.py` the application uses; a stub in its place would be
+checking a stub. The shell here is a mock: the real one does not exist yet
+(`4.0-F02`), and when it appears the suite is set on it without rewriting
+the requirements.
 
-Запуск:
+To run:
     python tools/conformance.py
 """
 
@@ -78,14 +80,16 @@ def requirement(number, title):
 
 
 # ---------------------------------------------------------------------------
-# Транспорт внутри процесса
+# The in-process transport
 # ---------------------------------------------------------------------------
 class Endpoint:
     """
-    Одна сторона: сессия, номера сообщений, буферы обоих каналов.
+    One side: the session, the message numbers, the buffers of both
+    channels.
 
-    Наружу отдаёт только байты. Всё, что сторона «знает» о собеседнике,
-    получено разбором пришедших кадров, а не обращением к его объектам.
+    It gives out only bytes. Everything a side "knows" about its
+    correspondent was obtained by parsing the frames that arrived, not by
+    reaching into its objects.
     """
 
     def __init__(self, side, prefix, versions=(1,), capabilities=None):
@@ -109,7 +113,7 @@ class Endpoint:
 
 
 def deliver(src, dst):
-    """Перенести управляющие байты и вернуть разобранные сообщения."""
+    """Carry the control bytes across and return the parsed messages."""
     raw, src.control_out = bytes(src.control_out), bytearray()
     got = list(dst.control_in.feed(raw))
     dst.received.extend(got)
@@ -129,16 +133,17 @@ def one(messages, what="сообщение"):
 
 
 # ---------------------------------------------------------------------------
-# Эталонное ядро
+# The reference core
 # ---------------------------------------------------------------------------
 class ReferenceCore:
     """
-    Ядро, отвечающее по протоколу.
+    A core that answers by the protocol.
 
-    Тонкая замена `4.0-E02`, которого ещё нет: разбирает конверт, сторожит
-    рукопожатие и возможности, а опасное действие отдаёт настоящему
-    `ToolRunner` — ворота подтверждений обязаны быть теми же, что в
-    приложении, иначе проверяется заглушка.
+    A thin stand-in for `4.0-E02`, which does not exist yet: it parses the
+    envelope, guards the handshake and the capabilities, and hands a
+    dangerous action to the real `ToolRunner` — the confirmation gates are
+    obliged to be the same as in the application, or a stub is what gets
+    checked.
     """
 
     def __init__(self, store=None, capabilities=None, versions=(1,),
@@ -148,14 +153,15 @@ class ReferenceCore:
         settings = MemorySettings()
         from voice.reminders import ReminderStore
         from voice.user_commands import UserCommandStore
-        # Часы одни на журнал подтверждений и на канал разрешений: две шкалы
-        # времени в одном контуре — это срок, вычисленный на одной и
-        # проверяемый на другой.
+        # One clock for the confirmation ledger and for the permission
+        # channel: two time scales in one loop mean a deadline computed on
+        # one and checked on the other.
         clock = clock or time.time
         ledger = ConfirmationLedger(clock=clock)
-        #: Кого просить о системном действии. Ставится тестом после того,
-        #: как заведена оболочка: ядро без собеседника машину не трогает
-        #: вовсе (ADR 0009), и это его свойство, а не недоделка.
+        #: Who to ask about a system action. Set by the test after the shell
+        #: is created: a core without a correspondent does not touch the
+        #: machine at all (ADR 0009), and that is a property of it rather
+        #: than an unfinished job.
         self.peer = None
         self.runner = ToolRunner(ToolContext(
             settings=settings,
@@ -180,13 +186,13 @@ class ReferenceCore:
 
     def _round_trip(self, method, payload):
         """
-        Спросить оболочку и дождаться ответа — через провод.
+        Ask the shell and wait for an answer — over the wire.
 
-        Круг синхронный, потому что оба конца здесь в одном потоке: запрос
-        кладётся в буфер, доставляется, обслуживается, ответ доставляется
-        обратно. Настоящее ядро делает то же самое рабочим потоком
-        (`ask_shell_sync`), но проверяется здесь не многопоточность, а то,
-        что просьба **ушла и вернулась**.
+        The round is synchronous, because both ends are in one thread here:
+        the request is put into a buffer, delivered, served, and the answer
+        delivered back. A real core does the same with a worker thread
+        (`ask_shell_sync`), but what is checked here is not multithreading
+        but that the request **went and came back**.
         """
         if self.peer is None:
             return {}
@@ -216,7 +222,7 @@ class ReferenceCore:
         return bool(answer.get("ok")), str(answer.get("reason", ""))
 
     def handle(self, raw_or_envelope):
-        """Обработать одно пришедшее сообщение, вернуть ответы (список)."""
+        """Handle one incoming message, return the answers (a list)."""
         message = raw_or_envelope
         out = []
         with trace_scope(message.trace_id):
@@ -256,11 +262,11 @@ class ReferenceCore:
 
     def _command(self, message):
         """
-        Одна команда, отображённая в один вызов инструмента.
+        One command, mapped to one tool call.
 
-        Настоящий разбор фразы живёт в роутере и проверяется golden-набором;
-        здесь важно другое — что ворота подтверждений стоят на пути от
-        провода к исполнению.
+        The real phrase parsing lives in the router and is checked by the
+        golden suite; what matters here is something else — that the
+        confirmation gates stand on the path from the wire to the execution.
         """
         out = []
         text = message.payload.get("text", "")
@@ -291,14 +297,14 @@ class ReferenceCore:
 
 
 class ReferenceShell:
-    """Оболочка-заглушка: умеет поздороваться, спросить и послушать."""
+    """A stub shell: it can say hello, ask and listen."""
 
     def __init__(self, versions=(1,), capabilities=None):
         self.endpoint = Endpoint(Side.SHELL, "s-", versions, capabilities)
         self.events = Router()
         self.heard = []
-        self.done = []          # системные действия, о которых просило ядро
-        self.launched = []      # что просили запустить
+        self.done = []          # system actions the core asked for
+        self.launched = []      # what was asked to be launched
         for name in ("assistant.response", "task.progress", "task.partial",
                      "task.done", "task.failed", "task.cancelled"):
             self.events.on(name, lambda p, n=name: self.heard.append(n))
@@ -312,11 +318,11 @@ class ReferenceShell:
             method, dict(payload or {}), id=self.endpoint.ids.next(),
             trace_id=trace_id))
 
-    #: Что оболочку просили сделать с машиной (`4.0-G01`, ADR 0009).
-    #: Ядро больше не трогает систему само, и проверка «дошло до
-    #: системного слоя» теперь смотрит именно сюда.
+    #: What the shell was asked to do to the machine (`4.0-G01`, ADR 0009).
+    #: The core no longer touches the system itself, and the check "it
+    #: reached the system layer" now looks precisely here.
     def serve(self, request):
-        """Ответить на запрос ядра так, как ответила бы настоящая оболочка."""
+        """Answer a request from the core the way a real shell would."""
         if request.method == "system.do":
             action = request.payload.get("action", "")
             self.done.append(action)
@@ -333,7 +339,7 @@ class ReferenceShell:
 
 
 def handshake(shell, core):
-    """Провести рукопожатие через провод. Возвращает ответ ядра."""
+    """Carry out the handshake over the wire. Returns the core's answer."""
     with trace_scope() as trace:
         shell.ask("hello", shell.session.hello_payload(), trace_id=trace)
     incoming = one(deliver(shell.endpoint, core.endpoint), "hello")
@@ -347,11 +353,12 @@ def handshake(shell, core):
 
 def talk(shell, core, method, payload=None, trace_id=None):
     """
-    Запрос оболочки → обработка ядром → всё, что вернулось.
+    The shell's request -> handling by the core -> everything that came back.
 
-    Встречные запросы ядра (`system.do`, `apps.launch`) обслуживаются
-    внутри обработки: с `4.0-G01` системное действие делается не в ядре, а
-    по ту сторону провода, и исход нужен инструменту немедленно.
+    The core's counter-requests (`system.do`, `apps.launch`) are served
+    inside the handling: since `4.0-G01` a system action is performed not in
+    the core but on the other side of the wire, and the tool needs the
+    outcome immediately.
     """
     shell.ask(method, payload, trace_id=trace_id)
     for message in deliver(shell.endpoint, core.endpoint):
@@ -378,7 +385,7 @@ required = ("v", "type", "id", "timestamp", "trace_id", "payload")
 missing = [f for m in answers for f in required if f not in m.to_dict()]
 check("во всех ответах полный конверт", not missing, f"| {missing}")
 
-# Битое сообщение, собранное руками в обход конструктора.
+# A broken message, assembled by hand around the constructor.
 import json as _json
 
 broken = _json.dumps({"v": 1, "type": "request", "method": "command.handle",
@@ -462,7 +469,7 @@ check("ядро без stt объявило это в рукопожатии",
 check("оболочка сама не станет звать speech.listen_once",
       not picky_shell.session.may_call("speech.listen_once"))
 
-# А если всё же позовёт — ядро откажет тем же кодом.
+# And if it does call — the core refuses with the same code.
 picky_shell.ask("speech.listen_once", {})
 for message in deliver(picky_shell.endpoint, deaf_core.endpoint):
     deaf_core.handle(message)
@@ -478,7 +485,7 @@ audio = DataSender()
 audio.open_stream(11, "audio.input")
 check("до кредита не отправляется ни байта", audio.available(11) == 0)
 audio.grant(11, 2048)
-chunk = b"\x00\x01" * 512                       # 1024 байта
+chunk = b"\x00\x01" * 512                       # 1024 bytes
 shell.endpoint.send_data(audio.send(11, chunk))
 shell.endpoint.send_data(audio.send(11, chunk))
 overflow = None
@@ -584,7 +591,7 @@ check("код — «требуется подтверждение»",
       f"| {refusal[0].payload['code'] if refusal else '—'}")
 check("компьютер не тронут", box.actions == [], f"| {box.actions}")
 
-# Теперь с подтверждением, выданным ядром через канал разрешений.
+# Now with a confirmation issued by the core through the permission channel.
 ask = core.permissions.ask("power_action", {"action": "sleep"},
                            permission="system.power",
                            reason="Пользователь сказал «усыпи компьютер»",
@@ -613,9 +620,10 @@ check("а ядро само машину не трогало",
 # --- 10 --------------------------------------------------------------------
 requirement(10, "просроченное подтверждение отклоняется")
 
-# Ядро с поддельными часами: срок проверяется, а не пережидается. Первая
-# редакция этой проверки провалилась, и провал был настоящим — журнал
-# подтверждений жил по системному времени, а канал разрешений по своему.
+# A core with a fake clock: the deadline is checked rather than waited out.
+# The first edition of this check failed, and the failure was real — the
+# confirmation ledger ran on system time and the permission channel on its
+# own.
 late_clock = [1000.0]
 slow_core = ReferenceCore(clock=lambda: late_clock[0])
 slow_shell = ReferenceShell()
@@ -629,7 +637,7 @@ check("подтверждение выдано и живо",
       slow_core.runner._confirmations.pending() == 1)
 
 box.clear()
-late_clock[0] += 120                      # окно прошло
+late_clock[0] += 120                      # the window has passed
 answers = talk(slow_shell, slow_core, "command.handle",
                {"text": "усыпи компьютер", "source": "voice",
                 "confirmation_id": granted["confirmation_id"]})
@@ -659,12 +667,12 @@ task_before.start()
 check("до падения есть и данные, и летучее состояние",
       store and core2.volatile.snapshot()["задачи"] == 1)
 
-was = core2.volatile.reset()          # ядро умерло
-shell2.session.close()                # оболочка увидела обрыв
+was = core2.volatile.reset()          # the core died
+shell2.session.close()                # the shell saw the break
 check("оболочка знает, что связи нет",
       shell2.session.state == SessionState.CLOSED)
 
-core3 = ReferenceCore(store=store)    # оболочка подняла ядро заново
+core3 = ReferenceCore(store=store)    # the shell raised the core afresh
 shell3 = ReferenceShell()
 handshake(shell3, core3)
 check("новое рукопожатие состоялось", shell3.session.ready)

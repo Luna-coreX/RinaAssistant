@@ -1,16 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-E01 + E02: ядро отдельным процессом, и с ним разговаривают по проводу.
+E01 + E02: the core as a separate process, and talking to it over the wire.
 
-Это первая проверка, где разделение не изображается, а происходит: ядро
-запускается настоящим `subprocess`, у него свой интерпретатор, своя память и
-свой журнал, а связь — только байты через стандартный ввод-вывод.
+This is the first check where the split is not depicted but happens: the
+core is started as a real `subprocess`, it has its own interpreter, its own
+memory and its own journal, and the link is only bytes through standard
+input and output.
 
-Ядро поднимается через `tools/_core_sandboxed.py`, а не напрямую: побочные
-эффекты обезвреживаются в самом дочернем процессе, потому что песочница
-родителя на него не распространяется.
+The core is raised through `tools/_core_sandboxed.py` rather than directly:
+the side effects are disarmed inside the child process itself, because the
+parent's sandbox does not extend to it.
 
-Запуск:
+To run:
     python tools/test_service.py
 """
 
@@ -36,11 +37,11 @@ from core.wire import (Envelope, FrameDecoder, IdGenerator, MessageType,
 
 fails = 0
 
-#: Простейший плагин для проверки установки.
+#: The simplest plugin, for checking installation.
 #:
-#: Переводы строки склеиваются из `chr(10)`, а не пишутся `\n`:
-#: константа правилась скриптом, и экранированный перенос дважды
-#: превратился в настоящий, ломая файл.
+#: The newlines are glued from `chr(10)` rather than written as `\n`: the
+#: constant was edited by a script, and an escaped newline turned into a real
+#: one twice over, breaking the file.
 PLUGIN_SOURCE = (
     "from plugins.api import Plugin" + chr(10) * 3
     + "class Fresh(Plugin):" + chr(10)
@@ -60,7 +61,7 @@ LAUNCHER = os.path.join(ROOT, "tools", "_core_sandboxed.py")
 
 
 class Core:
-    """Ядро в отдельном процессе; наружу — только кадры."""
+    """The core in a separate process; outwards — only frames."""
 
     def __init__(self, extra=()):
         self.proc = subprocess.Popen(
@@ -70,9 +71,9 @@ class Core:
         self.decoder = FrameDecoder()
         self.ids = IdGenerator("s-")
         self.session = Session(side=Side.SHELL)
-        self.apps = []          # индекс, который отдаём ядру
-        self.did = []           # системные действия, о которых просили
-        self.launched = []      # что просили запустить
+        self.apps = []          # the index we hand to the core
+        self.did = []           # the system actions that were asked for
+        self.launched = []      # what was asked to be launched
 
     def send(self, envelope):
         self.proc.stdin.write(encode_frame(envelope))
@@ -86,17 +87,18 @@ class Core:
 
     def read_until(self, method, timeout=30.0, limit=20):
         """
-        Читать, пока не придёт нужное событие.
+        Read until the event we need arrives.
 
-        Ответ «принято» и сам ответ Рины разделены во времени — в этом и
-        смысл: команда думает, а запрос не держат открытым. Ждать
-        фиксированное число сообщений значило бы гадать, сколько их будет.
+        The "accepted" answer and Rina's answer itself are separated in
+        time — that is the point: the command thinks, and the request is not
+        held open. Waiting for a fixed number of messages would mean
+        guessing how many there will be.
         """
         seen = []
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline and len(seen) < limit:
             if self.proc.poll() is not None:
-                break                # ядро умерло — ждать больше нечего
+                break                # the core died — there is nothing more to wait for
             batch = self.read(1, timeout=deadline - time.monotonic())
             if not batch:
                 break
@@ -105,15 +107,15 @@ class Core:
                 break
         return seen
 
-    #: Что ядро просило сделать с машиной и что запустить.
-    #: Проверки смотрят сюда: своих системных вызовов у ядра больше нет.
+    #: What the core asked to be done to the machine and what to launch.
+    #: The checks look here: the core has no system calls of its own any more.
     def serve(self, message):
         """
-        Ответить на встречный запрос ядра, как ответила бы оболочка.
+        Answer a counter-request from the core, as a shell would.
 
-        Возвращает True, если сообщение было запросом и на него ответили, —
-        такие сообщения не считаются «пришедшими»: это наша половина
-        разговора, а не ответ ядра.
+        Returns True if the message was a request and was answered — such
+        messages do not count as "arrived": they are our half of the
+        conversation, not the core's answer.
         """
         if message.type != MessageType.REQUEST:
             return False
@@ -133,7 +135,7 @@ class Core:
         return True
 
     def read(self, count=1, timeout=15.0):
-        """Дождаться указанного числа сообщений."""
+        """Wait for the stated number of messages."""
         got, deadline = [], time.monotonic() + timeout
         while len(got) < count and time.monotonic() < deadline:
             header = self.proc.stdout.read(4)
@@ -147,9 +149,9 @@ class Core:
                     break
                 body += piece
             for message in self.decoder.feed(header + body):
-                # Запрос ядра — наша забота, а не «пришедшее сообщение»:
-                # отдать его наружу значило бы заставить каждую проверку
-                # знать, что ядро иногда спрашивает.
+                # A request from the core is our own business rather than
+                # an "arrived message": handing it outwards would mean
+                # making every check know that the core sometimes asks.
                 if not self.serve(message):
                     got.append(message)
         return got
@@ -196,7 +198,7 @@ bad = subprocess.run(
 check("без сессии режим pipe отклонён с кодом 2", bad.returncode == 2,
       f"| код {bad.returncode}")
 
-# Ядро обязано работать там, где интерфейсной библиотеки нет.
+# The core is obliged to work where there is no interface library.
 headless = subprocess.run(
     [sys.executable, "-u", "-c",
      "import sys; sys.path.insert(0, r'%s');"
@@ -263,11 +265,12 @@ check("и диапазон", schema["volume"]["low"] == 0
 check("и перечисление", "DEBUG" in schema["log_level"]["choices"])
 check("и зависимость между полями",
       schema["llm_url"]["depends_on"] == "llm_enabled")
-# Ни одна настройка не требует перезапуска, и это утверждение, а не
-# совпадение: язык, движки речи и уровень журнала применяются на лету.
-# Признак в схеме остаётся — он понадобится тому, что вправду нельзя
-# применить живьём, — но появление такого ключа должно быть решением, а не
-# случайностью, поэтому проверка о нём и споткнётся.
+# Not one setting requires a restart, and that is a statement rather than a
+# coincidence: the language, the speech engines and the journal level are
+# applied on the fly. The mark stays in the schema — it will be needed by
+# something that truly cannot be applied live — but such a key appearing must
+# be a decision rather than an accident, and that is what this check trips
+# over.
 check("настройки применяются без перезапуска",
       not any(spec.get("restart_required") for spec in schema.values()),
       f"| {[k for k, v in schema.items() if v.get('restart_required')]}")
@@ -277,7 +280,7 @@ check("раскладку ядро не описывает намеренно",
       and "ADR 0006" in described.payload.get("note", ""),
       f"| {described.payload.get('note')}")
 
-# Запись: вердикт по каждому ключу, а не одно «получилось» на всю посылку.
+# Writing: a verdict per key, not one "it worked" for the whole parcel.
 core.ask("settings.set", {"values": {"volume": 42, "log_level": "TRACE",
                                      "llm_url": "http://192.168.1.9:11434",
                                      "нетакого": 1}})
@@ -318,9 +321,9 @@ check("по просьбе ядро завершилось с нулём", code 
 print()
 print("=== E05: напоминание срабатывает само ===")
 
-# Первый настоящий потребитель канала событий: до сих пор его проверяли
-# заглушками. Напоминание ставится голосовой командой — через настоящий
-# разбор, — и приходит push-событием, которого никто не запрашивал.
+# The event channel's first real consumer: until now it was checked with
+# stubs. The reminder is set by a voice command — through the real parse —
+# and arrives as a push event nobody asked for.
 timer = Core()
 timer.handshake()
 
@@ -330,12 +333,12 @@ check("команда принята и подтверждена вслух",
       any(m.method == "assistant.response" for m in booked),
       f"| {[m.method for m in booked]}")
 
-# Ответ на список и само срабатывание идут по одному каналу и могут
-# перемешаться: таймер трёхсекундный, а ответ приходит когда приходит.
-# Поэтому читается один поток до срабатывания, а разбирается он потом.
-# Первая редакция этой проверки ждала их по очереди — и цикл ожидания
-# ответа съедал пришедшее следом событие, после чего второй цикл ждал
-# того, что уже прочитано.
+# The answer to the list and the firing itself go over one channel and may
+# get mixed up: the timer is three seconds, and the answer comes when it
+# comes. So one stream is read up to the firing, and parsed afterwards. The
+# first edition of this check waited for them in turn — and the loop waiting
+# for the answer ate the event that came next, after which the second loop
+# waited for what had already been read.
 timer.ask("reminders.list")
 alarm = timer.read_until("reminder.fired", timeout=25, limit=30)
 
@@ -375,7 +378,7 @@ print("=== E01: ядро не переживает свою оболочку ===
 orphan = Core()
 orphan.handshake()
 check("ядро живо, пока канал открыт", orphan.proc.poll() is None)
-orphan.proc.stdin.close()                      # «оболочка умерла»
+orphan.proc.stdin.close()                      # "the shell died"
 code = orphan.wait()
 check("после обрыва ядро завершилось само", code == 0, f"| код {code}")
 
@@ -404,8 +407,8 @@ strict.wait()
 print()
 print("=== F04: команды и история через протокол ===")
 
-# Шесть возможностей инвентаря были недостижимы: место в архитектуре у них
-# было, а метода не было. Здесь проверяется, что теперь достижимы.
+# Six of the inventory's capabilities were unreachable: they had a place in
+# the architecture and no method. Here it is checked that they are reachable now.
 work = Core()
 work.handshake()
 check("ядро объявило возможности команд и истории",
@@ -447,7 +450,7 @@ check("новая команда из импорта принята",
 work.ask("commands.delete", {"id": saved["id"]})
 check("команда удаляется", work.read(1)[0].payload["deleted"] is True)
 
-# История: разговор виден, стирается и выгружается.
+# History: the conversation is visible, erasable and exportable.
 work.ask("command.handle", {"text": "который час", "source": "typed"})
 work.read_until("assistant.response")
 work.ask("history.list", {"limit": 10})
@@ -468,8 +471,9 @@ check("история стирается по просьбе человека",
       cleared > 0 and work.read(1)[0].payload["total"] == 0,
       f"| стёрто {cleared}")
 
-# Установка плагина: раньше здесь стоял честный отказ «появится вместе с
-# блоком H». Блок H закрыт, отказ снят, и проверка проверяет установку.
+# Installing a plugin: there used to be an honest refusal here, "it will come
+# with block H". Block H is closed, the refusal is gone, and the check checks
+# the installation.
 work.ask("plugins.install", {"source": "C:/nowhere"})
 answer = work.read(1)[0]
 check("несуществующий источник отклонён с причиной",
@@ -477,7 +481,7 @@ check("несуществующий источник отклонён с при�
       and "не найден" in answer.payload["message"],
       f"| {answer.payload.get('message')}")
 
-# И настоящая установка — из папки, собранной здесь же.
+# And a real installation — from a folder assembled right here.
 
 with tempfile.TemporaryDirectory() as staging:
     folder = os.path.join(staging, "probe_install")
@@ -489,9 +493,10 @@ with tempfile.TemporaryDirectory() as staging:
     io.open(os.path.join(folder, "main.py"), "w",
             encoding="utf-8").write(PLUGIN_SOURCE)
 
-    # Ставим в настоящий каталог плагинов — другого установка не знает, —
-    # поэтому убираем за собой и до, и после: проверка, оставившая плагин,
-    # на втором прогоне проверяет замену вместо установки. Так и вышло.
+    # We install into the real plugins directory — installation knows no
+    # other — so we clear up both before and after: a check that left a
+    # plugin behind checks replacement instead of installation on the second
+    # run. Which is what happened.
     installed = os.path.join(ROOT, "plugins", "probe_install")
     shutil.rmtree(installed, ignore_errors=True)
 
@@ -512,7 +517,7 @@ with tempfile.TemporaryDirectory() as staging:
 shutil.rmtree(os.path.join(ROOT, "plugins", "probe_install"),
               ignore_errors=True)
 
-# Сброс настроек: возвращает умолчания и не трогает команды.
+# Resetting the settings: it returns the defaults and does not touch the commands.
 work.ask("settings.set", {"values": {"volume": 11}})
 work.read(1)
 work.ask("commands.save", {"command": {"type": "speak", "target": "тест",
@@ -537,15 +542,15 @@ work.wait()
 print()
 print("=== F11: опасное подтверждается, а не выполняется ===")
 
-# Ядро не может выполнить необратимое само: оно просит, оболочка спрашивает
-# человека, решение возвращается. До сих пор канал разрешений существовал, но
-# им никто не пользовался — опасное действие просто отклонялось.
+# The core cannot perform something irreversible itself: it asks, the shell
+# asks the person, the decision comes back. Until now the permission channel
+# existed but nobody used it — a dangerous action was simply rejected.
 danger = Core()
 danger.handshake()
 
 danger.ask("command.handle", {"text": "выключи компьютер", "source": "voice"})
-# Ждём именно запрос разрешения: сторожевое слово, которого не
-# бывает, заставляло бы ждать весь срок впустую.
+# We wait for the permission request itself: a sentinel word that never
+# comes would make us wait out the whole deadline for nothing.
 asked = danger.read_until("permission.request", timeout=25, limit=10)
 requests = [m for m in asked if m.type == MessageType.REQUEST
             and m.method == "permission.request"]
@@ -564,9 +569,9 @@ if requests:
           f"| {ask.payload.get('ttl')} с")
     check("запрос несёт свой номер", bool(ask.payload.get("request_id")))
 
-    # --- отказ ---
-    # Отвечаем так же, как отвечала бы оболочка: ответ наследует
-    # трассировку и версию у запроса.
+    # --- the refusal ---
+    # We answer as a shell would: the answer inherits the trace and the
+    # version from the request.
     danger.send(ask.reply({"granted": False, "scope": "once"},
                           id=danger.ids.next()))
     after = danger.read_until("assistant.response", timeout=20, limit=8)
@@ -575,7 +580,7 @@ if requests:
     check("после отказа Рина отвечает словами, а не молчит", said,
           f"| {said}")
 
-# --- согласие: то же действие, но разрешённое ---
+# --- consent: the same action, but permitted ---
 danger.ask("command.handle", {"text": "выключи компьютер", "source": "voice"})
 asked2 = danger.read_until("permission.request", timeout=25, limit=10)
 requests2 = [m for m in asked2 if m.type == MessageType.REQUEST
@@ -599,9 +604,9 @@ danger.wait()
 print()
 print("=== F04: список значений спрашивают, а не угадывают ===")
 
-# Изменчивое отделено от постоянного: `describe` говорит, что набор есть,
-# `options` — какой он сегодня. Проверяется в живом ядре, потому что ответ
-# зависит от того, что на машине действительно установлено.
+# The changeable is separated from the constant: `describe` says a set
+# exists, `options` says what it is today. Checked in a live core, because
+# the answer depends on what is really installed on the machine.
 opt = Core()
 opt.handshake()
 
@@ -628,15 +633,15 @@ check("недоступное показано, а не спрятано",
       any(not o["available"] for o in listed["stt_engine"]),
       "| иначе человек не узнает, что такое бывает")
 
-# Значение вне сегодняшнего набора не принимается: набор — это правда о
-# машине, а не украшение списка.
+# A value outside today's set is not accepted: the set is the truth about
+# the machine, not a decoration of the list.
 opt.ask("settings.set", {"values": {"tts_engine": "такого-нет"}})
 verdict = opt.read(1)[0].payload["verdicts"]["tts_engine"]
 check("чужое значение отклонено", not verdict["accepted"],
       f"| {verdict['code']}")
 
-# Смена движка уводит за собой голос: у каждого движка своя нумерация, и
-# оставленный чужой голос молчал бы навсегда.
+# Changing the engine takes the voice with it: every engine has its own
+# numbering, and a foreign voice left behind would stay silent forever.
 before = listed["voice"]
 opt.ask("settings.set", {"values": {"tts_engine": "silent"}})
 said = opt.read(1)[0].payload["verdicts"]["tts_engine"]
@@ -657,12 +662,12 @@ opt.wait()
 print()
 print("=== E06a: настройка переживает перезапуск ядра ===")
 
-# Единственная проверка, которая ловит это: в одном процессе значение
-# читается обратно и без записи на диск — оно лежит в памяти. В 3.1.0
-# сохранял тот, кто менял, — экран настроек; экран уехал в другой процесс,
-# а вызов остался там, и настройка держалась ровно до выхода из ядра.
-# Оба ядра смотрят в один каталог: иначе «перезапуск» — это два разных
-# хранилища, и проверка зелена, ничего не проверив.
+# The only check that catches this: in one process the value is read back
+# without being written to disk — it lies in memory. In 3.1.0 the saving was
+# done by whoever changed it — the settings screen; the screen moved to
+# another process and the call stayed there, and a setting held exactly until
+# the core exited. Both cores look into one directory: otherwise a "restart"
+# is two different stores, and the check is green having checked nothing.
 shared_dir = tempfile.mkdtemp(prefix="rina-restart-")
 os.environ["RINA_SANDBOX_DIR"] = shared_dir
 
@@ -692,11 +697,12 @@ again.ask("core.shutdown")
 again.read(1)
 again.wait()
 
-# И то же с другой стороны: ядро, которому меняют один ключ, не должно
-# уносить с собой остальные. Так пропали настройки вживую — оболочка
-# записала отделку, а на диск уехала вся группа умолчаниями, потому что
-# ядро файла не читало. Проверка кладёт заведомо чужие значения в файл до
-# запуска ядра и смотрит, что с ними станет.
+# And the same from the other side: a core that has one key changed must not
+# carry the rest away with it. That is how the settings went missing in real
+# life — the shell wrote down the finish, and the whole group went to disk as
+# defaults, because the core did not read the file. The check puts knowingly
+# foreign values into the file before the core starts and looks at what
+# becomes of them.
 import json as _json3
 
 untouched = os.path.join(shared_dir, "RinaAssistant", "settings.json")
@@ -726,9 +732,10 @@ shutil.rmtree(shared_dir, ignore_errors=True)
 print()
 print("=== F04: плагины по проводу ===")
 
-# Менеджер плагинов был написан под окно и тянул Qt. Проверка идёт через
-# настоящий процесс ядра ровно поэтому: импорт PySide6 в ядре запрещён, и
-# узнать об этом надо здесь, а не на машине, где Qt не установлен.
+# The plugin manager was written for a window and dragged Qt along. The check
+# goes through a real core process for exactly that reason: importing PySide6
+# in the core is forbidden, and that has to be found out here rather than on
+# a machine where Qt is not installed.
 plug = Core()
 plug.handshake()
 
@@ -739,8 +746,8 @@ check("у каждого есть имя и номер",
       all(p.get("plugin_id") and p.get("name") for p in listed))
 by_id = {p["plugin_id"]: p for p in listed}
 
-# Включение возвращает состояние ПОСЛЕ, а не «принято»: плагин может
-# отказаться загружаться, и «включено» было бы неправдой.
+# Switching on returns the state AFTER, not "accepted": a plugin may refuse
+# to load, and "on" would be an untruth.
 first = sorted(by_id)[0]
 plug.ask("plugins.set_enabled", {"plugin_id": first, "enabled": True})
 state = plug.read(1)[0].payload["plugin"]
@@ -750,7 +757,7 @@ plug.ask("plugins.list")
 after = {p["plugin_id"]: p for p in plug.read(1)[0].payload["items"]}
 with_page = [pid for pid, p in after.items() if p["has_page"]]
 
-# У выключенного страницы нет: он не загружен, и спрашивать его не о чем.
+# A switched-off one has no page: it is not loaded, and there is nothing to ask it.
 for pid in sorted(by_id):
     if pid == first:
         continue
@@ -772,8 +779,8 @@ if with_page:
     check("у каждого элемента есть вид",
           all(e.get("kind") for e in page["elements"]))
 
-    # Действие возвращает новую страницу тем же ответом: кнопка меняет то,
-    # что нарисовано рядом с ней.
+    # An action returns a new page in the same answer: a button changes
+    # what is drawn next to it.
     plug.ask("plugins.action", {"plugin_id": target, "action": "clear"})
     again = plug.read(1)[0].payload
     check("действие вернуло новую страницу",
@@ -794,10 +801,10 @@ plug.wait()
 print()
 print("=== F08: язык реплик Рины ===")
 
-# Слова интерфейса переводит оболочка, реплики Рины — ядро (ADR 0007).
-# Проверяется вторая половина: настройка одна, и ядро обязано применить её
-# к себе само — раньше это делало окно 3.1.0, единственный вход в
-# программу, а в разделённой программе входов два.
+# The interface's words are translated by the shell, Rina's lines by the core
+# (ADR 0007). The second half is checked here: there is one setting, and the
+# core is obliged to apply it to itself — 3.1.0's window used to do that, the
+# program's only entrance, and in a split program there are two.
 speaker = Core()
 speaker.handshake()
 
