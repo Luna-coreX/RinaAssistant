@@ -422,6 +422,20 @@ public partial class App
               window.FinishValue is "silver" or "black",
               $"| {window.FinishValue}");
 
+        // The data schema arrives in the handshake and is a real number
+        // (4.0-U01, ADR 0004). The update check compares a rollback against
+        // it, and a zero disables that comparison in silence.
+        //
+        // This is a check of the wiring, not of the arithmetic. The
+        // updater's own scenarios pass the schema by hand and were green
+        // while `AboutPage` asked for it with `settings.get` as
+        // `config_version` — a secret key the core does not hand out — and
+        // got zero every time. A check that calls the mechanism directly
+        // agrees with its author.
+        Check("схема данных пришла в рукопожатии",
+              link.Connection is { Ready: true, DataVersion: > 0 },
+              $"| {link.Connection?.DataVersion}");
+
         // Pages are built only inside a live tree, so the window is shown
         // off the edge of the screen: checking a page without showing it
         // means checking a constructor rather than a page.

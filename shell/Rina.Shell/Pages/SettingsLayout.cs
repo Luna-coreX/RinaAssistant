@@ -213,7 +213,10 @@ public static class SettingsLayout
         "llm_persona" => S("например, отвечай коротко и по делу"),
         "vosk_model" => S("папка с моделью"),
         "piper_model" => S("файл .onnx"),
-        "wake_word" => S("Рина"),
+        // There is deliberately no `wake_word` here. The core marks it
+        // obsolete — it is 3.1.0's singular mirror of `wake_words`, kept for
+        // compatibility and never shown — so a hint for it could never
+        // appear. A hint nobody will see reads as a key that exists.
         _ => "",
     };
 

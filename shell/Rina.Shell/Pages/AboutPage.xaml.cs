@@ -78,8 +78,7 @@ public partial class AboutPage : UserControl
         try
         {
             var found = await new Update.Updater([ProtocolVersion.Current])
-                .CheckAsync(ShellVersion, CoreVersion,
-                            await DataSchemaAsync());
+                .CheckAsync(ShellVersion, CoreVersion, DataSchema);
 
             UpdateState.Text = found.Explanation;
             UpdateNote.Text = found.Verdict switch
@@ -116,30 +115,32 @@ public partial class AboutPage : UserControl
     /// The version of the data schema on disk.
     /// </summary>
     /// <remarks>
-    /// Asked of the core, because the core is what writes to disk. Zero
-    /// means "we do not know" — and then a rollback is not forbidden by
-    /// schema, and not forbidden in silence either: an unknown number is no
-    /// reason to refuse, but no reason to allow either, so the schema check
-    /// simply does not fire.
+    /// <para>
+    /// From the handshake — the same source as the row that shows it. The
+    /// core names it there deliberately (<c>4.0-U01</c>, ADR 0004): the file
+    /// on disk belongs to the core, and it is not a setting.
+    /// </para>
+    /// <para>
+    /// It used to be asked for with <c>settings.get</c> as
+    /// <c>config_version</c>, and that always came back empty: the key is
+    /// marked secret, and the core does not hand secret keys out — it is
+    /// the state of the store rather than a setting. So the number was
+    /// always zero, and the rollback guard in <see cref="Update.Updater"/>,
+    /// which compares it, never fired. The guard's own check passed all the
+    /// while: it calls the updater directly and passes the schema by hand.
+    /// A check of the mechanism agrees with its author; what was broken was
+    /// the wiring to it.
+    /// </para>
+    /// <para>
+    /// Zero still means "we do not know" — before the handshake there is
+    /// nowhere to take the number from — and a rollback is then not
+    /// forbidden by schema. That is a decision, not an oversight: an unknown
+    /// number is no reason to refuse.
+    /// </para>
     /// </remarks>
-    private async Task<int> DataSchemaAsync()
-    {
-        if (_link?.Connection is not { Ready: true } connection) return 0;
-        try
-        {
-            var answer = await connection.CallAsync(Methods.SettingsGet,
-                new JsonObject
-                {
-                    ["keys"] = new JsonArray("config_version"),
-                }, TimeSpan.FromSeconds(10));
-            return answer.Payload["values"]?["config_version"]
-                   ?.GetValue<int>() ?? 0;
-        }
-        catch
-        {
-            return 0;
-        }
-    }
+    private int DataSchema =>
+        _link?.Connection is { Ready: true, DataVersion: > 0 } live
+            ? live.DataVersion : 0;
 
     /// <summary>
     /// What to put in place of an unknown version.
@@ -171,10 +172,10 @@ public partial class AboutPage : UserControl
             S("на чём они разговаривают"));
 
         // The data schema comes from the handshake: the file on disk
-        // belongs to the core, and it is not handed out as a setting.
+        // belongs to the core, and it is not handed out as a setting. The
+        // same number the update check compares against (see `DataSchema`).
         Add(S("Данные на диске"),
-            connection is { Ready: true, DataVersion: > 0 } data
-                ? data.DataVersion.ToString() : Unknown,
+            DataSchema > 0 ? DataSchema.ToString() : Unknown,
             S("формат настроек и истории"));
         await Task.CompletedTask;
     }
