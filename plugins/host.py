@@ -1,31 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-Процесс одного плагина.
+One plugin's process.
 
-Задача плана `4.0-H07`, решение принято ещё в 3.1.0 (ADR 3.1-D01): плагин
-перестаёт быть произвольным Python внутри ядра и получает собственный
-процесс.
+Plan item `4.0-H07`; the decision was taken back in 3.1.0 (ADR 3.1-D01): a
+plugin stops being arbitrary Python inside the core and gets a process of
+its own.
 
-**Почему отдельный процесс, а не try/except.** Ошибку можно поймать;
-бесконечный цикл — нельзя. Плагин, ушедший в `while True`, забирает поток
-ядра и Рина замолкает целиком; плагин, съевший гигабайт, роняет процесс,
-который слушает микрофон. Ловушка исключений от этого не спасает, потому
-что исключения тут и нет.
+**Why a separate process rather than try/except.** An error can be caught;
+an infinite loop cannot. A plugin that has gone into a `while True` takes
+the core's thread and Rina falls silent entirely; a plugin that ate a
+gigabyte drops the process that listens to the microphone. An exception trap
+does not save one from that, because there is no exception here.
 
-**Тот же провод, что у оболочки.** Конверт, кадрирование, коды ошибок и
-трассировка — из `core/wire`: третий формат сообщений в одной программе
-означал бы третий разбор, третий набор ошибок и третье место, где они
-разъезжаются. Отличается только таблица методов и то, что плагин ничего
-не согласовывает: он объявляет себя в ответ на `plugin.hello`, а решает
-ядро.
+**The same wire as the shell's.** The envelope, the framing, the error codes
+and the tracing come from `core/wire`: a third message format in one program
+would mean a third parser, a third set of errors and a third place where
+they drift apart. What differs is only the method table and the fact that a
+plugin negotiates nothing: it declares itself in answer to `plugin.hello`,
+and the core decides.
 
-**Направление разговора.** Ядро спрашивает — плагин отвечает. Плагину
-разрешено обратиться к ядру ровно за двумя вещами: сказать реплику
-(`plugin.respond`) и прочитать или записать свою настройку. Всё остальное
-он объявляет инструментами и ждёт, когда ядро их позовёт.
+**The direction of the conversation.** The core asks, the plugin answers. A
+plugin is allowed to turn to the core for exactly two things: to say a line
+(`plugin.respond`) and to read or write a setting of its own. Everything
+else it declares as tools and waits for the core to call them.
 
-Запуск (ядром, не человеком):
-    python -m plugins.host <путь-к-папке-плагина>
+Started (by the core, not by a person):
+    python -m plugins.host <path-to-the-plugin-folder>
 """
 import importlib.util
 import json
@@ -35,8 +35,8 @@ import sys
 import threading
 import traceback
 
-# Ядро запускает нас своим интерпретатором из корня проекта, но полагаться
-# на это нельзя: путь добавляем сами.
+# The core starts us with its own interpreter from the project root, but
+# that must not be relied on: we add the path ourselves.
 _HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _HERE not in sys.path:
     sys.path.insert(0, _HERE)
@@ -50,12 +50,13 @@ from plugins.page_spec import page_to_dict
 
 class RemoteContext(PluginContext):
     """
-    Контекст плагина, живущего отдельно.
+    The context of a plugin living separately.
 
-    Плагин зовёт `self.ctx.respond(...)` так же, как раньше; разница в том,
-    что вызов уходит по проводу. Обратной связи у настроек нет намеренно:
-    ответ на «прочитай настройку» нужен немедленно, поэтому чтение — это
-    запрос с ожиданием, а запись — уведомление без него.
+    A plugin calls `self.ctx.respond(...)` just as before; the difference is
+    that the call goes over the wire. Settings deliberately have no
+    round-trip: the answer to "read the setting" is needed immediately, so
+    reading is a request with a wait, and writing is a notification without
+    one.
     """
 
     def __init__(self, manifest, host):
@@ -87,7 +88,7 @@ class RemoteContext(PluginContext):
 
 
 class Host:
-    """Один плагин и провод к ядру."""
+    """One plugin and the wire to the core."""
 
     def __init__(self, folder):
         self.folder = folder
@@ -100,16 +101,17 @@ class Host:
         self._lock = threading.Lock()
         self._answers = {}
         self._waiting = {}
-        #: Трассировка запроса, который сейчас обрабатываем.
+        #: The trace of the request being handled right now.
         self._trace = ""
-        #: Очередь запросов ядра. Обрабатывает **рабочий** поток: страница
-        #: плагина может по дороге спросить настройку, а ответ на этот
-        #: вопрос принесёт приёмный поток. Обрабатывай мы запросы прямо в
-        #: нём — плагин ждал бы ответа тем потоком, который его принесёт,
-        #: и не дождался бы никогда. Так и вышло при первом запуске.
+        #: The queue of the core's requests. The **worker** thread handles
+        #: it: a plugin's page may ask for a setting along the way, and the
+        #: answer to that question will be brought by the receiving thread.
+        #: Were we to handle requests in that thread, the plugin would wait
+        #: for the answer with the very thread that will bring it, and would
+        #: wait forever. Which is what happened on the first run.
         self._work = queue.Queue()
 
-    # -- провод --------------------------------------------------------------
+    # -- the wire ---------------------------------------------------------------
     def send(self, envelope):
         with self._lock:
             self._out.write(encode_frame(envelope))
@@ -117,23 +119,23 @@ class Host:
 
     def notify_core(self, method, payload):
         """
-        Сказать ядру и не ждать: у реплики нет ответа.
+        Tell the core and do not wait: a line has no answer.
 
-        Трассировка — та, под которой нас позвали: реплика плагина
-        рождается внутри обработки команды, и терять на ней цепочку
-        значило бы иметь в журнале ответ без вопроса.
+        The trace is the one we were called under: a plugin's line is born
+        inside the handling of a command, and losing the chain on it would
+        mean having an answer without a question in the journal.
         """
         self.send(Envelope.event(method, dict(payload), id=self.ids.next(),
                                  trace_id=self._trace or NO_TRACE))
 
     def ask_core(self, method, payload, timeout=5.0):
         """
-        Спросить ядро и дождаться.
+        Ask the core and wait.
 
-        Ждёт **рабочий** поток, а не приёмный: ответ принесёт приёмный, и
-        заблокировать его значило бы ждать самого себя. Здесь плагин
-        однопоточен, поэтому ожидание простое, но правило то же, что в
-        ядре (`ask_shell_sync`).
+        The **worker** thread waits, not the receiving one: the receiving
+        thread will bring the answer, and blocking it would mean waiting for
+        oneself. The plugin here is single-threaded, so the waiting is
+        simple, but the rule is the same as in the core (`ask_shell_sync`).
         """
         request = Envelope.request(method, dict(payload), id=self.ids.next(),
                                    trace_id=self._trace or NO_TRACE)
@@ -145,7 +147,7 @@ class Host:
             return None
         return self._answers.pop(request.id, None)
 
-    # -- загрузка ------------------------------------------------------------
+    # -- loading ------------------------------------------------------------------
     def load(self):
         path = os.path.join(self.folder, "plugin.json")
         try:
@@ -195,13 +197,13 @@ class Host:
             return False
         return True
 
-    # -- методы, которые зовёт ядро -----------------------------------------
+    # -- the methods the core calls -------------------------------------------
     def accept(self, message):
         """
-        Разобрать пришедшее: ответ — сразу, запрос — в очередь.
+        Parse what arrived: an answer at once, a request into the queue.
 
-        Приёмный поток обязан остаться свободным: он единственный, кто
-        может принести ответ на вопрос плагина.
+        The receiving thread is obliged to stay free: it is the only one
+        that can bring the answer to the plugin's question.
         """
         if message.type == MessageType.RESPONSE:
             done = self._waiting.pop(message.correlation_id, None)
@@ -213,7 +215,7 @@ class Host:
             self._work.put(message)
 
     def work_forever(self):
-        """Один рабочий поток: состояние плагина не потокобезопасно."""
+        """One worker thread: a plugin's state is not thread-safe."""
         while True:
             message = self._work.get()
             if message is None:
@@ -227,9 +229,10 @@ class Host:
         try:
             payload = self._serve(message.method, message.payload)
         except Exception:                                # noqa: BLE001
-            # Плагин уронил обработчик. Отвечаем ошибкой: молчание
-            # превратится в таймаут у ядра, а таймаут — в «плагин зависли»,
-            # хотя он всего лишь ошибся.
+            # The plugin dropped the handler. We answer with an error:
+            # silence would turn into a timeout at the core, and a timeout
+            # into "the plugin has hung", when all it did was make a
+            # mistake.
             from core.wire.errors import make
 
             self.send(message.fail(
@@ -257,9 +260,10 @@ class Host:
                 },
                 "has_page": (self.plugin is not None
                              and type(self.plugin).page is not Plugin.page),
-                # Как назвать раздел плагина в колонке. Плагин вправе
-                # назваться иначе, чем в списке установленного: «Заметки»
-                # короче, чем «Быстрые заметки», а в колонке место дорого.
+                # What to call the plugin's section in the column. A plugin
+                # is entitled to call itself something other than its name
+                # in the installed list: "Notes" is shorter than "Quick
+                # notes", and room in the column is dear.
                 "page_title": str(getattr(self.plugin, "page_title", "")
                                   or (self.manifest.name if self.manifest
                                       else "")),
@@ -300,7 +304,7 @@ class Host:
         return {"ok": False, "error": f"неизвестный метод: {method}"}
 
     def _tools(self):
-        """Объявленные инструменты — описанием, без вызываемых объектов."""
+        """The declared tools — as descriptions, without callables."""
         if self.plugin is None:
             return []
         listed = []
@@ -325,7 +329,7 @@ class Host:
                     else str(answer)}
         return {"ok": False, "error": f"нет инструмента: {name}"}
 
-    # -- цикл ----------------------------------------------------------------
+    # -- the loop ------------------------------------------------------------------
     def serve_forever(self):
         source = sys.stdin.buffer
         while True:
@@ -349,8 +353,9 @@ def main(argv=None):
         print("нужно: путь-к-папке-плагина", file=sys.stderr)
         return 2
 
-    # Плагин не должен писать в стандартный вывод: там наш провод. Своё
-    # `print` в плагине иначе испортил бы кадр посреди сообщения.
+    # A plugin must not write to standard output: our wire is there. A
+    # `print` of its own inside a plugin would otherwise spoil a frame in
+    # the middle of a message.
     host = Host(argv[0])
     real_stdout = sys.stdout
     sys.stdout = sys.stderr
@@ -359,7 +364,7 @@ def main(argv=None):
         worker = threading.Thread(target=host.work_forever, daemon=True)
         worker.start()
         host.serve_forever()
-        # Провод кончился — ядро ушло. Рабочему потоку тоже пора.
+        # The wire has ended — the core is gone. It is time for the worker thread too.
         host._work.put(None)
         worker.join(timeout=2.0)
     finally:

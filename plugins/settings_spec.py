@@ -1,10 +1,11 @@
 """
-Декларативное описание настроек плагина.
+The declarative description of a plugin's settings.
 
-Плагин описывает свои настройки списком полей (не касаясь Qt), а приложение
-само строит панель и хранит значения в общем конфиге (plugin_settings).
+A plugin describes its settings as a list of fields (without touching Qt),
+and the application builds the panel itself and keeps the values in the
+shared config (plugin_settings).
 
-Пример в плагине:
+An example inside a plugin:
 
     from plugins.api import Plugin
     from plugins.settings_spec import Toggle, Text, Choice, Slider
@@ -32,9 +33,9 @@ class Field:
     description: str = ""
     icon: str = ""
 
-    # для choice
+    # for choice
     options: Optional[List[str]] = None
-    # для slider
+    # for slider
     min: int = 0
     max: int = 100
     step: int = 1

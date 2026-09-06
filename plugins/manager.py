@@ -1,9 +1,10 @@
 """
-Менеджер плагинов: обнаружение, загрузка, включение/выключение, диспетчеризация.
+The plugin manager: discovery, loading, switching on and off, dispatch.
 
-Устойчивость к ошибкам — приоритет: битый или падающий плагин не должен
-ронять приложение. Любая ошибка при загрузке/вызове хука ловится и пишется
-в лог плагина, сам плагин помечается как сбойный.
+Robustness against errors is the priority: a broken or crashing plugin must
+not drop the application. Any error while loading or calling a hook is
+caught and written to the plugin's log, and the plugin itself is marked
+broken.
 """
 
 import os
@@ -24,7 +25,7 @@ log = get_logger("plugins")
 
 
 def plugins_dir() -> str:
-    """Каталог с плагинами (рядом с проектом)."""
+    """The plugins' directory (next to the project)."""
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(here, "plugins")
     os.makedirs(path, exist_ok=True)
@@ -32,16 +33,16 @@ def plugins_dir() -> str:
 
 
 class PluginInstallError(Exception):
-    """Папка или архив не похожи на плагин."""
+    """The folder or archive does not look like a plugin."""
 
 
-# Имя плагина становится именем папки, поэтому допускаем только простое имя:
-# буквы, цифры, «_», «-», точка внутри. Ни разделителей пути, ни «.»/«..».
+# A plugin's name becomes the folder's name, so we allow only a plain name:
+# letters, digits, "_", "-", a dot inside. No path separators, no "."/"..".
 _PLUGIN_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
 
 
 def _safe_plugin_id(raw):
-    """Проверенное имя плагина или PluginInstallError."""
+    """A checked plugin name, or PluginInstallError."""
     plugin_id = re.sub(r"[^\w.-]+", "_", str(raw or "").strip())
     if (not plugin_id or plugin_id in (".", "..")
             or not _PLUGIN_ID_RE.match(plugin_id)):
@@ -52,12 +53,12 @@ def _safe_plugin_id(raw):
 
 def install_plugin(source_path):
     """
-    Устанавливает плагин из папки или .zip в каталог plugins/.
+    Installs a plugin from a folder or a .zip into the plugins/ directory.
 
-    Проверяем содержимое до копирования: манифест и main.py обязательны,
-    иначе в каталоге плагинов появится мусор, который каждый запуск будет
-    показываться как сбойный плагин.
-    Возвращает id установленного плагина.
+    We check the contents before copying: the manifest and main.py are
+    required, or the plugins directory will gain rubbish that will show up
+    as a broken plugin on every start.
+    Returns the id of the installed plugin.
     """
     import shutil
     import zipfile
@@ -95,8 +96,9 @@ def install_plugin(source_path):
 
         base = os.path.abspath(plugins_dir())
         target = os.path.abspath(os.path.join(base, plugin_id))
-        # Имя берётся из чужого файла, поэтому проверяем результат, а не только
-        # исходную строку: путь обязан остаться прямо внутри каталога плагинов.
+        # The name is taken from somebody else's file, so we check the
+        # result rather than only the original string: the path is obliged
+        # to stay directly inside the plugins directory.
         if os.path.dirname(target) != base or target == base:
             security_log().warning(
                 "Путь установки плагина ведёт за пределы каталога: %s", target)
@@ -105,17 +107,18 @@ def install_plugin(source_path):
             raise PluginInstallError(tr("Этот плагин уже установлен"))
         replaced = os.path.isdir(target)
         if replaced:
-            # обновление поверх: удаляем только то, что само является плагином
+            # updating over the top: we delete only what is itself a plugin
             if not os.path.isfile(os.path.join(target, "plugin.json")):
                 raise PluginInstallError(tr("В папке назначения не плагин"))
             shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(staged, target)
 
     if replaced:
-        # Под этим id уже был плагин, и он мог быть включён. Код нового плагина
-        # выполняется при включении, поэтому не наследуем чужое «включено»:
-        # иначе подсунутый архив с чужим id запускался бы сам, без ведома
-        # пользователя. Пусть включит осознанно.
+        # There already was a plugin under this id, and it may have been
+        # switched on. A new plugin's code runs when it is switched on, so we
+        # do not inherit somebody else's "on": otherwise a slipped-in archive
+        # with somebody else's id would run by itself, without the user
+        # knowing. Let them switch it on deliberately.
         _disable_saved(plugin_id)
         security_log().warning(
             "Плагин %s заменён установкой из %s и принудительно выключен",
@@ -127,7 +130,7 @@ def install_plugin(source_path):
 
 
 def _disable_saved(plugin_id):
-    """Убирает плагин из списка включённых в настройках."""
+    """Removes a plugin from the list of switched-on ones in the settings."""
     enabled = [p for p in (settings.get("enabled_plugins", []) or [])
                if p != plugin_id]
     settings.set("enabled_plugins", enabled)
@@ -135,7 +138,7 @@ def _disable_saved(plugin_id):
 
 
 def _find_plugin_root(base):
-    """Ищет папку с plugin.json — архив часто содержит одну вложенную папку."""
+    """Looks for the folder with plugin.json — an archive often holds one nested folder."""
     if os.path.isfile(os.path.join(base, "plugin.json")):
         return base
     for name in sorted(os.listdir(base)):
@@ -147,29 +150,31 @@ def _find_plugin_root(base):
 
 
 class LoadedPlugin:
-    """Обёртка над экземпляром плагина + его состояние."""
+    """A wrapper around a plugin's instance plus its state."""
     def __init__(self, manifest: PluginManifest):
         self.manifest = manifest
-        self.instance = None      # экземпляр Plugin (если загружен)
+        self.instance = None      # the Plugin instance (if loaded)
         self.enabled = False
-        self.error = None         # текст ошибки, если сбой
-        self.logs = []            # последние строки лога
+        self.error = None         # the error text, if it failed
+        self.logs = []            # the log's last lines
 
 
 class Signal:
     """
-    Оповещение подписчиков. Подмена `PySide6.QtCore.Signal`.
+    Notifying subscribers. A stand-in for `PySide6.QtCore.Signal`.
 
-    Менеджер плагинов жил в приложении с окном и оповещал его сигналами Qt.
-    В 4.0 плагины принадлежат **ядру**, а ядро обязано работать там, где
-    интерфейсной библиотеки нет вовсе (`rina_core.check_headless`): один
-    транзитивный импорт Qt — и разделение нарушено.
+    The plugin manager lived in an application with a window and notified it
+    with Qt signals. In 4.0 the plugins belong to the **core**, and the core
+    is obliged to work where there is no interface library at all
+    (`rina_core.check_headless`): one transitive import of Qt and the split
+    is broken.
 
-    Поверхность сохранена нарочно — `connect` и `emit`, — чтобы приложение
-    3.1.0 продолжало работать без правок на своей стороне. Разница в том,
-    что вызов происходит **в том же потоке**, а не через очередь событий
-    окна: у ядра очереди окна нет, а подписчику важнее получить
-    оповещение, чем получить его в чужом потоке.
+    The surface is preserved deliberately — `connect` and `emit` — so that
+    the 3.1.0 application goes on working without changes on its side. The
+    difference is that the call happens **in the same thread** rather than
+    through the window's event queue: the core has no window queue, and it
+    matters more to a subscriber to get the notification than to get it in
+    somebody else's thread.
     """
 
     def __init__(self, *types):
@@ -188,9 +193,10 @@ class Signal:
             self._listeners.remove(listener)
 
     def emit(self, *args):
-        # Подписчик, уронивший обработчик, не должен обрывать оповещение
-        # остальным: плагин уже показал, что бывает ненадёжным, и хоронить
-        # вместе с ним половину подписчиков — не то, чего мы хотим.
+        # A subscriber that dropped its handler must not cut off the
+        # notification to the rest: the plugin has already shown that it can
+        # be unreliable, and burying half the subscribers with it is not
+        # what we want.
         for listener in list(self._listeners):
             try:
                 listener(*args)
@@ -200,20 +206,21 @@ class Signal:
 
 class PluginManager:
     def __init__(self, parent=None):
-        # Сигналы — свои у каждого менеджера, а не общие на класс: у Qt они
-        # объявлялись в теле класса, но связывались с экземпляром. Оставить
-        # их в теле здесь значило бы, что два менеджера делят подписчиков.
-        self.changed = Signal()               # список/состояние изменились
+        # The signals belong to each manager rather than being shared by
+        # the class: in Qt they were declared in the class body but bound to
+        # the instance. Leaving them in the body here would mean two
+        # managers sharing subscribers.
+        self.changed = Signal()               # the list/state changed
         self.log_added = Signal(str, str)     # (plugin_id, message)
-        self.response = Signal(str, str)      # плагин что-то ответил
-        self.pages_changed = Signal()         # набор вкладок изменился
+        self.response = Signal(str, str)      # the plugin said something
+        self.pages_changed = Signal()         # the set of tabs changed
         self.window_requested = Signal(str, object, str, int, int)
         self.notify_requested = Signal(str, str, str)
         self.plugins = {}   # id -> LoadedPlugin
 
-    # ---------- обнаружение ----------
+    # ---------- discovery ----------
     def discover(self):
-        """Сканирует каталог плагинов и читает манифесты (без загрузки кода)."""
+        """Scans the plugins directory and reads the manifests (without loading code)."""
         self.plugins.clear()
         base = plugins_dir()
         enabled_ids = set(settings.get("enabled_plugins", []) or [])
@@ -227,12 +234,13 @@ class PluginManager:
                 with open(manifest_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 manifest = PluginManifest.from_dict(data, path=folder)
-                # Имя папки — единственный надёжный идентификатор: id внутри
-                # plugin.json пишет автор плагина, и совпадение с чужим id
-                # отдало бы ему настройки и место соседа в списке.
+                # The folder's name is the only reliable identifier: the id
+                # inside plugin.json is written by the plugin's author, and
+                # a clash with somebody else's id would hand them that
+                # plugin's settings and its place in the list.
                 manifest.id = name
             except Exception as e:
-                # битый манифест — показываем как сбойный плагин
+                # a broken manifest — we show it as a broken plugin
                 manifest = PluginManifest(id=name, name=name, path=folder)
                 lp = LoadedPlugin(manifest)
                 lp.error = f"Ошибка манифеста: {e}"
@@ -240,11 +248,11 @@ class PluginManager:
                 continue
 
             lp = LoadedPlugin(manifest)
-            # проверка совместимости API
+            # the API compatibility check
             if not manifest.api_compatible():
-                # Причина, версия и что делать — одним предложением
-                # (4.0-H05). Молчаливое «не работает» выглядит как поломка
-                # Рины, а не как устаревший плагин.
+                # The reason, the version and what to do, in one sentence
+                # (4.0-H05). A silent "it does not work" looks like a
+                # breakage in Rina rather than an outdated plugin.
                 lp.error = manifest.why_incompatible()
             self.plugins[manifest.id] = lp
 
@@ -254,14 +262,14 @@ class PluginManager:
         for pid in broken:
             log.warning("Плагин «%s»: %s", pid, self.plugins[pid].error)
 
-        # включаем те, что были включены ранее
+        # we switch on the ones that were on before
         for pid in enabled_ids:
             if pid in self.plugins:
                 self.enable(pid, persist=False)
 
         self.changed.emit()
 
-    # ---------- загрузка кода ----------
+    # ---------- loading the code ----------
     def _load_instance(self, lp: LoadedPlugin) -> bool:
         manifest = lp.manifest
         main_py = os.path.join(manifest.path, "main.py")
@@ -279,7 +287,7 @@ class PluginManager:
             lp.error = tr("Ошибка импорта:\n") + traceback.format_exc(limit=3)
             return False
 
-        # находим класс плагина
+        # we find the plugin's class
         plugin_cls = None
         if manifest.entry:
             plugin_cls = getattr(module, manifest.entry, None)
@@ -301,12 +309,12 @@ class PluginManager:
             lp.error = tr("Ошибка инициализации:\n") + traceback.format_exc(limit=3)
             return False
 
-    # ---------- включение / выключение ----------
+    # ---------- switching on / off ----------
     def enable(self, plugin_id: str, persist=True):
         lp = self.plugins.get(plugin_id)
         if not lp or lp.enabled:
             return
-        # несовместимые по API не включаем
+        # we do not switch on ones incompatible by API
         if not lp.manifest.api_compatible():
             self.changed.emit()
             return
@@ -345,9 +353,9 @@ class PluginManager:
         settings.set("enabled_plugins", ids)
         settings.save()
 
-    # ---------- диспетчеризация ----------
+    # ---------- dispatch ----------
     def dispatch_command(self, text: str) -> bool:
-        """Прогоняет команду по включённым плагинам. True если кто-то обработал."""
+        """Runs a command past the switched-on plugins. True if somebody handled it."""
         for lp in self.plugins.values():
             if lp.enabled and lp.instance is not None:
                 try:
@@ -373,7 +381,7 @@ class PluginManager:
             self.log(lp.manifest.id,
                      f"Ошибка {method}:\n" + traceback.format_exc(limit=2))
 
-    # ---------- сервисы для плагинов (PluginContext) ----------
+    # ---------- services for plugins (PluginContext) ----------
     def log(self, plugin_id: str, message: str):
         lp = self.plugins.get(plugin_id)
         if lp is not None:
@@ -395,17 +403,17 @@ class PluginManager:
         settings.save()
 
     def open_plugin_window(self, plugin_id, widget, title, width, height):
-        # UI-поток подхватит сигнал и создаст окно
+        # the UI thread will pick the signal up and create the window
         self.window_requested.emit(plugin_id, widget, title, width, height)
 
     def notify_from_plugin(self, plugin_id, title, message):
         self.notify_requested.emit(plugin_id, title, message)
 
-    # ---------- доступ к вкладкам плагинов ----------
+    # ---------- access to plugins' tabs ----------
     def page_plugins(self):
         """
-        Список (plugin_id, LoadedPlugin) включённых плагинов со страницей.
-        Порядок стабильный.
+        A list of (plugin_id, LoadedPlugin) of switched-on plugins with a
+        page. The order is stable.
         """
         result = []
         for pid, lp in self.plugins.items():
@@ -418,30 +426,32 @@ class PluginManager:
         return result
 
     def _has_page(self, lp):
-        # Страница есть, если переопределён `page()`. Проверяем «дёшево»:
-        # отличается ли метод от базового. `create_page` больше не
-        # рассматривается вовсе — плагин, отдающий виджет, не загружается
-        # (4.0-H05).
+        # There is a page if `page()` is overridden. We check it "cheaply":
+        # does the method differ from the base one. `create_page` is not
+        # considered at all any more — a plugin that gives out a widget does
+        # not load (4.0-H05).
         return type(lp.instance).page is not Plugin.page
 
-    # ---------- объявленные инструменты (4.0-H03) ----------
+    # ---------- the declared tools (4.0-H03) ----------
     def tool_prefix(self, plugin_id):
         """
-        Под каким именем инструменты плагина живут в реестре.
+        Under what name a plugin's tools live in the registry.
 
-        Префикс обязателен: два плагина с инструментом `roll` иначе
-        спорили бы за одно имя, и победил бы тот, кто включился позже.
+        The prefix is obligatory: two plugins with a `roll` tool would
+        otherwise fight over one name, and whichever was switched on later
+        would win.
         """
         return f"plugin.{plugin_id}."
 
     def declared_tools(self, plugin_id):
         """
-        Что плагин объявил — уже с проверенными разрешениями.
+        What the plugin declared — already with checked permissions.
 
-        Возвращает список `(Tool, run)`: первое — описание для реестра
-        ядра, второе — что вызвать. Инструмент, просящий недоступное
-        плагину (ADR 0010), **не заводится вовсе**: он всё равно отказал бы,
-        но уже после того, как человек его увидел и позвал.
+        Returns a list of `(Tool, run)`: the first is the description for
+        the core's registry, the second is what to call. A tool asking for
+        what a plugin may not have (ADR 0010) is **not created at all**: it
+        would refuse anyway, but only after the person had seen it and
+        called it.
         """
         from core.permissions import plugin_allowed
         from core.tools import Tool
@@ -488,12 +498,12 @@ class PluginManager:
 
     def _wrap(self, plugin_id, declared):
         """
-        Обёртка вокруг вызова плагина.
+        A wrapper around a call into the plugin.
 
-        Плагин ненадёжен по определению — он чужой код, — поэтому его
-        исключение превращается в неуспех инструмента, а не в падение
-        ядра. И записывается в журнал плагина: автору нужно узнать, что
-        сломалось, а человеку — что не вышло.
+        A plugin is unreliable by definition — it is somebody else's code —
+        so its exception turns into a tool's failure rather than into the
+        core falling over. And it is written to the plugin's log: the author
+        needs to learn what broke, and the person that it did not work.
         """
         from core.toolrunner import ToolResult
 
@@ -513,7 +523,7 @@ class PluginManager:
         return run
 
     def get_plugin_page_spec(self, plugin_id):
-        """Декларативное описание вкладки (список элементов) или []."""
+        """The declarative description of a tab (a list of elements), or []."""
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
             return []
@@ -525,14 +535,14 @@ class PluginManager:
             return []
 
     def dispatch_action(self, plugin_id, action, value=None):
-        """Нажата кнопка на вкладке плагина."""
+        """A button on the plugin's tab was pressed."""
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
             return
         self._safe_call(lp, "on_action", action, value)
 
     def plugin_page_meta(self, plugin_id):
-        """(title, icon) для вкладки плагина."""
+        """(title, icon) for the plugin's tab."""
         lp = self.plugins.get(plugin_id)
         if not lp:
             return (plugin_id, "🧩")
@@ -557,5 +567,5 @@ class PluginManager:
             return []
 
 
-# единый экземпляр
+# one instance
 plugin_manager = PluginManager()

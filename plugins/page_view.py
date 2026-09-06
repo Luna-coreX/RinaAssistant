@@ -1,12 +1,13 @@
 """
-Отрисовка декларативной вкладки плагина (API v2).
+Drawing a plugin's declarative tab (API v2).
 
-Это единственное место, где описание страницы превращается в Qt-виджеты.
-Плагин про Qt ничего не знает — значит, ту же страницу сможет нарисовать
-и другая оболочка, не переписывая плагины.
+This is the only place where a page's description turns into Qt widgets. The
+plugin knows nothing about Qt — which means another shell will be able to
+draw the same page without rewriting the plugins.
 
-После действия (нажатия кнопки) страница пересобирается: плагин просто
-описывает своё текущее состояние, а не следит за синхронизацией виджетов.
+After an action (a button press) the page is rebuilt: the plugin simply
+describes its current state rather than watching over the synchronisation of
+widgets.
 """
 
 from PySide6.QtWidgets import (
@@ -29,7 +30,7 @@ class PluginPageView(QWidget):
         self._layout.setSpacing(10)
         self.rebuild()
 
-    # ---------- сборка ----------
+    # ---------- assembling ----------
     def rebuild(self):
         while self._layout.count():
             item = self._layout.takeAt(0)
@@ -44,7 +45,7 @@ class PluginPageView(QWidget):
 
     @staticmethod
     def _plain(label):
-        """Плагин задаёт текст сам — рисуем его как текст, а не как разметку."""
+        """The plugin sets the text itself — we draw it as text, not as markup."""
         label.setTextFormat(Qt.PlainText)
         return label
 
@@ -170,7 +171,7 @@ class PluginPageView(QWidget):
         edit.returnPressed.connect(submit)
         lay.addWidget(edit, 1)
 
-        if element.variant:          # подпись кнопки, если плагин её задал
+        if element.variant:          # the button's label, if the plugin set one
             btn = QPushButton(element.variant)
             btn.setCursor(Qt.PointingHandCursor)
             btn.setFixedHeight(38)
@@ -248,7 +249,7 @@ class PluginPageView(QWidget):
         lay.addWidget(bar)
         return box
 
-    # ---------- действия ----------
+    # ---------- actions ----------
     def _on_action(self, action, value=None):
         self._manager.dispatch_action(self._plugin_id, action, value)
-        self.rebuild()      # состояние могло измениться — показываем актуальное
+        self.rebuild()      # the state may have changed — we show what is current

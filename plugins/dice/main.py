@@ -1,9 +1,10 @@
 """
-Кубик и монетка.
+A die and a coin.
 
-Пример инструмента **с аргументом**: у кубика бывает разное число граней.
-Аргументы описываются теми же `Param`, что у встроенных инструментов ядра,
-и проверяются реестром — плагину не приходится ни разбирать, ни доверять.
+An example of a tool **with an argument**: a die can have different numbers
+of faces. Arguments are described with the same `Param` as the core's
+built-in tools, and are checked by the registry — a plugin has neither to
+parse nor to trust.
 """
 import random
 
@@ -12,7 +13,7 @@ from plugins.api import Plugin, PluginTool
 
 
 class DicePlugin(Plugin):
-    """Кубик и монетка."""
+    """A die and a coin."""
 
     def tools(self):
         return [

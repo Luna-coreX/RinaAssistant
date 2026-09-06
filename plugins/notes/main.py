@@ -1,9 +1,9 @@
 """
-Заметки.
+Notes.
 
-Пример **страницы на схеме версии 2**: карточка, секция, ряд кнопок и
-поле ввода. До версии 2 словарь был плоским, и такую страницу выразить
-было нечем — только столбиком абзацев.
+An example of a **page on the version 2 schema**: a card, a section, a row
+of buttons and an input field. Before version 2 the dictionary was flat, and
+there was nothing to express such a page with — only a column of paragraphs.
 """
 from core.tools import Param
 from plugins.api import Plugin, PluginTool
@@ -14,10 +14,11 @@ from plugins.settings_spec import Choice, Slider, Text, Toggle
 
 class NotesPlugin(Plugin):
     """
-    Демонстрация расширенного API: страница, настройки, команда, инструмент.
+    A demonstration of the extended API: a page, settings, a command, a
+    tool.
 
-    Страница описана декларативно — плагин не импортирует ни Qt, ни WPF,
-    поэтому его не пришлось переписывать при смене оболочки.
+    The page is described declaratively — the plugin imports neither Qt nor
+    WPF, so it did not have to be rewritten when the shell changed.
     """
 
     page_title = "Заметки"
@@ -26,7 +27,7 @@ class NotesPlugin(Plugin):
     def on_enable(self):
         self.log("Плагин заметок включён")
 
-    # --- объявленный инструмент ---
+    # --- the declared tool ---
     def tools(self):
         return [
             PluginTool(
@@ -37,7 +38,7 @@ class NotesPlugin(Plugin):
             ),
         ]
 
-    # --- команда: «запиши купить молоко» ---
+    # --- a command: "запиши купить молоко" ---
     def on_command(self, text):
         low = text.lower()
         if low.startswith("запиши") or "заметка" in low:
@@ -54,7 +55,7 @@ class NotesPlugin(Plugin):
         self.ctx.set_setting("items", notes[-self._limit():])
         return f"Записала: {note.strip()}"
 
-    # --- декларативные настройки (панель строит оболочка) ---
+    # --- declarative settings (the shell builds the panel) ---
     def settings_schema(self):
         return [
             Toggle("announce", "Озвучивать при записи", default=True,
@@ -66,7 +67,7 @@ class NotesPlugin(Plugin):
             Text("prefix", "Префикс заметки", default="•"),
         ]
 
-    # --- своя страница (схема версии 2) ---
+    # --- a page of its own (the version 2 schema) ---
     def page(self):
         notes = self._visible_notes()
         prefix = self.setting("prefix", "•")
@@ -106,7 +107,7 @@ class NotesPlugin(Plugin):
         elif action == "add" and value:
             self._add(str(value))
 
-    # --- вспомогательное ---
+    # --- helpers ---
     def _limit(self):
         try:
             return max(1, int(self.setting("limit", 20)))

@@ -1,62 +1,64 @@
 """
-Публичный API плагинов Rina. Версия 4.
+Rina's public plugin API. Version 4.
 
-Каждый плагин — папка в plugins/ с plugin.json (манифест) и main.py
-(класс-наследник Plugin). Класс находится по полю "entry" манифеста
-либо автоматически (первый наследник Plugin).
+Every plugin is a folder in plugins/ with a plugin.json (the manifest) and a
+main.py (a class inheriting from Plugin). The class is found by the
+manifest's "entry" field, or automatically (the first subclass of Plugin).
 
-**Плагин объявляет, а не делает.** Решение — [ADR 0010]
-(../docs/adr/0010-plugin-api.md). Он объявляет три вещи, и все три
-данными:
+**A plugin declares rather than does.** The decision is
+[ADR 0010](../docs/adr/0010-plugin-api.md). It declares three things, and
+all three as data:
 
-  - **инструменты** (`tools()`) — что он умеет; уходят в реестр ядра и
-    получают там разрешения, подтверждения и журнал наравне со
-    встроенными;
-  - **страницу** (`page()`) — как он выглядит; описанием по схеме версии 2
-    (`plugins/page_spec.py`), без виджетов;
-  - **разрешения** — что ему нужно от машины; списком в манифесте, до
-    первого запуска.
+  - **tools** (`tools()`) — what it can do; they go into the core's registry
+    and get permissions, confirmations and journalling there on a par with
+    the built-in ones;
+  - **a page** (`page()`) — how it looks; as a description by the version 2
+    schema (`plugins/page_spec.py`), without widgets;
+  - **permissions** — what it needs from the machine; as a list in the
+    manifest, before the first run.
 
-Почему так: ядро спрашивает у человека согласие на «запуск программ» и
-отказывает без него, а плагин рядом мог позвать `subprocess` и ничего не
-спросить. Пока плагины были три демонстрационных, это была теоретическая
-дыра; со сторонними она становится единственной, которая имеет значение.
+Why: the core asks a person for consent to "launching programs" and refuses
+without it, while a plugin beside it could call `subprocess` and ask
+nothing. While the plugins were three demonstrations, that was a theoretical
+hole; with third-party ones it becomes the only one that matters.
 
-Возможности плагина (все хуки необязательны):
-  - on_enable / on_disable         — жизненный цикл
-  - on_command(text) -> bool       — обработка команды
-  - on_event(name, data)           — произвольные события
-  - tools() -> [PluginTool]        — объявленные инструменты (v4)
-  - page() -> [Element]            — своя страница, описанием
-  - on_action(action, value)       — нажали кнопку на странице
-  - settings_schema() -> [Field]   — декларативные настройки
+A plugin's capabilities (every hook is optional):
+  - on_enable / on_disable         — the life cycle
+  - on_command(text) -> bool       — handling a command
+  - on_event(name, data)           — arbitrary events
+  - tools() -> [PluginTool]        — the declared tools (v4)
+  - page() -> [Element]            — a page of its own, as a description
+  - on_action(action, value)       — a button on the page was pressed
+  - settings_schema() -> [Field]   — declarative settings
 
-Через self.ctx доступны сервисы приложения:
-  - respond(text)                  — Рина озвучит/покажет текст
-  - log(msg)                       — лог плагина
-  - get_setting/set_setting        — свои настройки (хранятся в конфиге)
-  - notify(title, message)         — уведомление (трей)
+Through self.ctx the application's services are available:
+  - respond(text)                  — Rina will speak/show the text
+  - log(msg)                       — the plugin's log
+  - get_setting/set_setting        — its own settings (kept in the config)
+  - notify(title, message)         — a notification (the tray)
 
-Чего **больше нет**: `create_page()` и `open_window()`. Готовый виджет
-привязывал ядро к конкретной оболочке — это был прямой блокер разделения
-процессов. Плагин версии 1–3 не загружается, и человеку сказано, почему
-(`4.0-H05`).
+What is **gone**: `create_page()` and `open_window()`. A ready-made widget
+tied the core to a particular shell — that was a direct blocker of the
+process split. A version 1-3 plugin does not load, and the person is told
+why (`4.0-H05`).
 
-Совместимость: манифест указывает "api_version". Текущая — API_VERSION.
+Compatibility: the manifest states "api_version". The current one is
+API_VERSION.
 """
 
 from dataclasses import dataclass, field
 
 
-#: Версия API плагинов. Растёт при несовместимых изменениях.
+#: The plugin API's version. Grows on incompatible changes.
 #:
-#: 4 — плагин объявляет инструменты и страницу; `create_page` убран.
+#: 4 — a plugin declares tools and a page; `create_page` is gone.
 API_VERSION = 4
 
-#: Минимальная версия, которую ядро ещё загружает.
+#: The lowest version the core still loads.
 #:
-#: Совпадает с текущей нарочно: плагин, отдающий виджет, невозможно
-#: «частично поддержать» — оболочка на C# не нарисует `QWidget` никак.
+#: It deliberately coincides with the current one: a plugin that gives out a
+#: widget cannot be "partly supported" — a C# shell will not draw a
+#: `QWidget` in any way at all.
 MIN_API_VERSION = 4
 
 
@@ -70,10 +72,11 @@ class PluginManifest:
     entry: str = ""
     icon: str = "🧩"
     path: str = ""
-    api_version: int = 1     # какую версию API ожидает плагин
-    #: Что плагин просит от машины (`4.0-H06`). Имена — из каталога
-    #: `core/permissions.py`; второй каталог «для плагинов» означал бы два
-    #: языка об одном и том же. Доступно из него не всё: см. ADR 0010.
+    api_version: int = 1     # which API version the plugin expects
+    #: What the plugin asks of the machine (`4.0-H06`). The names come from
+    #: the `core/permissions.py` catalogue; a second catalogue "for plugins"
+    #: would mean two languages about one and the same thing. Not all of it
+    #: is available: see ADR 0010.
     permissions: tuple = ()
 
     @staticmethod
@@ -92,16 +95,16 @@ class PluginManifest:
         )
 
     def api_compatible(self) -> bool:
-        """Загружаем ли мы такой плагин вовсе."""
+        """Do we load such a plugin at all."""
         return MIN_API_VERSION <= self.api_version <= API_VERSION
 
     def why_incompatible(self) -> str:
         """
-        Почему не загрузили — человеческими словами (`4.0-H05`).
+        Why it was not loaded — in human words (`4.0-H05`).
 
-        Молчаливое «плагин просто не работает» выглядит как поломка Рины,
-        а не как устаревший плагин. Поэтому названы и причина, и версия, и
-        что автору делать.
+        A silent "the plugin simply does not work" looks like a breakage in
+        Rina rather than an outdated plugin. So the reason, the version and
+        what the author should do are all named.
         """
         if self.api_version > API_VERSION:
             return (f"Плагину нужна версия API {self.api_version}, "
@@ -115,31 +118,32 @@ class PluginManifest:
 @dataclass
 class PluginTool:
     """
-    Инструмент, объявленный плагином.
+    A tool declared by a plugin.
 
-    Уходит в реестр ядра под именем `plugin.<id>.<name>` и получает там
-    ровно те же ворота, что встроенный: проверку разрешений, подтверждение
-    необратимого, запись в журнал с указанием, какой плагин это затеял.
+    It goes into the core's registry under the name `plugin.<id>.<name>` and
+    gets exactly the same gates there as a built-in one: the permission
+    check, confirmation of the irreversible, a journal entry saying which
+    plugin started this.
 
-    `run(args)` вызывается ядром, а не плагином: плагин не решает, когда
-    его инструменту работать, — он объявил, что умеет, и ждёт.
+    `run(args)` is called by the core, not by the plugin: a plugin does not
+    decide when its tool works — it declared what it can do and waits.
     """
 
     name: str
     summary: str
     run: object = None
-    #: Аргументы — теми же `Param`, что у встроенных инструментов.
+    #: The arguments — by the same `Param` as the built-in tools'.
     params: tuple = ()
-    #: Что нужно позволить. Пустой набор — ничего.
+    #: What has to be allowed. An empty set means nothing.
     permissions: tuple = ()
-    #: Спрашивать человека при каждом вызове.
+    #: Ask the person on every call.
     confirm_required: bool = False
 
 
 class PluginContext:
     """
-    Прослойка между плагином и приложением. Плагин зависит только от неё,
-    а не от внутренностей UI.
+    A layer between the plugin and the application. A plugin depends only on
+    it, not on the UI's innards.
     """
 
     def __init__(self, manifest: PluginManifest, host):
@@ -150,7 +154,7 @@ class PluginContext:
         self._host.log(self.manifest.id, str(message))
 
     def respond(self, text: str):
-        """Рина озвучит/покажет текст."""
+        """Rina will speak/show the text."""
         self._host.respond(self.manifest.id, str(text))
 
     def get_setting(self, key: str, default=None):
@@ -160,31 +164,31 @@ class PluginContext:
         self._host.set_plugin_setting(self.manifest.id, key, value)
 
     def notify(self, title, message):
-        """Показать уведомление (через трей, если доступен)."""
+        """Show a notification (through the tray, if it is available)."""
         self._host.notify_from_plugin(self.manifest.id, title, message)
 
 
 class Plugin:
     """
-    Базовый класс плагина. Наследники переопределяют нужные хуки.
+    A plugin's base class. Subclasses override the hooks they need.
     """
 
-    # заголовок/иконка вкладки (если плагин отдаёт create_page)
-    page_title = None    # по умолчанию берётся имя из манифеста
-    page_icon = None     # по умолчанию иконка из манифеста
+    # the tab's title/icon (if the plugin gives out create_page)
+    page_title = None    # by default the name from the manifest is taken
+    page_icon = None     # by default the icon from the manifest
 
     def __init__(self, context: PluginContext):
         self.ctx = context
         self.manifest = context.manifest
 
-    # --- удобные прокси ---
+    # --- convenient proxies ---
     def log(self, message):
         self.ctx.log(message)
 
     def respond(self, text):
         self.ctx.respond(text)
 
-    # --- хуки жизненного цикла ---
+    # --- the life-cycle hooks ---
     def on_enable(self):
         pass
 
@@ -197,49 +201,51 @@ class Plugin:
     def on_event(self, name: str, data: dict = None):
         pass
 
-    # --- расширения UI (необязательные) ---
+    # --- UI extensions (optional) ---
     def page(self):
         """
-        Описать свою вкладку списком элементов (см. plugins/page_spec.py).
-        Приложение само её нарисует, поэтому плагин не зависит от Qt и
-        не сломается при смене оболочки. [] или None — вкладки нет.
+        Describe your own tab as a list of elements (see
+        plugins/page_spec.py). The application draws it itself, so the
+        plugin does not depend on Qt and will not break when the shell
+        changes. [] or None means there is no tab.
 
-        Это рекомендуемый способ (API v2).
+        This is the recommended way (API v2).
         """
         return None
 
     def on_action(self, action: str, value=None):
         """
-        Нажали кнопку с этим action на вкладке плагина.
-        После вызова страница пересобирается автоматически.
+        A button with this action on the plugin's tab was pressed.
+        After the call the page is rebuilt automatically.
         """
         pass
 
     def tools(self):
         """
-        Объявить инструменты (API v4).
+        Declare tools (API v4).
 
-        Список `PluginTool`. Имена внутри плагина короткие — ядро само
-        добавит префикс `plugin.<id>.`, чтобы два плагина с инструментом
-        `roll` не спорили за одно имя.
+        A list of `PluginTool`. The names inside a plugin are short — the
+        core adds the `plugin.<id>.` prefix itself, so that two plugins with
+        a `roll` tool do not fight over one name.
 
-        Разрешения проверяются **до** регистрации: то, что плагину не
-        положено (ADR 0010), не выдаётся, а сам инструмент не заводится —
-        инструмент без нужного разрешения всё равно отказал бы, но уже
-        после того, как человек его увидел и позвал.
+        The permissions are checked **before** registration: what a plugin
+        is not entitled to (ADR 0010) is not granted, and the tool itself is
+        not created — a tool without the permission it needs would refuse
+        anyway, but only after the person had seen it and called it.
         """
         return []
 
     def settings_schema(self):
         """
-        Вернуть список Field (см. ui/plugins/settings_spec.py) — тогда
-        приложение само построит панель настроек плагина. [] — нет настроек.
+        Return a list of Field (see ui/plugins/settings_spec.py) — then the
+        application builds the plugin's settings panel itself. [] means
+        there are no settings.
         """
         return []
 
-    # --- удобный доступ к своим настройкам с учётом схемы ---
+    # --- convenient access to one's own settings, respecting the schema ---
     def setting(self, key, default=None):
-        # значение из конфига, иначе default из схемы, иначе переданный default
+        # the value from the config, else the schema's default, else the one passed in
         val = self.ctx.get_setting(key, None)
         if val is not None:
             return val
