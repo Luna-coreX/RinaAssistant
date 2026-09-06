@@ -30,6 +30,18 @@ public partial class App
     {
         base.OnStartup(e);
 
+        // UTF-8 out, whatever the console's code page is. The same
+        // understanding as `tools/console.py`, and for the same reason: the
+        // regression reads our output and decodes it as UTF-8, and a
+        // Russian line in a code page arrives as rubbish. The check modes
+        // set their own writer later; this covers what is printed before
+        // that — the screenshot's path, for one.
+        //
+        // In a try: with no console attached there is nothing to set, and
+        // that is not a reason to refuse to start.
+        try { Console.OutputEncoding = System.Text.Encoding.UTF8; }
+        catch (IOException) { }
+
         var args = e.Args;
 
         // The language can be set from outside: a screenshot in another
