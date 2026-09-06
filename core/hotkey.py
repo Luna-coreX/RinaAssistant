@@ -1,18 +1,20 @@
 """
-Глобальная горячая клавиша.
+The global hotkey.
 
-Проблема: QShortcut срабатывает только когда окно в фокусе. Чтобы вызывать
-Рину из любого места (даже когда окно свёрнуто в трей), нужен системный
-перехват клавиатуры. Используем pynput (опциональная зависимость): он слушает
-клавиатуру в фоновом потоке на уровне ОС.
+The problem: QShortcut fires only when the window has focus. To summon Rina
+from anywhere (even when the window is minimised to the tray), a system-wide
+keyboard interception is needed. We use pynput (an optional dependency): it
+listens to the keyboard in a background thread at the OS level.
 
-Важно: колбэк pynput приходит из ДРУГОГО потока. Трогать Qt-виджеты из чужого
-потока нельзя — поэтому пробрасываем событие в GUI-поток через сигнал Qt
-(HotkeyManager.activated), к которому уже подключается главное окно.
+Note: pynput's callback arrives from ANOTHER thread. Qt widgets must not be
+touched from a foreign thread — so we forward the event into the GUI thread
+through a Qt signal (HotkeyManager.activated), which the main window then
+connects to.
 
-Если pynput не установлен — приложение продолжает работать, просто без
-глобального хоткея (в UI показываем подсказку). Комбинация при фокусе окна
-всё равно доступна через QShortcut, который вешает главное окно отдельно.
+If pynput is not installed, the application goes on working, simply without
+a global hotkey (we show a hint in the UI). The combination is still
+available while the window has focus, through the QShortcut the main window
+hangs separately.
 """
 
 import threading
@@ -30,8 +32,8 @@ except Exception:
 
 def qt_to_pynput_hotkey(sequence: str) -> str:
     """
-    Преобразует строку в стиле Qt ("Ctrl+Shift+R") в формат pynput
-    ("<ctrl>+<shift>+r"). Возвращает None, если распарсить не удалось.
+    Converts a Qt-style string ("Ctrl+Shift+R") into pynput's format
+    ("<ctrl>+<shift>+r"). Returns None if the parse failed.
     """
     if not sequence:
         return None
@@ -56,10 +58,10 @@ def qt_to_pynput_hotkey(sequence: str) -> str:
         elif len(part) == 1:
             out.append(low)
         else:
-            # функциональные клавиши и пр.: F5 -> <f5>, Space -> <space>
+            # function keys and the like: F5 -> <f5>, Space -> <space>
             out.append(f"<{low}>")
 
-    # хоткей без обычной клавиши (только модификаторы) не имеет смысла
+    # a hotkey without an ordinary key (modifiers only) makes no sense
     has_key = any(not p.startswith("<") or p[1:-1] not in
                   ("ctrl", "shift", "alt", "cmd") for p in out)
     if not has_key:
@@ -70,17 +72,17 @@ def qt_to_pynput_hotkey(sequence: str) -> str:
 
 class HotkeyManager(QObject):
     """
-    Регистрирует глобальные хоткеи и шлёт сигналы в GUI-поток.
-    Поддерживает основной хоткей (activated) и именованные действия
-    (action_activated с id действия).
+    Registers global hotkeys and sends signals into the GUI thread.
+    Supports the main hotkey (activated) and named actions
+    (action_activated with the action's id).
     """
 
-    activated = Signal()            # основной хоткей «слушать»
-    action_activated = Signal(str)  # доп. действие по id
+    activated = Signal()            # the main "listen" hotkey
+    action_activated = Signal(str)  # an extra action by id
 
-    # Удержание комбинации даёт автоповтор клавиш, и pynput честно сообщает
-    # о каждом повторе. Без подавления одно нажатие запускало команду
-    # несколько раз подряд.
+    # Holding the combination gives keyboard auto-repeat, and pynput
+    # honestly reports every repeat. Without suppression one press ran the
+    # command several times in a row.
     DEBOUNCE_SECONDS = 0.3
 
     def __init__(self, parent=None):
@@ -88,11 +90,11 @@ class HotkeyManager(QObject):
         self._listener = None
         self._current = None
         self._action_map = {}       # action_id -> sequence
-        self._last_fire = {}        # что и когда срабатывало в последний раз
+        self._last_fire = {}        # what fired last, and when
         self._fire_lock = threading.Lock()
 
     def _too_soon(self, key) -> bool:
-        """Срабатывание слишком близко к предыдущему для той же комбинации."""
+        """A firing too close to the previous one for the same combination."""
         now = time.monotonic()
         with self._fire_lock:
             last = self._last_fire.get(key, 0.0)
@@ -107,9 +109,9 @@ class HotkeyManager(QObject):
 
     def register(self, sequence: str, actions: dict = None) -> bool:
         """
-        Регистрирует основной хоткей + (опционально) карту действий
-        {action_id: "Ctrl+Alt+X"}. Повторный вызов заменяет всё.
-        Возвращает True, если основной хоткей зарегистрирован.
+        Registers the main hotkey plus (optionally) a map of actions
+        {action_id: "Ctrl+Alt+X"}. A repeat call replaces everything.
+        Returns True if the main hotkey was registered.
         """
         self.unregister()
         self._action_map = dict(actions or {})
@@ -128,7 +130,7 @@ class HotkeyManager(QObject):
             main_ok = True
             self._current = sequence
 
-        # действия
+        # the actions
         for action_id, seq in self._action_map.items():
             c = qt_to_pynput_hotkey(seq)
             if c and c not in hotkeys:
@@ -155,7 +157,7 @@ class HotkeyManager(QObject):
         return cb
 
     def _on_triggered(self):
-        # вызывается из потока pynput -> просто эмитим сигнал (thread-safe)
+        # called from pynput's thread -> we simply emit the signal (thread-safe)
         if self._too_soon("__main__"):
             return
         self.activated.emit()

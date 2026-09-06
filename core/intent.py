@@ -1,23 +1,24 @@
 """
-Модель данных: намерение, действие, результат.
+The data model: intent, action, result.
 
-Задача плана 4.0-B01. Сейчас по коду ходят строки и словари: конвейер
-угадывает намерение и тут же его исполняет, поэтому «что пользователь хотел»
-нигде не выражено отдельно от «что мы сделали». Пока это одно и то же, нельзя
-ни проверить разбор без побочных эффектов, ни отправить решение по протоколу,
-ни подставить рядом с правилами языковую модель.
+Plan item 4.0-B01. At the moment strings and dicts travel through the code:
+the pipeline guesses the intent and performs it on the spot, so "what the
+user wanted" is nowhere expressed separately from "what we did". While these
+are one and the same, the parse cannot be checked without side effects, the
+decision cannot be sent over the protocol, and a language model cannot be
+placed alongside the rules.
 
-Три типа разделяют то, что сейчас слито:
+Three types separate what is now fused:
 
-    Intent  — что хотел пользователь. Чистые данные, никаких действий.
-    Action  — что надо сделать. Тоже данные: описание, а не вызов.
-    Result  — что получилось.
+    Intent  — what the user wanted. Pure data, no actions.
+    Action  — what has to be done. Data too: a description, not a call.
+    Result  — what came of it.
 
-Все три сериализуемы в JSON без потерь: они едут по протоколу (см.
-docs/protocol/PROTOCOL-v1.md), и любое поле, которое нельзя записать в JSON,
-здесь недопустимо.
+All three serialise to JSON without loss: they travel over the protocol (see
+docs/protocol/PROTOCOL-v1.md), and any field that cannot be written to JSON
+is inadmissible here.
 
-Qt тут нет намеренно: модуль лежит в ядре.
+There is deliberately no Qt here: the module lies in the core.
 """
 
 import json
@@ -26,75 +27,77 @@ from types import MappingProxyType
 
 
 # ---------------------------------------------------------------------------
-# Каталог намерений
+# The catalogue of intents
 # ---------------------------------------------------------------------------
-# Имена не придуманы заново: они выведены из фактического поведения 3.1.0
-# (docs/INVENTORY-3.1.0.md) и уже используются golden-набором. Менять их
-# нельзя, не поправив набор — там 112 случаев ссылаются на эти строки.
+# The names are not invented afresh: they are derived from 3.1.0's actual
+# behaviour (docs/INVENTORY-3.1.0.md) and are already used by the golden
+# suite. They must not be changed without amending that suite — 112 cases
+# there refer to these strings.
 INTENTS = {
-    # запуск программ
+    # launching programs
     "app.launch":         "Запустить программу. Аргументы: app",
     "app.ambiguous":      "Несколько кандидатов, нужен выбор. Аргументы: options, query",
     "app.not_found":      "Программа не найдена. Аргументы: query",
     "app.launch_failed":  "Программа найдена, но не запустилась. Аргументы: app",
 
-    # напоминания
+    # reminders
     "reminder.create":    "Создать напоминание. Аргументы: kind, seconds или at, text",
     "reminder.list":      "Показать запланированное. Аргументы: empty",
     "reminder.cancel":    "Отменить запланированное. Аргументы: empty, count",
 
-    # система
+    # the system
     "system.action":      "Выполнить системное действие. Аргументы: action",
     "system.confirm":     "Опасное действие, нужно подтверждение. Аргументы: action",
     "command.confirm":    "Пользовательская команда опасна, нужно подтверждение",
 
-    # ответы
+    # answers
     "calc":               "Арифметика. Аргументы: result",
     "calc.zero_division": "Деление на ноль",
     "websearch":          "Явный поиск в интернете. Аргументы: query",
     "builtin.answer":     "Встроенный ответ. Аргументы: topic",
 
-    # диалог
+    # the dialogue
     "ask.wake":           "Прозвучало слово активации без команды",
     "cancelled":          "Пользователь отказался от предложенного",
     "silence":            "Ничего не делаем и молчим",
 
-    # хвост конвейера
+    # the pipeline's tail
     "llm.answer":         "Ответила языковая модель. Аргументы: text",
     "fallback.search":    "Не разобрали — ищем в интернете. Аргументы: query",
     "fallback.none":      "Не разобрали и не ищем",
 
-    # служебное
+    # internal
     "plugin":             "Фразу забрал плагин. Аргументы: plugin_id",
     "user_command":       "Сработала пользовательская команда. Аргументы: command_id",
     "unknown":            "Классифицировать не удалось — дефект разбора или прогонщика",
 }
 
-#: Намерения, после которых ядро ждёт ответа пользователя.
+#: Intents after which the core waits for the user's answer.
 PENDING_INTENTS = frozenset({"app.ambiguous", "system.confirm",
                              "command.confirm"})
 
 
 def _frozen(mapping):
     """
-    Словарь, который нельзя изменить.
+    A dict that cannot be changed.
 
-    `frozen=True` у dataclass запрещает переприсваивать поля, но не мешает
-    менять словарь внутри поля. Без этого «неизменяемый» Intent можно было
-    молча испортить по дороге — ровно то, ради чего он и вводился.
+    `frozen=True` on a dataclass forbids reassigning fields but does not
+    prevent changing a dict inside a field. Without this an "immutable"
+    Intent could be spoiled in silence along the way — exactly what it was
+    introduced to prevent.
     """
     return MappingProxyType(dict(mapping or {}))
 
 
 class UnknownIntent(ValueError):
-    """Имя намерения нет в каталоге."""
+    """The intent's name is not in the catalogue."""
 
 
 def check_intent_name(name):
-    """Проверенное имя или UnknownIntent.
+    """A checked name, or UnknownIntent.
 
-    Опечатка в имени намерения иначе прошла бы молча и превратилась в
-    расхождение, которое ищут глазами.
+    A typo in an intent's name would otherwise pass in silence and turn into
+    a divergence that has to be hunted for by eye.
     """
     if name not in INTENTS:
         raise UnknownIntent(f"неизвестное намерение: {name!r}")
@@ -102,26 +105,27 @@ def check_intent_name(name):
 
 
 # ---------------------------------------------------------------------------
-# Типы
+# The types
 # ---------------------------------------------------------------------------
 @dataclass(frozen=True)
 class Intent:
     """
-    Что хотел пользователь.
+    What the user wanted.
 
-    Неизменяемый: намерение — это вывод разбора, и переписывать его по дороге
-    означает потерять то, что было решено. Изменённая копия — through `with_`.
+    Immutable: an intent is the parse's conclusion, and rewriting it along
+    the way means losing what was decided. A changed copy comes from
+    `with_`.
     """
 
     name: str
     args: dict = field(default_factory=dict)
-    # Насколько уверен разбор. Правила дают 1.0; шаг для языковой модели
-    # (4.0-B02) будет давать меньше, и по этому числу можно будет решать,
-    # переспрашивать ли.
+    # How confident the parse is. The rules give 1.0; the language model
+    # step (4.0-B02) will give less, and that number can be used to decide
+    # whether to ask again.
     confidence: float = 1.0
-    # Какой шаг конвейера произвёл намерение — для журнала и отладки.
+    # Which pipeline step produced the intent — for the journal and for debugging.
     stage: str = ""
-    # Исходная фраза. Нужна, чтобы объяснить решение (4.0b-B04, «Почему?»).
+    # The original phrase. Needed to explain the decision (4.0b-B04, "Why?").
     text: str = ""
 
     def __post_init__(self):
@@ -130,14 +134,14 @@ class Intent:
 
     @property
     def needs_answer(self):
-        """Ждёт ли ядро ответа пользователя после этого намерения."""
+        """Whether the core waits for the user's answer after this intent."""
         return self.name in PENDING_INTENTS
 
     def arg(self, key, default=None):
         return self.args.get(key, default)
 
     def with_(self, **changes):
-        """Копия с изменёнными полями."""
+        """A copy with changed fields."""
         return replace(self, **changes)
 
     def to_dict(self):
@@ -160,19 +164,20 @@ class Intent:
 @dataclass(frozen=True)
 class Action:
     """
-    Что надо сделать. Описание, а не вызов.
+    What has to be done. A description, not a call.
 
-    Отделено от Intent, потому что одно намерение может дать разные действия:
-    «выключи компьютер» — это либо вопрос, либо выключение, смотря был ли
-    подтверждён. И потому, что действие можно показать до исполнения — это
-    основа предпросмотра опасных операций (4.0-C05).
+    Separated from Intent, because one intent can give different actions:
+    "shut down the computer" is either a question or a shutdown, depending
+    on whether it was confirmed. And because an action can be shown before
+    it is performed — that is the basis of previewing dangerous operations
+    (4.0-C05).
     """
 
     kind: str
     args: dict = field(default_factory=dict)
-    #: Нужен ли действительный confirmation_id (см. протокол, §11).
+    #: Whether a valid confirmation_id is needed (see the protocol, §11).
     confirm_required: bool = False
-    #: Разрешения, которых требует действие (4.0-C04).
+    #: The permissions the action requires (4.0-C04).
     permissions: tuple = ()
 
     def __post_init__(self):
@@ -194,11 +199,11 @@ class Action:
 @dataclass(frozen=True)
 class Result:
     """
-    Что получилось.
+    What came of it.
 
-    `response` — то, что Рина скажет; `error_code` — то, по чему ветвится
-    логика. Разделены по той же причине, что в каталоге ошибок протокола:
-    текст переводится, код — нет.
+    `response` is what Rina will say; `error_code` is what the logic
+    branches on. Separated for the same reason as in the protocol's error
+    catalogue: the text is translated, the code is not.
     """
 
     ok: bool
@@ -219,7 +224,7 @@ class Result:
                    data=data)
 
     def with_data(self, **extra):
-        """Копия с дополненными данными: Result неизменяем."""
+        """A copy with data added: Result is immutable."""
         merged = dict(self.data)
         merged.update(extra)
         return Result(ok=self.ok, response=self.response,
@@ -240,10 +245,11 @@ class Result:
 # ---------------------------------------------------------------------------
 def assert_json_safe(obj):
     """
-    Проверяет, что объект переживёт дорогу по протоколу.
+    Checks that an object will survive the journey over the protocol.
 
-    Правило протокола: всё сериализуемо, исключений нет. Тип, который нельзя
-    записать в JSON, обнаружится здесь, а не при первом запуске двух процессов.
+    The protocol's rule: everything is serialisable, no exceptions. A type
+    that cannot be written to JSON will be discovered here rather than at
+    the first run of the two processes.
     """
     json.dumps(obj.to_dict(), ensure_ascii=False)
     return True

@@ -1,12 +1,13 @@
 """
-Экспорт и импорт пользовательских данных.
+Exporting and importing the user's data.
 
-Команды переносятся между компьютерами, история выгружается для чтения вне
-приложения. Формат — JSON с версией и типом: без них импорт не отличит файл
-команд от файла истории и не переживёт смену формата.
+Commands are carried between computers, the history is exported for reading
+outside the application. The format is JSON with a version and a kind:
+without them an import will not tell a file of commands from a file of
+history and will not survive a change of format.
 
-Импорт команд по умолчанию ДОБАВЛЯЕТ, а не заменяет: подменить весь набор
-команд одним неверным кликом — слишком дорогая ошибка.
+Importing commands ADDS by default rather than replacing: substituting the
+whole set of commands with one wrong click is too expensive a mistake.
 """
 
 import json
@@ -21,7 +22,7 @@ KIND_HISTORY = "rina.history"
 
 
 class TransferError(Exception):
-    """Файл не подошёл: не тот формат, битый JSON, чужие данные."""
+    """The file would not do: the wrong format, broken JSON, somebody else's data."""
 
 
 def _envelope(kind, payload):
@@ -35,10 +36,10 @@ def _envelope(kind, payload):
 
 
 # ---------------------------------------------------------------------------
-# Команды
+# Commands
 # ---------------------------------------------------------------------------
 def export_commands(path, commands, stats=None):
-    """Сохраняет команды (и статистику запусков) в файл."""
+    """Saves the commands (and the launch statistics) to a file."""
     data = _envelope(KIND_COMMANDS, {
         "commands": list(commands or []),
         "stats": dict(stats or {}),
@@ -50,8 +51,8 @@ def export_commands(path, commands, stats=None):
 
 def read_commands(path):
     """
-    Читает файл команд. Возвращает список команд.
-    Бросает TransferError, если файл не тот.
+    Reads a file of commands. Returns a list of commands.
+    Raises TransferError if the file is the wrong one.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
@@ -62,7 +63,7 @@ def read_commands(path):
     if not isinstance(data, dict):
         raise TransferError("Файл не похож на экспорт Рины")
 
-    # допускаем и «голый» список команд — его легко получить руками
+    # we also allow a "bare" list of commands — it is easy to get one by hand
     if "payload" not in data and isinstance(data.get("commands"), list):
         commands = data["commands"]
     else:
@@ -92,9 +93,10 @@ def read_commands(path):
     return clean
 
 
-# Файл команд мог быть написан кем угодно, а команда — это запуск программы.
-# Поэтому импортированное приводится к безопасному виду и приходит выключенным:
-# пользователь включает вручную, увидев, что именно он добавил.
+# A file of commands could have been written by anyone, and a command is the
+# launching of a program. So what is imported is brought to a safe form and
+# arrives switched off: the user switches it on by hand, having seen what
+# exactly they added.
 MAX_COMMANDS = 500
 MAX_TRIGGERS = 20
 MAX_TRIGGER_LEN = 200
@@ -102,18 +104,18 @@ MIN_TRIGGER_LEN = 2
 
 
 def _sanitize_command(raw):
-    """Оставляет только известные поля и приводит их к ожидаемым типам."""
+    """Keeps only the known fields and brings them to the expected types."""
     from voice.user_commands import COMMAND_TYPES, SYSTEM_ACTIONS
 
     known_types = {t for t, _label, *_ in COMMAND_TYPES} | {"pause"}
     cmd_type = str(raw.get("type", "app"))
     if cmd_type not in known_types:
-        cmd_type = "speak"          # неизвестный тип ничего не запускает
+        cmd_type = "speak"          # an unknown kind launches nothing
 
     triggers = []
     for trigger in (raw.get("triggers") or [])[:MAX_TRIGGERS]:
         trigger = str(trigger).strip()[:MAX_TRIGGER_LEN]
-        # слишком короткая фраза срабатывала бы почти на любую реплику
+        # too short a phrase would fire on almost any line
         if len(trigger) >= MIN_TRIGGER_LEN:
             triggers.append(trigger)
 
@@ -128,7 +130,7 @@ def _sanitize_command(raw):
 
     return {
         "id": str(raw.get("id", "")),
-        # импортированное всегда выключено: включение — осознанный шаг
+        # what is imported is always off: switching on is a deliberate step
         "enabled": False,
         "type": cmd_type,
         "triggers": triggers,
@@ -142,11 +144,12 @@ def _sanitize_command(raw):
 
 def merge_commands(existing, incoming, new_id):
     """
-    Досыпает импортированные команды к имеющимся.
+    Adds the imported commands to the existing ones.
 
-    Совпадением считаем одинаковый набор фраз активации: id у файла с другого
-    компьютера свой, а фразы — это то, чем команда является для пользователя.
-    Возвращает (итоговый список, добавлено, пропущено дубликатов).
+    A match is taken to be the same set of activation phrases: a file from
+    another computer has ids of its own, while the phrases are what the
+    command is to the user. Returns (the resulting list, added, duplicates
+    skipped).
     """
     from voice.textmatch import normalize
 
@@ -163,7 +166,7 @@ def merge_commands(existing, incoming, new_id):
             skipped += 1
             continue
         copy = dict(cmd)
-        copy["id"] = new_id()          # чужой id мог бы совпасть с местным
+        copy["id"] = new_id()          # a foreign id could clash with a local one
         result.append(copy)
         known.add(cmd_key)
         added += 1
@@ -171,7 +174,7 @@ def merge_commands(existing, incoming, new_id):
 
 
 # ---------------------------------------------------------------------------
-# История
+# History
 # ---------------------------------------------------------------------------
 def export_history_json(path, entries):
     with open(path, "w", encoding="utf-8") as f:
@@ -181,7 +184,7 @@ def export_history_json(path, entries):
 
 
 def export_history_text(path, entries):
-    """Читаемая выгрузка: дата, время, кто, текст."""
+    """A readable export: date, time, who, text."""
     lines = []
     last_day = None
     for entry in entries or []:

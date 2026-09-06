@@ -1,50 +1,50 @@
 """
-Небольшая шина сигналов приложения — чтобы страницы могли
-уведомлять главное окно (и наоборот) без прямых ссылок друг на друга.
+A small bus of application signals — so that pages can notify the main
+window (and the other way round) without direct references to one another.
 """
 
 from PySide6.QtCore import QObject, Signal
 
 
 class _AppSignals(QObject):
-    # настройка сворачивания в трей изменилась
+    # the minimise-to-tray setting changed
     tray_pref_changed = Signal()
 
-    # пользователь изменил горячую клавишу -> перерегистрировать
+    # the user changed the hotkey -> re-register it
     hotkey_changed = Signal()
 
-    # окно сообщает, доступен ли глобальный хоткей (bool) — для подсказки в UI
+    # the window reports whether the global hotkey is available (bool) — for a hint in the UI
     hotkey_status = Signal(bool)
 
-    # тумблер «всегда слушать» на странице Рины изменился
+    # the "always listen" toggle on Rina's page changed
     always_listen_changed = Signal(bool)
 
-    # список пользовательских команд изменился (создали/удалили/изменили)
+    # the list of user commands changed (created/deleted/edited)
     commands_changed = Signal()
 
-    # запрос выполнить пользовательскую команду по id (кнопка «Выполнить»)
+    # a request to run a user command by id (the "Run" button)
     run_command = Signal(str)
 
-    # в историю добавилась запись
+    # an entry was added to the history
     history_changed = Signal()
 
-    # язык интерфейса изменился — пересобрать UI
+    # the interface language changed — rebuild the UI
     language_changed = Signal()
 
-    # программу запустить не удалось — предложить указать файл вручную
-    app_not_found = Signal(str)      # что искали
+    # the program could not be launched — offer to point at the file by hand
+    app_not_found = Signal(str)      # what was being looked for
 
-    # список таймеров/напоминаний изменился — обновить вкладку
+    # the list of timers/reminders changed — refresh the tab
     reminders_changed = Signal()
 
-    # действие над окном Рины (свернуть/показать/выйти/озвучка).
-    # Нужен именно сигнал: команды выполняются в фоновом потоке распознавания,
-    # а трогать виджеты можно только из GUI-потока.
-    window_action = Signal(str)      # id действия
+    # an action on Rina's window (minimise/show/quit/speech).
+    # A signal is exactly what is needed: commands run in the recognition
+    # thread, and widgets may only be touched from the GUI thread.
+    window_action = Signal(str)      # the action's id
 
     def __init__(self):
         super().__init__()
-        self.last_hotkey_global = False  # кэш последнего статуса для UI
+        self.last_hotkey_global = False  # a cache of the last status for the UI
 
     def _remember_status(self, ok):
         self.last_hotkey_global = ok

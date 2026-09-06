@@ -1,29 +1,30 @@
 """
-Каталог инструментов Рины — описания, а не реализация.
+The catalogue of Rina's tools — descriptions, not implementation.
 
-Задача плана 4.0-C03, первая половина: объявить всё, что ядро умеет делать,
-в виде описаний реестра. Вторая половина — провести исполнение через реестр —
-живёт в core/executor.py.
+Plan item 4.0-C03, the first half: declare everything the core can do as
+registry descriptions. The second half — putting execution through the
+registry — lives in core/executor.py.
 
-Список выведен из инвентаря поведения (docs/INVENTORY-3.1.0.md, §3
-«Побочные эффекты»): здесь ровно то, чем Рина меняет мир, и ничего сверх.
-Читать эти два документа стоит рядом — они описывают одно и то же с разных
-сторон, и расхождение между ними означает, что один из них устарел.
+The list is derived from the inventory of behaviour
+(docs/INVENTORY-3.1.0.md, §3 "Side effects"): here is exactly what Rina
+changes the world with, and nothing beyond. These two documents are worth
+reading side by side — they describe one and the same thing from different
+sides, and a divergence between them means one of them is out of date.
 
-Разрешения расставлены не «на всякий случай», а по тому, что инструмент
-действительно делает. `calculate` не требует ничего: он считает выражение и
-никуда не ходит. `ask_model` требует сети, и какой именно — зависит от
-настройки: локальный адрес и чужой сервер это разные вещи, и притворяться,
-что это одно разрешение, было бы неправдой.
+The permissions are laid out not "just in case" but by what a tool actually
+does. `calculate` requires nothing: it computes an expression and goes
+nowhere. `ask_model` requires the network, and which network depends on a
+setting: a local address and somebody else's server are different things,
+and pretending they are one permission would be untrue.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 from core.tools import Param, Tool, ToolRegistry
 
 
 # ---------------------------------------------------------------------------
-# Программы
+# Programs
 # ---------------------------------------------------------------------------
 LAUNCH_APP = Tool(
     name="launch_app",
@@ -36,7 +37,7 @@ LAUNCH_APP = Tool(
               required=False),
     ),
     permissions={"process.launch"},
-    # Запуск не идемпотентен: второй вызов откроет второе окно.
+    # Launching is not idempotent: a second call opens a second window.
     idempotent=False,
     returns="Подтверждение запуска с именем программы.",
     errors=("app.not_found", "app.launch_failed"),
@@ -51,7 +52,7 @@ LIST_APPS = Tool(
         Param("limit", "integer", "Сколько вернуть.", required=False,
               minimum=1, maximum=200, default=20),
     ),
-    permissions=set(),          # чтение индекса ничего не меняет
+    permissions=set(),          # reading the index changes nothing
     idempotent=True,
     returns="Список программ: имя, источник, вид.",
     errors=(),
@@ -59,7 +60,7 @@ LIST_APPS = Tool(
 
 
 # ---------------------------------------------------------------------------
-# Система
+# The system
 # ---------------------------------------------------------------------------
 SET_VOLUME = Tool(
     name="set_volume",
@@ -69,7 +70,7 @@ SET_VOLUME = Tool(
               choices=("up", "down", "mute")),
     ),
     permissions={"system.media"},
-    idempotent=False,           # «громче» дважды — это два шага громкости
+    idempotent=False,           # "louder" twice is two steps of volume
     returns="Короткое подтверждение.",
     errors=("internal",),
 )
@@ -92,7 +93,7 @@ LOCK_SCREEN = Tool(
     summary="Заблокировать рабочий стол.",
     params=(),
     permissions={"system.lock"},
-    idempotent=True,            # заблокировать заблокированное безвредно
+    idempotent=True,            # locking what is locked is harmless
     returns="Подтверждение.",
     errors=("internal",),
 )
@@ -105,8 +106,9 @@ POWER_ACTION = Tool(
               choices=("shutdown", "restart", "sleep")),
     ),
     permissions={"system.power"},
-    # Не «желательно подтвердить», а нельзя выполнить без подтверждения:
-    # одна неверно распознанная фраза иначе выключает компьютер.
+    # Not "confirmation is desirable" but "it cannot be performed without
+    # confirmation": otherwise one misrecognised phrase shuts the computer
+    # down.
     confirm_required=True,
     idempotent=False,
     returns="Подтверждение начала действия.",
@@ -118,14 +120,14 @@ TAKE_SCREENSHOT = Tool(
     summary="Снять экран и сохранить снимок в «Изображения».",
     params=(),
     permissions={"screen.capture"},
-    idempotent=False,           # каждый вызов создаёт новый файл
+    idempotent=False,           # every call creates a new file
     returns="Путь к сохранённому файлу.",
     errors=("internal",),
 )
 
 
 # ---------------------------------------------------------------------------
-# Напоминания
+# Reminders
 # ---------------------------------------------------------------------------
 CREATE_REMINDER = Tool(
     name="create_reminder",
@@ -140,7 +142,7 @@ CREATE_REMINDER = Tool(
         Param("text", "string", "О чём напомнить.", required=False),
     ),
     permissions=set(),
-    idempotent=False,           # два вызова — два напоминания
+    idempotent=False,           # two calls, two reminders
     returns="Подтверждение со сроком или временем.",
     errors=("tool.invalid_arguments",),
 )
@@ -163,7 +165,7 @@ CANCEL_REMINDER = Tool(
               required=False),
     ),
     permissions=set(),
-    # Отменить отменённое — безвредно и даёт тот же результат.
+    # Cancelling what is cancelled is harmless and gives the same result.
     idempotent=True,
     returns="Сколько записей снято.",
     errors=(),
@@ -171,7 +173,7 @@ CANCEL_REMINDER = Tool(
 
 
 # ---------------------------------------------------------------------------
-# Пользовательские команды и плагины
+# User commands and plugins
 # ---------------------------------------------------------------------------
 RUN_USER_COMMAND = Tool(
     name="run_user_command",
@@ -179,8 +181,8 @@ RUN_USER_COMMAND = Tool(
     params=(
         Param("command_id", "string", "Идентификатор команды."),
     ),
-    # Команда может запускать программы и открывать сайты; более узкого
-    # разрешения дать нельзя, не зная её содержимого.
+    # A command may launch programs and open sites; a narrower permission
+    # cannot be given without knowing its contents.
     permissions={"process.launch", "network.external"},
     idempotent=False,
     returns="Ответ, заданный командой, либо подтверждение по умолчанию.",
@@ -193,10 +195,10 @@ DISPATCH_PLUGIN_COMMAND = Tool(
     params=(
         Param("text", "string", "Фраза целиком."),
     ),
-    # Плагин сегодня — произвольный код в процессе ядра, и честного набора
-    # разрешений у него нет. Изоляция — 4.0-H07; до неё запись здесь
-    # означает «плагин может всё, что может приложение», и это записано
-    # в SECURITY.md, а не спрятано.
+    # A plugin today is arbitrary code in the core's process, and it has no
+    # honest set of permissions. Isolation is 4.0-H07; until then the entry
+    # here means "a plugin can do everything the application can", and that
+    # is written down in SECURITY.md rather than hidden.
     permissions={"process.launch", "network.external", "files.read"},
     idempotent=False,
     returns="Признак того, что плагин взял фразу.",
@@ -205,7 +207,7 @@ DISPATCH_PLUGIN_COMMAND = Tool(
 
 
 # ---------------------------------------------------------------------------
-# Ответы
+# Answers
 # ---------------------------------------------------------------------------
 CALCULATE = Tool(
     name="calculate",
@@ -213,7 +215,7 @@ CALCULATE = Tool(
     params=(
         Param("expression", "string", "Выражение или фраза со счётом."),
     ),
-    permissions=set(),          # считает и ничего больше
+    permissions=set(),          # computes and nothing more
     idempotent=True,
     returns="Результат вычисления.",
     errors=("tool.invalid_arguments",),
@@ -228,7 +230,7 @@ WEB_SEARCH = Tool(
               choices=("google", "yandex", "duckduckgo", "bing")),
     ),
     permissions={"network.external"},
-    idempotent=True,            # тот же запрос даёт ту же страницу
+    idempotent=True,            # the same query gives the same page
     returns="Подтверждение с запросом и системой.",
     errors=("internal",),
 )
@@ -241,11 +243,12 @@ ASK_MODEL = Tool(
         Param("context", "array", "Последние реплики для связности.",
               required=False),
     ),
-    # Локальная сеть — по умолчанию. Если адрес в настройках не локальный,
-    # исполнитель обязан потребовать ещё и network.external: «модель на
-    # своём компьютере» и «модель на чужом сервере» — разные обещания.
+    # The local network by default. If the address in the settings is not
+    # local, the executor is obliged to demand network.external as well: "a
+    # model on one's own computer" and "a model on somebody else's server"
+    # are different promises.
     permissions={"network.local"},
-    idempotent=False,           # модель отвечает по-разному на одно и то же
+    idempotent=False,           # the model answers the same thing differently
     returns="Ответ модели одной-двумя фразами.",
     errors=("llm.unavailable",),
 )
@@ -261,5 +264,5 @@ ALL_TOOLS = (
 
 
 def default_registry():
-    """Реестр со всеми инструментами приложения."""
+    """A registry with every one of the application's tools."""
     return ToolRegistry(ALL_TOOLS)

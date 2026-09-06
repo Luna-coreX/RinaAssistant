@@ -1,35 +1,37 @@
 """
-Каталог разрешений.
+The permission catalogue.
 
-Задача плана 4.0-C04. Перечисление того, что вообще можно позволить, и матрица
-«инструмент → требуемые разрешения» (она живёт в описании инструмента, см.
+Plan item 4.0-C04. A list of what may be allowed at all, and the matrix
+"tool → required permissions" (that lives in the tool's description, see
 core/tools.py).
 
-Зачем заводить сейчас, когда всё разрешено. Разрешение, добавленное после
-того, как инструмент написан, добавляется не туда: его ставят перед вызовом,
-а обходной путь остаётся. Список, заведённый до реализации, заставляет каждый
-новый инструмент ответить на вопрос «а что тебе нужно» в момент объявления.
+Why create it now, when everything is allowed. A permission added after a
+tool is written gets added in the wrong place: it is put before the call,
+and the way around it stays. A list created before the implementation makes
+every new tool answer the question "and what do you need" at the moment it
+is declared.
 
-Два разрешения объявлены **впрок**: чтение экрана и синтез ввода нужны только
-в 5.0, но модель разрешений вокруг них продумывается, пока это стоит абзаца,
-а не переписывания реестра.
+Two permissions are declared **in advance**: reading the screen and
+synthesising input are needed only in 5.0, but the permission model around
+them is thought through while that costs a paragraph rather than a rewrite
+of the registry.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 from typing import NamedTuple
 
 
 class Permission(NamedTuple):
-    """Одно разрешение: что это, насколько опасно и зачем нужно."""
+    """One permission: what it is, how dangerous it is, and what it is for."""
 
     name: str
     title: str
-    #: Опасное разрешение требует подтверждения при каждом использовании,
-    #: а не однократной выдачи.
+    #: A dangerous permission requires confirmation on every use rather than
+    #: being granted once.
     dangerous: bool
-    #: Пояснение для пользователя — оно попадёт на экран выдачи разрешений
-    #: (5.0-C02), поэтому пишется человеческим языком, а не терминами.
+    #: An explanation for the user — it will go onto the permission-granting
+    #: screen (5.0-C02), so it is written in human language, not in terms.
     why: str
 
 
@@ -63,7 +65,7 @@ PERMISSIONS = {p.name: p for p in (
     Permission(
         "files.write", "Запись файлов", True,
         "Создавать и изменять файлы."),
-    # --- заведено впрок, используется с 5.0 ---
+    # --- created in advance, used from 5.0 ---
     Permission(
         "screen.read", "Чтение содержимого экрана", True,
         "Видеть, что происходит на экране. Понадобится, когда Рина "
@@ -75,19 +77,20 @@ PERMISSIONS = {p.name: p for p in (
 )}
 
 
-#: Разрешения, которые плагину не выдаются никогда (`4.0-H06`).
+#: Permissions that are never granted to a plugin (`4.0-H06`).
 #:
-#: Каталог у плагина и у ядра **один**: второй, «для плагинов», означал бы
-#: два языка об одном и том же и неизбежное расхождение — разрешение,
-#: названное здесь «сеть», а там «интернет». Но доступно из него не всё.
+#: The catalogue is **one** for the plugin and for the core: a second one,
+#: "for plugins", would mean two languages about one and the same thing and
+#: an inevitable divergence — a permission called "network" here and
+#: "internet" there. But not all of it is available.
 #:
-#: Выключение компьютера по решению стороннего кода — не то, за чем ставят
-#: плагин погоды. Запись файлов — чужое имя в каталогах человека. Два
-#: последних зарезервированы под 5.0 и не существуют ни у одного
-#: инструмента вовсе.
+#: Shutting the computer down at somebody else's code's decision is not what
+#: a weather plugin is installed for. Writing files means somebody else's
+#: name in a person's directories. The last two are reserved for 5.0 and do
+#: not exist on a single tool at all.
 #:
-#: Список проверяется, а не подразумевается: тест сверяет его с каталогом
-#: и с объявлениями встроенных плагинов.
+#: The list is checked rather than assumed: a test compares it with the
+#: catalogue and with the built-in plugins' declarations.
 PLUGIN_FORBIDDEN = frozenset({
     "system.power",
     "files.write",
@@ -98,10 +101,10 @@ PLUGIN_FORBIDDEN = frozenset({
 
 def plugin_allowed(names):
     """
-    Что из запрошенного плагину можно. Возвращает (можно, нельзя).
+    What of what was asked for a plugin may have. Returns (allowed, denied).
 
-    Отказ здесь — не ошибка, а ответ: плагин мог попросить впрок, и
-    человек должен увидеть, что именно ему не дали.
+    A refusal here is not an error but an answer: the plugin may have asked
+    in advance, and the person must see what exactly it was not given.
     """
     wanted = {str(n) for n in (names or [])}
     unknown = {n for n in wanted if n not in PERMISSIONS}
@@ -109,21 +112,21 @@ def plugin_allowed(names):
     return sorted(wanted - refused), sorted(refused)
 
 
-#: Разрешения, которых в 4.0 не существует ни у одного инструмента.
-#: Отдельным списком, чтобы «не используется» было утверждением, а не
-#: наблюдением: тест сверяет его с реальной матрицей.
+#: Permissions that in 4.0 do not exist on a single tool.
+#: As a separate list, so that "not used" is a statement rather than an
+#: observation: a test compares it with the real matrix.
 RESERVED = frozenset({"screen.read", "input.synthesize"})
 
 
 class UnknownPermission(ValueError):
-    """Имени нет в каталоге."""
+    """The name is not in the catalogue."""
 
 
 def check_permission(name):
-    """Проверенное имя или UnknownPermission.
+    """A checked name, or UnknownPermission.
 
-    Опечатка иначе завела бы разрешение, которого никто не выдаёт, и
-    инструмент молча перестал бы работать.
+    A typo would otherwise create a permission nobody grants, and a tool
+    would quietly stop working.
     """
     if name not in PERMISSIONS:
         raise UnknownPermission(f"неизвестное разрешение: {name!r}")
@@ -131,10 +134,10 @@ def check_permission(name):
 
 
 def dangerous(names):
-    """Есть ли среди перечисленных хотя бы одно опасное."""
+    """Is at least one of those listed dangerous?"""
     return any(PERMISSIONS[check_permission(n)].dangerous for n in names)
 
 
 def describe(names):
-    """Человеческое перечисление — для экрана выдачи разрешений."""
+    """A human list — for the permission-granting screen."""
     return [PERMISSIONS[check_permission(n)] for n in sorted(names)]

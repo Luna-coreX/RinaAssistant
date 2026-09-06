@@ -1,31 +1,34 @@
 """
-Реестр инструментов: что Рина умеет делать и на каких условиях.
+The tool registry: what Rina can do and on what terms.
 
-Задачи плана 4.0-C01 (модель) и 4.0-C02 (валидация аргументов).
+Plan items 4.0-C01 (the model) and 4.0-C02 (argument validation).
 
-Инструмент — это описанное действие. У описания семь частей, и каждая
-отвечает на вопрос, который иначе решался бы по месту и по-разному:
+A tool is a described action. The description has seven parts, and each
+answers a question that would otherwise be settled on the spot and
+differently every time:
 
-    имя                 как его назвать в протоколе и в журнале
-    схема аргументов    что можно передать и в каком виде
-    разрешения          что нужно позволить, чтобы это выполнилось
-    confirm_required    надо ли спрашивать человека каждый раз
-    форма результата    что вернётся при успехе
-    каталог ошибок      чем это может закончиться, кроме успеха
-    идемпотентность     безопасно ли повторить
+    the name             what to call it in the protocol and the journal
+    the argument schema  what may be passed and in what form
+    the permissions      what has to be allowed for this to be performed
+    confirm_required     whether to ask the person every time
+    the result's shape   what comes back on success
+    the error catalogue  how this may end other than in success
+    idempotence          whether it is safe to repeat
 
-**Зачем описывать, а не просто вызывать.** Сегодня реестр даёт чистую границу
-между ядром и оболочкой: оболочка узнаёт список умений, не читая код ядра.
-Завтра тем же списком пользуется языковая модель — и тогда описание перестаёт
-быть документацией и становится защитой. Модель ошибается в именах и в
-аргументах чаще, чем человек; проверка по схеме — первое, обо что эта ошибка
-разбивается, ещё до исполнения.
+**Why describe rather than simply call.** Today the registry gives a clean
+boundary between the core and the shell: the shell learns the list of skills
+without reading the core's code. Tomorrow a language model uses that same
+list — and then the description stops being documentation and becomes a
+defence. A model gets names and arguments wrong more often than a person
+does; the schema check is the first thing that mistake breaks against, still
+before execution.
 
-Отсюда строгость, которая иначе выглядела бы избыточной: **лишний аргумент —
-ошибка, а не то, что молча игнорируется.** Пропущенный лишний аргумент значит,
-что вызывающая сторона считала, будто просит одно, а получит другое.
+Hence a strictness that would otherwise look excessive: **a surplus argument
+is an error, not something silently ignored.** A surplus argument let
+through means the calling side believed it was asking for one thing and will
+get another.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 from dataclasses import dataclass, field
@@ -35,11 +38,12 @@ from core.permissions import check_permission, dangerous
 
 
 # ---------------------------------------------------------------------------
-# Ошибки
+# Errors
 # ---------------------------------------------------------------------------
-#: Коды, которыми отвечает сам реестр. Остальные коды принадлежат инструментам
-#: и перечислены в их описаниях. Полный каталог с категориями и признаком
-#: «можно ли повторить» сводит 4.0-D05; здесь — то, без чего не работает C02.
+#: The codes the registry itself answers with. The other codes belong to the
+#: tools and are listed in their descriptions. The full catalogue with
+#: categories and a "may this be retried" mark is brought together by
+#: 4.0-D05; here is what C02 cannot work without.
 ERROR_UNKNOWN_TOOL = "tool.unknown"
 ERROR_INVALID_ARGUMENTS = "tool.invalid_arguments"
 ERROR_PERMISSION_DENIED = "permission.denied"
@@ -47,7 +51,7 @@ ERROR_CONFIRMATION_REQUIRED = "confirmation.required"
 
 
 class ToolError(Exception):
-    """Ошибка реестра. Несёт код, пригодный для протокола."""
+    """A registry error. Carries a code fit for the protocol."""
 
     code = "internal"
 
@@ -67,10 +71,11 @@ class InvalidArguments(ToolError):
 
 
 # ---------------------------------------------------------------------------
-# Схема аргументов
+# The argument schema
 # ---------------------------------------------------------------------------
-#: Типы, которые может нести аргумент. Ограничены намеренно: всё, что уедет
-#: по протоколу, обязано быть JSON-совместимым (PROTOCOL-v1, §1).
+#: The types an argument may carry. Limited deliberately: everything that
+#: will travel over the protocol is obliged to be JSON-compatible
+#: (PROTOCOL-v1, §1).
 TYPES = {
     "string": str,
     "integer": int,
@@ -83,13 +88,13 @@ TYPES = {
 
 @dataclass(frozen=True)
 class Param:
-    """Один аргумент инструмента."""
+    """One argument of a tool."""
 
     name: str
     type: str
     description: str
     required: bool = True
-    #: Допустимые значения. Пустой набор — любые.
+    #: The permissible values. An empty set means any.
     choices: tuple = ()
     minimum: Any = None
     maximum: Any = None
@@ -101,7 +106,7 @@ class Param:
         object.__setattr__(self, "choices", tuple(self.choices))
 
     def to_dict(self):
-        """Описание для протокола и для function-calling (N-C01)."""
+        """A description for the protocol and for function calling (N-C01)."""
         out = {"name": self.name, "type": self.type,
                "description": self.description, "required": self.required}
         if self.choices:
@@ -117,20 +122,20 @@ class Param:
 
 @dataclass(frozen=True)
 class Tool:
-    """Описанное действие."""
+    """A described action."""
 
     name: str
     summary: str
     params: tuple = ()
-    #: Что нужно позволить. Пустой набор — ничего.
+    #: What has to be allowed. An empty set means nothing.
     permissions: frozenset = frozenset()
-    #: Спрашивать человека при каждом вызове.
+    #: Ask the person on every call.
     confirm_required: bool = False
-    #: Безопасно ли повторить с теми же аргументами.
+    #: Whether it is safe to repeat with the same arguments.
     idempotent: bool = False
-    #: Что вернётся при успехе — словами, для описания и для протокола.
+    #: What comes back on success — in words, for the description and for the protocol.
     returns: str = ""
-    #: Чем может закончиться, кроме успеха.
+    #: How it may end other than in success.
     errors: tuple = ()
 
     def __post_init__(self):
@@ -143,8 +148,9 @@ class Tool:
         if len(names) != len(set(names)):
             raise ValueError(f"{self.name}: повторяющиеся имена аргументов")
 
-        # Опасное разрешение обязано требовать подтверждения. Иначе
-        # «опасное» — просто пометка в каталоге, ни на что не влияющая.
+        # A dangerous permission is obliged to require confirmation.
+        # Otherwise "dangerous" is merely a mark in the catalogue, affecting
+        # nothing.
         if dangerous(perms) and not self.confirm_required:
             raise ValueError(
                 f"{self.name}: требует опасного разрешения, значит обязан "
@@ -174,19 +180,19 @@ class Tool:
 
 
 # ---------------------------------------------------------------------------
-# Валидация (4.0-C02)
+# Validation (4.0-C02)
 # ---------------------------------------------------------------------------
 def validate(tool, args):
     """
-    Проверенные аргументы или InvalidArguments.
+    Checked arguments, or InvalidArguments.
 
-    Возвращает НОВЫЙ словарь: подставленные значения по умолчанию и
-    приведённые числа не должны просачиваться обратно к вызывающему.
+    Returns a NEW dict: substituted defaults and coerced numbers must not
+    leak back to the caller.
 
-    Сообщение об ошибке пишется так, чтобы по нему можно было исправиться
-    с первой попытки: что не так, у какого аргумента, и что ожидалось.
-    Позже по нему будет исправляться языковая модель (5.0-C05), и «invalid
-    argument» ей не поможет.
+    The error message is written so that one can correct oneself from it on
+    the first attempt: what is wrong, in which argument, and what was
+    expected. Later a language model will correct itself by it (5.0-C05),
+    and "invalid argument" will not help it.
     """
     args = dict(args or {})
     known = {p.name for p in tool.params}
@@ -218,7 +224,7 @@ def validate(tool, args):
 def _check_value(tool, param, value):
     expected = TYPES[param.type]
 
-    # bool — подкласс int, поэтому «истина» прошла бы как целое число.
+    # bool is a subclass of int, so "true" would pass as a whole number.
     if param.type in ("integer", "number") and isinstance(value, bool):
         raise InvalidArguments(
             f"{tool.name}: «{param.name}» ожидает {param.type}, "
@@ -254,10 +260,10 @@ def _check_value(tool, param, value):
 
 
 # ---------------------------------------------------------------------------
-# Реестр
+# The registry
 # ---------------------------------------------------------------------------
 class ToolRegistry:
-    """Все известные инструменты."""
+    """Every known tool."""
 
     def __init__(self, tools=()):
         self._tools = {}
@@ -280,10 +286,11 @@ class ToolRegistry:
 
     def forget(self, name):
         """
-        Убрать инструмент. Нужно выключению плагина (`4.0-H03`).
+        Remove a tool. Needed when a plugin is switched off (`4.0-H03`).
 
-        Выключенный плагин обязан унести свои инструменты с собой: реестр,
-        помнящий инструмент выключенного плагина, однажды его вызовет.
+        A switched-off plugin is obliged to take its tools with it: a
+        registry that remembers a switched-off plugin's tool will call it
+        one day.
         """
         return self._tools.pop(name, None)
 
@@ -297,15 +304,15 @@ class ToolRegistry:
         return [self._tools[n] for n in self.names()]
 
     def validate(self, name, args):
-        """Проверить вызов, ничего не выполняя."""
+        """Check a call without performing anything."""
         return validate(self.get(name), args)
 
     def describe(self):
-        """Весь реестр словарями — для протокола и для function-calling."""
+        """The whole registry as dicts — for the protocol and for function calling."""
         return [tool.to_dict() for tool in self.all()]
 
     def requiring(self, permission):
-        """Кто просит это разрешение — для экрана разрешений и для тестов."""
+        """Who asks for this permission — for the permissions screen and for the tests."""
         return [t for t in self.all() if permission in t.permissions]
 
     def __len__(self):

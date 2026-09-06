@@ -1,33 +1,35 @@
 """
-Незакрытые вопросы ассистента: явные переходы, сериализуемое состояние.
+The assistant's unclosed questions: explicit transitions, serialisable state.
 
-Задача плана 4.0-B03. Раньше это был словарь `self._pending` внутри ядра:
-переходы жили в трёх местах разом, состояние нельзя было ни сохранить, ни
-показать, а в списке вариантов лежали объекты AppEntry — то есть по протоколу
-такое состояние не проехало бы вовсе.
+Plan item 4.0-B03. This used to be a `self._pending` dict inside the core:
+the transitions lived in three places at once, the state could neither be
+saved nor shown, and the list of options held AppEntry objects — that is,
+such a state would not have travelled over the protocol at all.
 
-Рина задаёт вопросы трёх видов, и все они устроены одинаково: спросили,
-ждём ответа, через минуту вопрос протух.
+Rina asks questions of three kinds, and they are all built the same way: we
+asked, we are waiting for an answer, and after a minute the question goes
+stale.
 
-    choose_app       какую из нескольких программ запустить
-    confirm_action   подтвердить опасное системное действие
-    confirm_command  подтвердить опасную пользовательскую команду
+    choose_app       which of several programs to launch
+    confirm_action   confirm a dangerous system action
+    confirm_command  confirm a dangerous user command
 
-Поведение 3.1.0 воспроизводится буквально, включая неочевидное: **любая
-нераспознанная реплика снимает вопрос** (см. docs/INVENTORY-3.1.0.md, §6).
-Сказать «выключи компьютер», потом что-то постороннее, потом «да» — и ничего
-не произойдёт. Для опасного действия это осторожная сторона ошибки, для
-выбора программы — потерянный вопрос; менять это здесь нельзя, иначе
-golden-набор покажет расхождение там, где его не задумывали.
+3.1.0's behaviour is reproduced literally, including the non-obvious part:
+**any unrecognised line withdraws the question** (see
+docs/INVENTORY-3.1.0.md, §6). Say "shut down the computer", then something
+unrelated, then "yes" — and nothing happens. For a dangerous action that is
+the cautious side of the mistake, for choosing a program it is a lost
+question; it must not be changed here, or the golden suite will show a
+divergence where none was intended.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 import time
 from dataclasses import dataclass, field, replace
 
 
-#: Через сколько секунд заданный вопрос считается неактуальным.
+#: After how many seconds a question that was asked counts as stale.
 TTL_SECONDS = 60
 
 CHOOSE_APP = "choose_app"
@@ -40,26 +42,27 @@ KINDS = (CHOOSE_APP, CONFIRM_ACTION, CONFIRM_COMMAND)
 @dataclass(frozen=True)
 class Question:
     """
-    Заданный вопрос. Только сериализуемые значения.
+    A question that was asked. Serialisable values only.
 
-    Варианты выбора хранятся словарями, а не объектами AppEntry: состояние
-    обязано переживать запись в файл и дорогу по протоколу. Восстановить
-    объект из словаря умеет сам индекс программ.
+    The options are kept as dicts rather than AppEntry objects: the state is
+    obliged to survive being written to a file and travelling over the
+    protocol. Restoring the object from a dict is something the program
+    index can do itself.
     """
 
     kind: str
     asked_at: float = field(default_factory=time.time)
-    #: для confirm_action
+    #: for confirm_action
     action: str = ""
-    #: для confirm_command
+    #: for confirm_command
     command_id: str = ""
-    #: для choose_app — список словарей вида AppEntry.to_dict()
+    #: for choose_app — a list of dicts of the form AppEntry.to_dict()
     options: tuple = ()
-    #: что искали, когда возник вопрос
+    #: what was being looked for when the question arose
     query: str = ""
-    #: выданное подтверждение для опасного действия (4.0-C05).
-    #: Хранится в вопросе, потому что согласие человека относится к
-    #: конкретному вызову, а не к тому, что вопрос когда-то задавали.
+    #: the confirmation issued for a dangerous action (4.0-C05).
+    #: Kept in the question, because a person's consent applies to a
+    #: particular call rather than to the fact that a question was once asked.
     confirmation_id: str = ""
 
     def __post_init__(self):
@@ -71,7 +74,7 @@ class Question:
         return (now or time.time()) - self.asked_at > TTL_SECONDS
 
     def entries(self):
-        """Варианты выбора обратно объектами индекса."""
+        """The options back as index objects."""
         from voice.app_index import AppEntry
 
         return [AppEntry.from_dict(o) for o in self.options]
@@ -95,7 +98,7 @@ class Question:
 
     @classmethod
     def choose_app(cls, options, query=""):
-        """options — список AppEntry."""
+        """options is a list of AppEntry."""
         return cls(kind=CHOOSE_APP, query=query,
                    options=tuple(e.to_dict() for e in options))
 
@@ -112,21 +115,22 @@ class Question:
 
 class Dialog:
     """
-    Незакрытый вопрос и переходы вокруг него.
+    The unclosed question and the transitions around it.
 
-    Переходов ровно три, и других быть не должно:
+    There are exactly three transitions, and there must be no others:
 
-        ask      — задали вопрос
-        answered — на него ответили, вопрос снят
-        dropped  — вопрос снят, не получив ответа (протух или перебит)
+        ask      — a question was asked
+        answered — it was answered, the question is withdrawn
+        dropped  — the question was withdrawn without an answer (stale or
+                   interrupted)
     """
 
     def __init__(self, question=None):
         self._question = question
 
-    # ---------- чтение ----------
+    # ---------- reading ----------
     def current(self, now=None):
-        """Действующий вопрос или None. Протухший снимается здесь же."""
+        """The question in force, or None. A stale one is withdrawn here and now."""
         if self._question is None:
             return None
         if self._question.expired(now):
@@ -138,26 +142,26 @@ class Dialog:
     def pending(self):
         return self.current() is not None
 
-    # ---------- переходы ----------
+    # ---------- transitions ----------
     def ask(self, question):
         self._question = question
         return question
 
     def answered(self):
-        """Вопрос закрыт ответом."""
+        """The question was closed by an answer."""
         self._question = None
 
     def dropped(self):
         """
-        Вопрос снят, не получив ответа.
+        The question was withdrawn without an answer.
 
-        Так ведёт себя 3.1.0 на любой нераспознанной реплике. Отдельный
-        переход от `answered`, потому что это разные события: одно значит
-        «поняли», другое — «забыли».
+        That is how 3.1.0 behaves on any unrecognised line. A transition
+        separate from `answered`, because these are different events: one
+        means "we understood", the other "we forgot".
         """
         self._question = None
 
-    # ---------- состояние ----------
+    # ---------- state ----------
     def to_dict(self):
         return {"question": self._question.to_dict() if self._question
                 else None}

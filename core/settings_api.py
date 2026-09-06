@@ -1,23 +1,26 @@
 """
-Интерфейс доступа к настройкам.
+The interface for accessing the settings.
 
-Задача плана 4.0-B06. До неё ядро импортировало модульный синглтон
-`core.settings_store.settings` и обращалось к нему напрямую из десятка мест.
-Три следствия, каждое из которых мешает разделению:
+Plan item 4.0-B06. Before it, the core imported the module singleton
+`core.settings_store.settings` and used it directly from a dozen places.
+Three consequences, each of which gets in the way of the split:
 
-    * два ядра в одном процессе обязаны делить одни настройки;
-    * подставить в тесте другие значения можно только подменой модуля;
-    * оболочка после разделения не сможет получать настройки по протоколу,
-      пока «настройки» означают «этот конкретный файл».
+    * two cores in one process are obliged to share one set of settings;
+    * substituting other values in a test is possible only by replacing the
+      module;
+    * after the split the shell will not be able to get the settings over
+      the protocol while "the settings" means "this particular file".
 
-Здесь описано, что именно ядру от настроек нужно. Список намеренно короткий:
-всё, чего в нём нет, ядру знать не положено — ни где лежит файл, ни в каком он
-формате, ни сколько там групп.
+Described here is exactly what the core needs from the settings. The list is
+deliberately short: everything not in it the core is not supposed to know —
+neither where the file lies, nor what format it is in, nor how many groups
+are there.
 
-Реализация по умолчанию — тот же `settings_store`, поэтому поведение не
-меняется. Смысл не в новой реализации, а в том, что зависимость стала явной.
+The default implementation is that same `settings_store`, so the behaviour
+does not change. The point is not a new implementation but that the
+dependency has become explicit.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 import contextlib
@@ -26,39 +29,39 @@ from typing import Any, Protocol, runtime_checkable
 
 @runtime_checkable
 class SettingsProvider(Protocol):
-    """Минимум, которого ядру достаточно."""
+    """The minimum the core needs."""
 
     def get(self, key: str, default: Any = None) -> Any:
-        """Значение настройки или default."""
+        """A setting's value, or default."""
         ...
 
     def set(self, key: str, value: Any) -> None:
-        """Записать значение. На диск не обязательно — см. save()."""
+        """Write a value. Not necessarily to disk — see save()."""
         ...
 
     def save(self) -> bool:
-        """Сохранить изменённое."""
+        """Save what changed."""
         ...
 
     def transaction(self):
         """
-        Блокировка на всё чтение-изменение-запись.
+        A lock over the whole read-change-write.
 
-        Нужна хранилищам истории, напоминаний и статистики: сама
-        последовательность «прочитать список — изменить — записать» не
-        атомарна, и два потока теряют записи друг друга (см. 3.1.0, R03).
+        Needed by the stores of history, reminders and statistics: the
+        sequence "read the list — change it — write it" is not atomic in
+        itself, and two threads lose each other's entries (see 3.1.0, R03).
         """
         ...
 
 
 class MemorySettings:
     """
-    Настройки в памяти. Для тестов и headless-прогонов.
+    Settings in memory. For tests and headless runs.
 
-    Существует затем, чтобы проверять ядро с любыми значениями, не трогая
-    файл пользователя. Раньше для этого приходилось подменять модуль целиком
-    и надеяться, что подмена не переживёт тест: так однажды были переписаны
-    настоящие настройки на машине разработчика.
+    It exists so that the core can be checked with any values without
+    touching the user's file. This used to require replacing the whole
+    module and hoping the replacement would not outlive the test: that is
+    how a developer's real settings were once overwritten.
     """
 
     def __init__(self, values=None):
@@ -96,12 +99,12 @@ class MemorySettings:
 
     @property
     def saves(self):
-        """Сколько раз просили сохранить — полезно в тестах."""
+        """How many times a save was asked for — useful in tests."""
         return self._saved
 
 
 def default_settings():
-    """Реализация по умолчанию — общее хранилище приложения."""
+    """The default implementation — the application's shared store."""
     from core.settings_store import settings
 
     return settings

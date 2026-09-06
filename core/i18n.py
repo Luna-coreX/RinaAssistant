@@ -1,15 +1,17 @@
 """
-Локализация интерфейса.
+Localising the interface.
 
-Подход: исходные русские строки — это ключи. tr("Настройки")) вернёт перевод
-для текущего языка. Если языка/перевода нет — вернётся сама строка (русская),
-поэтому ничего не падает при пропущенном переводе.
+The approach: the original Russian strings are the keys. tr("Настройки")
+returns the translation for the current language. If there is no language or
+no translation, the string itself comes back (the Russian one), so nothing
+falls over on a missing translation.
 
-Язык берётся из настройки ui_language ("Русский" | "English"). Смена языка
-шлёт сигнал app_signals.language_changed, по которому UI пересобирается.
+The language is taken from the ui_language setting ("Русский" | "English").
+Changing the language sends the app_signals.language_changed signal, on which
+the UI is rebuilt.
 """
 
-# Английские переводы: {русская строка: "English"}.
+# The English translations: {the Russian string: "English"}.
 _EN = {
     'Рина': 'Rina',
     'Настройки': 'Settings',
@@ -92,16 +94,16 @@ _EN = {
     'Сохранять историю': 'Save history',
     'Не получилось выполнить команду: ': "Couldn't run the command: ",
 
-    # диагностика: сбои проверок и распознавания
+    # diagnostics: check and recognition failures
     'Не получилось распознать речь: ': "Couldn't recognise speech: ",
     'Не удалось проверить микрофон: ': "Couldn't test the microphone: ",
     'Ошибка проверки: ': 'Check failed: ',
 
-    # запуск: цель исчезла
+    # launching: the target is gone
     'Не нашла «{target}» — программу удалили или перенесли.': "Couldn't find “{target}” — the program was removed or moved.",
     'Не получилось запустить {app} — программу удалили или перенесли.': "Couldn't launch {app} — the program was removed or moved.",
 
-    # диагностика (журнал приложения)
+    # diagnostics (the application's journal)
     'Диагностика': 'Diagnostics',
     'Подробность журнала': 'Log detail',
     'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — failures only, DEBUG — everything',
@@ -613,9 +615,10 @@ _EN = {
 
 from core.i18n_langs import UK as _UK, ES as _ES, DE as _DE
 
-# Словари по языкам. Русский — язык исходных строк, ему словарь не нужен.
-# Английский переведён полностью, остальные — основной интерфейс; всё
-# непереведённое честно показывается по-русски (см. core/i18n_langs.py).
+# The dictionaries by language. Russian is the language of the original
+# strings and needs no dictionary. English is translated in full, the rest
+# cover the main interface; everything untranslated is honestly shown in
+# Russian (see core/i18n_langs.py).
 _TRANSLATIONS = {
     "English": _EN,
     "Українська": _UK,
@@ -623,7 +626,7 @@ _TRANSLATIONS = {
     "Deutsch": _DE,
 }
 
-# Список поддерживаемых языков для выпадающего списка.
+# The list of supported languages for the dropdown.
 LANGUAGES = ["Русский"] + list(_TRANSLATIONS.keys())
 
 _current = {"lang": "Русский"}
@@ -640,8 +643,9 @@ def get_language():
 
 def coverage(lang=None):
     """
-    Доля переведённых строк (0..1) — чтобы честно понимать состояние языка.
-    Для русского всегда 1.0: это язык оригинала.
+    The share of translated strings (0..1) — so as to understand a
+    language's state honestly. For Russian it is always 1.0: that is the
+    original language.
     """
     lang = lang or _current["lang"]
     if lang == "Русский":
@@ -649,18 +653,18 @@ def coverage(lang=None):
     table = _TRANSLATIONS.get(lang)
     if not table or not _EN:
         return 0.0
-    # за 100% берём объём английского словаря — он полный
+    # we take the English dictionary's size as 100% — it is the complete one
     return min(1.0, len(table) / len(_EN))
 
 
 def t(_text, **kwargs):
-    """Перевести строку на текущий язык (или вернуть как есть).
+    """Translate a string into the current language (or return it as it is).
 
-    Поддерживает подстановку: t("Автор: {name}", name="...").
+    Supports substitution: t("Автор: {name}", name="...").
 
-    Первый параметр назван с подчёркиванием намеренно: иначе строка с
-    плейсхолдером {text} — t("Напомню: {text}", text=...) — конфликтует
-    с самим аргументом функции.
+    The first parameter is deliberately named with an underscore: otherwise
+    a string with a {text} placeholder — t("Напомню: {text}", text=...) —
+    clashes with the function's own argument.
     """
     text = _text
     table = _TRANSLATIONS.get(_current["lang"])

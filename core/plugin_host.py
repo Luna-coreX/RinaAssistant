@@ -1,26 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Плагины, живущие отдельными процессами.
+Plugins living as separate processes.
 
-Задача плана `4.0-H07`. Наружу отдаётся **та же поверхность**, что у
-`plugins.manager.PluginManager`: `discover`, `enable`, `disable`,
+Plan item `4.0-H07`. What is exposed outwards is **the same surface** as
+`plugins.manager.PluginManager`'s: `discover`, `enable`, `disable`,
 `dispatch_command`, `page_plugins`, `get_plugin_page_spec`,
-`dispatch_action`, `declared_tools`, сигналы. Ядро и сервер протокола не
-знают, где живёт плагин, — и не должны: подмена одного менеджера другим не
-имеет права быть заметной.
+`dispatch_action`, `declared_tools`, the signals. The core and the protocol
+server do not know where a plugin lives — and must not: substituting one
+manager for the other has no right to be noticeable.
 
-**Что даёт процесс.** Плагин, ушедший в бесконечный цикл, не забирает
-поток ядра: ответа нет, срок истекает, плагин помечается сбойным и
-убивается. Плагин, упавший с исключением, роняет себя. Ассистент при этом
-продолжает работать — это и есть критерий приёмки задачи.
+**What a process gives.** A plugin that has gone into an infinite loop does
+not take the core's thread with it: there is no answer, the deadline
+expires, the plugin is marked broken and killed. A plugin that fell over
+with an exception drops itself. The assistant meanwhile goes on working —
+and that is the task's acceptance criterion.
 
-**Срок ответа, а не бесконечное ожидание.** Каждый вызов ограничен по
-времени. Без срока «плагин задумался» и «плагин повесился» — одно и то же
-состояние, и различить их нечем.
+**A deadline for the answer, not an endless wait.** Every call is bounded in
+time. Without a deadline, "the plugin is thinking" and "the plugin has hung"
+are one and the same state, and there is nothing to tell them apart with.
 
-**Один процесс на плагин, а не один на всех.** Иначе один сбойный плагин
-уносил бы с собой соседей, и мы бы вернулись к тому, от чего ушли, — просто
-на процесс дальше.
+**One process per plugin, not one for all.** Otherwise one broken plugin
+would take its neighbours with it, and we would be back where we started —
+merely one process further on.
 """
 import os
 import subprocess
@@ -35,22 +36,22 @@ from core.wire.envelope import (Envelope, FrameDecoder, IdGenerator,
 
 log = get_logger("plugins")
 
-#: Сколько ждать ответа на обычный вызов.
+#: How long to wait for an answer to an ordinary call.
 CALL_TIMEOUT = 10.0
 
-#: Сколько ждать, пока процесс поднимется и представится.
+#: How long to wait for the process to come up and introduce itself.
 START_TIMEOUT = 20.0
 
-#: Сколько ждать, пока убитый процесс действительно уйдёт.
+#: How long to wait for a killed process actually to go.
 KILL_TIMEOUT = 5.0
 
 
 class Signal:
     """
-    Оповещение подписчиков — то же, что в `plugins.manager`.
+    Notifying subscribers — the same as in `plugins.manager`.
 
-    Своё, а не оттуда: этот модуль не должен зависеть от менеджера,
-    которого он заменяет.
+    Its own rather than from there: this module must not depend on the
+    manager it replaces.
     """
 
     def __init__(self, *types):
@@ -76,7 +77,7 @@ class Signal:
 
 
 class Manifest:
-    """Что плагин рассказал о себе. Обёртка ради той же поверхности."""
+    """What a plugin said about itself. A wrapper for the sake of the same surface."""
 
     def __init__(self, data=None, folder=""):
         data = data or {}
@@ -92,12 +93,12 @@ class Manifest:
 
 
 class HostedPlugin:
-    """Один плагин и процесс, в котором он живёт."""
+    """One plugin and the process it lives in."""
 
     def __init__(self, folder, owner):
         self.folder = folder
         self.manifest = Manifest(folder=folder)
-        self.instance = None        # для совместимости поверхности
+        self.instance = None        # for surface compatibility
         self.enabled = False
         self.error = None
         self.logs = []
@@ -114,13 +115,13 @@ class HostedPlugin:
         self._pending = {}
         self._reader = None
 
-    # -- жизнь процесса ------------------------------------------------------
+    # -- the process's life --------------------------------------------------
     @property
     def alive(self):
         return self._proc is not None and self._proc.poll() is None
 
     def start(self):
-        """Поднять процесс и дождаться, пока плагин представится."""
+        """Raise the process and wait for the plugin to introduce itself."""
         if self.alive:
             return True
 
@@ -154,8 +155,9 @@ class HostedPlugin:
         self.tools = list(answer.get("tools") or [])
 
         if not answer.get("ok"):
-            # Плагин поднялся, но собой быть не смог: старый API, битый
-            # main.py. Причину он уже назвал — её и показываем.
+            # The plugin came up but could not be itself: an old API, a
+            # broken main.py. It has already named the reason — that is what
+            # we show.
             self.error = str(answer.get("error") or "Плагин не загрузился.")
             self.kill()
             return False
@@ -164,7 +166,7 @@ class HostedPlugin:
         return True
 
     def kill(self):
-        """Убить процесс. Мягко не просим: спрашивали уже."""
+        """Kill the process. We do not ask nicely: we asked already."""
         proc, self._proc = self._proc, None
         if proc is None:
             return
@@ -179,20 +181,22 @@ class HostedPlugin:
             self._pending.clear()
 
     def stop(self):
-        """Попросить закрыться, потом убить."""
+        """Ask it to close, then kill it."""
         if self.alive:
             self.ask("plugin.shutdown", {}, timeout=2.0)
         self.kill()
 
-    # -- разговор ------------------------------------------------------------
+    # -- the conversation ------------------------------------------------------
     def ask(self, method, payload=None, timeout=CALL_TIMEOUT):
         """
-        Спросить плагин и дождаться ответа. `None` — не ответил.
+        Ask the plugin and wait for an answer. `None` means it did not
+        answer.
 
-        Срок обязателен: без него «плагин задумался» и «плагин повесился» —
-        одно и то же состояние. Не ответивший в срок считается сбойным и
-        убивается: процесс, который не отвечает, уже ничем не полезен, а
-        память и процессор занимает.
+        A deadline is obligatory: without one, "the plugin is thinking" and
+        "the plugin has hung" are the same state. One that does not answer
+        in time counts as broken and is killed: a process that does not
+        answer is of no use any more, while it does occupy memory and
+        processor.
         """
         if not self.alive:
             return None
@@ -227,7 +231,7 @@ class HostedPlugin:
             self._owner.changed.emit()
             return None
 
-        # Разбудить могли и обрывом связи, а не ответом.
+        # We may have been woken by a broken link rather than by an answer.
         if not holder and not self.alive:
             self._forget(request.id)
             self.error = self.error or "Плагин упал."
@@ -247,7 +251,7 @@ class HostedPlugin:
             getattr(self, "_answers", {}).pop(request_id, None)
 
     def _read_forever(self):
-        """Читать ответы и просьбы плагина, пока процесс жив."""
+        """Read the plugin's answers and requests while the process lives."""
         proc = self._proc
         source = proc.stdout if proc else None
         while source is not None:
@@ -264,15 +268,15 @@ class HostedPlugin:
             for message in self._decoder.feed(header + body):
                 self._on_message(message)
 
-        # Провод кончился — процесса больше нет. Ждущих надо отпустить
-        # немедленно: иначе «плагин упал» станет известно только по
-        # истечении срока, то есть через десять секунд после того, как это
-        # уже произошло.
+        # The wire has ended — the process is gone. Those waiting must be
+        # released at once: otherwise "the plugin fell over" becomes known
+        # only when the deadline expires, that is, ten seconds after it
+        # actually happened.
         with self._lock:
             for done in self._pending.values():
                 done.set()
 
-        # Если процесс не убивали мы, это падение.
+        # If it was not we who killed the process, this is a crash.
         if self._proc is proc and proc is not None and proc.poll() not in (
                 None, 0):
             self.error = "Плагин упал."
@@ -296,16 +300,16 @@ class HostedPlugin:
                 done.set()
             return
 
-        # Просьбы плагина: их ровно три, и ни одна не про мир снаружи.
+        # The plugin's requests: there are exactly three, and none is about the world outside.
         self._owner.serve_plugin(self, message)
 
 
 class HostedPlugins:
     """
-    Все плагины, каждый в своём процессе.
+    Every plugin, each in a process of its own.
 
-    Поверхность повторяет `PluginManager` нарочно: ядро не должно знать,
-    где живёт плагин.
+    The surface repeats `PluginManager`'s deliberately: the core must not
+    know where a plugin lives.
     """
 
     def __init__(self, settings=None):
@@ -315,19 +319,20 @@ class HostedPlugins:
         self.response = Signal(str, str)
         self.pages_changed = Signal()
         self.notify_requested = Signal(str, str, str)
-        #: Настройки плагинов хранит ядро: плагин пишет своё, а где это
-        #: лежит — не его дело. Заодно так его настройки переживают его
-        #: собственное падение.
+        #: Plugin settings are kept by the core: a plugin writes its own,
+        #: and where that lies is none of its business. It also means its
+        #: settings outlive its own crash.
         self._settings = settings
 
-    # -- обнаружение ---------------------------------------------------------
+    # -- discovery -------------------------------------------------------------
     def discover(self):
         """
-        Найти папки плагинов. Кода при этом **не запускаем**.
+        Find the plugins' folders. We do **not** run any code while doing so.
 
-        Процесс поднимается при включении, а не при обнаружении: иначе
-        сбойный плагин мешал бы уже старту Рины, а список плагинов
-        стоил бы столько же, сколько их запуск.
+        The process comes up when a plugin is switched on, not when it is
+        discovered: otherwise a broken plugin would get in the way of Rina's
+        very start, and the list of plugins would cost as much as running
+        them.
         """
         from plugins.manager import plugins_dir
 
@@ -361,10 +366,11 @@ class HostedPlugins:
     @staticmethod
     def _read_manifest(hosted):
         """
-        Прочитать манифест, не запуская плагин.
+        Read the manifest without starting the plugin.
 
-        Список плагинов должен быть виден до того, как их включат: человек
-        выбирает из имён и описаний, а не из работающих процессов.
+        The list of plugins must be visible before they are switched on: a
+        person chooses from names and descriptions, not from running
+        processes.
         """
         import json
 
@@ -375,7 +381,7 @@ class HostedPlugins:
         except Exception as exc:                         # noqa: BLE001
             hosted.error = f"Ошибка манифеста: {exc}"
 
-    # -- включение -----------------------------------------------------------
+    # -- switching on ------------------------------------------------------------
     def enable(self, plugin_id, persist=True):
         hosted = self.plugins.get(plugin_id)
         if hosted is None:
@@ -425,13 +431,13 @@ class HostedPlugins:
         for hosted in self.plugins.values():
             hosted.stop()
 
-    # -- то, чем пользуется ядро --------------------------------------------
+    # -- what the core uses --------------------------------------------------
     def dispatch_command(self, text):
         """
-        Отдать команду плагинам. `True` — кто-то взял.
+        Hand a command to the plugins. `True` means somebody took it.
 
-        Порядок стабильный: два плагина, откликающиеся на одно слово, иначе
-        отвечали бы по-разному от запуска к запуску.
+        The order is stable: two plugins responding to one word would
+        otherwise answer differently from one run to the next.
         """
         for plugin_id in sorted(self.plugins):
             hosted = self.plugins[plugin_id]
@@ -471,11 +477,11 @@ class HostedPlugins:
 
     def declared_tools(self, plugin_id):
         """
-        Инструменты плагина — с проверенными разрешениями (ADR 0010).
+        A plugin's tools — with checked permissions (ADR 0010).
 
-        Описание пришло из процесса плагина; `Tool` строится **здесь**,
-        потому что проверять разрешения имеет право только эта сторона.
-        Плагин может объявить что угодно; заводится то, что позволено.
+        The description came from the plugin's process; the `Tool` is built
+        **here**, because only this side has the right to check permissions.
+        A plugin may declare anything; what gets created is what is allowed.
         """
         from core.permissions import plugin_allowed
         from core.tools import Param, Tool
@@ -537,14 +543,15 @@ class HostedPlugins:
 
         return run
 
-    # -- просьбы плагина -----------------------------------------------------
+    # -- the plugin's requests ---------------------------------------------------
     def serve_plugin(self, hosted, message):
         """
-        Ответить плагину. Просьб ровно три, и ни одна не про мир снаружи.
+        Answer the plugin. There are exactly three requests, and none is
+        about the world outside.
 
-        Плагин не может ни запустить программу, ни открыть окно, ни узнать
-        о соседях: всё, что он умеет делать с миром, объявлено
-        инструментами и проходит через реестр (ADR 0010).
+        A plugin can neither launch a program, nor open a window, nor learn
+        about its neighbours: everything it can do to the world is declared
+        as tools and goes through the registry (ADR 0010).
         """
         plugin_id = hosted.manifest.id
         method = message.method
@@ -565,7 +572,7 @@ class HostedPlugins:
             self._set_setting(plugin_id, str(message.payload.get("key")),
                               message.payload.get("value"))
         else:
-            # Метод, которого мы не знаем, — не повод молчать: плагин ждёт.
+            # A method we do not know is no reason to stay silent: the plugin is waiting.
             self._answer(hosted, message,
                          {"ok": False, "error": "неизвестный метод"})
             return
@@ -592,7 +599,7 @@ class HostedPlugins:
         log.info("[%s] %s", plugin_id, message)
         self.log_added.emit(plugin_id, message)
 
-    # -- настройки плагина ---------------------------------------------------
+    # -- the plugin's settings -----------------------------------------------
     def _bag(self):
         if self._settings is None:
             return {}
@@ -610,7 +617,7 @@ class HostedPlugins:
             self._settings.set("plugin_settings", bag)
             self._settings.save()
 
-    # Совместимость поверхности: менеджер в процессе умеет и это.
+    # Surface compatibility: the in-process manager can do this too.
     def get_plugin_setting(self, plugin_id, key, default=None):
         return self._setting(plugin_id, key, default)
 
@@ -619,7 +626,7 @@ class HostedPlugins:
 
 
 class _Element:
-    """Элемент страницы, пришедший от плагина, — в виде объекта."""
+    """An element of a page that came from a plugin, as an object."""
 
     __slots__ = ("kind", "data")
 
@@ -633,10 +640,10 @@ class _Element:
 
 def _as_elements(listed):
     """
-    Обернуть словари в объекты с `to_dict` и `kind`.
+    Wrap dicts in objects with `to_dict` and `kind`.
 
-    Нужно ради той же поверхности: сервер протокола зовёт `to_dict()` у
-    элементов, и ему не должно быть важно, пришли они из процесса рядом
-    или собрались здесь.
+    Needed for the sake of the same surface: the protocol server calls
+    `to_dict()` on the elements, and it must not matter to it whether they
+    came from the process next door or were assembled here.
     """
     return [_Element(item) for item in listed if isinstance(item, dict)]

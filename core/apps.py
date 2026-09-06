@@ -1,31 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Какую программу человек имел в виду.
+Which program the person meant.
 
-`4.0-G07`, решение — [ADR 0009](../docs/adr/0009-system-layer.md):
-**индекс — данные операционной системы и живёт в оболочке; сопоставление —
-язык и живёт здесь.** «Телеграм» → Telegram, «фотошоп» → Photoshop,
-«вижуал студио» → который из двух (и надо переспросить) — это
-транслитерация, нечёткое совпадение и разрешение неоднозначности, то есть
-речь.
+`4.0-G07`; the decision is
+[ADR 0009](../docs/adr/0009-system-layer.md): **the index is
+operating-system data and lives in the shell; the matching is language and
+lives here.** "Телеграм" → Telegram, "фотошоп" → Photoshop, "вижуал студио"
+→ which of the two (and one has to ask again) — that is transliteration,
+fuzzy matching and disambiguation, that is, speech.
 
-Довод, решивший развилку: позже сопоставление будет улучшать языковая
-модель, а она живёт в ядре. Разложи мы это в оболочку — первое же
-улучшение потребовало бы либо тащить модель туда, либо возвращать логику
-обратно.
+The argument that settled the fork: later the matching will be improved by a
+language model, and that lives in the core. Had we laid this out in the
+shell, the very first improvement would have demanded either dragging the
+model there or bringing the logic back.
 
-Модуль ничего не знает про Windows: ни реестра, ни меню «Пуск», ни `PATH`.
-Ему дают список записей — откуда он взялся, его не касается. Поэтому
-`find()` и требует `entries`: сходить и посмотреть самому ему нечем, и это
-не недоделка, а граница.
+The module knows nothing about Windows: neither the registry, nor the Start
+menu, nor `PATH`. It is handed a list of entries — where that came from is
+none of its business. That is why `find()` requires `entries`: it has
+nothing to go and look with, and that is a boundary rather than an
+unfinished job.
 """
 
 from voice.textmatch import has_cyrillic, normalize, similar, translit
 
 
-# Разговорные названия -> как программа называется в системе.
-# Транслитерация вытягивает многое («блендер» -> blender), но не всё:
-# «хром» -> hrom, «стим» -> stim, «ворд» -> vord — тут нужна прямая подсказка.
+# Spoken names -> what the program is called in the system.
+# Transliteration pulls a lot across ("блендер" -> blender), but not
+# everything: "хром" -> hrom, "стим" -> stim, "ворд" -> vord — here a direct
+# hint is needed.
 SPOKEN_ALIASES = {
     "хром": "chrome", "гугл хром": "chrome", "гуглхром": "chrome",
     "ворд": "word", "эксель": "excel", "поверпоинт": "powerpoint",
@@ -47,21 +49,22 @@ SPOKEN_ALIASES = {
     "терминал": "terminal", "командная строка": "cmd",
 }
 
-# Браузер — это не имя программы, а роль: у одного стоит Brave, у другого Edge.
-# Ищем первый установленный из списка (порядок = приоритет).
+# A browser is not a program's name but a role: one person has Brave
+# installed, another Edge. We look for the first installed one from the list
+# (order = priority).
 BROWSER_WORDS = ("браузер", "browser", "интернет")
 KNOWN_BROWSERS = ("chrome", "brave", "firefox", "edge", "opera", "yandex",
                   "vivaldi", "chromium")
 
 
 class AppEntry:
-    """Одно найденное приложение."""
+    """One application that was found."""
 
     __slots__ = ("name", "launch", "kind", "source")
 
     def __init__(self, name, launch, kind, source):
-        self.name = name        # отображаемое имя («Telegram Desktop»)
-        self.launch = launch    # что запускать (путь к .lnk/.exe или AppID)
+        self.name = name        # the display name ("Telegram Desktop")
+        self.launch = launch    # what to launch (a path to .lnk/.exe, or an AppID)
         self.kind = kind        # "file" | "uwp"
         self.source = source    # "start_menu" | "uwp" | "path"
 
@@ -84,8 +87,9 @@ class AppEntry:
 
 def query_variants(query):
     """
-    Варианты написания запроса: как сказано, транслитом и по таблице
-    разговорных названий. «фотошоп» ищется и как «fotoshop», и как «photoshop».
+    Spellings of the query: as it was said, transliterated, and by the table
+    of spoken names. "фотошоп" is looked for both as "fotoshop" and as
+    "photoshop".
     """
     norm = normalize(query)
     if not norm:
@@ -96,7 +100,7 @@ def query_variants(query):
         variants.append(normalize(alias))
     if has_cyrillic(norm):
         variants.append(translit(norm))
-    # уникальные, непустые, в исходном порядке приоритета
+    # unique, non-empty, in the original order of priority
     seen, result = set(), []
     for v in variants:
         if v and v not in seen:
@@ -105,17 +109,17 @@ def query_variants(query):
     return result
 
 
-# Программы из PATH — это сотни служебных .exe (antiword, mobsync и т.п.).
-# Их пускаем в выдачу только при уверенном совпадении, иначе они забивают
-# нормальные приложения из меню «Пуск».
+# Programs from PATH are hundreds of utility .exe files (antiword, mobsync
+# and so on). We let them into the results only on a confident match, or
+# they crowd out the normal applications from the Start menu.
 MIN_SCORE_PATH = 80
 
 
 def _score(key, variant):
     if key == variant:
         return 100
-    # совпадение с целым словом важнее совпадения с началом длинного слова:
-    # «обс» -> «OBS Studio», а не «Obsidian»
+    # a match with a whole word matters more than a match with the beginning
+    # of a long word: "обс" -> "OBS Studio", not "Obsidian"
     if variant in key.split():
         return 90
     if key.startswith(variant):
@@ -128,13 +132,13 @@ def _score(key, variant):
 
 
 def is_browser_query(query):
-    """Просят «браузер» вообще, а не конкретную программу."""
+    """They are asking for "a browser" in general, not for a particular program."""
     variants = query_variants(query)
     return bool(variants) and variants[0] in BROWSER_WORDS
 
 
 def _find_browser(entries):
-    """Установленные браузеры в порядке приоритета из KNOWN_BROWSERS."""
+    """The installed browsers in the order of priority from KNOWN_BROWSERS."""
     result = []
     for wanted in KNOWN_BROWSERS:
         for entry in entries:
@@ -147,21 +151,22 @@ def _find_browser(entries):
 
 def find(query, limit=5, entries=None):
     """
-    Кандидаты под запрос, от лучшего к худшему.
+    Candidates for the query, from best to worst.
 
-    Ранжирование: точное имя → начинается с запроса → содержит → похоже.
-    Точность важнее полноты: запустить не ту программу неприятнее, чем
-    переспросить.
+    The ranking: an exact name → begins with the query → contains it →
+    resembles it. Precision matters more than completeness: launching the
+    wrong program is more unpleasant than asking again.
 
-    `entries` обязателен, хоть и со значением по умолчанию: сходить и
-    посмотреть самому этому модулю нечем — индекс собирает оболочка
-    (ADR 0009). Пустой список даёт пустой ответ, а не поход в систему.
+    `entries` is required, even though it has a default: this module has
+    nothing to go and look with — the index is assembled by the shell
+    (ADR 0009). An empty list gives an empty answer rather than a trip into
+    the system.
     """
     variants = query_variants(query)
     if not variants or not entries:
         return []
 
-    # «запусти браузер» — просят роль, а не конкретное имя
+    # "launch a browser" — they are asking for a role, not a particular name
     if variants[0] in BROWSER_WORDS:
         found = _find_browser(entries)
         return found[:limit]
@@ -175,14 +180,14 @@ def find(query, limit=5, entries=None):
         for i, variant in enumerate(variants):
             value = _score(key, variant)
             if value:
-                # вариант «как сказано» чуть важнее производных
+                # the "as it was said" variant matters slightly more than the derived ones
                 value -= i
                 best = max(best, value)
         if not best:
             continue
         if entry.source == "path" and best < MIN_SCORE_PATH:
             continue
-        # более короткое имя при равном совпадении обычно и есть нужное
+        # with an equal match, the shorter name is usually the one wanted
         scored.append((best, -len(key), entry))
 
     scored.sort(key=lambda t: (t[0], t[1]), reverse=True)

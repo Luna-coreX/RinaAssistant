@@ -1,18 +1,20 @@
 """
-Переводы интерфейса на украинский, испанский и немецкий.
+Translations of the interface into Ukrainian, Spanish and German.
 
-Здесь покрыт основной интерфейс — то, что пользователь видит постоянно:
-навигация, заголовки страниц и секций, кнопки, названия настроек и самые
-частые ответы ассистента. Редкие строки (тексты ошибок движков, подсказки
-в конструкторе) намеренно не переведены: непереведённое место честно
-показывает русский оригинал, а не выдуманный машинный перевод.
+What is covered here is the main interface — what the user sees constantly:
+the navigation, the titles of pages and sections, the buttons, the names of
+settings and the commonest replies from the assistant. Rare strings (the
+engines' error texts, hints in the editor) are deliberately untranslated: an
+untranslated place honestly shows the Russian original rather than an
+invented machine translation.
 
-Полноту покрытия можно посмотреть функцией core.i18n.coverage().
+How complete the coverage is can be seen with the core.i18n.coverage()
+function.
 """
 
 # --- Українська ---
 UK = {
-    # навигация и страницы
+    # navigation and pages
     'Рина': 'Ріна',
     'Настройки': 'Налаштування',
     'Команды': 'Команди',
@@ -23,7 +25,7 @@ UK = {
     'Напоминания': 'Нагадування',
     'Раздел': 'Розділ',
 
-    # частые действия
+    # frequent actions
     'Сохранить': 'Зберегти',
     'Отмена': 'Скасувати',
     'Отменить': 'Скасувати',
@@ -51,7 +53,7 @@ UK = {
     'Не нужно': 'Не треба',
     'Указать файл…': 'Вказати файл…',
 
-    # секции настроек
+    # settings sections
     'Внешний вид': 'Зовнішній вигляд',
     'Аудио': 'Аудіо',
     'Модели голоса': 'Моделі голосу',
@@ -62,7 +64,7 @@ UK = {
     'Приватность': 'Приватність',
     'Голос и речь': 'Голос і мовлення',
 
-    # настройки
+    # settings
     'Тема оформления': 'Тема оформлення',
     'Акцентный цвет': 'Акцентний колір',
     'Язык': 'Мова',
@@ -84,16 +86,16 @@ UK = {
     'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant — частина NeuroSync Foundry. © 2026 Luna-coreX. Ліцензія Apache 2.0.',
     'Не получилось выполнить команду: ': 'Не вдалося виконати команду: ',
 
-    # диагностика: сбои проверок и распознавания
+    # diagnostics: check and recognition failures
     'Не получилось распознать речь: ': 'Не вдалося розпізнати мовлення: ',
     'Не удалось проверить микрофон: ': 'Не вдалося перевірити мікрофон: ',
     'Ошибка проверки: ': 'Помилка перевірки: ',
 
-    # запуск: цель исчезла
+    # launching: the target is gone
     'Не нашла «{target}» — программу удалили или перенесли.': 'Не знайшла «{target}» — програму видалили або перенесли.',
     'Не получилось запустить {app} — программу удалили или перенесли.': 'Не вдалося запустити {app} — програму видалили або перенесли.',
 
-    # диагностика (журнал приложения)
+    # diagnostics (the application's journal)
     'Диагностика': 'Діагностика',
     'Подробность журнала': 'Докладність журналу',
     'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — лише збої, DEBUG — усе поспіль',
@@ -105,7 +107,7 @@ UK = {
     'Чувствительность активации': 'Чутливість активації',
     'Длительность записи': 'Тривалість запису',
 
-    # ответы ассистента
+    # the assistant's answers
     'Запускаю {app}.': 'Запускаю {app}.',
     'Не нашла программу «{name}».': 'Не знайшла програму «{name}».',
     'Извини, я не поняла команду.': 'Вибач, я не зрозуміла команду.',
@@ -118,7 +120,7 @@ UK = {
         'Мене звати Ріна, я твій голосовий асистент.',
     'Всегда пожалуйста!': 'Завжди будь ласка!',
 
-    # статусы и мелочи
+    # statuses and small things
     'Сохранено': 'Збережено',
     'Сегодня': 'Сьогодні',
     'Вчера': 'Вчора',
@@ -203,16 +205,16 @@ ES = {
     'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant es parte de NeuroSync Foundry. © 2026 Luna-coreX. Licencia Apache 2.0.',
     'Не получилось выполнить команду: ': 'No pude ejecutar el comando: ',
 
-    # диагностика: сбои проверок и распознавания
+    # diagnostics: check and recognition failures
     'Не получилось распознать речь: ': 'No pude reconocer el habla: ',
     'Не удалось проверить микрофон: ': 'No pude probar el micrófono: ',
     'Ошибка проверки: ': 'Error de comprobación: ',
 
-    # запуск: цель исчезла
+    # launching: the target is gone
     'Не нашла «{target}» — программу удалили или перенесли.': 'No encontré «{target}»: el programa fue eliminado o movido.',
     'Не получилось запустить {app} — программу удалили или перенесли.': 'No pude abrir {app}: el programa fue eliminado o movido.',
 
-    # диагностика (журнал приложения)
+    # diagnostics (the application's journal)
     'Диагностика': 'Diagnóstico',
     'Подробность журнала': 'Detalle del registro',
     'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — solo fallos, DEBUG — todo',
@@ -320,16 +322,16 @@ DE = {
     'Rina Assistant — часть NeuroSync Foundry. © 2026 Luna-coreX. Лицензия Apache 2.0.': 'Rina Assistant ist Teil von NeuroSync Foundry. © 2026 Luna-coreX. Apache-2.0-Lizenz.',
     'Не получилось выполнить команду: ': 'Befehl konnte nicht ausgeführt werden: ',
 
-    # диагностика: сбои проверок и распознавания
+    # diagnostics: check and recognition failures
     'Не получилось распознать речь: ': 'Spracherkennung fehlgeschlagen: ',
     'Не удалось проверить микрофон: ': 'Mikrofontest fehlgeschlagen: ',
     'Ошибка проверки: ': 'Prüfung fehlgeschlagen: ',
 
-    # запуск: цель исчезла
+    # launching: the target is gone
     'Не нашла «{target}» — программу удалили или перенесли.': '„{target}“ nicht gefunden – das Programm wurde gelöscht oder verschoben.',
     'Не получилось запустить {app} — программу удалили или перенесли.': '{app} konnte nicht gestartet werden – das Programm wurde gelöscht oder verschoben.',
 
-    # диагностика (журнал приложения)
+    # diagnostics (the application's journal)
     'Диагностика': 'Diagnose',
     'Подробность журнала': 'Protokolldetails',
     'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — nur Fehler, DEBUG — alles',

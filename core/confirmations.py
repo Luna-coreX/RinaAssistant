@@ -1,29 +1,31 @@
 """
-Контур подтверждения опасных действий.
+The loop that confirms dangerous actions.
 
-Задача плана 4.0-C05. В 3.1.0 подтверждение жило словарём `pending` внутри
-ядра: без идентификатора, без срока и без однократности. Проверить, что
-опасное действие подтверждено, можно было только доверившись порядку вызовов —
-то есть никак.
+Plan item 4.0-C05. In 3.1.0 a confirmation lived as a `pending` dict inside
+the core: with no identifier, no deadline and no one-time use. Checking that
+a dangerous action was confirmed could only be done by trusting the order of
+calls — that is, not at all.
 
-Здесь подтверждение становится предметом, который можно предъявить:
+Here a confirmation becomes a thing that can be presented:
 
-    confirmation_id   выдан на конкретный вызов
-    срок              просроченное не принимается
-    однократность     предъявленное сгорает
+    confirmation_id   issued for a particular call
+    a deadline        an expired one is not accepted
+    one-time use      what is presented burns up
 
-Три свойства, каждое из которых закрывает свой способ ошибиться.
+Three properties, each of which closes off its own way of going wrong.
 
-**Привязка к аргументам, а не только к инструменту.** Согласие на «усыпить»
-нельзя предъявить для «выключить»: это один инструмент `power_action` с
-разными аргументами, и без отпечатка аргументов подмена прошла бы. Человек
-подтверждает то, что ему показали, а не имя функции.
+**Bound to the arguments, not only to the tool.** Consent to "sleep" cannot
+be presented for "shut down": that is one `power_action` tool with different
+arguments, and without a fingerprint of the arguments the substitution would
+go through. A person confirms what they were shown, not the name of a
+function.
 
-**Однократность.** Иначе одно согласие годилось бы до истечения срока для
-любого числа вызовов — то есть «выключи компьютер», подтверждённое однажды,
-выключало бы его и на второй раз, когда фраза распозналась случайно.
+**One-time use.** Otherwise one consent would serve until the deadline for
+any number of calls — that is, "shut down the computer", confirmed once,
+would shut it down a second time as well, when the phrase was recognised by
+accident.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 import hashlib
@@ -34,29 +36,31 @@ import time
 from dataclasses import dataclass
 
 
-#: Сколько живёт выданное подтверждение. Совпадает со сроком незакрытого
-#: вопроса (core/dialog.py): и то и другое — окно, в течение которого ответ
-#: человека ещё относится к заданному вопросу.
+#: How long an issued confirmation lives. The same as the deadline of an
+#: unclosed question (core/dialog.py): both are a window during which a
+#: person's answer still belongs to the question that was asked.
 DEFAULT_TTL = 60
 
-#: Область действия.
+#: The scope.
 #:
-#: Их две, а не три, как было записано в §11 спецификации. «До конца сессии»
-#: убрано не из осторожности, а потому что отдельного механизма под него нет:
-#: §13 прямо говорит, что выданные разрешения переподключение не переживают,
-#: то есть сессия и есть верхняя граница для любой области. Третье имя для
-#: того же поведения — приглашение считать, будто оно другое.
+#: There are two, not three as was written down in §11 of the specification.
+#: "Until the end of the session" was removed not out of caution but because
+#: there is no separate mechanism for it: §13 says outright that granted
+#: permissions do not survive a reconnection, that is, the session is the
+#: upper bound for any scope. A third name for the same behaviour is an
+#: invitation to think it is something else.
 #:
-#: Прежнее имя SESSION описывало ровно нынешнее UNTIL: подтверждение
-#: оставалось годным до истечения срока, а вовсе не до конца сессии. Имя,
-#: обещающее не то, что делает код, — заготовка будущей ошибки.
-ONCE = "once"          # сгорает при первом предъявлении
-UNTIL = "until"        # годно до expires_at, сколько угодно раз
+#: The former name SESSION described precisely today's UNTIL: a confirmation
+#: stayed valid until the deadline expired, and not at all until the end of
+#: the session. A name that promises something other than what the code does
+#: is a blank for a future mistake.
+ONCE = "once"          # burns up at the first presentation
+UNTIL = "until"        # valid until expires_at, any number of times
 SCOPES = (ONCE, UNTIL)
 
 
 class ConfirmationError(Exception):
-    """Подтверждение не принято. Несёт код для протокола."""
+    """The confirmation was not accepted. Carries a code for the protocol."""
 
     def __init__(self, message, code, details=None):
         super().__init__(message)
@@ -67,10 +71,11 @@ class ConfirmationError(Exception):
 
 def fingerprint(tool_name, args):
     """
-    Отпечаток вызова: инструмент плюс аргументы.
+    A call's fingerprint: the tool plus the arguments.
 
-    Считается от канонической записи, чтобы порядок ключей не менял
-    результат — иначе подтверждение переставало бы подходить само себе.
+    Computed from a canonical form, so that the order of keys does not
+    change the result — otherwise a confirmation would stop matching
+    itself.
     """
     payload = json.dumps({"tool": tool_name, "args": args or {}},
                          sort_keys=True, ensure_ascii=False,
@@ -80,7 +85,7 @@ def fingerprint(tool_name, args):
 
 @dataclass(frozen=True)
 class Confirmation:
-    """Выданное разрешение на один конкретный вызов."""
+    """Permission granted for one particular call."""
 
     id: str
     tool: str
@@ -88,8 +93,8 @@ class Confirmation:
     issued_at: float
     expires_at: float
     scope: str = ONCE
-    #: Что показали человеку. Хранится, чтобы журнал безопасности мог
-    #: записать, на что именно он согласился, а не только имя действия.
+    #: What the person was shown. Kept so that the security journal can
+    #: record what exactly they agreed to, not only the action's name.
     preview: str = ""
 
     def expired(self, now=None):
@@ -104,30 +109,31 @@ class Confirmation:
 
 class ConfirmationLedger:
     """
-    Выданные подтверждения.
+    The confirmations that have been issued.
 
-    Живёт в ядре: решение о том, подтверждено ли действие, не должно
-    приниматься на стороне оболочки, иначе его можно обойти со стороны
-    интерфейса.
+    Lives in the core: the decision on whether an action is confirmed must
+    not be taken on the shell's side, or it can be circumvented from the
+    interface.
     """
 
     def __init__(self, ttl=DEFAULT_TTL, clock=time.time):
         self._ttl = ttl
-        #: Часы передаются снаружи по той же причине, что и всюду в ядре:
-        #: срок надо уметь проверить, а не переждать. Но здесь есть и вторая,
-        #: важнее. Канал разрешений (4.0-D12) считает своё окно ожидания по
-        #: собственным часам и передаёт сюда остаток срока. Пока журнал жил по
-        #: системному времени, а канал — по своим, это были две разные шкалы в
-        #: одном контуре: срок, вычисленный на одной, проверялся на другой.
-        #: Заметил это conformance-набор, где просроченное подтверждение
-        #: спокойно прошло.
+        #: The clock is passed in from outside for the same reason as
+        #: everywhere in the core: a deadline must be checkable rather than
+        #: waited out. But there is a second reason here, and a weightier
+        #: one. The permission channel (4.0-D12) counts its own waiting
+        #: window on a clock of its own and passes the remaining time here.
+        #: While the ledger ran on system time and the channel on its own,
+        #: these were two different scales in one loop: a deadline computed
+        #: on one was checked on the other. The conformance suite noticed
+        #: it, where an expired confirmation passed without trouble.
         self._clock = clock
         self._items = {}
         self._lock = threading.RLock()
 
-    # ---------- выдача ----------
+    # ---------- issuing ----------
     def issue(self, tool_name, args=None, ttl=None, scope=ONCE, preview=""):
-        """Выдать подтверждение на конкретный вызов."""
+        """Issue a confirmation for a particular call."""
         if scope not in SCOPES:
             raise ValueError(f"неизвестная область: {scope!r}")
         now = self._clock()
@@ -144,15 +150,15 @@ class ConfirmationLedger:
             self._items[confirmation.id] = confirmation
         return confirmation
 
-    # ---------- предъявление ----------
+    # ---------- presenting ----------
     def redeem(self, confirmation_id, tool_name, args=None, now=None):
         """
-        Принять подтверждение и погасить его.
+        Accept a confirmation and burn it.
 
-        Возвращает Confirmation или бросает ConfirmationError. Коды ошибок
-        разные намеренно: «не предъявлено», «не найдено», «просрочено» и «не
-        от этого действия» — четыре разные ситуации, и человеку нужно
-        сказать разное.
+        Returns a Confirmation or raises a ConfirmationError. The error
+        codes differ deliberately: "not presented", "not found", "expired"
+        and "not for this action" are four different situations, and a
+        person has to be told different things.
         """
         if not confirmation_id:
             raise ConfirmationError(
@@ -183,19 +189,19 @@ class ConfirmationLedger:
                     "подтверждение выдано на другие аргументы",
                     "confirmation.invalid", {"tool": tool_name})
 
-            # Однократное сгорает; «до срока» остаётся годным до expires_at.
+            # A one-time one burns up; an "until" one stays valid until expires_at.
             if confirmation.scope == ONCE:
                 del self._items[confirmation_id]
 
         return confirmation
 
-    # ---------- обслуживание ----------
+    # ---------- maintenance ----------
     def revoke(self, confirmation_id):
         with self._lock:
             return self._items.pop(confirmation_id, None) is not None
 
     def revoke_all(self):
-        """Снять все выданные — сюда придёт kill-switch из 5.0-D08."""
+        """Revoke every one issued — the 5.0-D08 kill switch will come here."""
         with self._lock:
             count = len(self._items)
             self._items.clear()

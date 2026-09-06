@@ -1,36 +1,38 @@
 """
-Доступность возможностей.
+The availability of capabilities.
 
-Задача плана 4.0-B08. В бете платных возможностей нет и все ответы —
-«доступно». Тогда зачем интерфейс сейчас?
+Plan item 4.0-B08. In the beta there are no paid capabilities and every
+answer is "available". Then why an interface now?
 
-Затем, что проверка доступности, добавленная позже, расползается по коду:
-условие в конвейере, второе в оболочке, третье в настройках — и через полгода
-никто не может ответить, где именно решается, что пользователю можно. Один
-интерфейс, заведённый до появления первой платной возможности, превращает это
-в замену реализации вместо правок по всему проекту.
+Because an availability check added later spreads through the code: a
+condition in the pipeline, a second in the shell, a third in the settings —
+and six months on nobody can say where exactly it is decided what a user may
+do. One interface, created before the first paid capability appears, turns
+that into replacing an implementation instead of edits all over the project.
 
-Три правила, ради которых он существует:
+Three rules it exists for:
 
-    * **Решает ядро, показывает оболочка.** Оболочка спрашивает и рисует
-      состояние; решать доступность она не имеет права, иначе решение
-      окажется в двух местах сразу и оболочку можно будет обойти.
-    * **Проверок мимо этого интерфейса быть не должно.** Ни `plan == "pro"`,
-      ни «если лицензия», ни флага в настройках.
-    * **В бете всё доступно.** Не потому, что забыли, а потому что это
-      решение: бета проверяет пользу продукта, а не платёжную инфраструктуру.
+    * **The core decides, the shell shows.** The shell asks and draws the
+      state; it has no right to decide availability, or the decision ends up
+      in two places at once and the shell can be circumvented.
+    * **There must be no checks that bypass this interface.** Neither
+      `plan == "pro"`, nor "if there is a licence", nor a flag in the
+      settings.
+    * **In the beta everything is available.** Not because we forgot but
+      because it is a decision: the beta tests the product's usefulness, not
+      the payment infrastructure.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 from typing import Protocol, runtime_checkable
 
 
-#: Возможности, которые когда-нибудь могут стать платными.
+#: Capabilities that may some day become paid.
 #:
-#: Список — не обещание, а словарь имён: он существует, чтобы имя возможности
-#: писалось одинаково в ядре, в оболочке и в будущем сервере лицензий.
-#: Ни одна из них сегодня не ограничена.
+#: The list is not a promise but a dictionary of names: it exists so that a
+#: capability's name is written the same way in the core, in the shell and
+#: in a future licence server. Not one of them is limited today.
 FEATURES = {
     "rag":            "Поиск по локальным документам",
     "agents":         "Многошаговые сценарии с подтверждением",
@@ -43,20 +45,20 @@ FEATURES = {
     "workflow_packs": "Готовые наборы сценариев",
 }
 
-#: План, под которым работает приложение сейчас.
+#: The plan the application is running under right now.
 COMMUNITY = "community"
 
 
 class UnknownFeature(ValueError):
-    """Имени нет в словаре возможностей."""
+    """The name is not in the capability dictionary."""
 
 
 def check_feature_name(name):
-    """Проверенное имя или UnknownFeature.
+    """A checked name, or UnknownFeature.
 
-    Опечатка в имени иначе означала бы тихо выключенную возможность:
-    `has_feature("agent")` вместо `"agents"` вернул бы False и выглядел бы
-    как честный отказ.
+    A typo in a name would otherwise mean a quietly switched-off capability:
+    `has_feature("agent")` instead of `"agents"` would return False and look
+    like an honest refusal.
     """
     if name not in FEATURES:
         raise UnknownFeature(f"неизвестная возможность: {name!r}")
@@ -65,28 +67,28 @@ def check_feature_name(name):
 
 @runtime_checkable
 class FeatureProvider(Protocol):
-    """Что ядру нужно знать о доступности."""
+    """What the core needs to know about availability."""
 
     def plan(self) -> str:
-        """Имя текущего плана — для показа, не для ветвления."""
+        """The current plan's name — for showing, not for branching."""
         ...
 
     def has_feature(self, feature: str) -> bool:
-        """Доступна ли возможность."""
+        """Whether the capability is available."""
         ...
 
     def enabled_features(self) -> set:
-        """Всё, что доступно сейчас."""
+        """Everything that is available right now."""
         ...
 
 
 class CommunityFeatures:
     """
-    Бесплатный план: доступно всё.
+    The free plan: everything is available.
 
-    Это и есть реализация на 4.0. Она не заглушка: локальная база остаётся
-    бесплатной и после появления платных планов, поэтому сам класс переживёт
-    их появление — рядом просто встанет второй.
+    This is the implementation as of 4.0. It is not a stub: the local base
+    stays free even after paid plans appear, so the class itself will
+    outlive their appearance — a second one will simply stand beside it.
     """
 
     def plan(self):
@@ -102,8 +104,8 @@ class CommunityFeatures:
 
 class LimitedFeatures:
     """
-    Ограниченный набор. Существует ради тестов и ради того, чтобы код,
-    спрашивающий доступность, был проверяем ДО появления платного плана.
+    A limited set. Exists for the sake of the tests and so that code asking
+    about availability is checkable BEFORE a paid plan appears.
     """
 
     def __init__(self, allowed=(), plan_name="test"):
@@ -122,5 +124,5 @@ class LimitedFeatures:
 
 
 def default_features():
-    """Реализация по умолчанию."""
+    """The default implementation."""
     return CommunityFeatures()

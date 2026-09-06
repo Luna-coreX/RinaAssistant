@@ -1,19 +1,21 @@
 """
-Журналирование приложения.
+The application's journalling.
 
-Зачем это появилось: оба аудита 3.0.0 воспроизводили проблемы в песочнице,
-потому что журналов не существовало вовсе. Сбой в фоновом потоке уносил поток
-молча, и снаружи было видно только, что «ничего не произошло». После
-разделения на два процесса (4.0.0) отладка вслепую станет невозможной.
+Why this appeared: both 3.0.0 audits reproduced problems in a sandbox,
+because journals did not exist at all. A failure in a background thread
+carried the thread off in silence, and from outside all one could see was
+that "nothing happened". After the split into two processes (4.0.0),
+debugging blind will become impossible.
 
-Приватность. Тексты реплик — это содержимое разговора, и в журнал они не
-попадают. Исключение одно: уровень DEBUG при явно включённой настройке
-`log_texts`. Во всех остальных случаях вместо текста пишется его длина, чего
-достаточно, чтобы отличить «пустой ввод» от «10 000 символов», и недостаточно,
-чтобы прочитать разговор. Поэтому журнал можно прикладывать к сообщению об
-ошибке, не разглашая переписку.
+Privacy. The text of lines is the content of a conversation, and it does not
+get into the journal. There is one exception: DEBUG level with the
+`log_texts` setting explicitly on. In every other case the text's length is
+written instead, which is enough to tell "empty input" from "10,000
+characters" and not enough to read the conversation. So the journal can be
+attached to a bug report without disclosing the correspondence.
 
-Qt здесь нет намеренно: модуль лежит в ядре и должен работать в headless-режиме.
+There is deliberately no Qt here: the module lies in the core and must work
+headless.
 """
 
 import logging
@@ -28,16 +30,17 @@ from core.trace import TraceFilter
 LOGGER_NAME = "rina"
 FILE_NAME = "rina.log"
 
-# Отдельный файл под события, которые оба аудита 3.0.0 искали руками:
-# установка и замена плагинов, отклонённые имена, импорт команд, запуск
-# системных утилит, нелокальный адрес модели, отказ от опасного действия.
-# Он короткий и его не нужно вычитывать из общего потока, а уровень
-# приложения на него не влияет — такие записи нужны всегда.
+# A separate file for the events that both 3.0.0 audits hunted for by hand:
+# installing and replacing plugins, rejected names, importing commands,
+# running system utilities, a non-local model address, refusing a dangerous
+# action. It is short and need not be read out of the general stream, and the
+# application's level does not affect it — such entries are always needed.
 SECURITY_LOGGER_NAME = "rina.security"
 SECURITY_FILE_NAME = "security.log"
 
-# Журнал нужен для разбора последнего сбоя, а не для истории за месяц:
-# 1 МБ на файл и три ротации — это заведомо больше одного сеанса.
+# The journal is for looking into the last failure, not for a month's
+# history: 1 MB per file and three rotations is knowingly more than one
+# session.
 MAX_BYTES = 1024 * 1024
 BACKUP_COUNT = 3
 
@@ -50,12 +53,13 @@ _LEVEL_VALUES = {
     "ERROR": logging.ERROR,
 }
 
-# `trace` — сквозной идентификатор действия (4.0-D15, §14 спецификации).
-# Он в формате потому, что журнал без него в двухпроцессной системе
-# бесполезен: две программы пишут два несвязанных набора строк, и вопрос
-# «что произошло после того нажатия» отвечается сверкой отметок времени,
-# то есть догадкой. Поле подставляет `core.trace.TraceFilter`; там же
-# объяснено, почему прочерк честнее выдуманного значения.
+# `trace` is an action's end-to-end identifier (4.0-D15, §14 of the
+# specification). It is in the format because a journal without it is
+# useless in a two-process system: two programs write two unconnected sets
+# of lines, and the question "what happened after that keypress" is answered
+# by comparing timestamps, that is, by guesswork. The field is filled in by
+# `core.trace.TraceFilter`; the same place explains why a dash is more honest
+# than an invented value.
 _FORMAT = "%(asctime)s %(levelname)-7s %(trace)-14s %(name)-20s %(message)s"
 _DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
@@ -65,10 +69,10 @@ _hooks_installed = False
 
 
 # ---------------------------------------------------------------------------
-# Расположение
+# Location
 # ---------------------------------------------------------------------------
 def logs_dir() -> str:
-    """Папка с журналами рядом с настройками. Создаётся при обращении."""
+    """The folder with the journals, next to the settings. Created on demand."""
     from core.settings_store import config_dir
 
     path = os.path.join(config_dir(), "logs")
@@ -82,19 +86,20 @@ def log_path() -> str:
 
 def security_log() -> logging.Logger:
     """
-    Журнал безопасности. Пишет и в свой файл, и в общий (через родителя),
-    чтобы в общем журнале сохранялась связная хронология.
+    The security journal. Writes both to its own file and to the general one
+    (through its parent), so that the general journal keeps a coherent
+    chronology.
     """
     return logging.getLogger(SECURITY_LOGGER_NAME)
 
 
 def get_logger(name: str = "") -> logging.Logger:
-    """Логгер приложения. `name` — короткое имя подсистемы («engine», «tts»)."""
+    """The application's logger. `name` is a subsystem's short name ("engine", "tts")."""
     return logging.getLogger(f"{LOGGER_NAME}.{name}" if name else LOGGER_NAME)
 
 
 # ---------------------------------------------------------------------------
-# Настройки
+# Settings
 # ---------------------------------------------------------------------------
 def _settings():
     from core.settings_store import settings
@@ -102,7 +107,7 @@ def _settings():
 
 
 def current_level() -> int:
-    """Уровень из настроек. До их загрузки — значение по умолчанию."""
+    """The level from the settings. Before they are loaded, the default."""
     try:
         name = str(_settings().get("log_level", DEFAULT_LEVEL)).upper()
     except Exception:
@@ -111,7 +116,7 @@ def current_level() -> int:
 
 
 def texts_allowed() -> bool:
-    """Разрешил ли пользователь писать в журнал содержимое реплик."""
+    """Whether the user allowed the content of lines to be written to the journal."""
     try:
         return bool(_settings().get("log_texts", False))
     except Exception:
@@ -120,10 +125,10 @@ def texts_allowed() -> bool:
 
 def safe(text) -> str:
     """
-    Реплика в виде, пригодном для журнала.
+    A line in a form fit for the journal.
 
-    Сам текст — только с явного разрешения; иначе длина, по которой видно
-    форму проблемы, но не её содержание.
+    The text itself only with explicit permission; otherwise the length, by
+    which the shape of a problem is visible but not its content.
     """
     text = "" if text is None else str(text)
     if texts_allowed():
@@ -132,12 +137,13 @@ def safe(text) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Настройка
+# Setting up
 # ---------------------------------------------------------------------------
 def setup(force: bool = False) -> None:
     """
-    Поднимает журналирование. Безопасно вызывать до загрузки настроек:
-    уровень тогда берётся по умолчанию, а `apply_settings()` поправит его.
+    Raises journalling. Safe to call before the settings are loaded: the
+    level is then taken from the default, and `apply_settings()` will
+    correct it.
     """
     global _configured
 
@@ -146,8 +152,9 @@ def setup(force: bool = False) -> None:
             return
 
         logger = logging.getLogger(LOGGER_NAME)
-        # пропускаем всё, отбор делают обработчики — иначе смена уровня
-        # в настройках потребовала бы пересборки логгера
+        # we let everything through, the handlers do the selecting —
+        # otherwise changing the level in the settings would require
+        # rebuilding the logger
         logger.setLevel(logging.DEBUG)
         logger.propagate = False
 
@@ -159,10 +166,10 @@ def setup(force: bool = False) -> None:
                 pass
 
         formatter = logging.Formatter(_FORMAT, datefmt=_DATE_FORMAT)
-        # Фильтр вешается на обработчики, а не на логгер: так поле получает
-        # и запись, созданная в обход наших путей, и формат не падает на
-        # KeyError посреди разбора сбоя — ровно тогда, когда журнал нужнее
-        # всего.
+        # The filter is hung on the handlers rather than on the logger: that
+        # way the field also reaches a record created around our paths, and
+        # the format does not fall over with a KeyError in the middle of
+        # looking into a failure — exactly when the journal is needed most.
         trace_filter = TraceFilter()
 
         try:
@@ -174,11 +181,11 @@ def setup(force: bool = False) -> None:
             file_handler.setLevel(current_level())
             logger.addHandler(file_handler)
         except OSError:
-            # без журнала жить можно, без приложения — нет
+            # one can live without a journal, but not without the application
             pass
 
-        # В собранном exe stderr может отсутствовать, а при запуске из
-        # исходников он полезен: предупреждения видно сразу.
+        # In a built exe stderr may be absent, while when running from
+        # source it is useful: warnings are visible at once.
         if getattr(sys, "stderr", None) is not None:
             stream_handler = logging.StreamHandler(sys.stderr)
             stream_handler.setFormatter(formatter)
@@ -192,7 +199,7 @@ def setup(force: bool = False) -> None:
 
 
 def _setup_security_handler(formatter, trace_filter=None):
-    """Свой файл для журнала безопасности, независимо от общего уровня."""
+    """A file of its own for the security journal, independent of the general level."""
     security = logging.getLogger(SECURITY_LOGGER_NAME)
     security.setLevel(logging.INFO)
     for handler in list(security.handlers):
@@ -215,7 +222,7 @@ def _setup_security_handler(formatter, trace_filter=None):
 
 
 def apply_settings() -> None:
-    """Перечитать уровень из настроек — после их загрузки или изменения."""
+    """Re-read the level from the settings — after they are loaded or changed."""
     level = current_level()
     for handler in logging.getLogger(LOGGER_NAME).handlers:
         if isinstance(handler, logging.handlers.RotatingFileHandler):
@@ -223,7 +230,7 @@ def apply_settings() -> None:
 
 
 def log_startup(version: str = "") -> None:
-    """Первая запись сеанса: по ней в присланном журнале видно окружение."""
+    """The session's first entry: by it the environment is visible in a journal that was sent in."""
     log = get_logger("app")
     log.info("--- запуск Rina Assistant %s ---", version or "?")
     log.info("Python %s, платформа %s",
@@ -235,7 +242,7 @@ def log_startup(version: str = "") -> None:
 
 
 # ---------------------------------------------------------------------------
-# Необработанные исключения
+# Unhandled exceptions
 # ---------------------------------------------------------------------------
 def _install_excepthooks() -> None:
     global _hooks_installed
@@ -250,16 +257,18 @@ def _install_excepthooks() -> None:
         if not issubclass(exc_type, KeyboardInterrupt):
             log.critical("Необработанное исключение",
                          exc_info=(exc_type, exc_value, traceback_obj))
-        # Штатный обработчик печатает то же самое в stderr, куда уже пишет
-        # наш обработчик, — получалась бы двойная трассировка. Чужой
-        # обработчик, наоборот, вызываем: он мог быть поставлен не нами.
+        # The standard handler prints the same thing to stderr, where our
+        # handler already writes — there would be a double traceback.
+        # Somebody else's handler, on the contrary, we do call: it may have
+        # been installed by someone other than us.
         if previous is not sys.__excepthook__:
             previous(exc_type, exc_value, traceback_obj)
 
     sys.excepthook = main_hook
 
-    # Исключение в фоновом потоке уносит поток молча: пользователь видит,
-    # что действие просто не произошло. Так терялся сбой распознавания.
+    # An exception in a background thread carries the thread off in silence:
+    # the user sees that the action simply did not happen. That is how a
+    # recognition failure went missing.
     previous_thread = getattr(threading, "excepthook", None)
     if previous_thread is not None:
         def thread_hook(args):

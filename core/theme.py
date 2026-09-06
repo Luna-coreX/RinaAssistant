@@ -1,10 +1,11 @@
 """
-Динамическая система тем.
+The dynamic theme system.
 
-Color — объект с атрибутами-цветами (BASE, TEXT, ACCENT, ...).
-При смене темы атрибуты МУТИРУЮТСЯ, затем theme_manager.changed шлёт сигнал,
-по которому каждый виджет пересобирает свой QSS через apply_theme().
-Существующий код, обращающийся к Color.BASE как к строке, работает без правок.
+Color is an object with colour attributes (BASE, TEXT, ACCENT, ...).
+On a change of theme the attributes are MUTATED, then theme_manager.changed
+sends a signal, on which every widget rebuilds its QSS through
+apply_theme(). Existing code that treats Color.BASE as a string works
+without changes.
 """
 
 from PySide6.QtCore import QObject, Signal
@@ -108,7 +109,7 @@ DEFAULT_ACCENT = "Mauve"
 
 
 def _mix(c1: str, c2: str, t: float) -> str:
-    """Линейная интерполяция двух hex-цветов (#rrggbb). t=0 -> c1, t=1 -> c2."""
+    """Linear interpolation of two hex colours (#rrggbb). t=0 -> c1, t=1 -> c2."""
     c1 = c1.lstrip("#")
     c2 = c2.lstrip("#")
     r = round(int(c1[0:2], 16) + (int(c2[0:2], 16) - int(c1[0:2], 16)) * t)
@@ -118,14 +119,14 @@ def _mix(c1: str, c2: str, t: float) -> str:
 
 
 class _Color:
-    """Держатель текущих цветов; атрибуты меняются при смене темы."""
+    """A holder of the current colours; the attributes change with the theme."""
     BASE = MANTLE = CRUST = ""
     SURFACE_0 = SURFACE_1 = SURFACE_2 = ""
     TEXT = SUBTEXT = OVERLAY = ""
     GREEN = RED = PEACH = YELLOW = PINK = BLUE = TEAL = MAUVE = ""
-    # Один акцент на весь интерфейс: подсветка активного, кнопки действия,
-    # фокус. Никаких вторичных «неоновых» оттенков — иерархия строится
-    # размером и воздухом, а не цветом.
+    # One accent for the whole interface: highlighting what is active,
+    # action buttons, focus. No secondary "neon" shades — the hierarchy is
+    # built with size and air, not with colour.
     ACCENT = ""
 
     def apply(self, theme_name, accent_name):
@@ -141,12 +142,12 @@ class _Color:
     @staticmethod
     def alpha(hex_color, aa):
         """
-        Корректная прозрачность для Qt-стилей: возвращает #AARRGGBB.
+        Correct transparency for Qt styles: returns #AARRGGBB.
 
-        Внимание: конкатенация «{Color.X}22» даёт #RRGGBBAA, но Qt читает
-        8-значный hex как #AARRGGBB — цвет получается неверным. Этот helper
-        ставит альфу в начало, как ждёт Qt.
-        `aa` — строка из 2 hex-символов ('22') или int 0..255.
+        Note: concatenating "{Color.X}22" gives #RRGGBBAA, but Qt reads an
+        8-digit hex as #AARRGGBB — and the colour comes out wrong. This
+        helper puts the alpha at the front, as Qt expects.
+        `aa` is a string of 2 hex characters ("22") or an int 0..255.
         """
         h = hex_color.lstrip("#")
         if isinstance(aa, int):

@@ -1,22 +1,23 @@
 """
-Исполнитель: намерение -> вызов инструмента -> результат.
+The executor: intent -> tool call -> result.
 
-Задача плана 4.0-B04, переработан под 4.0-C03.
+Plan item 4.0-B04, reworked for 4.0-C03.
 
-Раньше исполнитель сам делал побочные эффекты: звал `app_index.launch`,
-`system_control.run`, открывал браузер. Теперь он **ничего не делает сам** —
-он переводит намерение в вызов инструмента и отдаёт его `ToolRunner`, который
-проверяет аргументы, разрешения и подтверждение.
+The executor used to produce the side effects itself: it called
+`app_index.launch`, `system_control.run`, opened the browser. Now it **does
+nothing itself** — it turns an intent into a tool call and hands it to
+`ToolRunner`, which checks the arguments, the permissions and the
+confirmation.
 
-Разделение по одной причине: пока побочный эффект достижим из исполнителя
-напрямую, любые ворота перед ним держатся на дисциплине. Критерий C03 —
-«исполнитель не имеет ни одного пути исполнения в обход реестра» — проверяется
-механически (tools/test_registry_only.py), и проверять его можно только если
-путь ровно один.
+The split is for one reason: while a side effect is reachable from the
+executor directly, any gates before it rest on discipline. C03's criterion —
+"the executor has not one path of execution around the registry" — is
+checked mechanically (tools/test_registry_only.py), and it can be checked
+only if there is exactly one path.
 
-Что осталось исполнителю: знать, каким инструментом отвечает каждое намерение,
-и превратить результат в реплику. Реплики — здесь, потому что после 4.0-F08
-текст ответов Рины собирается в ядре, а не в оболочке.
+What is left to the executor: knowing which tool answers each intent, and
+turning the result into a line. The lines are here, because after 4.0-F08
+the text of Rina's answers is assembled in the core, not in the shell.
 """
 
 from core.i18n import t as tr
@@ -28,7 +29,7 @@ log = get_logger("executor")
 
 
 class Executor:
-    """Переводит намерения в вызовы инструментов."""
+    """Turns intents into tool calls."""
 
     def __init__(self, *, say, tools, emit=None):
         self._say = say
@@ -41,7 +42,7 @@ class Executor:
 
     # ------------------------------------------------------------------
     def execute(self, intent, source="typed"):
-        """Namespace намерения -> метод. Возвращает Result."""
+        """An intent's namespace -> a method. Returns a Result."""
         handler = getattr(self, "_do_" + intent.name.replace(".", "_"), None)
         if handler is None:
             log.warning("Нечем исполнить намерение %s", intent.name)
@@ -49,7 +50,7 @@ class Executor:
         log.debug("Исполняю %s для %s", intent.name, safe(intent.text))
         return handler(intent, source)
 
-    # ---------- программы ----------
+    # ---------- programs ----------
     def _do_app_launch(self, intent, source):
         return self._run("launch_app", {
             "name": intent.arg("app"),
@@ -76,8 +77,8 @@ class Executor:
             tr("Не получилось запустить {app} — программу удалили "
                "или перенесли.", app=intent.arg("app")), "app.launch_failed")
 
-    # ---------- система ----------
-    #: Действие 3.1.0 -> (инструмент, аргументы).
+    # ---------- the system ----------
+    #: A 3.1.0 action -> (tool, arguments).
     _SYSTEM = {
         "volume_up": ("set_volume", {"action": "up"}),
         "volume_down": ("set_volume", {"action": "down"}),
@@ -103,12 +104,13 @@ class Executor:
 
     def _do_system_confirm(self, intent, source):
         """
-        Задать вопрос об опасном действии.
+        Ask about a dangerous action.
 
-        Подтверждение выдаётся здесь же и возвращается в Result: ядро кладёт
-        его идентификатор в заданный вопрос и предъявит, когда человек
-        согласится. Так согласие оказывается привязано к конкретному вызову,
-        а не к самому факту, что вопрос когда-то задавали.
+        The confirmation is issued here and now and returned in the Result:
+        the core puts its identifier into the question asked and will
+        present it when the person agrees. That way consent is bound to a
+        particular call rather than to the mere fact that a question was
+        once asked.
         """
         from voice import system_control
 
@@ -124,7 +126,7 @@ class Executor:
         result = self._ok(question)
         return result.with_data(confirmation_id=confirmation.id)
 
-    # ---------- напоминания ----------
+    # ---------- reminders ----------
     def _do_reminder_create(self, intent, source):
         args = {"kind": intent.arg("kind")}
         for key in ("seconds", "at", "text"):
@@ -139,7 +141,7 @@ class Executor:
     def _do_reminder_cancel(self, intent, source):
         return self._run("cancel_reminder", {}, source=source)
 
-    # ---------- пользовательские команды и плагины ----------
+    # ---------- user commands and plugins ----------
     def _do_user_command(self, intent, source):
         return self._run("run_user_command",
                          {"command_id": intent.arg("command_id")},
@@ -147,22 +149,23 @@ class Executor:
                          source=source)
 
     def dispatch_plugins(self, text, source="typed"):
-        """Отдать фразу плагинам. True — плагин её взял."""
+        """Hand the phrase to the plugins. True means a plugin took it."""
         result = self._tools.call("dispatch_plugin_command", {"text": text},
                                   source=source)
         return bool(result.value)
 
     def run_user_command(self, command, source="shell"):
         """
-        Выполнить команду по объекту — для кнопки «Выполнить» в списке.
+        Perform a command by object — for the "Run" button in the list.
 
-        Источник по умолчанию «shell»: нажали кнопку, а не сказали фразу.
-        В журнале вызовов это разные инициаторы, и различать их важно.
+        The source is "shell" by default: a button was pressed, not a phrase
+        said. In the call journal these are different initiators, and
+        telling them apart matters.
         """
         return self._run("run_user_command",
                          {"command_id": command.get("id")}, source=source)
 
-    # ---------- ответы ----------
+    # ---------- answers ----------
     def _do_calc(self, intent, source):
         return self._ok(tr("Получается {result}.",
                            result=intent.arg("result")))
@@ -191,7 +194,7 @@ class Executor:
     def _do_silence(self, intent, source):
         return Result.success()
 
-    # ---------- хвост ----------
+    # ---------- the tail ----------
     def _do_llm_answer(self, intent, source):
         result = self._tools.call(
             "ask_model", {"question": intent.text}, source=source)
@@ -207,17 +210,17 @@ class Executor:
                                   source=source)
         if not result.ok:
             return self._do_fallback_none(intent, source)
-        # Формулировка запасного поиска отличается от явного: человек не
-        # просил искать, и об этом честнее сказать.
+        # The wording of a fallback search differs from an explicit one: the
+        # person did not ask to search, and it is more honest to say so.
         return self._ok(tr("Не нашла такой команды — поищу «{query}» "
                            "в интернете.", query=query))
 
     def _do_fallback_none(self, intent, source):
         return self._fail(tr("Извини, я не поняла команду."), "internal")
 
-    # ---------- вспомогательное ----------
+    # ---------- helpers ----------
     def _run(self, name, args, confirmation_id=None, *, source):
-        """Вызов инструмента и превращение результата в реплику."""
+        """A tool call and the turning of the result into a line."""
         result = self._tools.call(name, args,
                                   confirmation_id=confirmation_id,
                                   source=source)

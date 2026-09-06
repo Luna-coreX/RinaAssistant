@@ -1,37 +1,42 @@
 """
-Журнал вызовов инструментов.
+The journal of tool calls.
 
-Задача плана 4.0-C06. Каждый вызов: время, инструмент, аргументы, инициатор,
-разрешения, результат. Позже это единственный способ понять, что натворила
-Рина, — и единственный источник для функции «Почему?» из 4.0b-B04.
+Plan item 4.0-C06. Every call: the time, the tool, the arguments, the
+initiator, the permissions, the result. Later this is the only way to
+understand what Rina got up to — and the only source for the "Why?" feature
+from 4.0b-B04.
 
-**Отказы записываются наравне с успехами.** Попытка выключить компьютер без
-подтверждения — самая интересная запись в журнале, и терять её нельзя.
+**Refusals are recorded on a par with successes.** An attempt to shut the
+computer down without confirmation is the most interesting entry in the
+journal, and it must not be lost.
 
-## Приватность
+## Privacy
 
-Аргументы содержат то, что человек сказал: запрос поиска, вопрос к модели,
-текст напоминания. Записывать их дословно значит завести стенограмму
-разговоров в базе данных — ровно то, чего продукт обещает не делать.
+The arguments contain what a person said: a search query, a question to the
+model, a reminder's text. Recording them verbatim means keeping a transcript
+of conversations in a database — precisely what the product promises not to
+do.
 
-Правило вывели из схемы инструмента, а не из списка исключений: **у аргумента
-есть перечень допустимых значений — значит он не текст человека, а выбор из
-известного набора, и пишется дословно.** `power_action {"action": "shutdown"}`
-записывается целиком, потому что «shutdown» пришло из перечня. А
-`web_search {"query": ...}` — свободный текст, и от него остаётся длина.
+The rule was derived from a tool's schema rather than from a list of
+exceptions: **an argument has a list of permissible values — so it is not a
+person's text but a choice from a known set, and it is written verbatim.**
+`power_action {"action": "shutdown"}` is recorded whole, because "shutdown"
+came from a list. Whereas `web_search {"query": ...}` is free text, and only
+its length remains.
 
-Так журнал отвечает на вопрос «что она сделала», не отвечая на вопрос «о чём
-её просили». Дословную запись включает та же настройка `log_texts`, что и в
-журнале приложения: одно решение, одно место.
+That way the journal answers the question "what did she do" without
+answering the question "what was she asked about". Verbatim recording is
+switched on by the same `log_texts` setting as in the application's journal:
+one decision, one place.
 
-## Почему база, а не файл
+## Why a database and not a file
 
-Журнал нужен с отбором: последние вызовы, вызовы одного инструмента, только
-отказы, только опасное. По текстовому файлу это делается разбором строк,
-который однажды соврёт. SQLite входит в стандартную библиотеку, новых
-зависимостей нет.
+The journal is needed with selection: the last calls, one tool's calls,
+refusals only, the dangerous only. Over a text file that is done by parsing
+lines, which will one day lie. SQLite is part of the standard library; there
+are no new dependencies.
 
-Qt здесь нет: модуль лежит в ядре.
+There is no Qt here: the module lies in the core.
 """
 
 import json
@@ -47,8 +52,9 @@ log = get_logger("audit")
 
 FILE_NAME = "audit.db"
 
-#: Сколько хранить. Журнал нужен, чтобы разобраться в недавнем, а не вести
-#: летопись: без предела он растёт, пока не станет проблемой сам по себе.
+#: How long to keep it. The journal is there to look into the recent past,
+#: not to keep a chronicle: without a limit it grows until it becomes a
+#: problem in itself.
 KEEP_DAYS = 30
 KEEP_ROWS = 50_000
 
@@ -74,10 +80,10 @@ CREATE INDEX IF NOT EXISTS idx_calls_ok   ON calls(ok);
 
 def redact_args(tool, args, verbatim=False):
     """
-    Аргументы в виде, пригодном для журнала.
+    The arguments in a form fit for the journal.
 
-    Дословно пишется то, что пришло из перечня допустимых значений, числа и
-    логические значения. Свободный текст заменяется длиной.
+    What came from a list of permissible values, numbers and booleans are
+    written verbatim. Free text is replaced by its length.
     """
     out = {}
     for key, value in (args or {}).items():
@@ -101,7 +107,7 @@ def redact_args(tool, args, verbatim=False):
 
 
 class AuditLog:
-    """Журнал вызовов. Только добавление и чтение."""
+    """The journal of calls. Appending and reading only."""
 
     def __init__(self, path=None, keep_days=KEEP_DAYS, keep_rows=KEEP_ROWS):
         self._path = path or self._default_path()
@@ -122,13 +128,14 @@ class AuditLog:
         try:
             if self._path != ":memory:":
                 os.makedirs(os.path.dirname(self._path), exist_ok=True)
-            # Соединение переживает потоки: запись идёт и из потока команд,
-            # и из планировщика напоминаний. Согласованность держит замок.
+            # The connection outlives threads: writing comes both from the
+            # command thread and from the reminder scheduler. Consistency is
+            # held by the lock.
             self._db = sqlite3.connect(self._path, check_same_thread=False)
             self._db.executescript(SCHEMA)
             self._db.commit()
         except sqlite3.Error:
-            # Без журнала приложение работает; падать из-за него нельзя.
+            # The application works without a journal; it must not fall over because of one.
             log.exception("Не удалось открыть журнал вызовов: %s", self._path)
             self._db = None
 
@@ -143,7 +150,7 @@ class AuditLog:
     # ------------------------------------------------------------------
     def record(self, *, tool, args, source, permissions, ok, error_code="",
                duration_ms=0, confirmation_id="", trace_id="", verbatim=False):
-        """Записать один вызов. `tool` — объект Tool либо его имя."""
+        """Record one call. `tool` is a Tool object or its name."""
         if self._db is None:
             return None
 
@@ -173,7 +180,7 @@ class AuditLog:
 
     # ------------------------------------------------------------------
     def recent(self, limit=50, tool=None, only_failures=False):
-        """Последние вызовы, новые первыми."""
+        """The last calls, newest first."""
         if self._db is None:
             return []
         query = ("SELECT id, ts, tool, args, source, permissions, ok,"
@@ -233,7 +240,7 @@ class AuditLog:
         return max(0, removed)
 
     def clear(self):
-        """Стереть журнал целиком — для «Забудь это» из 4.0b-B02."""
+        """Erase the journal entirely — for "Forget this" from 4.0b-B02."""
         if self._db is None:
             return 0
         with self._lock:

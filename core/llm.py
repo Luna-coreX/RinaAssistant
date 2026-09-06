@@ -1,14 +1,15 @@
 """
-Ответы на свободные вопросы через локальную модель (Ollama).
+Answers to free-form questions through a local model (Ollama).
 
-Это последний шаг конвейера: если фразу не разобрал ни один обработчик,
-вместо «Извини, я не поняла» на неё может ответить языковая модель.
+This is the pipeline's last step: if a phrase was parsed by no handler, then
+instead of "Sorry, I did not understand" a language model may answer it.
 
-Приватность: запрос уходит ТОЛЬКО на адрес из настройки llm_url (по умолчанию
-localhost). Модель работает на компьютере пользователя, наружу ничего не
-отправляется — именно поэтому выбран локальный Ollama, а не облачный сервис.
+Privacy: the request goes ONLY to the address in the llm_url setting
+(localhost by default). The model runs on the user's computer, nothing is
+sent outside — which is exactly why a local Ollama was chosen rather than a
+cloud service.
 
-Зависимостей не добавляет: Ollama отвечает по HTTP, и хватает urllib.
+It adds no dependencies: Ollama answers over HTTP, and urllib is enough.
 """
 
 import http.client
@@ -24,8 +25,8 @@ DEFAULT_URL = "http://localhost:11434"
 DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_TIMEOUT = 30
 
-# Сколько последних реплик отдавать модели, чтобы разговор был связным.
-# Больше — дороже и медленнее, а польза быстро выходит на полку.
+# How many recent lines to give the model, so the conversation is coherent.
+# More is dearer and slower, and the benefit quickly plateaus.
 CONTEXT_MESSAGES = 6
 
 DEFAULT_PERSONA = (
@@ -37,7 +38,7 @@ DEFAULT_PERSONA = (
 
 
 class LLMError(Exception):
-    """Модель недоступна или ответила ошибкой."""
+    """The model is unavailable or answered with an error."""
 
 
 def _settings():
@@ -46,16 +47,17 @@ def _settings():
 
 
 LOCAL_HOSTS = ("localhost", "127.0.0.1", "::1", "[::1]")
-MAX_RESPONSE_BYTES = 4 * 1024 * 1024      # ответ модели заведомо меньше
+MAX_RESPONSE_BYTES = 4 * 1024 * 1024      # a model's answer is knowingly smaller
 
 
 def base_url():
     """
-    Адрес сервера из настроек, если он выглядит адресом http(s).
+    The server's address from the settings, if it looks like an http(s)
+    address.
 
-    Адрес задаётся текстом, а по нему уходит переписка с моделью — поэтому
-    непонятную строку не пробуем «как-нибудь» открыть, а возвращаемся
-    к локальному серверу.
+    The address is given as text, and correspondence with the model goes to
+    it — so we do not try to open an unintelligible string "somehow" but
+    fall back to the local server.
     """
     import urllib.parse
 
@@ -67,7 +69,7 @@ def base_url():
 
 
 def is_local_url(url=None):
-    """Останется ли переписка на этом компьютере."""
+    """Will the correspondence stay on this computer."""
     import urllib.parse
 
     parts = urllib.parse.urlsplit(url or base_url())
@@ -79,7 +81,7 @@ def is_enabled():
 
 
 def _request(path, payload=None, timeout=8):
-    """Запрос к Ollama. Возвращает разобранный JSON."""
+    """A request to Ollama. Returns the parsed JSON."""
     url = base_url() + path
     data = None
     headers = {}
@@ -87,36 +89,37 @@ def _request(path, payload=None, timeout=8):
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
     if not is_local_url(url):
-        # переписка уходит с этого компьютера — это событие безопасности
+        # the correspondence is leaving this computer — that is a security event
         from core.logging_setup import security_log
         security_log().warning("Запрос к модели по нелокальному адресу: %s",
                                base_url())
     req = urllib.request.Request(url, data=data, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            # ограничиваем чтение: сервер по этому адресу может быть каким угодно
+            # we limit the read: the server at this address may be anything at all
             raw = resp.read(MAX_RESPONSE_BYTES)
             return json.loads(raw.decode("utf-8", errors="replace"))
     except urllib.error.URLError as e:
         raise LLMError(tr("Ollama не отвечает: ") + str(getattr(e, "reason", e)))
     except (ValueError, OSError, http.client.HTTPException) as e:
-        # HTTPException (обрыв ответа, битый chunked, слишком длинная строка
-        # заголовка) не наследуется от OSError и раньше пролетал наружу:
-        # кнопка «Проверить связь» оставалась в состоянии проверки навсегда
+        # HTTPException (a truncated response, broken chunking, too long a
+        # header line) does not inherit from OSError and used to fly out
+        # past us: the "Check the connection" button stayed in the checking
+        # state forever
         raise LLMError(tr("Ошибка обращения к модели: ") + str(e))
 
 
 # ---------------------------------------------------------------------------
-# Состояние сервера
+# The server's state
 # ---------------------------------------------------------------------------
 _status_cache = {"ts": 0.0, "models": None, "error": ""}
-STATUS_TTL = 10          # секунд: не дёргать сервер на каждый чих
+STATUS_TTL = 10          # seconds: do not pester the server over every trifle
 
 
 def models(force=False):
     """
-    Список установленных моделей. Кэшируется, потому что настройки могут
-    спрашивать его часто, а ответ меняется редко.
+    The list of installed models. Cached, because the settings may ask for
+    it often while the answer changes rarely.
     """
     now = time.time()
     if not force and _status_cache["models"] is not None \
@@ -135,7 +138,7 @@ def models(force=False):
 
 
 def status():
-    """(доступна ли, текст для показа в настройках)."""
+    """(is it available, the text to show in the settings)."""
     found = models()
     if found:
         return True, tr("Ollama на связи, моделей: {count}", count=len(found))
@@ -146,7 +149,7 @@ def status():
 
 
 def current_model():
-    """Выбранная модель; если не выбрана — первая установленная."""
+    """The chosen model; if none is chosen, the first installed one."""
     chosen = str(_settings().get("llm_model", "") or "").strip()
     if chosen:
         return chosen
@@ -160,10 +163,10 @@ def persona():
 
 
 # ---------------------------------------------------------------------------
-# Вопрос модели
+# A question to the model
 # ---------------------------------------------------------------------------
 def _context_messages(history):
-    """Последние реплики диалога в формате Ollama."""
+    """The dialogue's recent lines in Ollama's format."""
     messages = []
     for entry in (history or [])[-CONTEXT_MESSAGES:]:
         role = "user" if entry.get("kind") == "user" else "assistant"
@@ -175,8 +178,8 @@ def _context_messages(history):
 
 def ask(question, history=None):
     """
-    Задаёт вопрос модели и возвращает ответ.
-    Бросает LLMError, если модель недоступна или ответила пусто.
+    Asks the model a question and returns the answer.
+    Raises LLMError if the model is unavailable or answered with nothing.
     """
     question = str(question or "").strip()
     if not question:

@@ -1,33 +1,36 @@
 """
-Сквозная трассировка.
+End-to-end tracing.
 
-Задача плана `4.0-D15`; спецификация, §14.
+Plan item `4.0-D15`; specification, §14.
 
-**Лежит в ядре, а не в пакете провода**, хотя появился ради протокола.
-Трассировка — забота ядра целиком: цепочка начинается там, где началось
-действие, и первым потребителем вне провода оказался сам движок, которому
-надо пометить сработавшее напоминание (`4.0-E05`). Модуль ничего не знает ни
-о конверте, ни о канале; держать его в проводе значило бы заставить
-журналирование тянуть за собой протокол.
+**It lies in the core rather than in the wire package**, although it
+appeared for the protocol's sake. Tracing is entirely the core's business:
+a chain begins where the action began, and the first consumer outside the
+wire turned out to be the engine itself, which has to mark a reminder that
+fired (`4.0-E05`). The module knows nothing of the envelope or the channel;
+keeping it in the wire would mean making journalling drag the protocol
+along behind it.
 
-`trace_id` рождается там, где началось действие — нажатие в оболочке или
-распознанная фраза, — и переносится **во все** сообщения, порождённые этим
-действием, включая события и ошибки.
+A `trace_id` is born where the action began — a click in the shell or a
+recognised phrase — and is carried into **every** message that action gives
+rise to, including events and errors.
 
-Это единственный способ отлаживать двухпроцессную систему. Без него в двух
-журналах лежат два несвязанных набора строк, и вопрос «что именно произошло
-после того нажатия» отвечается сверкой отметок времени — то есть догадкой.
+This is the only way to debug a two-process system. Without it, two journals
+hold two unconnected sets of lines, and the question "what exactly happened
+after that click" is answered by comparing timestamps — that is, by
+guesswork.
 
-**Почему контекст, а не параметр.** Событие рождается глубоко: реестр
-инструментов вызывает исполнение, исполнение поднимает событие. Протащить
-`trace_id` параметром через всю цепочку можно, но тогда каждая новая функция
-на пути обязана его принять и передать, и однажды кто-то этого не сделает —
-причём молча, потому что событие без трассировки выглядит совершенно
-нормальным. `contextvars` делает потерю невозможной по построению: значение
-живёт в контексте выполнения, а не в сигнатурах.
+**Why a context rather than a parameter.** An event is born deep down: the
+tool registry calls the execution, the execution raises the event. The
+`trace_id` could be dragged through the whole chain as a parameter, but then
+every new function on the path is obliged to accept and pass it, and one day
+somebody will not — and in silence at that, because an event without a trace
+looks perfectly normal. `contextvars` makes losing it impossible by
+construction: the value lives in the execution context, not in signatures.
 
-`contextvars`, а не `threading.local`: контекст наследуется задачами asyncio,
-а ядро после `4.0-E01` станет асинхронным сервисом.
+`contextvars` rather than `threading.local`: the context is inherited by
+asyncio tasks, and after `4.0-E01` the core will become an asynchronous
+service.
 """
 
 import contextvars
@@ -37,27 +40,29 @@ from contextlib import contextmanager
 _current: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "rina_trace", default=None)
 
-#: Что пишется в журнал, когда действия нет: фоновая работа, запуск, таймер,
-#: сработавший сам по себе. Прочерк честнее выдуманного идентификатора.
+#: What is written to the journal when there is no action: background work,
+#: startup, a timer that fired by itself. A dash is more honest than an
+#: invented identifier.
 NO_TRACE = "-"
 
 
 def new_trace_id() -> str:
-    """Начало новой цепочки."""
+    """The beginning of a new chain."""
     return "t-" + uuid.uuid4().hex[:12]
 
 
 def current_trace() -> str | None:
-    """Идентификатор действия, которое сейчас обрабатывается."""
+    """The identifier of the action being handled right now."""
     return _current.get()
 
 
 def require_trace() -> str:
     """
-    Текущая трассировка; если действия нет — новая.
+    The current trace; if there is no action, a new one.
 
-    Сообщение без `trace_id` протокол запрещает (§3), поэтому здесь не отказ,
-    а порождение: лучше цепочка из одного звена, чем неотправленное сообщение.
+    The protocol forbids a message without a `trace_id` (§3), so this is not
+    a refusal but a birth: better a chain of one link than an unsent
+    message.
     """
     return _current.get() or new_trace_id()
 
@@ -65,11 +70,12 @@ def require_trace() -> str:
 @contextmanager
 def trace_scope(trace_id: str | None = None):
     """
-    Обработка одного действия.
+    The handling of one action.
 
-    Вход в область без аргумента начинает новую цепочку — так поступают там,
-    где действие рождается: нажатие, распознанная фраза, сработавшее
-    напоминание. С аргументом — продолжают чужую, пришедшую из канала.
+    Entering the scope without an argument begins a new chain — that is what
+    is done where an action is born: a click, a recognised phrase, a
+    reminder that fired. With an argument, somebody else's chain, arrived
+    from the channel, is continued.
     """
     token = _current.set(trace_id or new_trace_id())
     try:
@@ -80,11 +86,12 @@ def trace_scope(trace_id: str | None = None):
 
 class TraceFilter:
     """
-    Подстановка трассировки в записи журнала.
+    Substituting the trace into journal records.
 
-    Фильтр, а не форматтер: запись, созданная в обход наших путей, всё равно
-    получит поле, и формат не упадёт на `KeyError` посреди разбора сбоя —
-    ровно в тот момент, когда журнал нужнее всего.
+    A filter rather than a formatter: a record created around our paths will
+    get the field all the same, and the format will not fall over with a
+    `KeyError` in the middle of looking into a failure — at exactly the
+    moment the journal is needed most.
     """
 
     def filter(self, record):

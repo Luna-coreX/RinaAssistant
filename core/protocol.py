@@ -1,47 +1,47 @@
 """
-Контракт между ядром и оболочкой.
+The contract between the core and the shell.
 
-Здесь перечислены все события, которые публикует ядро, и состав их данных.
-Это единственное место, где описан их формат: когда оболочка переедет в
-другой процесс (или на другой язык), контракт станет протоколом IPC, а не
-набором договорённостей, разбросанных по коду.
+Listed here is every event the core publishes, and what their data consists
+of. This is the only place where their format is described: when the shell
+moves to another process (or to another language), the contract becomes an
+IPC protocol rather than a set of understandings scattered through the code.
 
-Правило: данные события — простые значения (строки, числа, словари, списки),
-пригодные к сериализации в JSON. Исключений нет: всё, что нельзя записать в
-JSON (например, найденные программы при уточняющем вопросе), остаётся внутри
-ядра и наружу не выходит.
+The rule: an event's data is simple values (strings, numbers, dicts, lists)
+fit for serialisation into JSON. There are no exceptions: everything that
+cannot be written to JSON (the programs found during a clarifying question,
+for instance) stays inside the core and does not go out.
 """
 
 PROTOCOL_VERSION = 1
 
 
 class Events:
-    # --- микрофон ---
+    # --- the microphone ---
     LISTENING_STARTED = "listening.started"   # {}
     LISTENING_STOPPED = "listening.stopped"   # {}
     CAPTURING = "listening.capturing"         # {"active": bool}
     ALWAYS_LISTEN = "listening.always"        # {"enabled": bool}
     RECOGNIZED = "speech.recognized"          # {"text": str}
 
-    # --- ответы ассистента ---
+    # --- the assistant's answers ---
     RESPONSE = "assistant.response"           # {"text": str}
     ERROR = "assistant.error"                 # {"text": str}
-    # модель думает над ответом: это может занять секунды, и оболочке стоит
-    # показать индикатор, а не молчать
+    # the model is thinking about an answer: this may take seconds, and the
+    # shell had better show an indicator rather than stay silent
     THINKING = "assistant.thinking"           # {"active": bool}
 
-    # --- данные ---
+    # --- data ---
     HISTORY_CHANGED = "history.changed"       # {}
     REMINDER_FIRED = "reminder.fired"         # {"item": dict}
 
-    # --- запросы к оболочке ---
-    # Ядро не умеет показывать окна: оно сообщает о намерении, а оболочка
-    # решает, как это выглядит (и показывать ли вообще).
+    # --- requests to the shell ---
+    # The core cannot show windows: it reports an intent, and the shell
+    # decides how that looks (and whether to show it at all).
     APP_NOT_FOUND = "apps.not_found"          # {"query": str}
     WINDOW_ACTION = "window.action"           # {"action": str}
 
 
-#: Все известные события — удобно для проверок и отладки.
+#: Every known event — handy for checks and for debugging.
 ALL_EVENTS = tuple(
     value for name, value in vars(Events).items()
     if not name.startswith("_") and isinstance(value, str)
