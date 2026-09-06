@@ -22,6 +22,8 @@ automatically.
 import contextlib
 import copy
 import os
+import re
+import shutil
 import sys
 import json
 import tempfile
@@ -248,6 +250,82 @@ class SettingsStore:
                         f.write(content)
         except OSError:
             pass            # could not make a copy: we migrate all the same
+
+    def backups(self):
+        """
+        Which copies exist, oldest first. The number is the version they were
+        taken from.
+        """
+        found = []
+        try:
+            for name in os.listdir(self._dir):
+                match = re.fullmatch(r"backup-v(\d+)", name)
+                if match and os.path.isdir(os.path.join(self._dir, name)):
+                    found.append(int(match.group(1)))
+        except OSError:
+            return []
+        return sorted(found)
+
+    def restore_backup(self, from_version=None):
+        """
+        Put the files back as they were before a migration. `True` if done.
+
+        The copy has been taken since the file split and never read: a backup
+        nobody can restore from is a folder that takes up room. Plan item
+        `4.0-I02` asks for both halves, and this is the second.
+
+        **The newest copy by default.** The one taken from the highest
+        version is the state just before the last migration — that is what a
+        person wants back when a migration turned out badly.
+
+        **Files the copy does not have are deleted.** A restore that only
+        overwrites leaves a mixed state: the old monolith plus the new group
+        files, which no version of the program ever wrote. What has to come
+        back is the shape, not only the values.
+
+        **What is replaced is put aside first, and once.** A rollback that
+        destroys the state it replaces is itself irreversible, and this is
+        the wrong place for that. It is put aside once, by the same rule as
+        the copy itself: a second rollback would otherwise overwrite the
+        valuable state with the one just restored.
+        """
+        with self._lock:
+            available = self.backups()
+            if not available:
+                return False
+            version = available[-1] if from_version is None else from_version
+            source = os.path.join(self._dir, f"backup-v{version}")
+            if not os.path.isdir(source):
+                return False
+
+            try:
+                aside = os.path.join(source, "replaced")
+                if not os.path.isdir(aside):
+                    os.makedirs(aside, exist_ok=True)
+                    for group in GROUPS:
+                        current = self._group_path(group)
+                        if os.path.isfile(current):
+                            shutil.copy2(current,
+                                         os.path.join(aside, f"{group}.json"))
+
+                for group in GROUPS:
+                    current = self._group_path(group)
+                    if os.path.isfile(current):
+                        os.remove(current)
+                for name in os.listdir(source):
+                    if not name.endswith(".json"):
+                        continue
+                    shutil.copy2(os.path.join(source, name),
+                                 os.path.join(self._dir, name))
+            except OSError:
+                return False
+
+            # What is in memory is now a stranger to what is on disk, and
+            # the next `save()` would write it back over the restored files.
+            self._data = defaults_for()
+            self._dirty.clear()
+            self._loaded = False
+            return True
 
     def _migrate_schema(self):
         """Brings the data up to the current CONFIG_VERSION. True if anything was changed."""

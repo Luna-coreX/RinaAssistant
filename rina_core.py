@@ -64,6 +64,14 @@ def parse_args(argv):
     parser.add_argument(
         "--print-capabilities", action="store_true",
         help="напечатать возможности и версии протокола и выйти")
+    parser.add_argument(
+        "--list-backups", action="store_true",
+        help="показать копии, снятые перед миграциями, и выйти")
+    parser.add_argument(
+        "--restore-backup", nargs="?", const=-1, type=int, default=None,
+        metavar="ВЕРСИЯ",
+        help="вернуть настройки, команды, плагины, историю и напоминания "
+             "из копии (по умолчанию — из самой свежей) и выйти")
     return parser.parse_args(argv)
 
 
@@ -94,6 +102,50 @@ def check_headless():
             "ядро обязано работать там, где интерфейсной библиотеки нет")
 
 
+def manage_backups(args):
+    """
+    Показать копии или вернуться к одной из них.
+
+    Обе половины `4.0-I02` в одном месте: копия снимается перед миграцией
+    сама, а возвращает её человек — и ему надо сказать, что вообще есть.
+    Откат, который нельзя позвать, — это не возможность откатиться.
+    """
+    from core.settings_store import config_dir, settings
+
+    available = settings.backups()
+    if args.list_backups:
+        print(f"каталог данных: {config_dir()}")
+        if not available:
+            print("копий нет: миграции ещё не было")
+        for version in available:
+            print(f"  backup-v{version} — снята перед переходом с версии "
+                  f"формата {version}")
+        return EXIT_OK
+
+    if not available:
+        print("возвращаться некуда: копий нет", file=sys.stderr)
+        return EXIT_ARGS
+
+    wanted = None if args.restore_backup == -1 else args.restore_backup
+    if wanted is not None and wanted not in available:
+        print(f"копии backup-v{wanted} нет; есть: "
+              + ", ".join(f"v{v}" for v in available), file=sys.stderr)
+        return EXIT_ARGS
+
+    if not settings.restore_backup(wanted):
+        print("вернуть не вышло — смотрите журнал", file=sys.stderr)
+        return EXIT_ARGS
+
+    took = available[-1] if wanted is None else wanted
+    print(f"вернули из backup-v{took}")
+    # Замещённое не стёрто, и об этом надо сказать: человек, откатившийся по
+    # ошибке, иначе будет думать, что потерял всё, что накопил после
+    # миграции.
+    print(f"то, что заменили, отложено в "
+          f"{os.path.join(config_dir(), f'backup-v{took}', 'replaced')}")
+    return EXIT_OK
+
+
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     try:
@@ -114,6 +166,13 @@ def main(argv=None):
         print("protocol_versions: 1")
         print("capabilities: " + ", ".join(CORE_CAPABILITIES))
         return EXIT_OK
+
+    # Копии и откат — до всего остального: у миграции есть вторая половина
+    # (`4.0-I02`), и без способа её позвать копия остаётся папкой, которая
+    # занимает место. Здесь, а не в окне: откатываются один раз и обычно
+    # тогда, когда окно как раз и не открывается.
+    if args.list_backups or args.restore_backup is not None:
+        return manage_backups(args)
 
     if args.transport == "pipe" and not args.session:
         print("режиму pipe нужен --session", file=sys.stderr)
