@@ -1,21 +1,23 @@
 """
-Индекс установленных приложений.
+The index of installed applications.
 
-Раньше список запускаемых программ был захардкожен (пять штук в
-voice/commands.py), и всё остальное приходилось добавлять руками. Здесь Рина
-находит программы сама и запускает любую по имени.
+The list of launchable programs used to be hard-coded (five of them in
+voice/commands.py), and everything else had to be added by hand. Here Rina
+finds programs herself and launches any of them by name.
 
-Источники (Windows):
-  * ярлыки меню «Пуск» — основной и самый «человеческий» источник: имена там
-    уже такие, как их называет пользователь («Telegram», «Adobe Photoshop»);
-  * приложения Магазина (UWP) — через `Get-StartApps`, запуск по AppUserModelID;
-  * исполняемые файлы из PATH — как запасной слой для консольных утилит.
+The sources (Windows):
+  * Start-menu shortcuts — the main and most "human" source: the names there
+    are already what the user calls them ("Telegram", "Adobe Photoshop");
+  * Store (UWP) applications — through `Get-StartApps`, launched by
+    AppUserModelID;
+  * executables from PATH — a fallback layer for console utilities.
 
-Ярлыки намеренно НЕ разбираются: `.lnk` запускается напрямую через
-os.startfile(), поэтому не нужны ни pywin32, ни возня с разрешением целей.
+The shortcuts are deliberately NOT parsed: a `.lnk` is launched directly
+through os.startfile(), so neither pywin32 nor fiddling with resolving
+targets is needed.
 
-Скан занимает секунды, поэтому результат кэшируется на диск и обновляется
-в фоне (см. refresh_async).
+A scan takes seconds, so the result is cached to disk and refreshed in the
+background (see refresh_async).
 """
 
 import json
@@ -27,10 +29,10 @@ import time
 
 from voice.textmatch import normalize, similar, translit, has_cyrillic
 
-# Сопоставление имён уехало в ядро (4.0-G07, ADR 0009). Здесь оно
-# **переиспользуется**, а не повторяется: две копии словаря разговорных
-# названий разошлись бы на первой же правке. Этот модуль остался ради
-# приложения 3.1.0 — оно живёт одним процессом и оболочки не имеет.
+# Name matching moved into the core (4.0-G07, ADR 0009). Here it is
+# **reused** rather than repeated: two copies of the dictionary of spoken
+# names would part company at the first change. This module stayed for the
+# sake of the 3.1.0 application — it lives in one process and has no shell.
 from core.apps import (AppEntry, BROWSER_WORDS, KNOWN_BROWSERS,
                        MIN_SCORE_PATH, SPOKEN_ALIASES, _find_browser, _score,
                        find as match, is_browser_query, query_variants)
@@ -41,7 +43,7 @@ log = get_logger("apps")
 
 
 def find(query, limit=5, entries=None):
-    """Сопоставление ядра поверх собранного здесь индекса."""
+    """The core's matching over the index assembled here."""
     return match(query, limit=limit,
                  entries=entries if entries is not None else get_index())
 
@@ -52,9 +54,9 @@ KNOWN_BROWSERS = ("chrome", "brave", "firefox", "edge", "opera", "yandex",
 
 
 CACHE_NAME = "app_index.json"
-CACHE_TTL = 24 * 3600           # сутки: список программ меняется редко
+CACHE_TTL = 24 * 3600           # a day: the list of programs changes rarely
 
-# Ярлыки-мусор: в меню «Пуск» полно деинсталляторов, ридми и ссылок на сайты.
+# Junk shortcuts: the Start menu is full of uninstallers, readmes and links to sites.
 SKIP_WORDS = (
     "uninstall", "деинсталл", "удалить", "удаление",
     "readme", "read me", "прочти", "лицензи", "license", "licence",
@@ -66,12 +68,13 @@ SKIP_WORDS = (
     "командная строка разработчика", "developer command prompt",
 )
 
-# Приоритет источников при дедупликации: чем меньше, тем важнее.
-# Папки, указанные пользователем, идут высоко — он показал их осознанно.
+# The priority of sources when de-duplicating: the smaller, the more
+# important. Folders named by the user rank high — they pointed at them
+# deliberately.
 SOURCE_ORDER = {"start_menu": 0, "desktop": 1, "folder": 2, "uwp": 3, "path": 4}
 
-# Служебные подпапки: там лежат не программы, а их потроха
-# (в Ren'Py SDK, например, lib/py3-windows-x86_64/python.exe).
+# Internal subfolders: what lies there is not programs but their innards
+# (in the Ren'Py SDK, for instance, lib/py3-windows-x86_64/python.exe).
 SKIP_DIRS = {
     "lib", "libs", "library", "runtime", "resources", "res", "data",
     "plugins", "node_modules", "__pycache__", "vendor", "redist", "redistributable",
@@ -80,7 +83,7 @@ SKIP_DIRS = {
     "samples", "examples", "sdk-fonts", "locale", "locales", "drivers",
 }
 
-# Служебные исполняемые: сопровождают программу, но запускать их не надо.
+# Internal executables: they accompany a program, but must not be launched.
 SKIP_EXE = {
     "python", "pythonw", "pip", "conda", "node", "zsync", "zsyncmake",
     "vcredist", "vc_redist", "dxsetup", "dotnetfx", "directx",
@@ -90,11 +93,11 @@ SKIP_EXE = {
     "notification_helper", "elevate", "launcher_helper",
 }
 
-# Слишком общие имена: «game.exe» ничего не говорит — берём имя папки.
+# Names that are too general: "game.exe" says nothing — we take the folder's name.
 GENERIC_EXE = {"game", "start", "launcher", "run", "app", "main", "play",
                "program", "client", "engine"}
 
-# Ограничители, чтобы скан пользовательских папок не превратился в обход диска
+# Limits, so that scanning the user's folders does not turn into a walk of the disk
 FOLDER_MAX_DEPTH = 3
 FOLDER_MAX_ENTRIES = 400
 
@@ -105,7 +108,7 @@ def _is_junk(name):
 
 
 def _powershell():
-    """Полный путь к PowerShell: по короткому имени Windows ищет и в текущей папке."""
+    """The full path to PowerShell: by a short name Windows also looks in the current folder."""
     from voice.system_control import system_exe
     return system_exe("powershell.exe", os.path.join("System32",
                                                      "WindowsPowerShell", "v1.0"))
@@ -117,14 +120,14 @@ def _explorer():
 
 
 def _no_window():
-    """Флаги, чтобы не мигало консольное окно при вызове PowerShell."""
+    """Flags, so that a console window does not flash when PowerShell is called."""
     if sys.platform.startswith("win"):
         return {"creationflags": 0x08000000}   # CREATE_NO_WINDOW
     return {}
 
 
 # ---------------------------------------------------------------------------
-# Источники
+# The sources
 # ---------------------------------------------------------------------------
 def _start_menu_dirs():
     dirs = []
@@ -139,7 +142,7 @@ def _start_menu_dirs():
 
 
 def scan_start_menu():
-    """Ярлыки меню «Пуск». Имя ярлыка = то, как программу зовёт пользователь."""
+    """Start-menu shortcuts. A shortcut's name = what the user calls the program."""
     found = []
     for base in _start_menu_dirs():
         for root, _dirs, files in os.walk(base):
@@ -167,8 +170,8 @@ def _desktop_dirs():
 
 def scan_desktop():
     """
-    Ярлыки рабочего стола. Portable-программы часто попадают в систему только
-    так: в меню «Пуск» их нет, в реестре и PATH — тоже.
+    Desktop shortcuts. Portable programs often get into the system only this
+    way: they are not in the Start menu, nor in the registry, nor in PATH.
     """
     found, seen = [], set()
     for base in _desktop_dirs():
@@ -190,10 +193,11 @@ def scan_desktop():
 
 def _exe_display_name(exe_path):
     """
-    Как называть найденную программу.
+    What to call a program that was found.
 
-    Обычно имя файла и есть имя («renpy.exe» -> «renpy»), но у безымянных
-    «game.exe» / «launcher.exe» смысл несёт папка — берём её.
+    Usually the file's name is the name ("renpy.exe" -> "renpy"), but for
+    nameless "game.exe" / "launcher.exe" the meaning is carried by the
+    folder — we take that.
     """
     stem = os.path.splitext(os.path.basename(exe_path))[0]
     if stem.lower() in GENERIC_EXE:
@@ -205,11 +209,11 @@ def _exe_display_name(exe_path):
 
 def scan_program_folders(folders):
     """
-    Сканирует указанные пользователем папки с portable-программами.
+    Scans the folders of portable programs named by the user.
 
-    Обходятся только «внешние» уровни: служебные подпапки (lib, runtime,
-    resources…) пропускаются целиком — именно там лежат чужие python.exe
-    и прочие потроха, которые запускать не нужно.
+    Only the "outer" levels are walked: internal subfolders (lib, runtime,
+    resources...) are skipped whole — it is precisely there that other
+    people's python.exe and similar innards lie, which must not be launched.
     """
     found = []
     for root_folder in folders or []:
@@ -222,7 +226,7 @@ def scan_program_folders(folders):
             depth = root.rstrip("\\/").count(os.sep) - base_depth
             if depth >= FOLDER_MAX_DEPTH:
                 dirs[:] = []
-            # не спускаемся в служебные и скрытые каталоги
+            # we do not descend into internal and hidden directories
             dirs[:] = [d for d in dirs
                        if d.lower() not in SKIP_DIRS and not d.startswith(".")]
             for fname in files:
@@ -243,13 +247,14 @@ def scan_program_folders(folders):
 
 
 def scan_uwp():
-    """Приложения Магазина: имя + AppUserModelID через Get-StartApps."""
+    """Store applications: the name plus the AppUserModelID, through Get-StartApps."""
     if not sys.platform.startswith("win"):
         return []
     try:
-        # PowerShell по умолчанию пишет в кодировке консоли (cp866 на русской
-        # Windows) — русские имена («Блокнот», «Диспетчер задач») в UTF-8 читаются
-        # как мусор. Просим сам PowerShell выдавать UTF-8.
+        # By default PowerShell writes in the console's encoding (cp866 on a
+        # Russian Windows) — Russian names ("Блокнот", "Диспетчер задач") are
+        # read as rubbish in UTF-8. We ask PowerShell itself to give out
+        # UTF-8.
         proc = subprocess.run(
             [_powershell(), "-NoProfile", "-NonInteractive", "-Command",
              "[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; "
@@ -270,8 +275,9 @@ def scan_uwp():
         app_id = (item.get("AppID") or "").strip()
         if not name or not app_id or _is_junk(name):
             continue
-        # обычные программы тоже попадают в Get-StartApps как путь к .exe —
-        # их отдаём как файлы, а настоящие UWP запускаем через shell:AppsFolder
+        # ordinary programs also land in Get-StartApps as a path to an .exe
+        # — we hand those over as files, and launch real UWP ones through
+        # shell:AppsFolder
         if app_id.lower().endswith(".exe") and os.path.isabs(app_id):
             found.append(AppEntry(name, app_id, "file", "uwp"))
         else:
@@ -280,7 +286,7 @@ def scan_uwp():
 
 
 def scan_path():
-    """Исполняемые файлы из PATH — запасной слой (консольные утилиты)."""
+    """Executables from PATH — a fallback layer (console utilities)."""
     found, seen = [], set()
     for directory in os.environ.get("PATH", "").split(os.pathsep):
         directory = directory.strip('"')
@@ -305,10 +311,10 @@ def scan_path():
 
 
 # ---------------------------------------------------------------------------
-# Сборка индекса
+# Assembling the index
 # ---------------------------------------------------------------------------
 def program_folders():
-    """Папки с portable-программами, указанные пользователем в настройках."""
+    """Folders of portable programs named by the user in the settings."""
     try:
         from core.settings_store import settings
         return list(settings.get("program_folders", []) or [])
@@ -317,7 +323,7 @@ def program_folders():
 
 
 def build_index(include_path=True, folders=None):
-    """Полный скан. Дубликаты схлопываются, приоритет — у меню «Пуск»."""
+    """A full scan. Duplicates collapse; the Start menu has priority."""
     if folders is None:
         folders = program_folders()
     entries = (scan_start_menu() + scan_desktop()
@@ -338,7 +344,7 @@ def build_index(include_path=True, folders=None):
 
 
 # ---------------------------------------------------------------------------
-# Кэш
+# The cache
 # ---------------------------------------------------------------------------
 def _cache_path():
     from core.settings_store import config_dir
@@ -346,7 +352,7 @@ def _cache_path():
 
 
 def load_cache():
-    """(entries, timestamp) из кэша или ([], 0), если его нет/битый."""
+    """(entries, timestamp) from the cache, or ([], 0) if there is none or it is broken."""
     try:
         with open(_cache_path(), "r", encoding="utf-8") as f:
             data = json.load(f)
@@ -371,7 +377,7 @@ _LOCK = threading.Lock()
 
 
 def get_index(refresh=False):
-    """Индекс из памяти/кэша; при необходимости — пересканирует."""
+    """The index from memory or the cache; rescans if need be."""
     global _INDEX
     with _LOCK:
         if _INDEX is not None and not refresh:
@@ -385,18 +391,19 @@ def get_index(refresh=False):
         if entries:
             _INDEX = entries
             save_cache(entries)
-        else:                       # скан не дал результата — не теряем кэш
+        else:                       # the scan gave nothing — we do not lose the cache
             _INDEX = _INDEX or load_cache()[0]
         return _INDEX
 
 
 def cached_index():
     """
-    Индекс без сканирования: только память или готовый кэш.
+    The index without scanning: memory or a ready cache only.
 
-    get_index() при пустом кэше запускает полный обход (секунды, плюс запуск
-    PowerShell) и держит блокировку — вызывать его из потока интерфейса нельзя,
-    окно замирает. Страницы берут отсюда, а обновление просят в фоне.
+    With an empty cache, get_index() starts a full walk (seconds, plus
+    starting PowerShell) and holds a lock — it must not be called from the
+    interface thread, or the window freezes. The pages take from here, and
+    ask for a refresh in the background.
     """
     if _INDEX is not None:
         return _INDEX
@@ -405,14 +412,15 @@ def cached_index():
 
 
 def refresh_async(callback=None):
-    """Пересканировать в фоне (скан занимает секунды — в GUI-потоке нельзя)."""
+    """Rescan in the background (the scan takes seconds — not in the GUI thread)."""
     def worker():
         entries = []
         try:
             entries = get_index(refresh=True)
         finally:
-            # колбэк обязан сработать всегда: на нём разблокируется кнопка,
-            # иначе она осталась бы серой с надписью «Ищу…» навсегда
+            # the callback is obliged to fire in any case: it is what
+            # unblocks the button, or it would stay grey saying "Searching…"
+            # forever
             if callback:
                 try:
                     callback(entries)
@@ -422,25 +430,26 @@ def refresh_async(callback=None):
 
 
 # ---------------------------------------------------------------------------
-# Поиск и запуск
+# Searching and launching
 # ---------------------------------------------------------------------------
 def _uwp_known(app_id):
     """
-    Есть ли такой AppUserModelID среди найденных приложений Магазина.
+    Is there such an AppUserModelID among the Store applications found.
 
-    Проверить иначе нельзя: explorer.exe завершается сразу и о судьбе
-    `shell:AppsFolder\\<id>` ничего не сообщает, а ждать его нельзя —
-    если проводник ещё не запущен, он становится оболочкой и не завершается
-    вовсе. Поэтому сверяемся с индексом до запуска.
+    There is no other way to check: explorer.exe finishes at once and
+    reports nothing about the fate of `shell:AppsFolder\\<id>`, and it must
+    not be waited for — if the file manager is not running yet, it becomes
+    the shell and does not finish at all. So we compare with the index
+    before launching.
     """
     index = cached_index()
     if not index:
-        return True         # индекса нет — судить не о чем, пробуем запустить
+        return True         # no index, nothing to judge by: we try to launch
     return any(e.kind == "uwp" and e.launch == app_id for e in index)
 
 
 def launch(entry):
-    """Запускает приложение. True при успехе."""
+    """Launches the application. True on success."""
     try:
         if entry.kind == "uwp":
             if not _uwp_known(entry.launch):
@@ -451,15 +460,16 @@ def launch(entry):
                 **_no_window())
             return True
 
-        # Индекс живёт сутки, и программу за это время могли удалить.
-        # Молча отдать системе несуществующий путь — значит показать
-        # пользователю системную ошибку вместо внятного ответа.
+        # The index lives for a day, and the program may have been deleted
+        # in that time. Handing the system a non-existent path in silence
+        # means showing the user a system error instead of an intelligible
+        # answer.
         if os.path.isabs(entry.launch) and not os.path.exists(entry.launch):
             log.warning("Путь не существует: %s", entry.launch)
             return False
 
         if sys.platform.startswith("win"):
-            os.startfile(entry.launch)      # noqa: S606 — штатный запуск в ОС
+            os.startfile(entry.launch)      # noqa: S606 — the OS's normal launch
         elif sys.platform == "darwin":
             subprocess.Popen(["open", entry.launch])
         else:

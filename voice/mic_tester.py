@@ -1,6 +1,6 @@
 """
-Обёртка для теста микрофона: запускает запись в фоновом потоке и
-отдаёт результат в GUI через сигнал Qt.
+A wrapper for testing the microphone: starts recording in a background
+thread and hands the result to the GUI through a Qt signal.
 """
 
 import threading
@@ -36,9 +36,9 @@ class MicTester(QObject):
                          daemon=True).start()
 
     def _worker(self, device_id, seconds):
-        # Без finally исключение в test_microphone оставляло _busy=True
-        # навсегда: сигнал finished не приходил, и кнопка «Проверить»
-        # оставалась серой до перезапуска приложения.
+        # Without finally, an exception in test_microphone left _busy=True
+        # forever: the finished signal never came, and the "Check" button
+        # stayed grey until the application was restarted.
         result = None
         try:
             result = audio_devices.test_microphone(device_id, seconds=seconds)

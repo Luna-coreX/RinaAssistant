@@ -1,13 +1,14 @@
 r"""
-Автозапуск приложения при старте системы (кроссплатформенно).
+Starting the application when the system starts (cross-platform).
 
-Windows — ключ в реестре HKCU\...\Run.
-Linux   — .desktop-файл в ~/.config/autostart.
-macOS   — LaunchAgent plist в ~/Library/LaunchAgents.
+Windows — a key in the registry HKCU\...\Run.
+Linux   — a .desktop file in ~/.config/autostart.
+macOS   — a LaunchAgent plist in ~/Library/LaunchAgents.
 
-Все операции обёрнуты в try/except и возвращают bool: успех/неуспех.
-Команда запуска строится из текущего интерпретатора и main.py, чтобы
-работать и при запуске из исходников, и (по возможности) из сборки.
+Every operation is wrapped in try/except and returns a bool: success or
+failure. The launch command is built from the current interpreter and
+main.py, so as to work both when running from source and (where possible)
+from a build.
 """
 
 import os
@@ -17,17 +18,17 @@ APP_NAME = "RinaAssistant"
 
 
 def _launch_command():
-    """Команда, которая запускает приложение."""
-    # если это «замороженная» сборка (PyInstaller и т.п.) — сам исполняемый файл
+    """The command that launches the application."""
+    # if this is a "frozen" build (PyInstaller and the like) — the executable itself
     if getattr(sys, "frozen", False):
         return f'"{sys.executable}"'
-    # иначе — интерпретатор + main.py проекта
+    # otherwise — the interpreter plus the project's main.py
     main_py = os.path.join(_project_root(), "main.py")
     return f'"{sys.executable}" "{main_py}"'
 
 
 def _project_root():
-    # voice/autostart.py -> корень проекта на два уровня выше
+    # voice/autostart.py -> the project root two levels up
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -125,7 +126,7 @@ def _linux_is_enabled():
 
 
 def _launch_command_plain():
-    # для .desktop Exec без кавычек в стиле Windows
+    # for a .desktop, Exec without quotes in the Windows style
     if getattr(sys, "frozen", False):
         return sys.executable
     return f'{sys.executable} {os.path.join(_project_root(), "main.py")}'
@@ -180,7 +181,7 @@ def _mac_is_enabled():
 
 
 # ---------------------------------------------------------------------------
-# Публичный интерфейс
+# The public interface
 # ---------------------------------------------------------------------------
 def set_autostart(enabled: bool) -> bool:
     if sys.platform.startswith("win"):
@@ -201,4 +202,4 @@ def is_autostart_enabled() -> bool:
 
 
 def supported() -> bool:
-    return True  # все три платформы поддержаны
+    return True  # all three platforms are supported

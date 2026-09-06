@@ -1,23 +1,23 @@
 """
-Пользовательские команды.
+The user's commands.
 
-Пользователь создаёт команды через конструктор на вкладке «Команды».
-Каждая команда — словарь:
+A user creates commands through the editor on the "Commands" tab. Every
+command is a dict:
 
     {
         "id": "cmd_ab12",
         "enabled": True,
         "type": "app" | "folder" | "website" | "speak" | "system" | "sequence",
-        "triggers": ["запусти дискорд", "открой discord"],  # фразы активации
-        "match": "contains" | "exact",                       # режим совпадения
-        "target": "...",   # путь / url / текст / имя действия (зависит от типа)
-        "response": "Хорошо, запускаю Discord",              # что ответить (опц.)
-        "steps": [ {подкоманды} ],                           # только для sequence
+        "triggers": ["запусти дискорд", "открой discord"],  # activation phrases
+        "match": "contains" | "exact",                       # the match mode
+        "target": "...",   # a path / url / text / action name (depends on the type)
+        "response": "Хорошо, запускаю Discord",              # what to answer (optional)
+        "steps": [ {subcommands} ],                          # for sequence only
     }
 
-Хранятся в общем конфиге (settings["custom_commands"]).
-Выполнение кроссплатформенное: приложения/папки/сайты открываются штатными
-средствами ОС.
+They are kept in the shared config (settings["custom_commands"]).
+Execution is cross-platform: applications/folders/sites are opened by the
+OS's standard means.
 """
 
 import os
@@ -37,8 +37,8 @@ COMMAND_TYPES = [
     ("sequence", "Последовательность", "🔗"),
 ]
 
-# Действия над окном самой Рины выполняет главное окно (host),
-# действия с префиксом sys_ — voice/system_control (громкость, медиа, ПК).
+# Actions on Rina's own window are performed by the main window (host);
+# actions with the sys_ prefix by voice/system_control (volume, media, PC).
 SYSTEM_ACTIONS = [
     ("minimize",             "Свернуть окно Рины"),
     ("show",                 "Показать окно Рины"),
@@ -58,8 +58,8 @@ SYSTEM_ACTIONS = [
     ("sys_shutdown",         "Выключить компьютер"),
 ]
 
-# Действия, которые нельзя выполнять без подтверждения: ошибка распознавания
-# или случайно совпавшая фраза не должна выключать компьютер.
+# Actions that must not be performed without confirmation: a recognition
+# error or an accidentally matching phrase must not shut the computer down.
 DESTRUCTIVE_ACTIONS = {"sys_shutdown", "sys_restart", "sys_sleep", "quit"}
 
 
@@ -71,7 +71,7 @@ def action_label(action_id):
 
 
 def command_needs_confirm(command):
-    """Есть ли в команде (или её шагах) необратимое действие."""
+    """Is there an irreversible action in the command (or in its steps)."""
     if command.get("type") == "system":
         return command.get("target") in DESTRUCTIVE_ACTIONS
     if command.get("type") == "sequence":
@@ -95,7 +95,7 @@ def make_command(cmd_type="app", triggers=None, target="", response="",
         "triggers": triggers or [],
         "match": match,
         "target": target,
-        # чем является target: файл/путь или идентификатор приложения Магазина
+        # what the target is: a file/path or a Store application's identifier
         "target_kind": target_kind,
         "response": response,
         "steps": steps or [],
@@ -117,7 +117,7 @@ def type_icon(cmd_type):
 
 
 # ---------------------------------------------------------------------------
-# Хранилище
+# The store
 # ---------------------------------------------------------------------------
 class UserCommandStore:
     def __init__(self, settings):
@@ -158,7 +158,7 @@ class UserCommandStore:
                     c["enabled"] = bool(enabled)
             self.save_all(cmds)
 
-    # статистика запусков
+    # launch statistics
     def bump_stat(self, command_id):
         with self._settings.transaction():
             stats = dict(self._settings.get("command_stats", {}) or {})
@@ -171,16 +171,16 @@ class UserCommandStore:
 
 
 # ---------------------------------------------------------------------------
-# Сопоставление и выполнение
+# Matching and execution
 # ---------------------------------------------------------------------------
 def matches(command, text):
     """
-    Подходит ли команда под распознанный текст.
+    Does the command suit the recognised text.
 
-    Сравнение нечёткое: распознавание речи путает окончания и буквы
-    («зопусти дискорт»), а точное вхождение подстроки такие варианты теряет.
-    Режим «Точное совпадение» тоже допускает погрешность распознавания,
-    но требует совпадения фразы целиком, а не её вхождения.
+    The comparison is fuzzy: speech recognition muddles endings and letters
+    ("зопусти дискорт"), and an exact substring match loses such variants.
+    The "Exact match" mode also allows for a recognition error, but requires
+    the whole phrase to match rather than to be contained.
     """
     if not command.get("enabled", True):
         return False
@@ -203,12 +203,12 @@ def matches(command, text):
 
 def missing_path(target) -> bool:
     """
-    Цель выглядит путём, но такого пути нет.
+    The target looks like a path, but there is no such path.
 
-    Команда живёт дольше программы: путь мог остаться от удалённого или
-    перемещённого приложения. Короткое имя («discord») путём не считаем —
-    его разрешает сама ОС по реестру App Paths, и это допустимый способ
-    задать команду.
+    A command outlives a program: the path may be left over from a deleted
+    or moved application. A short name ("discord") is not counted as a path
+    — the OS itself resolves it through the App Paths registry, and that is
+    a permissible way of setting a command.
     """
     target = str(target or "")
     if not target:
@@ -219,7 +219,7 @@ def missing_path(target) -> bool:
 
 
 def _open_path(path):
-    """Открыть файл/папку/приложение штатно для ОС."""
+    """Open a file/folder/application in the OS's standard way."""
     if not path:
         return False
     if missing_path(path):
@@ -230,7 +230,7 @@ def _open_path(path):
         elif sys.platform == "darwin":
             subprocess.Popen(["open", path])
         else:
-            # если это исполняемый в PATH — запустим, иначе xdg-open
+            # if this is an executable in PATH — we launch it, otherwise xdg-open
             if shutil.which(path):
                 subprocess.Popen([path])
             else:
@@ -242,8 +242,9 @@ def _open_path(path):
 
 def execute(command, host=None, emit=None):
     """
-    Выполняет команду. host — объект с методами для системных действий
-    (minimize/show/quit/mute/unmute) и say(text). Возвращает (ok, response_text).
+    Performs a command. host is an object with methods for system actions
+    (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
+    response_text).
     """
     from core.i18n import t as tr
 
@@ -253,13 +254,13 @@ def execute(command, host=None, emit=None):
 
     ok = True
     if ctype == "app" and command.get("target_kind") == "uwp":
-        # приложение Магазина: запускается по идентификатору, а не по пути
+        # a Store application: launched by identifier, not by path
         from voice import app_index
         ok = app_index.launch(
             app_index.AppEntry(target, target, "uwp", "learned"))
     elif ctype == "app" or ctype == "folder":
         if missing_path(target):
-            # называем причину: «не получилось» не подсказывает, что делать
+            # we name the reason: "it did not work" does not suggest what to do
             ok = False
             response = response or tr(
                 "Не нашла «{target}» — программу удалили или перенесли.",
@@ -275,15 +276,15 @@ def execute(command, host=None, emit=None):
         except Exception:
             ok = False
     elif ctype == "speak":
-        # для «озвучить текст» ответом является сам текст (target),
-        # если отдельный response не задан
+        # for "say the text out loud" the answer is the text itself (target),
+        # if no separate response is set
         if not response:
             response = target
     elif ctype == "system":
         ok = _run_system_action(target, host, emit)
     elif ctype == "pause":
-        # пауза между шагами: дать программе время запуститься.
-        # Ограничиваем сверху, чтобы опечатка не подвесила выполнение надолго.
+        # a pause between steps: to give the program time to start.
+        # We limit it from above, so a typo does not hang execution for long.
         import time
         try:
             seconds = max(0.0, min(float(str(target).replace(",", ".")), 60.0))
@@ -300,23 +301,24 @@ def execute(command, host=None, emit=None):
         ok = False
 
     if not response:
-        # дефолтный ответ
+        # the default answer
         response = _default_response(command, ok)
     return ok, response
 
 
 def _run_system_action(action, host, emit=None):
-    # действия с компьютером (громкость, медиа, блокировка) — им host не нужен
+    # actions on the computer (volume, media, locking) — they need no host
     if str(action).startswith("sys_"):
         from voice import system_control
         from core.i18n import t as tr
         message = system_control.run(action[4:])
-        # run() возвращает текст и при неудаче — сравниваем именно с ним,
-        # иначе шаг последовательности отчитывался бы «Готово» после сбоя
+        # run() returns text on failure too — so we compare against exactly
+        # that, or a step of a sequence would report "Done" after a failure
         return bool(message) and message != tr("Не получилось выполнить действие.")
 
-    # действия над окном Рины трогают виджеты, а команда может выполняться
-    # в фоновом потоке (распознавание речи) — уводим их в GUI-поток сигналом
+    # actions on Rina's window touch widgets, and a command may run in a
+    # background thread (speech recognition) — we take them into the GUI
+    # thread with a signal
     mapping = {
         "minimize": "action_minimize",
         "show": "action_show",
@@ -326,14 +328,15 @@ def _run_system_action(action, host, emit=None):
     }
     if action not in mapping:
         return False
-    # Событие идёт в переданную шину, а не в модульный синглтон: иначе
-    # действие уходит мимо того ядра, которое его затеяло (4.0-B05).
+    # The event goes to the bus that was passed in rather than to the module
+    # singleton: otherwise the action goes past the very core that started
+    # it (4.0-B05).
     if emit is not None:
         from core.protocol import Events
 
         emit(Events.WINDOW_ACTION, action=action)
         return True
-    # запасной путь, если шину не передали
+    # the fallback path, if no bus was passed in
     if host is not None and hasattr(host, mapping[action]):
         try:
             getattr(host, mapping[action])()

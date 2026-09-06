@@ -1,12 +1,14 @@
 """
-Проверка обновлений.
+Checking for updates.
 
-Сравнивает текущую версию с последней, опубликованной на заданном endpoint.
-По умолчанию endpoint пустой (нет своего сервера релизов) — тогда проверка
-честно сообщает, что источник обновлений не настроен, вместо фальшивого «всё
-актуально». Если указать URL (напр. GitHub Releases API), проверка заработает.
+Compares the current version with the latest one published at a given
+endpoint. By default the endpoint is empty (there is no release server of
+our own) — the check then honestly reports that no update source is set up,
+instead of a false "everything is current". Setting a URL (the GitHub
+Releases API, say) makes the check work.
 
-Сетевой запрос — в фоновом потоке, результат через сигнал Qt.
+The network request goes in a background thread, the result through a Qt
+signal.
 """
 
 import json
@@ -19,8 +21,9 @@ from core.i18n import t as tr
 from version import APP_VERSION
 
 
-# Укажите сюда URL, отдающий JSON с полем "tag_name" или "version",
-# например GitHub: https://api.github.com/repos/<owner>/<repo>/releases/latest
+# Put here a URL that gives out JSON with a "tag_name" or "version" field,
+# for example GitHub:
+# https://api.github.com/repos/<owner>/<repo>/releases/latest
 UPDATE_ENDPOINT = "https://api.github.com/repos/Luna-corex/RinaAssistant/releases/latest"
 
 

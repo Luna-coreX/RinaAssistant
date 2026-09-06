@@ -1,9 +1,10 @@
 """
-Обёртка для теста голоса: произносит короткую фразу выбранным TTS-движком
-в фоновом потоке и отдаёт результат в GUI через сигнал Qt.
+A wrapper for testing the voice: says a short phrase with the chosen TTS
+engine in a background thread and hands the result to the GUI through a Qt
+signal.
 
-Используется на вкладке «Рина», чтобы прослушать выбранный голос/громкость/
-скорость до сохранения — синтез блокирующий, поэтому идёт в отдельном потоке.
+Used on the "Rina" tab, to hear the chosen voice/volume/speed before saving
+— synthesis blocks, so it goes in a separate thread.
 """
 
 import threading
@@ -15,7 +16,7 @@ from voice import tts as tts_mod
 
 class VoiceTester(QObject):
     started = Signal()
-    finished = Signal(str)   # "" при успехе, иначе текст ошибки
+    finished = Signal(str)   # "" on success, otherwise the error text
 
     def __init__(self, parent=None):
         super().__init__(parent)

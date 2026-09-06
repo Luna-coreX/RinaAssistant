@@ -1,9 +1,10 @@
 """
-Звуковые эффекты (короткие тоны), генерируются программно — без файлов.
+Sound effects (short tones), generated programmatically — without files.
 
-Играются через sounddevice, если он установлен. Уважают настройку
-sound_effects и выбранное устройство вывода (output_device). Проигрывание
-неблокирующее (в фоне), тихое (не мешает голосу).
+Played through sounddevice, if it is installed. They respect the
+sound_effects setting and the chosen output device (output_device). Playing
+is non-blocking (in the background) and quiet (it does not get in the
+voice's way).
 """
 
 import threading
@@ -24,7 +25,7 @@ def _output_device(settings):
 
 
 def _play_tone(freqs, duration=0.12, volume=0.25, device=None):
-    """Играет последовательность частот (мелодию) в фоне."""
+    """Plays a sequence of frequencies (a melody) in the background."""
     try:
         import numpy as np
         import sounddevice as sd
@@ -38,7 +39,7 @@ def _play_tone(freqs, duration=0.12, volume=0.25, device=None):
             for f in freqs:
                 t = np.linspace(0, duration, int(sr * duration), endpoint=False)
                 wave = np.sin(2 * np.pi * f * t)
-                # плавное затухание, чтобы не щёлкало
+                # a smooth fade, so it does not click
                 env = np.linspace(1.0, 0.0, len(wave)) ** 1.5
                 segments.append((wave * env).astype("float32"))
             audio = np.concatenate(segments) * volume
@@ -54,7 +55,7 @@ def _play_tone(freqs, duration=0.12, volume=0.25, device=None):
 
 
 def play_activation(settings):
-    """Звук начала прослушивания (восходящий)."""
+    """The sound of listening beginning (rising)."""
     if not _enabled(settings):
         return
     _play_tone([660, 880], duration=0.09, volume=0.25,
@@ -62,7 +63,7 @@ def play_activation(settings):
 
 
 def play_response(settings):
-    """Звук готового ответа (короткий мягкий)."""
+    """The sound of an answer being ready (short and soft)."""
     if not _enabled(settings):
         return
     _play_tone([880, 660], duration=0.08, volume=0.2,
@@ -70,7 +71,7 @@ def play_response(settings):
 
 
 def play_error(settings):
-    """Звук ошибки/непонимания (низкий)."""
+    """The sound of an error or of not understanding (low)."""
     if not _enabled(settings):
         return
     _play_tone([300, 240], duration=0.12, volume=0.22,

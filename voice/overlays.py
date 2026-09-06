@@ -1,11 +1,11 @@
 """
-Всплывающие окна голосового интерфейса:
-  - ListeningOverlay — окно «Слушаю…» с пульсирующим индикатором (по хоткею)
-  - Toast            — уведомление с текстом ответа ассистента
-  - MicWidget        — мини-виджет микрофона для режима «всегда слушать»
+The voice interface's pop-up windows:
+  - ListeningOverlay — the "Слушаю…" window with a pulsing indicator (on a hotkey)
+  - Toast            — a notification with the text of the assistant's answer
+  - MicWidget        — a mini microphone widget for the "always listen" mode
 
-Все они — независимые frameless-окна поверх приложения (Qt.Tool),
-чтобы показываться даже когда основное окно свёрнуто в трей.
+All of them are independent frameless windows on top of the application
+(Qt.Tool), so as to show even when the main window is minimised to the tray.
 """
 
 from PySide6.QtWidgets import (
@@ -24,7 +24,7 @@ from core.assets import logo_pixmap
 
 # ---------------------------------------------------------------------------
 class ListeningOverlay(QWidget):
-    """Окно «Слушаю…» с пульсирующим кругом."""
+    """The "Слушаю…" window with a pulsing circle."""
 
     def __init__(self):
         super().__init__()
@@ -65,13 +65,13 @@ class ListeningOverlay(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
 
-        # фон-карточка
+        # the background card
         p.setBrush(QColor(Color.CRUST))
         p.setPen(QColor(Color.SURFACE_1))
         p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1),
                           Radius.LG, Radius.LG)
 
-        # пульсирующие круги
+        # the pulsing circles
         cx, cy = self.width() / 2, 62
         accent = QColor(Color.ACCENT)
         for i, base_r in enumerate((34, 26, 18)):
@@ -83,7 +83,7 @@ class ListeningOverlay(QWidget):
             p.setPen(Qt.NoPen)
             p.drawEllipse(QPoint(int(cx), int(cy)), int(r), int(r))
 
-        # микрофон в центре
+        # the microphone in the centre
         core = QColor(accent)
         p.setBrush(core)
         p.drawEllipse(QPoint(int(cx), int(cy)), 14, 14)
@@ -104,7 +104,7 @@ class ListeningOverlay(QWidget):
         self.show()
         self.raise_()
         self._pulse_anim.start()
-        # плавное появление
+        # a smooth appearance
         eff = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(eff)
         a = QPropertyAnimation(eff, b"opacity", self)
@@ -119,7 +119,7 @@ class ListeningOverlay(QWidget):
 
 # ---------------------------------------------------------------------------
 class Toast(QWidget):
-    """Уведомление с текстом ответа ассистента (авто-скрытие)."""
+    """A notification with the text of the assistant's answer (auto-hiding)."""
 
     def __init__(self):
         super().__init__()
@@ -140,7 +140,7 @@ class Toast(QWidget):
         layout.addWidget(self.icon, 0, Qt.AlignTop)
 
         self.text = QLabel("")
-        # в toast попадают ответы модели и плагинов — только как обычный текст
+        # answers from the model and from plugins land in a toast — as plain text only
         self.text.setTextFormat(Qt.PlainText)
         self.text.setWordWrap(True)
         self.text.setStyleSheet(
@@ -158,7 +158,7 @@ class Toast(QWidget):
         p.setPen(QColor(Color.SURFACE_1))
         p.drawRoundedRect(self.rect().adjusted(1, 1, -1, -1),
                           Radius.MD, Radius.MD)
-        # цветная полоса-акцент слева
+        # a coloured accent strip on the left
         p.setBrush(QColor(Color.ACCENT))
         p.setPen(Qt.NoPen)
         p.drawRoundedRect(0, 8, 4, self.height() - 16, 2, 2)
@@ -201,8 +201,8 @@ class Toast(QWidget):
 # ---------------------------------------------------------------------------
 class MicWidget(QWidget):
     """
-    Плавающий мини-виджет микрофона для режима «всегда слушать».
-    Клик переключает режим. Можно перетаскивать мышью.
+    A floating mini microphone widget for the "always listen" mode.
+    A click switches the mode. It can be dragged with the mouse.
     """
 
     clicked = Signal()

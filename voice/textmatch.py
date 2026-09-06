@@ -1,25 +1,26 @@
 """
-Нечёткое сопоставление команд.
+Fuzzy matching of commands.
 
-Распознавание речи почти никогда не выдаёт фразу точно так, как её вписал
-пользователь: «запусти дискорд» превращается в «запусти Дискорд,», «зопусти
-дискорт» и т.п. Точное вхождение подстроки такие варианты не ловит, поэтому
-сравнение идёт в три шага: нормализация → вхождение → нечёткое сравнение.
+Speech recognition almost never gives out a phrase exactly as the user typed
+it: "запусти дискорд" turns into "запусти Дискорд,", "зопусти дискорт" and
+so on. An exact substring containment does not catch such variants, so the
+comparison goes in three steps: normalisation → containment → fuzzy
+comparison.
 
-Порог намеренно высокий: ложное срабатывание команды (запуск не той
-программы) неприятнее, чем необходимость повторить фразу.
+The threshold is deliberately high: a command firing falsely (launching the
+wrong program) is more unpleasant than having to repeat the phrase.
 """
 
 import difflib
 import re
 
 
-THRESHOLD = 0.82        # минимальная схожесть для нечёткого совпадения
-MIN_FUZZY_LEN = 4       # короткие слова сравниваем только точно
+THRESHOLD = 0.82        # the minimum similarity for a fuzzy match
+MIN_FUZZY_LEN = 4       # short words we compare only exactly
 
 
 def normalize(text):
-    """Приводит фразу к сравнимому виду: регистр, ё, пунктуация, пробелы."""
+    """Brings a phrase to a comparable form: case, ё, punctuation, spaces."""
     if not text:
         return ""
     low = str(text).lower().replace("ё", "е")
@@ -27,8 +28,9 @@ def normalize(text):
     return re.sub(r"\s+", " ", low).strip()
 
 
-# Кириллица -> латиница. Нужна, потому что распознавание речи всегда выдаёт
-# русские буквы («телеграм»), а названия программ почти всегда латиницей.
+# Cyrillic -> Latin. Needed because speech recognition always gives out
+# Russian letters ("телеграм"), while program names are almost always in
+# Latin.
 _TRANSLIT = {
     "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ж": "zh",
     "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n",
@@ -39,7 +41,7 @@ _TRANSLIT = {
 
 
 def translit(text):
-    """«телеграм» -> «telegram». Латиница остаётся как есть."""
+    """"телеграм" -> "telegram". Latin stays as it is."""
     norm = normalize(text)
     return "".join(_TRANSLIT.get(ch, ch) for ch in norm)
 
@@ -49,7 +51,7 @@ def has_cyrillic(text):
 
 
 def similar(a, b, threshold=THRESHOLD):
-    """Похожи ли две строки (после нормализации)."""
+    """Are two strings similar (after normalisation)."""
     a, b = normalize(a), normalize(b)
     if not a or not b:
         return False
@@ -62,10 +64,11 @@ def similar(a, b, threshold=THRESHOLD):
 
 def contains_phrase(haystack, needle, threshold=THRESHOLD):
     """
-    Есть ли фраза `needle` внутри `haystack` — точно или с опечатками.
+    Is the phrase `needle` inside `haystack` — exactly or with typos.
 
-    Скользим окном длиной в число слов фразы: «включи мне дискорд сейчас»
-    должно находить «включи дискорд» с поправкой на неточность распознавания.
+    We slide a window as long as the phrase's word count: "включи мне
+    дискорд сейчас" must find "включи дискорд" allowing for recognition
+    inexactness.
     """
     hay, ned = normalize(haystack), normalize(needle)
     if not hay or not ned:
@@ -77,7 +80,7 @@ def contains_phrase(haystack, needle, threshold=THRESHOLD):
     ned_words = ned.split()
     span = len(ned_words)
     if not hay_words or span > len(hay_words):
-        # фраза длиннее сказанного — сравниваем целиком
+        # the phrase is longer than what was said — we compare it whole
         return similar(hay, ned, threshold)
 
     for i in range(len(hay_words) - span + 1):
@@ -89,8 +92,9 @@ def contains_phrase(haystack, needle, threshold=THRESHOLD):
 
 def best_match(text, candidates, threshold=THRESHOLD):
     """
-    Возвращает (индекс, коэффициент) наиболее похожего кандидата или (None, 0).
-    Используется, когда нужно выбрать лучший вариант, а не первый подходящий.
+    Returns (index, coefficient) of the most similar candidate, or (None, 0).
+    Used when the best option has to be chosen rather than the first
+    suitable one.
     """
     norm = normalize(text)
     best_i, best_ratio = None, 0.0

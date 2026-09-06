@@ -1,10 +1,11 @@
 """
-Запуск программ по имени: «запусти телеграм», «открой блокнот».
+Launching programs by name: "запусти телеграм", "открой блокнот".
 
-Раньше список был захардкожен (пять программ), теперь имя ищется в индексе
-установленных приложений (voice/app_index.py). Если подходящих несколько —
-не гадаем, а возвращаем список кандидатов, чтобы ассистент переспросил:
-запустить не ту программу неприятнее, чем задать уточняющий вопрос.
+The list used to be hard-coded (five programs); now the name is looked up in
+the index of installed applications (voice/app_index.py). If several suit,
+we do not guess but return a list of candidates so the assistant can ask
+again: launching the wrong program is more unpleasant than asking a
+clarifying question.
 """
 
 import os
@@ -20,28 +21,28 @@ LAUNCH_VERBS = (
     "стартани", "launch", "open", "start", "run",
 )
 
-# Слова-паразиты после глагола: «запусти мне программу телеграм»
+# Filler words after the verb: "запусти мне программу телеграм"
 FILLER_WORDS = (
     "мне", "пожалуйста", "программу", "приложение", "прогу", "плиз",
     "давай", "please", "the", "app", "application",
 )
 
-# Насколько кандидаты должны отличаться, чтобы выбрать первого без вопроса
+# How far apart the candidates must be to pick the first without asking
 DECISIVE_GAP = 10
 
 
 class LaunchOutcome:
-    """Результат попытки запуска: что сказать и нужен ли уточняющий вопрос."""
+    """The result of an attempt to launch: what to say and whether a clarifying question is needed."""
 
     def __init__(self, status, message, options=None, query=""):
         self.status = status          # "launched" | "ambiguous" | "not_found"
         self.message = message
         self.options = options or []
-        self.query = query            # что искали (нужно для «запомни путь»)
+        self.query = query            # what was looked for (needed for "remember the path")
 
 
 # ---------------------------------------------------------------------------
-# Запомненные пользователем программы
+# Programs the user has remembered
 # ---------------------------------------------------------------------------
 def _aliases():
     from core.settings_store import settings
@@ -50,11 +51,11 @@ def _aliases():
 
 def remember(query, path, kind="file", name=None):
     """
-    Запомнить, что «ренпай» — это вот эта программа.
+    Remember that "ренпай" is this particular program.
 
-    Хранится словарём, потому что запомнить нужно не только путь: у приложений
-    Магазина вместо файла AppUserModelID, и проверять его существование на
-    диске бессмысленно.
+    Kept as a dict, because it is not only the path that has to be
+    remembered: Store applications have an AppUserModelID instead of a file,
+    and checking whether it exists on disk is meaningless.
     """
     from core.settings_store import settings
     key = normalize(query)
@@ -83,10 +84,11 @@ def forget(query):
 
 def alias_lookup(target, aliases):
     """
-    Запомненная программа под запрос — из переданного словаря.
+    The remembered program for a query — from the dict passed in.
 
-    Чистая: ничего не читает из настроек и, в отличие от alias_entry, не
-    вычищает устаревшие записи. Роутеру нужно решение, а не уборка.
+    Pure: it reads nothing from the settings and, unlike alias_entry, does
+    not clear out stale entries. The router needs a decision, not tidying
+    up.
     """
     saved = (aliases or {}).get(normalize(target))
     if not saved:
@@ -106,7 +108,7 @@ def alias_lookup(target, aliases):
 
 
 class LaunchDecision:
-    """Что запустить — до всякого запуска."""
+    """What to launch — before any launching."""
 
     def __init__(self, status, entry=None, options=None, query=""):
         self.status = status          # "launch" | "ambiguous" | "not_found"
@@ -117,11 +119,12 @@ class LaunchDecision:
 
 def decide(text, apps=None, aliases=None):
     """
-    Чистое решение о запуске: что бы запустили, ничего не запуская.
+    A pure decision about launching: what would be launched, launching
+    nothing.
 
-    Ровно та же логика выбора, что в resolve(), но без побочных эффектов —
-    ради роутера (4.0-B02). resolve() остаётся тем же самым решением плюс
-    исполнение.
+    Exactly the same choosing logic as in resolve(), but without side
+    effects — for the router's sake (4.0-B02). resolve() remains that same
+    decision plus the execution.
     """
     target = extract_target(text)
     if not target:
@@ -148,12 +151,12 @@ def decide(text, apps=None, aliases=None):
 
 
 def alias_entry(target):
-    """Запомненная программа под этот запрос (или None)."""
+    """The remembered program for this query (or None)."""
     saved = _aliases().get(normalize(target))
     if not saved:
         return None
 
-    # старый формат — просто строка с путём
+    # the old format — simply a string with a path
     if isinstance(saved, str):
         saved = {"path": saved, "kind": "file",
                  "name": os.path.splitext(os.path.basename(saved))[0]}
@@ -162,9 +165,9 @@ def alias_entry(target):
     if not path:
         return None
     kind = saved.get("kind", "file")
-    # у приложений Магазина вместо пути идентификатор — проверять нечего
+    # Store applications have an identifier instead of a path — there is nothing to check
     if kind == "file" and not os.path.exists(path):
-        forget(target)          # путь устарел — не держим мусор
+        forget(target)          # the path is stale — we keep no rubbish
         return None
     name = saved.get("name") or os.path.splitext(os.path.basename(path))[0]
     return app_index.AppEntry(name, path, kind, "learned")
@@ -172,8 +175,8 @@ def alias_entry(target):
 
 def extract_target(text):
     """
-    Возвращает имя программы после глагола запуска или None,
-    если фраза вообще не про запуск.
+    Returns the program's name after the launching verb, or None if the
+    phrase is not about launching at all.
     """
     if not text:
         return None
@@ -197,8 +200,8 @@ def extract_target(text):
 
 def _fallback_catalog(target):
     """
-    Запасной каталог для систем, где индекс пуст (не Windows).
-    Использует прежний захардкоженный список из voice/commands.py.
+    A fallback catalogue for systems where the index is empty (not Windows).
+    Uses the former hard-coded list from voice/commands.py.
     """
     try:
         from voice.commands import APPS, _launch
@@ -215,14 +218,15 @@ def _fallback_catalog(target):
 
 def resolve(text):
     """
-    Обрабатывает команду запуска.
-    Возвращает LaunchOutcome или None, если фраза не про запуск программы.
+    Handles a launch command.
+    Returns a LaunchOutcome, or None if the phrase is not about launching a
+    program.
     """
     target = extract_target(text)
     if not target:
         return None
 
-    # то, что пользователь показал вручную, важнее результатов поиска
+    # what the user pointed at by hand matters more than search results
     learned = alias_entry(target)
     if learned is not None:
         if app_index.launch(learned):
@@ -245,9 +249,10 @@ def resolve(text):
             tr("Не нашла программу «{name}».", name=target),
             query=target)
 
-    # один кандидат или явный лидер — запускаем без вопросов.
-    # «запусти браузер» тоже не переспрашиваем: просят роль, а не конкретную
-    # программу — берём первый по приоритету, как это делает система.
+    # one candidate or a clear leader — we launch without asking.
+    # "запусти браузер" we do not ask about either: they are asking for a
+    # role rather than a particular program — we take the first by priority,
+    # as the system does.
     decisive = len(candidates) == 1 or app_index.is_browser_query(target)
     if not decisive:
         top = app_index.find(target, limit=2)
@@ -273,7 +278,7 @@ def resolve(text):
 
 
 def _candidate_score(target, entry):
-    """Оценка кандидата тем же способом, что и в индексе (для сравнения пары)."""
+    """Scoring a candidate the same way as in the index (to compare a pair)."""
     best = 0
     for variant in app_index.query_variants(target):
         best = max(best, app_index._score(entry.key, variant))
@@ -281,7 +286,7 @@ def _candidate_score(target, entry):
 
 
 # ---------------------------------------------------------------------------
-# Ответ на уточняющий вопрос
+# The answer to a clarifying question
 # ---------------------------------------------------------------------------
 ORDINALS = {
     "первый": 0, "первое": 0, "первая": 0, "первую": 0, "1": 0, "один": 0,
@@ -296,8 +301,8 @@ CANCEL_WORDS = ("отмена", "отмени", "неважно", "ничего"
 
 def choose(text, options):
     """
-    Выбирает вариант из предложенных по ответу пользователя.
-    Возвращает (entry | None, cancelled: bool).
+    Chooses one of the offered options by the user's answer.
+    Returns (entry | None, cancelled: bool).
     """
     low = normalize(text)
     if not low:
@@ -305,14 +310,14 @@ def choose(text, options):
     if any(word in low for word in CANCEL_WORDS):
         return None, True
 
-    # «второй», «два», «2»
+    # "второй", "два", "2"
     for word in low.split():
         if word in ORDINALS:
             idx = ORDINALS[word]
             if idx < len(options):
                 return options[idx], False
 
-    # «obs studio» — по имени
+    # "obs studio" — by name
     ranked = app_index.find(low, limit=1, entries=options)
     if ranked:
         return ranked[0], False

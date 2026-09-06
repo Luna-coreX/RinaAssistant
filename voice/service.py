@@ -1,13 +1,13 @@
 """
-Qt-адаптер над ядром ассистента.
+A Qt adapter over the assistant's core.
 
-Вся логика живёт в core/engine.py и не знает про интерфейс. Здесь она
-превращается в привычные сигналы Qt: события ядра приходят из фоновых
-потоков, а трогать виджеты можно только из потока интерфейса — сигнал как
-раз и делает этот перенос.
+All the logic lives in core/engine.py and knows nothing about the interface.
+Here it is turned into the familiar Qt signals: the core's events arrive
+from background threads, and widgets may only be touched from the interface
+thread — a signal is exactly what does that carrying.
 
-Публичный интерфейс сохранён полностью (process_command, listen_once, say,
-set_always_listen…), поэтому окно и страницы работают без изменений.
+The public interface is preserved in full (process_command, listen_once,
+say, set_always_listen...), so the window and the pages work unchanged.
 """
 
 from PySide6.QtCore import QObject, Signal
@@ -18,7 +18,7 @@ from core.protocol import Events
 
 
 class VoiceService(QObject):
-    # сигналы остались теми же, что и до выделения ядра
+    # the signals stayed the same as before the core was separated out
     listening_started = Signal()
     listening_stopped = Signal()
     recognized = Signal(str)
@@ -27,23 +27,24 @@ class VoiceService(QObject):
     always_listen_changed = Signal(bool)
     always_capturing = Signal(bool)
     reminder_fired = Signal(dict)
-    thinking = Signal(bool)           # модель обдумывает ответ
+    thinking = Signal(bool)           # the model is thinking about an answer
 
     def __init__(self, plugin_manager=None, parent=None):
         super().__init__(parent)
-        # Своя шина, а не модульный синглтон: служба владеет своим ядром,
-        # и два экземпляра не должны слышать события друг друга (4.0-B05).
+        # A bus of its own rather than the module singleton: the service
+        # owns its core, and two instances must not hear each other's events
+        # (4.0-B05).
         self.engine = RinaEngine(plugin_manager=plugin_manager,
                                  event_bus=EventBus())
         self._subscriptions = []
         self._connect_engine()
         self.engine.start_reminders()
 
-    # ---------- мост между шиной ядра и сигналами Qt ----------
+    # ---------- the bridge between the core's bus and Qt's signals ----------
     def _connect_engine(self):
-        # Подписываемся на шину СВОЕГО ядра, а не на модульный синглтон.
-        # Раньше совпадало лишь потому, что ядро по умолчанию берёт тот же
-        # объект; со вторым ядром события уходили бы мимо (4.0-B05).
+        # We subscribe to OUR core's bus, not to the module singleton. It
+        # used to coincide only because the core takes that same object by
+        # default; with a second core the events would go past (4.0-B05).
         engine_bus = self.engine.bus
 
         def bind(event_name, handler):
@@ -67,7 +68,7 @@ class VoiceService(QObject):
         bind(Events.THINKING,
              lambda d: self.thinking.emit(bool(d.get("active"))))
 
-        # события, которые ядро адресует приложению целиком
+        # events the core addresses to the application as a whole
         bind(Events.HISTORY_CHANGED, lambda d: self._forward_history())
         bind(Events.APP_NOT_FOUND,
              lambda d: self._forward_app_not_found(str(d.get("query", ""))))
@@ -86,7 +87,7 @@ class VoiceService(QObject):
         from core.app_signals import app_signals
         app_signals.window_action.emit(action)
 
-    # ---------- то же API, что и раньше ----------
+    # ---------- the same API as before ----------
     def set_host(self, host):
         self.engine.set_host(host)
 
@@ -97,8 +98,9 @@ class VoiceService(QObject):
         self.engine.listen_once()
 
     def process_command(self, text, require_wake=False, source="typed"):
-        # в фоне: вызывают из потока интерфейса, а конвейер может уйти
-        # в сеть или к языковой модели на несколько секунд
+        # in the background: it is called from the interface thread, and the
+        # pipeline may go to the network or to the language model for
+        # several seconds
         self.engine.handle_command_async(
             text, require_wake=require_wake, source=source)
 
@@ -117,10 +119,10 @@ class VoiceService(QObject):
             self.engine.bus.off(event_name, handler)
         self._subscriptions.clear()
 
-    # ---------- состояние ядра ----------
+    # ---------- the core's state ----------
     @property
     def _pending(self):
-        """Незакрытый уточняющий вопрос (используется в тестах и отладке)."""
+        """The unclosed clarifying question (used in tests and debugging)."""
         return self.engine._pending
 
     @_pending.setter

@@ -1,12 +1,12 @@
 """
-Калькулятор для голосовых и текстовых команд.
+A calculator for voice and text commands.
 
-Понимает «посчитай 15*12», «сколько будет 2+2», «20 процентов от 3000»,
-а также словесные операторы («умножь 7 на 6»), потому что распознавание речи
-почти никогда не выдаёт символы «*» и «/».
+Understands "посчитай 15*12", "сколько будет 2+2", "20 процентов от 3000",
+and also verbal operators ("умножь 7 на 6"), because speech recognition
+almost never gives out the symbols "*" and "/".
 
-Вычисление идёт по разобранному дереву выражения (ast) с белым списком узлов —
-eval() на строке из микрофона использовать нельзя.
+The computation goes over a parsed expression tree (ast) with a whitelist of
+nodes — eval() must not be used on a string from a microphone.
 """
 
 import ast
@@ -16,8 +16,8 @@ import re
 from core.i18n import t as tr
 
 
-# команда считается «про счёт», если начинается с одного из этих слов
-# (глаголы-действия тоже: «умножь 7 на 6» — это запрос на вычисление)
+# a command counts as "about arithmetic" if it begins with one of these
+# words (action verbs too: "умножь 7 на 6" is a request to compute)
 TRIGGERS = (
     "посчитай", "подсчитай", "вычисли", "сколько будет", "чему равно",
     "умножить", "умножь", "разделить", "раздели", "поделить", "подели",
@@ -25,22 +25,22 @@ TRIGGERS = (
     "calculate", "compute", "how much is", "what is",
 )
 
-# Словесные операторы -> символы (речь не даёт знаков арифметики).
-# Порядок важен: составные обороты идут первыми, иначе «разделить на»
-# распадётся на «разделить» + отдельное «на» и выражение сломается.
+# Verbal operators -> symbols (speech gives no arithmetic signs).
+# The order matters: compound phrases come first, or "разделить на" falls
+# apart into "разделить" plus a separate "на" and the expression breaks.
 WORD_OPS = [
-    # составные
+    # the compound ones
     (r"\bразделить на\b", "/"), (r"\bподелить на\b", "/"),
     (r"\bумножить на\b", "*"), (r"\bумножь на\b", "*"),
     (r"\bdivided by\b", "/"), (r"\bmultiplied by\b", "*"),
     (r"\bв степени\b", "**"), (r"\bв квадрате\b", "**2"),
-    # одиночные
+    # the single ones
     (r"\bплюс\b", "+"), (r"\bприбавить\b", "+"), (r"\bсложить\b", "+"),
     (r"\bминус\b", "-"), (r"\bотнять\b", "-"), (r"\bвычесть\b", "-"),
     (r"\bумножить\b", "*"), (r"\bумножь\b", "*"),
     (r"\bразделить\b", "/"), (r"\bподелить\b", "/"),
     (r"\bplus\b", "+"), (r"\bminus\b", "-"), (r"\btimes\b", "*"),
-    # «на» как умножение — только последним, когда прочие обороты разобраны
+    # "на" as multiplication — only last, once the other phrases are parsed
     (r"\bна\b(?=\s*\d)", "*"),
 ]
 
@@ -58,7 +58,7 @@ _ALLOWED_UNARY = {
     ast.USub: operator.neg,
 }
 
-MAX_POWER = 64          # защита от 9**99999999 (зависание/память)
+MAX_POWER = 64          # a guard against 9**99999999 (hanging/memory)
 
 
 def _eval_node(node):
@@ -85,7 +85,7 @@ def _eval_node(node):
 
 
 def _format_number(value):
-    """Аккуратный вывод: целые — без .0, дробные — до 4 знаков."""
+    """Tidy output: whole numbers without .0, fractions to 4 places."""
     if isinstance(value, float):
         if value.is_integer():
             return str(int(value))
@@ -106,7 +106,7 @@ _PERCENT_RE = re.compile(
 
 
 def _percent_of(expr):
-    """«20 процентов от 3000» / «20% от 3000» -> (значение, совпадение)."""
+    """"20 процентов от 3000" / "20% от 3000" -> (value, match)."""
     m = _PERCENT_RE.search(expr)
     if not m:
         return None, None
@@ -115,8 +115,9 @@ def _percent_of(expr):
     return part / 100.0 * whole, m
 
 
-# Глагольные конструкции: связка между операндами зависит от глагола.
-# «раздели 100 на 5» — это деление, хотя «на» в других фразах значит умножение.
+# Verb constructions: the link between the operands depends on the verb.
+# "раздели 100 на 5" is division, although "на" in other phrases means
+# multiplication.
 VERB_PATTERNS = [
     (r"^(?:раздели(?:ть)?|подели(?:ть)?)\s+(.+?)\s+на\s+(.+)$", "({0})/({1})"),
     (r"^(?:умнож(?:ь|ить))\s+(.+?)\s+на\s+(.+)$", "({0})*({1})"),
@@ -126,7 +127,7 @@ VERB_PATTERNS = [
 
 
 def _verb_expression(low):
-    """Разбирает «раздели X на Y» и подобное. Возвращает выражение или None."""
+    """Parses "раздели X на Y" and the like. Returns an expression or None."""
     for pattern, template in VERB_PATTERNS:
         m = re.match(pattern, low)
         if m:
@@ -137,7 +138,7 @@ def _verb_expression(low):
 
 
 def _to_expression(text):
-    """Приводит фразу к арифметическому выражению (или None)."""
+    """Brings a phrase to an arithmetic expression (or None)."""
     low = text.lower().strip()
 
     expr = _verb_expression(low)
@@ -150,23 +151,23 @@ def _to_expression(text):
         expr = re.sub(pattern, symbol, expr)
 
     expr = expr.replace("×", "*").replace("÷", "/").replace("^", "**")
-    # десятичная запятая: «3,5» -> «3.5» (но не разделитель перечисления)
+    # a decimal comma: "3,5" -> "3.5" (but not a list separator)
     expr = re.sub(r"(\d),(\d)", r"\1.\2", expr)
     expr = expr.replace("=", " ").replace("?", " ")
     expr = re.sub(r"[^0-9+\-*/%().\s]", " ", expr)
     expr = re.sub(r"\s+", " ", expr).strip()
-    # «умножь 7 на 6» превращается в «* 7 * 6» — ведущий оператор лишний
+    # "умножь 7 на 6" turns into "* 7 * 6" — the leading operator is superfluous
     expr = re.sub(r"^[*/%]+\s*", "", expr).strip()
     return expr or None
 
 
 def classify(text):
     """
-    Чистый разбор: («calc», {"result": ...}) либо («calc.zero_division», {})
-    либо None. Ничего не выполняет и ничего не пишет.
+    A pure parse: ("calc", {"result": ...}), or ("calc.zero_division", {}),
+    or None. Performs nothing and writes nothing.
 
-    Отделено от try_calculate ради роутера (4.0-B02): тому нужно намерение
-    с аргументами, а не готовая фраза для озвучки.
+    Separated from try_calculate for the router's sake (4.0-B02): that needs
+    an intent with arguments, not a ready-made phrase to speak.
     """
     if not text:
         return None
@@ -202,17 +203,19 @@ def classify(text):
 
 def try_calculate(text):
     """
-    Возвращает текст ответа, если фраза — арифметика, иначе None.
+    Returns the text of an answer if the phrase is arithmetic, otherwise
+    None.
     """
     if not text:
         return None
     low = text.lower().strip()
     has_trigger = any(low.startswith(t) for t in TRIGGERS)
 
-    # Процент от числа — до общего разбора, но по тем же правилам допуска:
-    # либо фразу явно адресовали счёту, либо она и есть только это выражение.
-    # Иначе обычная реплика «скинули 20 процентов от 3000, беру» перехватывалась
-    # арифметикой вместо ответа по существу.
+    # A percentage of a number — before the general parse, but by the same
+    # admission rules: either the phrase was explicitly addressed to
+    # arithmetic, or it is nothing but that expression. Otherwise an
+    # ordinary line "скинули 20 процентов от 3000, беру" was intercepted by
+    # arithmetic instead of being answered on its merits.
     percent, match = _percent_of(low)
     if percent is not None:
         rest = low[:match.start()] + " " + low[match.end():]
@@ -225,8 +228,8 @@ def try_calculate(text):
     if not expr:
         return None
 
-    # без явного триггера считаем только «голое» выражение вида 2+2,
-    # иначе любая фраза с числами превращалась бы в арифметику
+    # without an explicit trigger we compute only a "bare" expression of the
+    # form 2+2, or any phrase with numbers would turn into arithmetic
     if not has_trigger and not re.fullmatch(r"[\d\s+\-*/%().]+", low):
         return None
     if not re.search(r"\d", expr) or not re.search(r"[+\-*/%]", expr):

@@ -1,15 +1,16 @@
 """
-Аудио-устройства: перечисление микрофонов/динамиков и тест микрофона.
+Audio devices: enumerating microphones/speakers and testing the microphone.
 
-Как и остальной голосовой слой, работает поверх опциональных библиотек:
-  - sounddevice (+ numpy) — предпочтительно: список устройств ввода/вывода
-    и запись для теста микрофона с измерением уровня;
-  - pyaudio — запасной вариант для перечисления;
-  - если ничего не установлено — возвращаем «Устройство по умолчанию» и
-    честно сообщаем, что тест недоступен.
+Like the rest of the voice layer, it works over optional libraries:
+  - sounddevice (+ numpy) — preferred: the list of input/output devices and
+    recording for a microphone test with a level measurement;
+  - pyaudio — a fallback for enumeration;
+  - if nothing is installed — we return "The default device" and honestly
+    report that the test is unavailable.
 
-Запись микрофона блокирующая, поэтому тест запускается из фонового потока
-(см. использование в UI). Здесь только «сырые» функции.
+Recording from the microphone blocks, so the test is started from a
+background thread (see its use in the UI). Here there are only the "raw"
+functions.
 """
 
 
@@ -37,7 +38,7 @@ DEFAULT_DEVICE = ("default", "Устройство по умолчанию")
 
 
 def input_devices():
-    """Список (device_id, label) устройств ВВОДА (микрофоны)."""
+    """A list of (device_id, label) of INPUT devices (microphones)."""
     sd, _ = _try_sounddevice()
     result = [DEFAULT_DEVICE]
     if sd is not None:
@@ -63,7 +64,7 @@ def input_devices():
 
 
 def output_devices():
-    """Список (device_id, label) устройств ВЫВОДА (динамики/наушники)."""
+    """A list of (device_id, label) of OUTPUT devices (speakers/headphones)."""
     sd, _ = _try_sounddevice()
     result = [DEFAULT_DEVICE]
     if sd is not None:
@@ -89,7 +90,7 @@ def output_devices():
 
 
 def audio_available():
-    """Доступна ли запись для теста микрофона."""
+    """Is recording available for a microphone test."""
     sd, _ = _try_sounddevice()
     return sd is not None
 
@@ -97,15 +98,15 @@ def audio_available():
 class MicTestResult:
     def __init__(self, ok=False, level=0.0, peak=0.0, error=None):
         self.ok = ok
-        self.level = level   # средний RMS-уровень 0..1
-        self.peak = peak     # пиковый уровень 0..1
+        self.level = level   # the mean RMS level, 0..1
+        self.peak = peak     # the peak level, 0..1
         self.error = error
 
 
 def test_microphone(device_id="default", seconds=2.0, samplerate=16000):
     """
-    Блокирующе записывает короткий фрагмент с микрофона и возвращает уровень.
-    Вызывать из фонового потока.
+    Blockingly records a short fragment from the microphone and returns the
+    level. Call from a background thread.
     """
     sd, np = _try_sounddevice()
     if sd is None:
@@ -126,7 +127,7 @@ def test_microphone(device_id="default", seconds=2.0, samplerate=16000):
             return MicTestResult(error="Пустая запись")
         rms = float(np.sqrt(np.mean(np.square(data))))
         peak = float(np.max(np.abs(data)))
-        # нормируем в удобный диапазон 0..1 (речь редко даёт rms > 0.3)
+        # we normalise into a convenient 0..1 range (speech rarely gives rms > 0.3)
         level = min(1.0, rms * 3.0)
         return MicTestResult(ok=True, level=level, peak=min(1.0, peak))
     except Exception as e:

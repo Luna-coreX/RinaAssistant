@@ -1,12 +1,13 @@
 """
-Плавающая строка команд — компактное окно поверх всех окон.
+The floating command bar — a compact window on top of every window.
 
-Показывается, когда основное окно свёрнуто (в панель задач или трей), если
-включена настройка floating_command_bar. Позволяет вводить команды текстом,
-когда микрофон недоступен/неудобен, и отправляет их в тот же конвейер команд.
+Shown when the main window is minimised (to the taskbar or the tray), if the
+floating_command_bar setting is on. It allows commands to be typed when the
+microphone is unavailable or inconvenient, and sends them into the same
+command pipeline.
 
-Есть кнопка микрофона (разовое прослушивание) и крестик (спрятать строку на
-текущую сессию). Окно перетаскивается за корпус.
+There is a microphone button (a single listen) and a close button (hide the
+bar for the current session). The window is dragged by its body.
 """
 
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QLineEdit, QPushButton, QLabel
@@ -19,9 +20,9 @@ from core.assets import logo_pixmap
 
 
 class FloatingCommandBar(QWidget):
-    submitted = Signal(str)        # введённая команда
-    mic_requested = Signal()       # нажата кнопка микрофона
-    closed = Signal()              # строку закрыли крестиком
+    submitted = Signal(str)        # the command that was typed
+    mic_requested = Signal()       # the microphone button was pressed
+    closed = Signal()              # the bar was closed with the close button
 
     def __init__(self):
         super().__init__()

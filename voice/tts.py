@@ -1,21 +1,22 @@
 """
-Text-to-Speech слой с выбором движка.
+The text-to-speech layer with a choice of engine.
 
-Абстракция TTSEngine позволяет выбирать «саму TTS» (не только голос):
-  - Pyttsx3Engine   — офлайн, системный синтез (SAPI5/NSSS/espeak)
-  - GttsEngine      — онлайн, Google TTS (естественнее, нужен интернет)
-  - SilentEngine    — без озвучки (только toast/текст), всегда доступен
+The TTSEngine abstraction makes it possible to choose "the TTS itself" (not
+only the voice):
+  - Pyttsx3Engine   — offline, system synthesis (SAPI5/NSSS/espeak)
+  - GttsEngine      — online, Google TTS (more natural, needs the internet)
+  - SilentEngine    — no speech (toast/text only), always available
 
-Каждый бэкенд опционален: если библиотека не установлена, движок помечается
-недоступным (available=False) и не предлагается. SilentEngine есть всегда,
-поэтому приложение работает и без единой TTS-библиотеки.
+Every backend is optional: if the library is not installed, the engine is
+marked unavailable (available=False) and is not offered. SilentEngine is
+always there, so the application works even without a single TTS library.
 
-Синтез блокирующий, поэтому вызывается из фонового потока (см. voice/service.py),
-а не напрямую из GUI.
+Synthesis blocks, so it is called from a background thread (see
+voice/service.py) rather than directly from the GUI.
 
-Воспроизведение проходит через единственную очередь (_Playback): ответы
-звучат по одному и в порядке поступления. Каждый синтез пишет в собственный
-временный файл, который удаляется после проигрывания.
+Playback goes through a single queue (_Playback): answers sound one at a
+time and in the order they arrive. Every synthesis writes into a temporary
+file of its own, which is deleted after playing.
 """
 
 import os
@@ -40,22 +41,23 @@ class TTSEngine:
         return False
 
     def voices(self):
-        """Список (voice_id, human_label) доступных голосов."""
+        """A list of (voice_id, human_label) of the available voices."""
         return []
 
     def render(self, text, voice=None, volume=75, rate=100):
         """
-        Синтезировать в файл и вернуть путь. `None` — не вышло.
+        Synthesise into a file and return the path. `None` means it did not
+        work.
 
-        Появилось для 4.0: синтез в ядре, воспроизведение в оболочке
-        (`4.0-F10`). Движку и раньше приходилось делать файл — каждый писал
-        временный и тут же его проигрывал; разделение лишь называет этот шаг
-        вслух. Кто вызвал, тот и удаляет.
+        Appeared for 4.0: synthesis in the core, playback in the shell
+        (`4.0-F10`). An engine had to make a file before this too — each
+        wrote a temporary one and played it on the spot; the split merely
+        says that step out loud. Whoever called deletes it.
         """
         return None
 
     def speak(self, text, voice=None, volume=75, rate=100):
-        """Блокирующе произносит текст. rate/volume — проценты (100 = норма)."""
+        """Blockingly says the text out loud. rate/volume are per cent (100 = normal)."""
         path = self.render(text, voice=voice, volume=volume, rate=rate)
         if path:
             _play_audio_file(path, delete_after=True)
@@ -66,7 +68,7 @@ class TTSEngine:
 
 # ---------------------------------------------------------------------------
 class SilentEngine(TTSEngine):
-    """Ничего не озвучивает — только текст/toast. Всегда доступен."""
+    """Voices nothing — text/toast only. Always available."""
     id = "silent"
     label = "Без озвучки (только текст)"
 
@@ -81,13 +83,13 @@ class SilentEngine(TTSEngine):
         return None
 
     def speak(self, text, voice=None, volume=75, rate=100):
-        # намеренно тихо; небольшая пауза ~ время «произношения»
+        # deliberately quiet; a small pause ~ the time of "saying it"
         return
 
 
 # ---------------------------------------------------------------------------
 class Pyttsx3Engine(TTSEngine):
-    """Офлайн системный TTS через pyttsx3."""
+    """Offline system TTS through pyttsx3."""
     id = "pyttsx3"
     label = "Системный (pyttsx3, офлайн)"
 
@@ -136,7 +138,7 @@ class Pyttsx3Engine(TTSEngine):
         if voice and voice != "default":
             eng.setProperty("voice", voice)
         eng.setProperty("volume", max(0.0, min(1.0, volume / 100.0)))
-        # pyttsx3 rate ~ слов/мин; 200 ≈ норма. Масштабируем от rate%.
+        # pyttsx3 rate ~ words/min; 200 is about normal. We scale from rate%.
         eng.setProperty("rate", int(200 * (rate / 100.0)))
 
     def render(self, text, voice=None, volume=75, rate=100):
@@ -154,8 +156,9 @@ class Pyttsx3Engine(TTSEngine):
                 return None
 
     def speak(self, text, voice=None, volume=75, rate=100):
-        # Произносит сам, а не через файл: системный синтез это умеет, и
-        # лишний круг через диск добавил бы задержку там, где её нет.
+        # Says it itself rather than through a file: system synthesis can do
+        # that, and an extra round through the disk would add latency where
+        # there is none.
         eng = self._get_engine()
         if eng is None:
             return
@@ -177,7 +180,7 @@ class Pyttsx3Engine(TTSEngine):
 
 # ---------------------------------------------------------------------------
 class GttsEngine(TTSEngine):
-    """Онлайн Google TTS (естественный голос, нужен интернет)."""
+    """Online Google TTS (a natural voice, needs the internet)."""
     id = "gtts"
     label = "Google TTS (онлайн)"
 
@@ -194,7 +197,7 @@ class GttsEngine(TTSEngine):
             return None
 
     def _can_play(self):
-        # воспроизведение через sounddevice + soundfile (как у Edge/Piper)
+        # playback through sounddevice + soundfile (as with Edge/Piper)
         try:
             import soundfile  # noqa
             import sounddevice  # noqa
@@ -224,7 +227,7 @@ class GttsEngine(TTSEngine):
 
 # ---------------------------------------------------------------------------
 def _selected_output_device():
-    """Индекс выбранного устройства вывода или None (по умолчанию)."""
+    """The index of the chosen output device, or None (the default)."""
     try:
         from core.settings_store import settings
         dev = settings.get("output_device", "default")
@@ -237,24 +240,24 @@ def _selected_output_device():
 
 def new_temp_file(suffix, prefix="rina_tts_"):
     """
-    Отдельный файл под каждый синтез.
+    A separate file for every synthesis.
 
-    Раньше имена были постоянными («rina_gtts.mp3»), и два ответа подряд
-    затирали файл друг друга: первый обрывался на середине, второй мог
-    прочитать наполовину записанные данные.
+    The names used to be constant ("rina_gtts.mp3"), and two answers in a
+    row overwrote each other's file: the first broke off in the middle, and
+    the second could read half-written data.
     """
     fd, path = tempfile.mkstemp(prefix=prefix, suffix=suffix)
-    os.close(fd)            # писать будет синтезатор, ему нужен путь
+    os.close(fd)            # the synthesiser will write; it needs the path
     return path
 
 
 class _Playback:
     """
-    Единственный воркер воспроизведения.
+    The single playback worker.
 
-    Ответы Рины должны звучать по очереди и целиком. Без очереди два
-    синтеза, начавшиеся почти одновременно, играли одновременно: слышно
-    было обоих и ни одного.
+    Rina's answers must sound one at a time and whole. Without a queue two
+    syntheses that began almost at the same time played at the same time:
+    both were audible and neither was.
     """
 
     def __init__(self):
@@ -276,8 +279,8 @@ class _Playback:
             try:
                 result.append(_play_now(path))
             except Exception:
-                # сбой одного файла не должен уносить воркер: следующий
-                # ответ обязан прозвучать
+                # one file's failure must not carry off the worker: the
+                # next answer is obliged to sound
                 log.exception("Ошибка воспроизведения")
                 result.append(False)
             finally:
@@ -289,7 +292,7 @@ class _Playback:
                 done.set()
 
     def play(self, path, delete_after=False, wait=True):
-        """Ставит файл в очередь. При wait=True ждёт окончания."""
+        """Puts a file into the queue. With wait=True it waits for the end."""
         self._ensure_worker()
         done = threading.Event()
         result = []
@@ -307,16 +310,16 @@ _playback = _Playback()
 
 
 def _play_audio_file(path, delete_after=False):
-    """Поставить файл в очередь воспроизведения и дождаться его."""
+    """Put a file into the playback queue and wait for it."""
     return _playback.play(path, delete_after=delete_after, wait=True)
 
 
 def _play_now(path):
-    """Собственно воспроизведение. Вызывается только воркером очереди."""
+    """The playing itself. Called only by the queue's worker."""
     device = _selected_output_device()
 
-    # если выбрано конкретное устройство вывода — играем через sounddevice,
-    # т.к. только он умеет направлять звук на заданное устройство.
+    # if a particular output device is chosen, we play through sounddevice,
+    # since only it can direct sound to a given device.
     if device is not None:
         try:
             import soundfile as sf
@@ -326,16 +329,16 @@ def _play_now(path):
             sd.wait()
             return True
         except Exception:
-            pass  # не вышло — падаем на общие способы ниже
+            pass  # it did not work — we fall through to the general ways below
 
-    # 1) playsound (лёгкий, системный вывод по умолчанию)
+    # 1) playsound (light, the default system output)
     try:
         import playsound
         playsound.playsound(path, True)
         return True
     except Exception:
         pass
-    # 2) sounddevice + soundfile (то, что уже стоит для микрофона)
+    # 2) sounddevice + soundfile (what is already installed for the microphone)
     try:
         import soundfile as sf
         import sounddevice as sd
@@ -346,7 +349,7 @@ def _play_now(path):
         return True
     except Exception:
         pass
-    # 3) системный проигрыватель как крайний случай
+    # 3) the system player as a last resort
     try:
         if sys.platform.startswith("win"):
             os.startfile(path)  # noqa
@@ -363,9 +366,9 @@ def _play_now(path):
 
 class EdgeTTSEngine(TTSEngine):
     """
-    Microsoft Edge Neural TTS (edge-tts): бесплатно, онлайн, очень естественные
-    нейросетевые голоса. Требует пакет edge-tts. Это отличный вариант «по
-    умолчанию» для качественной озвучки без ключей.
+    Microsoft Edge Neural TTS (edge-tts): free, online, very natural neural
+    voices. Requires the edge-tts package. This is an excellent "default"
+    option for good speech without keys.
     """
     id = "edge"
     label = "Edge Neural (онлайн, естественный)"
@@ -398,7 +401,7 @@ class EdgeTTSEngine(TTSEngine):
         if edge_tts is None:
             return None
         voice_id = voice if voice and voice.endswith("Neural") else "ru-RU-SvetlanaNeural"
-        # rate в edge-tts задаётся строкой вида "+10%" / "-20%"
+        # in edge-tts, rate is given as a string of the form "+10%" / "-20%"
         pct = int(rate) - 100
         rate_str = f"{'+' if pct >= 0 else ''}{pct}%"
         vol_pct = int(volume) - 100
@@ -420,9 +423,10 @@ class EdgeTTSEngine(TTSEngine):
 
 class PiperEngine(TTSEngine):
     """
-    Piper TTS: быстрый ОФЛАЙН нейросинтез. Требует пакет piper-tts и скачанную
-    модель голоса (.onnx). Путь к модели берётся из настройки piper_model.
-    Хорош, если нужен локальный естественный голос без интернета.
+    Piper TTS: fast OFFLINE neural synthesis. Requires the piper-tts package
+    and a downloaded voice model (.onnx). The path to the model is taken
+    from the piper_model setting. Good if a local natural voice without the
+    internet is wanted.
     """
     id = "piper"
     label = "Piper (офлайн, нейро)"
@@ -450,15 +454,15 @@ class PiperEngine(TTSEngine):
     _cached_path = None
 
     def _load_voice(self, PiperVoice, model_path):
-        # кэшируем загруженную модель (загрузка тяжёлая)
+        # we cache the loaded model (loading is heavy)
         if self._voice_cache is not None and self._cached_path == model_path:
             return self._voice_cache
-        # рядом с .onnx должен лежать .onnx.json (конфиг). Если указан без .json —
-        # piper сам подставит config_path = model + ".json".
+        # a .onnx.json (the config) must lie next to the .onnx. If it is
+        # given without .json, piper substitutes config_path = model + ".json".
         try:
             self._voice_cache = PiperVoice.load(model_path)
         except Exception:
-            # пробуем явно указать конфиг
+            # we try naming the config explicitly
             cfg = model_path + ".json"
             if os.path.isfile(cfg):
                 self._voice_cache = PiperVoice.load(model_path, config_path=cfg)
@@ -481,15 +485,15 @@ class PiperEngine(TTSEngine):
         try:
             voice_model = self._load_voice(PiperVoice, model_path)
             with wave.open(tmp, "wb") as wav:
-                # новый API (piper-tts 1.x): synthesize_wav
+                # the new API (piper-tts 1.x): synthesize_wav
                 if hasattr(voice_model, "synthesize_wav"):
                     voice_model.synthesize_wav(text, wav)
                 else:
-                    # старый API: synthesize(text, wav_file)
+                    # the old API: synthesize(text, wav_file)
                     voice_model.synthesize(text, wav)
             return tmp
         except Exception as e:
-            # не глушим молча — сохраняем причину, чтобы показать в UI/логах
+            # we do not swallow it in silence — we keep the reason, to show it in the UI/logs
             self._last_error = f"Ошибка Piper: {e}"
             return None
             raise
@@ -500,7 +504,7 @@ _ENGINES = None
 
 
 def all_engines():
-    """Все зарегистрированные движки (в т.ч. недоступные — для UI)."""
+    """Every registered engine (including unavailable ones — for the UI)."""
     global _ENGINES
     if _ENGINES is None:
         _ENGINES = [SilentEngine(), Pyttsx3Engine(), EdgeTTSEngine(),
@@ -516,9 +520,9 @@ def get_engine(engine_id):
     for e in all_engines():
         if e.id == engine_id:
             return e
-    return all_engines()[0]  # SilentEngine как безопасный дефолт
+    return all_engines()[0]  # SilentEngine as a safe default
 
 
 def engine_choices():
-    """Список (id, label, available) для выпадающего списка настроек."""
+    """A list of (id, label, available) for the settings dropdown."""
     return [(e.id, e.label, e.available) for e in all_engines()]

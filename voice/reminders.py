@@ -1,13 +1,15 @@
 """
-Таймеры, будильники и напоминания.
+Timers, alarms and reminders.
 
-Разбирает фразы вида «поставь таймер на 10 минут», «напомни через полчаса
-позвонить маме», «разбуди в 7:30» и хранит запланированное между запусками —
-напоминание должно пережить перезапуск приложения, иначе ему нельзя доверять.
+Parses phrases of the form "поставь таймер на 10 минут", "напомни через
+полчаса позвонить маме", "разбуди в 7:30" and keeps what is planned between
+runs — a reminder must survive a restart of the application, or it cannot be
+trusted.
 
-Здесь только разбор фраз и хранилище. Срок наступления проверяет ядро
-(RinaEngine.start_reminders) раз в секунду в фоновом потоке: один общий опрос
-дешевле и надёжнее, чем поток на каждое напоминание.
+Here there is only phrase parsing and the store. The core
+(RinaEngine.start_reminders) checks the due time once a second in a
+background thread: one shared poll is cheaper and more reliable than a
+thread per reminder.
 """
 
 import math
@@ -20,7 +22,7 @@ from voice.textmatch import normalize
 
 
 # ---------------------------------------------------------------------------
-# Разбор фраз
+# Parsing phrases
 # ---------------------------------------------------------------------------
 TIMER_WORDS = ("таймер", "засеки", "засечь", "timer")
 REMIND_WORDS = ("напомни", "напоминание", "напомнить", "remind")
@@ -31,7 +33,7 @@ CANCEL_WORDS = ("отмени таймер", "отмени напоминани�
                 "убери таймер", "убери напоминания", "отмени все таймеры",
                 "удали напоминания", "сбрось таймер")
 
-# Речь редко даёт цифры — числительные приходится понимать словами.
+# Speech rarely gives digits — the numerals have to be understood as words.
 NUM_WORDS = {
     "один": 1, "одну": 1, "одна": 1, "полторы": 1.5, "полтора": 1.5,
     "два": 2, "две": 2, "три": 3, "четыре": 4, "пять": 5, "шесть": 6,
@@ -42,7 +44,7 @@ NUM_WORDS = {
     "пятьдесят": 50, "шестьдесят": 60, "девяносто": 90,
 }
 
-# Больше года вперёд — почти наверняка ошибка распознавания
+# More than a year ahead is almost certainly a recognition error
 MAX_DELAY_SECONDS = 365 * 24 * 3600
 
 UNIT_SECONDS = {
@@ -55,26 +57,26 @@ UNIT_SECONDS = {
 
 
 class Parsed:
-    """Что распознали во фразе."""
+    """What was recognised in the phrase."""
 
     def __init__(self, action, delay=None, at=None, text="", kind="timer"):
         self.action = action      # "create" | "list" | "cancel"
-        self.delay = delay        # через сколько секунд
-        self.at = at              # абсолютное время (timestamp)
-        self.text = text          # о чём напомнить
+        self.delay = delay        # in how many seconds
+        self.at = at              # an absolute time (timestamp)
+        self.text = text          # what to remind about
         self.kind = kind          # "timer" | "reminder" | "alarm"
 
 
 def _duration_seconds(text):
-    """«10 минут», «полчаса», «пять секунд» -> секунды (или None)."""
+    """"10 минут", "полчаса", "пять секунд" -> seconds (or None)."""
     if re.search(r"\bполчаса\b", text):
         return 1800
     if re.search(r"\bполтора часа\b", text):
         return 5400
 
-    # Число (цифрами или словом) + единица. Складываем ВСЕ пары, а не
-    # только первую: «1 час 30 минут» — это полтора часа, и раньше
-    # пользователь узнавал об ошибке через час.
+    # A number (in digits or in words) plus a unit. We add up ALL the pairs
+    # rather than only the first: "1 час 30 минут" is an hour and a half,
+    # and the user used to find out about the mistake an hour later.
     pattern = r"(\d+(?:[.,]\d+)?|[а-яё]+)\s*(" + "|".join(UNIT_SECONDS) + r")\b"
     seconds = 0.0
     found = False
@@ -85,24 +87,24 @@ def _duration_seconds(text):
         except ValueError:
             amount = NUM_WORDS.get(raw)
             if amount is None:
-                # «через час», «на минуту» — числительное опущено
+                # "через час", "на минуту" — the numeral is omitted
                 amount = 1
         seconds += amount * UNIT_SECONDS[unit]
         found = True
 
     if not found:
         return None
-    # очень длинное число даёт inf, а int(inf) — исключение. Заодно отсекаем
-    # бессмысленные сроки: «через 99999999 минут» — это не напоминание.
+    # a very long number gives inf, and int(inf) is an exception. We also cut
+    # off meaningless spans: "через 99999999 минут" is not a reminder.
     if not math.isfinite(seconds) or seconds <= 0:
         return None
     return int(min(seconds, MAX_DELAY_SECONDS))
 
 
 def _absolute_time(text):
-    """«в 15:00», «в 7 30», «в 9 утра» -> ближайший такой момент (timestamp)."""
-    # «в 15:00» и «на 8 утра». Отрицательный просмотр вперёд не даёт спутать
-    # с длительностью: «на 10 минут» — это таймер, а не время 10:00.
+    """"в 15:00", "в 7 30", "в 9 утра" -> the nearest such moment (a timestamp)."""
+    # "в 15:00" and "на 8 утра". The negative lookahead prevents confusion
+    # with a duration: "на 10 минут" is a timer, not the time 10:00.
     match = re.search(
         r"\b(?:в|на)\s+(\d{1,2})(?:[:.\s](\d{2}))?\b"
         r"(?!\s*(?:секунд|минут|час|сек|мин))", text)
@@ -113,7 +115,7 @@ def _absolute_time(text):
     if hour > 23 or minute > 59:
         return None
 
-    # «в 7 вечера» -> 19:00
+    # "в 7 вечера" -> 19:00
     if re.search(r"\bвечера\b", text) and hour < 12:
         hour += 12
     if re.search(r"\bночи\b", text) and hour == 12:
@@ -124,16 +126,16 @@ def _absolute_time(text):
                                hour, minute, 0, 0, 0, -1))
     stamp = time.mktime(target)
     if stamp <= time.time():
-        stamp += 24 * 3600          # время уже прошло — значит, завтра
+        stamp += 24 * 3600          # the time has passed, so tomorrow
     if re.search(r"\bзавтра\b", text):
         stamp += 24 * 3600
     return stamp
 
 
 def _reminder_text(text):
-    """Что именно напомнить: хвост фразы после времени."""
+    """What exactly to remind about: the tail of the phrase after the time."""
     cleaned = re.sub(r"^.*?(напомни(?:ть)?|напоминание)\s*", "", text)
-    # отрезаем время: «через 15 минут», «через час», «завтра в 9», «в 15:00»
+    # we cut off the time: "через 15 минут", "через час", "завтра в 9", "в 15:00"
     cleaned = re.sub(
         r"^(?:завтра|сегодня)?\s*"
         r"(через\s+.*?(?:секунд\w*|минут\w*|час\w*|полчаса)"
@@ -144,7 +146,7 @@ def _reminder_text(text):
 
 
 def parse(text):
-    """Распознаёт команду про время. Возвращает Parsed или None."""
+    """Recognises a command about time. Returns Parsed or None."""
     if not text:
         return None
     low = normalize(text)
@@ -175,23 +177,23 @@ def parse(text):
         kind = "timer"
 
     label = _reminder_text(low) if is_remind else ""
-    # у абсолютного времени приоритет: «напомни в 15:00» — это не «через 15»
+    # absolute time has priority: "напомни в 15:00" is not "через 15"
     if at is not None and (is_alarm or is_remind or not is_timer):
         delay = None
     return Parsed("create", delay=delay, at=at, text=label, kind=kind)
 
 
 # ---------------------------------------------------------------------------
-# Хранилище
+# The store
 # ---------------------------------------------------------------------------
 class ReminderStore:
-    """Запланированное, переживающее перезапуск приложения."""
+    """What is planned, surviving a restart of the application."""
 
     def __init__(self, settings):
         self._settings = settings
 
     def all(self):
-        """Запланированное, приведённое к ожидаемому виду (см. HistoryStore.all)."""
+        """What is planned, brought to the expected form (see HistoryStore.all)."""
         clean = []
         for item in (self._settings.get("reminders", []) or []):
             if not isinstance(item, dict) or not item.get("id"):
@@ -199,7 +201,7 @@ class ReminderStore:
             try:
                 fire_at = float(item.get("fire_at", 0) or 0)
             except (TypeError, ValueError):
-                continue        # без внятного времени напоминание бессмысленно
+                continue        # without an intelligible time a reminder is meaningless
             clean.append({
                 "id": str(item["id"]),
                 "kind": str(item.get("kind", "reminder")),
@@ -217,7 +219,7 @@ class ReminderStore:
         self._settings.set("reminders", items)
         self._settings.save()
 
-    MAX_FUTURE = 10 * 365 * 24 * 3600      # дальше десяти лет — заведомо ошибка
+    MAX_FUTURE = 10 * 365 * 24 * 3600      # beyond ten years is knowingly a mistake
 
     def add(self, kind, fire_at, text=""):
         try:
@@ -233,9 +235,10 @@ class ReminderStore:
             "created_at": time.time(),
             "done": False,
         }
-        # чтение и запись — одной операцией: планировщик в фоновом потоке
-        # помечает сработавшее ровно тогда же, когда пользователь добавляет
-        # новое, и без блокировки одно затирает другое
+        # reading and writing in one operation: the scheduler in a
+        # background thread marks what has fired at exactly the moment the
+        # user adds something new, and without a lock one overwrites the
+        # other
         with self._settings.transaction():
             items = self.all()
             items.append(item)
@@ -265,14 +268,15 @@ class ReminderStore:
         return [r for r in self.active() if r.get("fire_at", 0) <= now]
 
 
-# Планировщик живёт в ядре (core/engine.py): здесь только разбор фраз,
-# хранилище и формулировки — модуль не зависит от интерфейса.
+# The scheduler lives in the core (core/engine.py): here there is only
+# phrase parsing, the store and the wordings — the module does not depend on
+# the interface.
 
 # ---------------------------------------------------------------------------
-# Формулировки
+# The wordings
 # ---------------------------------------------------------------------------
 def humanize_left(seconds):
-    """«через 1 ч 5 мин» — сколько осталось."""
+    """"через 1 ч 5 мин" — how much is left."""
     seconds = max(0, int(seconds))
     hours, rest = divmod(seconds, 3600)
     minutes, secs = divmod(rest, 60)
@@ -284,12 +288,13 @@ def humanize_left(seconds):
 
 
 def when_text(fire_at):
-    """Время срабатывания в читаемом виде."""
+    """The firing time in a readable form."""
     try:
         stamp = time.localtime(fire_at)
     except (OSError, OverflowError, ValueError):
-        # дата вне разумного диапазона: строку показать всё равно надо,
-        # иначе одна такая запись рушила бы всю вкладку и её нельзя было снять
+        # a date outside a sensible range: the string has to be shown all
+        # the same, or one such entry would wreck the whole tab and it could
+        # not be removed
         return "—"
     today = time.localtime()
     clock = time.strftime("%H:%M", stamp)
@@ -300,7 +305,7 @@ def when_text(fire_at):
 
 
 def describe(item):
-    """Строка для списка: «Таймер — 14:30 (через 5 мин)»."""
+    """A line for the list: "Таймер — 14:30 (через 5 мин)"."""
     titles = {"timer": tr("Таймер"), "reminder": tr("Напоминание"),
               "alarm": tr("Будильник")}
     title = titles.get(item.get("kind"), tr("Напоминание"))

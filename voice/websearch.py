@@ -1,9 +1,9 @@
 """
-Веб-поиск: явные команды («найди рецепт борща») и запасной вариант,
-когда команда не распознана ни одним обработчиком.
+Web search: explicit commands ("найди рецепт борща") and the fallback for
+when a command was recognised by no handler.
 
-Поисковая система выбирается настройкой search_engine. Запрос уходит в
-браузер по умолчанию — ничего никуда не отправляется мимо него.
+The search engine is chosen by the search_engine setting. The query goes to
+the default browser — nothing is sent anywhere past it.
 """
 
 import re
@@ -13,7 +13,7 @@ import webbrowser
 from core.i18n import t as tr
 
 
-# фразы, после которых идёт поисковый запрос
+# phrases after which a search query follows
 TRIGGERS = (
     "найди в интернете", "поищи в интернете", "найди в сети",
     "загугли", "погугли", "найди", "поищи", "поиск",
@@ -30,7 +30,7 @@ DEFAULT_ENGINE = "google"
 
 
 def engine_choices():
-    """[(id, label)] для выпадающего списка в настройках."""
+    """[(id, label)] for the dropdown in the settings."""
     return [(eid, label) for eid, (label, _) in ENGINES.items()]
 
 
@@ -44,7 +44,7 @@ def search_url(query, engine_id=DEFAULT_ENGINE):
 
 
 def open_search(query, engine_id=DEFAULT_ENGINE):
-    """Открывает поиск в браузере. True при успехе."""
+    """Opens a search in the browser. True on success."""
     query = (query or "").strip()
     if not query:
         return False
@@ -57,9 +57,9 @@ def open_search(query, engine_id=DEFAULT_ENGINE):
 
 def extract_query(text):
     """
-    Возвращает поисковый запрос, если фраза начинается с поискового триггера,
-    иначе None. Триггеры проверяются от длинных к коротким, чтобы
-    «найди в интернете X» не превратилось в «в интернете X».
+    Returns the search query if the phrase begins with a search trigger,
+    otherwise None. The triggers are checked from long to short, so that
+    "найди в интернете X" does not turn into "в интернете X".
     """
     if not text:
         return None
@@ -74,8 +74,9 @@ def extract_query(text):
 
 def try_search(text, engine_id=DEFAULT_ENGINE):
     """
-    Обрабатывает явную поисковую команду.
-    Возвращает текст ответа или None, если фраза не про поиск.
+    Handles an explicit search command.
+    Returns the text of an answer, or None if the phrase is not about
+    searching.
     """
     query = extract_query(text)
     if not query:
@@ -88,8 +89,9 @@ def try_search(text, engine_id=DEFAULT_ENGINE):
 
 def fallback_search(text, engine_id=DEFAULT_ENGINE):
     """
-    Запасной вариант для нераспознанной команды: ищем её текст целиком.
-    Возвращает текст ответа или None, если открыть браузер не вышло.
+    The fallback for an unrecognised command: we search for its text whole.
+    Returns the text of an answer, or None if the browser could not be
+    opened.
     """
     text = (text or "").strip()
     if not text:
