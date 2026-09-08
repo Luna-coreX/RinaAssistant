@@ -16,6 +16,7 @@ A decision belongs here when undoing it would mean rewriting rather than editing
 | [0008](0008-ui-framework.md) | Shell UI framework — WPF, Windows only | accepted | `4.0-F01` |
 | [0009](0009-system-layer.md) | System layer — the shell touches the machine, the core decides what to do | accepted | `4.0-G06` |
 | [0010](0010-plugin-api.md) | Plugin API — a plugin declares tools, page and permissions; it does not act on its own | accepted | `4.0-H03` |
+| [0011](0011-python-runtime.md) | Python runtime — an embedded distribution ships with the installer | accepted | `4.0-I01` |
 
 ## Decided but not yet written up
 

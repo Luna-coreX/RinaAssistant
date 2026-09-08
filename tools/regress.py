@@ -69,11 +69,22 @@ STARTUP = os.path.join("shell", "Rina.Shell", "Startup.cs")
 NOT_A_CHECK = {
     "_core_sandboxed.py": "запускатель ядра под песочницей, не проверка",
     "build_mockups.py": "собирает макеты, ничего не сверяет",
+    "build_release.py": "собирает выпуск; сверяет его check_release.py",
     "console.py": "общая мелочь: вывод в UTF-8",
     "regress.py": "этот файл",
     "retranslate.py": "правит комментарии по заданию",
     "sandbox.py": "песочница, которой пользуются проверки",
     "voice_bench.py": "стенд замеров: меряет, а не проверяет",
+}
+
+#: Проверки, которым нужен собранный выпуск, и где он лежит.
+#:
+#: Собирать выпуск внутри регресса нельзя: это минуты, сеть и четверть
+#: гигабайта на диске. Но и молчать о непроверенном установщике нельзя,
+#: поэтому без выпуска проверка не исчезает, а становится «пропущено» с
+#: указанием, чем это чинится.
+NEEDS_RELEASE = {
+    "check_release.py": os.path.join(ROOT, "dist", "Rina"),
 }
 
 #: Порождатели: проверка у них — сверить порождённое с источником.
@@ -106,11 +117,15 @@ TOUCHES_MACHINE = {"--check-voice", "--check-hover", "--check-tray",
 class Check:
     """Одна проверка: как её зовут, чем запускают и к какой группе она."""
 
-    def __init__(self, name, group, command, note=""):
+    def __init__(self, name, group, command, note="", skip=""):
         self.name = name
         self.group = group
         self.command = command
         self.note = note
+        #: Непустое — проверку не запускаем, а называем причину. Пропуск
+        #: должен объяснять себя сам: строка «пропущено» без «почему»
+        #: читается как «сломано, но мы не смотрели».
+        self.skip = skip
 
 
 def python_checks():
@@ -132,6 +147,14 @@ def python_checks():
             if args is None:
                 continue
             found.append(Check(name, "ядро", [sys.executable, path] + args))
+            continue
+        if name in NEEDS_RELEASE and not os.path.isdir(NEEDS_RELEASE[name]):
+            # Выпуска нет — проверять нечего, и это «пропущено», а не
+            # «успех»: зелёная строка про непроверенный установщик хуже
+            # красной, потому что ей верят.
+            found.append(Check(name, "выпуск", [sys.executable, path],
+                               skip="нет dist/Rina — "
+                                    "python tools/build_release.py"))
             continue
         if name.startswith(("test_", "check_")) or name in (
                 "conformance.py", "golden_runner.py"):
@@ -204,6 +227,8 @@ def all_checks(shots_dir):
 # ---------------------------------------------------------------------------
 def run(check, timeout):
     """Запустить и вернуть (исход, секунды, последняя внятная строка)."""
+    if check.skip:
+        return "пропущено", 0.0, check.skip
     started = time.monotonic()
     try:
         done = subprocess.run(check.command, capture_output=True, text=True,

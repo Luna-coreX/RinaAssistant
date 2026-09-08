@@ -589,6 +589,14 @@ public sealed class CoreLink : IAsyncDisposable
     {
         string[] candidates =
         [
+            // Привезённый нами рантайм — первым (ADR 0011). У человека
+            // сработает он и только он: это ровно тот интерпретатор, на
+            // котором мы проверяли, и он не зависит от того, что стоит на
+            // машине.
+            Path.Combine(AppContext.BaseDirectory, "runtime", "python",
+                         "python.exe"),
+
+            // Дальше — разработка. Окружение проекта, потом `PATH`.
             Path.Combine(root, "venv", "Scripts", "python.exe"),
             Path.Combine(root, ".venv", "Scripts", "python.exe"),
         ];
