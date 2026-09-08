@@ -758,9 +758,6 @@
   "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
     "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
   },
-  "Серебро или чёрное": {
-    "English": "Silver or black"
-  },
   "Система синтеза": {
     "English": "Synthesis engine"
   },
@@ -1150,5 +1147,8 @@
   },
   "Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает": {
     "English": "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once"
+  },
+  "Серебро, чёрное или графит": {
+    "English": "Silver, black or graphite"
   }
 }

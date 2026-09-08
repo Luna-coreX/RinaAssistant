@@ -118,11 +118,16 @@ CONSTRAINTS: dict[str, Constraint] = {
     # force only when history is on.
     "log_texts": Constraint(depends_on="save_history"),
 
-    # The finish changes on the fly: the two are equal, and a whole resource
-    # dictionary is swapped rather than colours recomputed from a base one.
-    # It needs no restart — and demanding one would be lying about how it is
-    # built.
-    "finish": Constraint(choices=("silver", "black")),
+    # The finish changes on the fly: the three are equal, and a whole
+    # resource dictionary is swapped rather than colours recomputed from a
+    # base one. It needs no restart — and demanding one would be lying about
+    # how it is built.
+    #
+    # `graphite` arrived with the depth work (4.0b-A06). It is a third
+    # finish rather than a rewrite of `black`: rewriting one of two equals
+    # would have cancelled 4.0-R02 and R03 by implementation, silently, and
+    # left the person no way back.
+    "finish": Constraint(choices=("silver", "black", "graphite")),
 
     # The language changes rarely and affects the whole window.
     # The languages are enumerated by the core: `core.i18n` knows the list,

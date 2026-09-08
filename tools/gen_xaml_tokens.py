@@ -68,6 +68,30 @@ def finish_xaml(name: str, finish: dict) -> str:
         lines.append(f'  <Color x:Key="Color.{key(role)}">{value}</Color>')
         lines.append(f'  <SolidColorBrush x:Key="C.{key(role)}" '
                      f'Color="{value}" />')
+
+    # Depth belongs to the finish, not to the geometry (4.0b-A06). The blur
+    # and the offset are the same everywhere; what differs is what a shadow
+    # is painted with — on a light panel it is a warm grey, on a dark one
+    # something deeper than the panel itself.
+    shadow = finish.get("shadow")
+    if shadow:
+        lines.append("")
+        lines.append(f'  <Color x:Key="Color.Shadow">{shadow}</Color>')
+
+    # The sheen is a gradient, and it is named that way on purpose:
+    # "gradient" in this category means the purple-to-blue glow that
+    # `4.0-R02` rejected by name. This is light falling on a panel from
+    # above — a few per cent between top and bottom, noticeable only in
+    # that the panel stops looking like a sticker.
+    sheen = finish.get("sheen")
+    if sheen:
+        lines.append("")
+        lines.append('  <LinearGradientBrush x:Key="C.FaceSheen" '
+                     'StartPoint="0,0" EndPoint="0,1">')
+        lines.append(f'    <GradientStop Offset="0" Color="{sheen["top"]}" />')
+        lines.append(f'    <GradientStop Offset="1" Color="{sheen["bottom"]}" />')
+        lines.append('  </LinearGradientBrush>')
+
     lines.append("</ResourceDictionary>")
     return "\n".join(lines) + "\n"
 
@@ -128,7 +152,11 @@ def common_xaml(tokens: dict) -> str:
     lines.append("")
     lines.append("  <!-- Движение (§7): длительности в миллисекундах -->")
     for name, value in motion.items():
-        if name == "easing":
+        # `easing` is curves and `background` is the backdrop's breathing:
+        # both have their own place below. Here there are only durations,
+        # and a dictionary among the numbers would mean a `Duration` made
+        # out of a dictionary.
+        if name in ("easing", "background"):
             continue
         lines.append(f'  <Duration x:Key="Motion.{key(name)}">'
                      f'0:0:{value / 1000:.3f}</Duration>')
@@ -146,6 +174,29 @@ def common_xaml(tokens: dict) -> str:
                      f'для затухания -->')
         lines.append('  <CubicEase x:Key="Ease.In" EasingMode="EaseOut" />')
         lines.append('  <CubicEase x:Key="Ease.Out" EasingMode="EaseIn" />')
+
+    elevation = tokens.get("elevation")
+    if elevation:
+        lines.append("")
+        lines.append("  <!-- Глубина (4.0b-A06): три уровня, дальше человек "
+                     "не различает -->")
+        for level, spec in elevation["level"].items():
+            k = key(level)
+            lines.append(f'  <sys:Double x:Key="Lift.{k}.Blur">'
+                         f'{spec["blur"]}</sys:Double>')
+            lines.append(f'  <sys:Double x:Key="Lift.{k}.Y">'
+                         f'{spec["y"]}</sys:Double>')
+            lines.append(f'  <sys:Double x:Key="Lift.{k}.Opacity">'
+                         f'{spec["opacity"]}</sys:Double>')
+
+    background = motion.get("background")
+    if background:
+        lines.append("")
+        lines.append("  <!-- Дыхание фона (4.0b-A06). Когда фон замирает, "
+                     "решает оболочка, а не эти числа -->")
+        for name in ("period", "amplitude", "fps"):
+            lines.append(f'  <sys:Double x:Key="Background.{key(name)}">'
+                         f'{background[name]}</sys:Double>')
 
     lines.append("")
     lines.append("  <!-- Штриховка опасного (§6): единственный признак необратимого -->")

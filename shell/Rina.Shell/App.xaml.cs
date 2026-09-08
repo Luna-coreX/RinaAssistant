@@ -86,9 +86,31 @@ public partial class App : Application
     /// earlier edit, while the method it describes had no documentation at
     /// all.
     /// </remarks>
+    /// <summary>The finishes, in the order the button walks them.</summary>
+    /// <remarks>
+    /// One list, so that a fourth finish means one line rather than a hunt
+    /// for the places where a chain of two names was written out.
+    /// </remarks>
+    public static readonly string[] Finishes = ["silver", "black", "graphite"];
+
+    /// <summary>The next finish in the ring.</summary>
+    public static string NextFinish(string current)
+    {
+        var at = Array.IndexOf(Finishes, current);
+        return Finishes[(at < 0 ? 0 : at + 1) % Finishes.Length];
+    }
+
     public static void ApplyFinish(string finish)
     {
-        var name = finish is "black" ? "Black" : "Silver";
+        // The name of the file, from the name of the finish. A switch over
+        // two values turned into a chain the moment a third appeared, and a
+        // chain over what is a list is a way to forget the fourth.
+        var name = finish switch
+        {
+            "black" => "Black",
+            "graphite" => "Graphite",
+            _ => "Silver",
+        };
         var wanted = new Uri($"Generated/Finish.{name}.g.xaml", UriKind.Relative);
 
         var dictionaries = Current.Resources.MergedDictionaries;

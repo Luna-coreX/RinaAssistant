@@ -40,4 +40,11 @@
   <SolidColorBrush x:Key="C.SignalSunk" Color="#cf5c12" />
   <Color x:Key="Color.Hatch">#dedace</Color>
   <SolidColorBrush x:Key="C.Hatch" Color="#dedace" />
+
+  <Color x:Key="Color.Shadow">#000000</Color>
+
+  <LinearGradientBrush x:Key="C.FaceSheen" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Offset="0" Color="#1f1f1c" />
+    <GradientStop Offset="1" Color="#171715" />
+  </LinearGradientBrush>
 </ResourceDictionary>

@@ -445,7 +445,7 @@ public partial class App
         // The shell does not read the finish from a file, it asks the core.
         await Task.Delay(1500);
         Check("отделка получена от ядра",
-              window.FinishValue is "silver" or "black",
+              Array.IndexOf(App.Finishes, window.FinishValue) >= 0,
               $"| {window.FinishValue}");
 
         // The data schema arrives in the handshake and is a real number
@@ -1620,12 +1620,25 @@ public partial class App
               $"| прозрачность {midway:0.00}");
         Check("и ещё не доехала", rise > 0.05, $"| осталось {rise:0.00} точек");
 
+        // Depth settles together with the rise (4.0b-A06). Halfway through
+        // the shadow is visible: contents arriving from above carry one
+        // while they travel.
+        var deep = window.PaneShadow;
+        Check("на середине перехода тень видна", deep > 0.02,
+              $"| плотность {deep:0.00}");
+
         await Task.Delay(400);
         var later = window.PaneOpacity;
         Check("через 400 мс панель на месте", later > 0.99,
               $"| прозрачность {later:0.00}");
         Check("и доехала", Math.Abs(window.PaneRise) < 0.01,
               $"| смещение {window.PaneRise:0.00}");
+        // And this is the amendment to §5 read back from the running
+        // window: a shadow is allowed as movement, and in a still frame
+        // there is none. A resting shadow would be a card on a shadow —
+        // the very thing the amendment refused to permit.
+        Check("а в покое тени нет вовсе", window.PaneShadow < 0.01,
+              $"| плотность {window.PaneShadow:0.00}");
 
         // The second transition is a separate check, and not for
         // completeness. The animation finishes with `HoldEnd`, that is, it
@@ -1646,6 +1659,74 @@ public partial class App
         var third = window.PaneOpacity;
         Check("и третий", third is > 0.01 and < 0.95,
               $"| прозрачность {third:0.00}");
+
+        // --- the living background, and above all its stopping ---
+        //
+        // This is the half of 4.0b-A06 that cannot be seen in a screenshot.
+        // "The background freezes when nobody is looking" is a promise
+        // about time, and the only way to check it is across time: the
+        // phase advances while the window is being looked at and stands
+        // still while it is not.
+        Console.WriteLine();
+        Console.WriteLine("=== движение: живой фон и его остановка ===");
+
+        if (Backdrop.WantsStillness)
+        {
+            // The system was asked for less movement, and we obey. There is
+            // nothing to measure then, and saying so out loud is more
+            // honest than a green line about a background that is standing
+            // still by request.
+            Check("система просит покоя — фон стоит", !window.BackdropRunning,
+                  "| ClientAreaAnimation выключен");
+        }
+        else
+        {
+            window.Activate();
+            await Task.Delay(300);
+            Check("окно перед человеком — фон живёт", window.BackdropRunning);
+
+            var before = window.BackdropPhase;
+            await Task.Delay(500);
+            var after = window.BackdropPhase;
+            Check("и он действительно движется", Math.Abs(after - before) > 1e-6,
+                  $"| фаза {before:0.0000} -> {after:0.0000}");
+
+            window.Hide();
+            await Task.Delay(300);
+            Check("окно скрыто — фон замер", !window.BackdropRunning);
+
+            var stopped = window.BackdropPhase;
+            await Task.Delay(500);
+            Check("и фаза стоит на месте",
+                  Math.Abs(window.BackdropPhase - stopped) < 1e-9,
+                  $"| фаза {stopped:0.0000} -> {window.BackdropPhase:0.0000}");
+
+            window.Show();
+            window.Activate();
+            await Task.Delay(300);
+            Check("вернулись — фон снова живёт", window.BackdropRunning);
+
+            // And the branch this machine is not in. Whether reduced
+            // motion is obeyed depends on the developer's own Windows
+            // setting, and on a machine with animations on it is never
+            // reached: breaking the obedience deliberately left the check
+            // green. So it is asked directly.
+            Backdrop.Stillness = true;
+            window.Activate();
+            await Task.Delay(300);
+            Check("система просит покоя — фон стоит", !window.BackdropRunning);
+
+            var still = window.BackdropPhase;
+            await Task.Delay(400);
+            Check("и стоит по-настоящему",
+                  Math.Abs(window.BackdropPhase - still) < 1e-9,
+                  $"| фаза {still:0.0000} -> {window.BackdropPhase:0.0000}");
+
+            Backdrop.Stillness = null;
+            window.Activate();
+            await Task.Delay(300);
+            Check("покой отменили — фон вернулся", window.BackdropRunning);
+        }
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");

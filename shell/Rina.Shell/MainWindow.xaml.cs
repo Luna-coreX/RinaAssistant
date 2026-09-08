@@ -52,6 +52,17 @@ public partial class MainWindow : Window
         InitializeComponent();
         Pane.RenderTransform = _paneRise;
 
+        // The living background (4.0b-A06). It follows whether there is
+        // anybody to look: hidden, minimised or behind another window means
+        // nobody, and then it stops. See Backdrop for why that is the task
+        // rather than an optimisation.
+        _backdrop = new Backdrop(Backdrop);
+        IsVisibleChanged += (_, _) => FollowBackdrop();
+        StateChanged += (_, _) => FollowBackdrop();
+        Activated += (_, _) => FollowBackdrop();
+        Deactivated += (_, _) => FollowBackdrop();
+        Loaded += (_, _) => FollowBackdrop();
+
         // Pages are created lazily and are handed a link, not the window:
         // a section that reaches up to its parent is the first step towards
         // the god object that block B was started to get rid of.
@@ -165,6 +176,29 @@ public partial class MainWindow : Window
                 EasingFunction = ease,
             });
 
+        // And the shadow settles with it (4.0b-A06). Contents arriving from
+        // above carry their shadow while they travel; when they have come
+        // to rest it is gone. Without this the rise reads as a picture
+        // sliding rather than as a layer settling — opacity and offset
+        // alone say "something appeared", not "something came to rest".
+        //
+        // **It goes to nothing, not to a resting shadow**, and that is the
+        // exact wording of the amendment to §5 of the design system: a
+        // shadow is allowed as movement, and in a still frame there is
+        // none. Letting it settle at the "raised" level would have been a
+        // card on a shadow — the thing the amendment does not permit — and
+        // the code would have quietly said something other than the
+        // document.
+        Pane.Effect = _paneLift;
+        _paneLift.Color = (System.Windows.Media.Color)FindResource("Color.Shadow");
+        Lift(System.Windows.Media.Effects.DropShadowEffect.BlurRadiusProperty,
+             (double)FindResource("Lift.Floating.Blur"),
+             (double)FindResource("Lift.Raised.Blur"), span, ease);
+        Lift(System.Windows.Media.Effects.DropShadowEffect.ShadowDepthProperty,
+             (double)FindResource("Lift.Floating.Y"), 0, span, ease);
+        Lift(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
+             (double)FindResource("Lift.Floating.Opacity"), 0, span, ease);
+
         foreach (var child in Sections.Children.OfType<RadioButton>())
             if ((string?)child.Tag == section && child.IsChecked != true)
                 child.IsChecked = true;
@@ -173,8 +207,63 @@ public partial class MainWindow : Window
     /// <summary>The shift by which a section's contents "arrive".</summary>
     private readonly System.Windows.Media.TranslateTransform _paneRise = new();
 
+    /// <summary>The living background, and its clock (<c>4.0b-A06</c>).</summary>
+    private readonly Backdrop _backdrop;
+
+    /// <summary>The shadow under the section's contents.</summary>
+    /// <remarks>
+    /// Held in a field because it is animated: a section that has just
+    /// arrived settles onto the panel, and the depth of its shadow is what
+    /// says so. Reaching for the effect through the visual tree on every
+    /// transition would work and would be a way to lose it after the first
+    /// change to the markup.
+    /// </remarks>
+    private readonly System.Windows.Media.Effects.DropShadowEffect _paneLift =
+        new() { Direction = 270, ShadowDepth = 0, BlurRadius = 0, Opacity = 0 };
+
+    /// <summary>Is the background moving right now — for the check.</summary>
+    public bool BackdropRunning => _backdrop.Running;
+
+    /// <summary>How far along its period the background is — for the check.</summary>
+    public double BackdropPhase => _backdrop.Phase;
+
+    /// <summary>
+    /// Let the background run only while there is somebody to look.
+    /// </summary>
+    /// <remarks>
+    /// Being active is part of it, not only being visible: a window left
+    /// open behind a browser is on screen and is not being looked at, and
+    /// that is the commonest case of all — usage mode number one is "in the
+    /// background while working".
+    /// </remarks>
+    private void FollowBackdrop() =>
+        _backdrop.Follow(IsVisible && WindowState != WindowState.Minimized
+                         && IsActive);
+
+    /// <summary>One property of the settling shadow.</summary>
+    private void Lift(DependencyProperty property, double from, double to,
+                      Duration span,
+                      System.Windows.Media.Animation.IEasingFunction ease) =>
+        _paneLift.BeginAnimation(property,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = from,
+                To = to,
+                Duration = span,
+                EasingFunction = ease,
+            });
+
     /// <summary>The section panel's opacity — for the motion check.</summary>
     public double PaneOpacity => Pane.Opacity;
+
+    /// <summary>How visible the section's shadow is — for the motion check.</summary>
+    /// <remarks>
+    /// Opacity rather than blur: the blur is what the shadow is made of,
+    /// the opacity is whether there is one at all. The check has to be able
+    /// to say "in a still frame there is no shadow", and only this answers
+    /// that.
+    /// </remarks>
+    public double PaneShadow => _paneLift.Opacity;
 
     /// <summary>How far the contents still have to travel — for the check.</summary>
     public double PaneRise => _paneRise.Y;
@@ -437,9 +526,11 @@ public partial class MainWindow : Window
 
     private async void OnSwitchFinish(object sender, RoutedEventArgs e)
     {
-        // The two finishes are equal (4.0-R08), so a toggle rather than a
-        // list: there is nothing to choose from but between them.
-        _finish = _finish == "black" ? "silver" : "black";
+        // The finishes are equal (4.0-R08), so the button walks the ring
+        // rather than choosing from a list: there is no main one to return
+        // to. With two it was a toggle; a third arrived with 4.0b-A06, and
+        // a toggle over three would have quietly hidden one of them.
+        _finish = App.NextFinish(_finish);
         if (Link is not null) await Link.SetFinishAsync(_finish);
         else App.ApplyFinish(_finish);
     }

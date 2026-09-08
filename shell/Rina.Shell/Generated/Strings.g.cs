@@ -1410,10 +1410,10 @@ public static partial class Loc
                 {
                     ["English"] = "now",
                 },
-            ["Серебро или чёрное"] =
+            ["Серебро, чёрное или графит"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Silver or black",
+                    ["English"] = "Silver, black or graphite",
                 },
             ["Система синтеза"] =
                 new Dictionary<string, string>

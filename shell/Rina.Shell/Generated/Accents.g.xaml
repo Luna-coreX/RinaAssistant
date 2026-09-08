@@ -49,4 +49,18 @@
   <Color x:Key="Accent.black.orchid.Signal">#b48ead</Color>
   <Color x:Key="Accent.black.orchid.SignalSunk">#997593</Color>
 
+  <!-- graphite -->
+  <Color x:Key="Accent.graphite.amber.Signal">#f2731c</Color>
+  <Color x:Key="Accent.graphite.amber.SignalSunk">#cf5c12</Color>
+  <Color x:Key="Accent.graphite.ember.Signal">#e65f53</Color>
+  <Color x:Key="Accent.graphite.ember.SignalSunk">#c44a40</Color>
+  <Color x:Key="Accent.graphite.brass.Signal">#d99b2b</Color>
+  <Color x:Key="Accent.graphite.brass.SignalSunk">#b8801f</Color>
+  <Color x:Key="Accent.graphite.moss.Signal">#7bab52</Color>
+  <Color x:Key="Accent.graphite.moss.SignalSunk">#658f42</Color>
+  <Color x:Key="Accent.graphite.steel.Signal">#5fa8d3</Color>
+  <Color x:Key="Accent.graphite.steel.SignalSunk">#4a8cb5</Color>
+  <Color x:Key="Accent.graphite.orchid.Signal">#b48ead</Color>
+  <Color x:Key="Accent.graphite.orchid.SignalSunk">#997593</Color>
+
 </ResourceDictionary>

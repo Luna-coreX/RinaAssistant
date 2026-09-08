@@ -36,11 +36,25 @@
       </StackPanel>
     </Grid>
 
-    <Grid Grid.Row="1">
+    <Grid Grid.Row="1" ClipToBounds="True">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="{StaticResource Col.LegendColumn}" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
+
+      <!--
+        The living background (4.0b-A06). It lies under everything in the
+        working area and is deliberately larger than it: the sheen drifts,
+        and a panel exactly the size of its place would show its own edge
+        at the far end of the travel.
+
+        The clipping is on the containing grid, so the drift never reaches
+        the section column or the level strip.
+      -->
+      <Rectangle x:Name="Backdrop" Grid.ColumnSpan="2"
+                 Margin="-120" IsHitTestVisible="False"
+                 RenderTransformOrigin="0.5,0.5"
+                 Fill="{DynamicResource C.FaceSheen}" />
 
       <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
       <Grid Grid.Column="0" Background="{DynamicResource C.FaceLow}">
@@ -66,7 +80,7 @@
             <TextBlock x:Name="FinishSwitch" Style="{StaticResource Text.Meta}"
                        Text="{loc:S 'вид'}" Cursor="Hand"
                        MouseLeftButtonUp="OnSwitchFinish"
-                       ToolTip="{loc:S 'Серебро или чёрное'}" />
+                       ToolTip="{loc:S 'Серебро, чёрное или графит'}" />
             <TextBlock Style="{StaticResource Text.Meta}" Text=" · " />
             <TextBlock Style="{StaticResource Text.Meta}" Cursor="Hand"
                        Text="{loc:S 'о программе'}"

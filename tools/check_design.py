@@ -169,11 +169,44 @@ check("опасность обозначена штриховкой",
 check("у ошибки и опасности разные средства",
       tokens["states"]["error"].get("hatch") is not True)
 
-# no shadows and no blurs
-check("в токенах нет теней и размытий",
-      not any(k in tokens for k in ("shadow", "blur", "elevation")))
+# Shadows: named, few, and only what motion needs (the 4.0b-A06 amendment).
+#
+# The rule used to be "no shadows in the tokens at all", and until 4.0b-A06
+# that was the whole of it. The amendment is narrow: a shadow is allowed as
+# **movement** — a layer arriving carries one — and under what genuinely
+# floats above the window. In a still frame there is still no shadow.
+#
+# So the check changed its subject rather than went away. Forbidding the
+# token would forbid the decision; what has to be forbidden is the cliché,
+# and the cliché has a shape: many levels, and a blur wide enough to be a
+# separator rather than a hint of travel.
+check("размытия как отдельного средства нет", "blur" not in tokens)
+
+lift = tokens.get("elevation") or {}
+levels = lift.get("level") or {}
+check("уровни возвышения названы поимённо", bool(levels), f"| {sorted(levels)}")
+
+# Three and no more. A fourth level is not distinguishable by a person, and
+# an indistinguishable level is decoration — which is what §5 forbids.
+check("уровней не больше трёх", len(levels) <= 3, f"| {len(levels)}")
+
+widest = max((spec.get("blur", 0) for spec in levels.values()), default=0)
+check("тень не шире 32 — иначе она разделитель, а не признак движения",
+      widest <= 32, f"| {widest}")
+
+# Every finish has to say what its shadow is painted with. A shadow without
+# a colour of its own would be painted with black on silver too, and that is
+# how the cliché starts.
+missing = [name for name, finish in tokens["finishes"].items()
+           if not finish.get("shadow")]
+check("у каждой отделки свой цвет тени", not missing, f"| {missing}")
+
 if mockups:
-    bad = [w for w in ("box-shadow", "text-shadow", "filter: blur", "backdrop-filter")
+    # The mock-up is a still frame, and a still frame has no motion in it.
+    # So here the old rule holds in full: what is seen in a screenshot is
+    # exactly what the amendment did not permit.
+    bad = [w for w in ("box-shadow", "text-shadow", "filter: blur",
+                       "backdrop-filter")
            if w in mockups]
     check("в макете нет теней и размытий", not bad, f"| {bad}")
 
@@ -183,6 +216,24 @@ if mockups:
     # the hatching's repeating-linear-gradient is counted separately
     plain = len(gradients) - mockups.count("repeating-linear-gradient")
     check("градиент ровно один (полоса уровня)", plain == 1, f"| {plain}")
+
+# The sheen is light on the panel, not a second gradient in the system: the
+# level strip stays the only place where a gradient is seen as a gradient.
+# The measure of that is exactly this — a few per cent. Anything further
+# apart is a colour ramp, and that is what `4.0-R02` rejected by name.
+def _value(hex_color):
+    h = hex_color.lstrip("#")
+    return sum(int(h[i:i + 2], 16) for i in (0, 2, 4)) / 3
+
+
+for name, finish in tokens["finishes"].items():
+    sheen = finish.get("sheen")
+    if not sheen:
+        check(f"[{name}] налёт задан", False)
+        continue
+    spread = abs(_value(sheen["top"]) - _value(sheen["bottom"])) / 255
+    check(f"[{name}] налёт — свет, а не переход цвета", spread <= 0.05,
+          f"| {spread * 100:.1f}% (не больше 5)")
 
 # tabular figures
 check("цифры моноширинные",
@@ -227,14 +278,30 @@ check("опасное отделено пустотой",
       f"| {tokens['space']['danger']} против {tokens['space']['between']}")
 
 print()
-print("=== R08: две отделки равноправны ===")
-silver = set(tokens["finishes"]["silver"]["color"])
-black = set(tokens["finishes"]["black"]["color"])
-check("набор ролей совпадает", silver == black,
-      f"| только в одной: {silver ^ black}")
-check("стекло в обеих отделках тёмное",
-      tokens["finishes"]["silver"]["color"]["GLASS"].lower() < "#404040"
-      and tokens["finishes"]["black"]["color"]["GLASS"].lower() < "#404040")
+# The finishes are equal (`4.0-R08`), and "equal" is a checkable statement:
+# the same set of roles, and glass that is dark in every one of them.
+#
+# It used to name `silver` and `black` by hand. That held while there were
+# two of them and stopped holding the moment `graphite` arrived in
+# `4.0b-A06`: the third finish would have gone unchecked, and unchecked in
+# silence, because a check that names two names cannot notice a third.
+print(f"=== R08: отделок {len(tokens['finishes'])}, и они равноправны ===")
+
+roles = {name: set(finish["color"])
+         for name, finish in tokens["finishes"].items()}
+first = next(iter(roles))
+for name, keys in roles.items():
+    if name == first:
+        continue
+    check(f"[{name}] набор ролей тот же, что у «{first}»", keys == roles[first],
+          f"| только в одной: {keys ^ roles[first]}")
+
+for name, finish in tokens["finishes"].items():
+    # Glass is where Rina's voice appears, and it is dark in every finish:
+    # "silver" is a finish of the panel, not of the screen.
+    glass = finish["color"]["GLASS"].lstrip("#")
+    value = sum(int(glass[i:i + 2], 16) for i in (0, 2, 4)) / 3
+    check(f"[{name}] стекло тёмное", value < 0x40, f"| {value:.0f} из 255")
 
 print()
 print("ИТОГО ошибок:", fails)

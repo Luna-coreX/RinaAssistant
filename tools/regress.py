@@ -42,6 +42,7 @@ To run:
     python tools/regress.py --list        only show what would be run
 """
 import io
+import json
 import os
 import re
 import shutil
@@ -107,9 +108,21 @@ BY_HAND = {
 
 #: The finishes, each with its own screenshot.
 #:
-#: The two are equals (`4.0-R08`), and checking one would mean checking
-#: half: their values differ, and they can drift apart independently.
-FINISHES = ("silver", "black")
+#: They are equals (`4.0-R08`), and checking one would mean checking a
+#: fraction: their values differ, and they can drift apart independently.
+#:
+#: Read from the tokens rather than written out here. A hand-written tuple
+#: is exactly what the header of this file warns about, and it caught up
+#: with us: `graphite` arrived in `4.0b-A06` and would have been left
+#: unchecked — silently, because a list that is short is not a list that is
+#: wrong.
+def _finishes() -> tuple[str, ...]:
+    with open(os.path.join(ROOT, "docs", "design", "tokens.json"),
+              encoding="utf-8") as handle:
+        return tuple(json.load(handle)["finishes"])
+
+
+FINISHES = _finishes()
 
 #: The shell modes that touch the machine or the person.
 #:
