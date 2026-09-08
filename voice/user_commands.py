@@ -127,8 +127,42 @@ class UserCommandStore:
         return list(self._settings.get("custom_commands", []) or [])
 
     def save_all(self, commands):
-        self._settings.set("custom_commands", commands)
-        self._settings.save()
+        """
+        Записать список целиком.
+
+        Под транзакцией, как и всё остальное здесь: соседние методы её
+        открывают, а этот — не открывал. Замок повторно входимый, поэтому
+        вложенный вызов изнутри чужой транзакции работает как прежде.
+
+        **Одного этого мало, и стоит сказать почему.** Замок здесь делает
+        неделимой запись, но не «прочитать — изменить — записать»: два
+        потока, прочитавшие один и тот же список, допишут каждый своё и
+        второй затрёт первого целиком. Для этого есть `merge`.
+        """
+        with self._settings.transaction():
+            self._settings.set("custom_commands", commands)
+            self._settings.save()
+
+    def merge(self, incoming, new_id):
+        """
+        Добавить пришедшие команды к своим. Возвращает (добавлено, пропущено).
+
+        Чтение, сведение и запись — под одной транзакцией. Врозь они
+        теряют чужую правку целиком: ввоз из файла и ответ Рины идут
+        разными потоками, оба читают список, оба дописывают своё, и
+        сохраняет тот, кто успел вторым.
+
+        Сведение живёт здесь, а не у вызывающего, именно поэтому: границы
+        транзакции должны совпадать с границами «прочитать — изменить —
+        записать», а вызывающий об этом помнить не обязан.
+        """
+        from core.data_transfer import merge_commands
+
+        with self._settings.transaction():
+            merged, added, skipped = merge_commands(
+                self.all(), incoming, new_id)
+            self.save_all(merged)
+        return added, skipped
 
     def add(self, command):
         with self._settings.transaction():

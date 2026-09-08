@@ -729,11 +729,11 @@ class ProtocolServer:
         except data_transfer.TransferError as problem:
             raise fault(problem.code, str(problem))
 
-        store = self._commands()
-        merged, added, skipped = data_transfer.merge_commands(
-            [dict(c) for c in store.all()], incoming,
-            lambda: "cmd_" + secrets.token_hex(3))
-        store.save_all(merged)
+        # Сведение и запись — одним вызовом: границы транзакции обязаны
+        # совпадать с границами «прочитать — изменить — записать», а здесь
+        # об этом помнить не надо.
+        added, skipped = self._commands().merge(
+            incoming, lambda: "cmd_" + secrets.token_hex(3))
         return {"added": added, "skipped": skipped}
 
     # -- the conversation's history ------------------------------------------------

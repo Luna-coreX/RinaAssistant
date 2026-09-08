@@ -78,6 +78,7 @@ SECURITY_ITEMS = {
     "4.0-H07": "плагин в отдельном процессе",
     "4.0-I03": "диагностический пакет",
     "4.0-U04": "скачивание и целостность",
+    "4.0b-C02a": "разбор ввозимого файла команд",
 }
 
 text = io.open(MODEL, encoding="utf-8").read()
@@ -129,7 +130,11 @@ print("=== названная защита существует ===")
 named_items, named_files, named_modes = set(), set(), set()
 for threat in threats.values():
     for token in re.findall(r"`([^`]+)`", threat["why"]):
-        if re.fullmatch(r"4\.0-[A-Z]\d+[a-z]?", token):
+        # `4.0b-` тоже: защита, дописанная в бете, — такое же требование
+        # безопасности, как и любое другое, и возводиться к модели обязана
+        # наравне. Без этой буквы пункт молча выпадал бы из сверки в обе
+        # стороны, то есть выглядел бы связанным, не будучи связанным.
+        if re.fullmatch(r"4\.0b?-[A-Z]\d+[a-z]?", token):
             named_items.add(token)
         elif token.startswith("--check-"):
             named_modes.add(token)

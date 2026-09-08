@@ -216,8 +216,16 @@ class ReminderStore:
         return [r for r in self.all() if not r.get("done")]
 
     def save_all(self, items):
-        self._settings.set("reminders", items)
-        self._settings.save()
+        """
+        Записать список целиком — под транзакцией.
+
+        Сюда приходят и планировщик, помечающий сработавшее, и человек,
+        заводящий новое: два потока, одна запись. То же правило, что у
+        своих команд.
+        """
+        with self._settings.transaction():
+            self._settings.set("reminders", items)
+            self._settings.save()
 
     MAX_FUTURE = 10 * 365 * 24 * 3600      # beyond ten years is knowingly a mistake
 
