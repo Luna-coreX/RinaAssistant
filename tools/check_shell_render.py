@@ -88,6 +88,13 @@ def brightness(pixel) -> float:
     return sum(pixel[:3]) / 3
 
 
+def nebula_ramp(finish_name):
+    """The stops of the living background's ramp, for this finish."""
+    with open(TOKENS, encoding="utf-8") as handle:
+        tokens = json.load(handle)
+    return tokens["finishes"][finish_name]["nebula"]["ramp"]
+
+
 def check_confirm(image, colors, tokens) -> int:
     """
     The confirmation window (4.0-F11): danger by hatching, not by colour.
@@ -186,35 +193,34 @@ def main(argv) -> int:
     pane_margin = column + tokens["space"]["between"] / 2
     pane = average(image, pane_margin, height * 0.5)
 
-    # The panel is no longer flat `FACE`: patches of light drift under it
-    # (`4.0b-A06`). So what is asserted has changed, and not by widening the
-    # tolerance — a tolerance wide enough to swallow a patch would also
-    # swallow the difference between `FACE` and `FACE_LOW`, which is seven
-    # values, and the check would stop being able to tell the panel from the
-    # column.
+    # The panel is no longer a flat surface at all: a computed flow runs
+    # under it (`4.0b-A06`). So the assertion changed its subject rather
+    # than its tolerance — a tolerance wide enough to swallow the flow would
+    # also swallow the difference between `FACE` and `FACE_LOW`, and the
+    # check would stop being able to tell the panel from the column.
     #
-    # Asserted instead are the two things that stay true under any patch.
-    #
-    # First: the panel is still the face, lit. The band is the one the
-    # design system fixes for a patch — 8% of the range — and it is read
-    # from the tokens rather than typed here, so loosening the rule in the
-    # system loosens it in exactly one place.
-    band = 0.08 * 255
-    drift = max(abs(x - y) for x, y in zip(pane, colors["FACE"]))
-    check("панель раздела — освещённый FACE", drift <= band,
-          f"| {pane} против {colors['FACE']}, разница {drift:.0f} "
-          f"(не больше {band:.0f})")
+    # What is asserted is that the colour on the panel is a colour the
+    # flow's own ramp can produce. That catches the thing worth catching —
+    # the shell painting something the tokens never named — and it says
+    # nothing about which point of the ramp happened to be there, which is
+    # a matter of the phase and not of correctness.
+    ramp = [tuple(int(stop.lstrip("#")[i:i + 2], 16) for i in (0, 2, 4))
+            for stop in nebula_ramp(finish_name)]
+    off = min(max(abs(x - y) for x, y in zip(pane, stop)) for stop in ramp)
+    check("панель раздела — цвет из палитры течения", off <= 12,
+          f"| {tuple(round(v) for v in pane)}, ближайшая ступень "
+          f"расходится на {off:.0f} (не больше 12)")
 
-    # Second, and this is what the original assertion was really for: the
-    # panel is raised above the column by a step of value. That is the
-    # system's only means of elevation, and no patch of light can turn it
-    # round — a background that made the panel darker than the column would
-    # be a background that had eaten the composition.
+    # And the areas are still separated. The system's means is a step of
+    # value plus a hairline seam; under a flow the direction of the step is
+    # no longer fixed — the flow can be darker or lighter than the column at
+    # any moment — but the **discontinuity** at the boundary stays, and that
+    # is what "separated" actually means.
     column_pixel = average(image, inside, height * 0.55)
-    check("панель светлее колонки — ступень значения на месте",
-          brightness(pane) > brightness(column_pixel),
+    gap = abs(brightness(pane) - brightness(column_pixel))
+    check("колонка и панель разделены — разрыв на границе", gap >= 4,
           f"| панель {brightness(pane):.0f}, колонка "
-          f"{brightness(column_pixel):.0f}")
+          f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
     check("полоса заголовка — FACE_LOW",
           near(at(width * 0.5, size["row"] / 2), colors["FACE_LOW"]),
           f"| {at(width * 0.5, size['row'] / 2)}")

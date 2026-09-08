@@ -1691,6 +1691,18 @@ public partial class App
             Check("и он действительно движется", Math.Abs(after - before) > 1e-6,
                   $"| фаза {before:0.0000} -> {after:0.0000}");
 
+            // What a frame costs, measured rather than assumed. The whole
+            // argument for stopping the background when nobody looks is
+            // that frames cost a person something; a cost that was never
+            // measured makes that argument on trust. The ceiling is a third
+            // of the interval — beyond that the flow starts eating the
+            // frame it was supposed to fit inside.
+            var frame = window.BackdropFrameMs;
+            var budget = 1000.0 / (double)Application.Current
+                .FindResource("Background.Fps") / 3;
+            Check("и стоит не дороже обещанного", frame <= budget,
+                  $"| {frame:0.0} мс на кадр, потолок {budget:0.0}");
+
             window.Hide();
             await Task.Delay(300);
             Check("окно скрыто — фон замер", !window.BackdropRunning);

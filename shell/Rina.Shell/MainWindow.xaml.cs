@@ -227,6 +227,9 @@ public partial class MainWindow : Window
     /// <summary>How far along its period the background is — for the check.</summary>
     public double BackdropPhase => _backdrop.Phase;
 
+    /// <summary>What one frame of the background costs — for the check.</summary>
+    public double BackdropFrameMs => _backdrop.LastFrameMs;
+
     /// <summary>
     /// Let the background run only while there is somebody to look.
     /// </summary>

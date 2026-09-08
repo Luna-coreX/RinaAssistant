@@ -43,11 +43,12 @@
 
   <Color x:Key="Color.Shadow">#4a463f</Color>
 
-  <Color x:Key="Color.Nebula0">#e2e7e9</Color>
-  <Color x:Key="Color.Nebula1">#e9e2e7</Color>
-  <Color x:Key="Color.Nebula2">#e1e8e2</Color>
-  <Color x:Key="Color.Nebula3">#eae5df</Color>
-  <sys:Int32 x:Key="Nebula.Count">4</sys:Int32>
-  <sys:Double x:Key="Nebula.Opacity">0.55</sys:Double>
-  <sys:Double x:Key="Nebula.Spread">1.15</sys:Double>
+  <Color x:Key="Color.Nebula0">#d6d4ce</Color>
+  <Color x:Key="Color.Nebula1">#dedcd6</Color>
+  <Color x:Key="Color.Nebula2">#e6e4df</Color>
+  <Color x:Key="Color.Nebula3">#eeece7</Color>
+  <Color x:Key="Color.Nebula4">#f5f3ef</Color>
+  <sys:Double x:Key="Nebula.Steps">5</sys:Double>
+  <sys:Double x:Key="Nebula.Scale">3.2</sys:Double>
+  <sys:Double x:Key="Nebula.Warp">1.1</sys:Double>
 </ResourceDictionary>

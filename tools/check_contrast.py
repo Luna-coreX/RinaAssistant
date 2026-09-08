@@ -82,8 +82,13 @@ def check_nebula(tokens, report):
     ink against `FACE` alone would be checking the panel the patches are
     not on.
 
-    The soft ones are checked too, at the same 4.5: a legend that a patch
+    The soft ones are checked too, at the same 4.5: a legend the flow
     swallows is a legend that was there for nothing.
+
+    This is the limit that shapes the whole look. On a dark finish the
+    ceiling is low, so the flow cannot show itself by getting brighter and
+    shows itself in hue instead — which is why the nebula is deep and
+    coloured rather than pale.
     """
     failures = 0
     for key, finish in tokens["finishes"].items():
@@ -92,12 +97,12 @@ def check_nebula(tokens, report):
             report(f"{key}: живой фон задан", False, "—")
             failures += 1
             continue
-        for at, tint in enumerate(nebula["tint"]):
+        for at, stop in enumerate(nebula["ramp"]):
             for ink in ("INK", "INK_SOFT"):
-                value = contrast(finish["color"][ink], tint)
+                value = contrast(finish["color"][ink], stop)
                 ok = value >= 4.5
                 failures += 0 if ok else 1
-                report(f"{key}: {ink.lower()} поверх пятна {at}", ok,
+                report(f"{key}: {ink.lower()} поверх ступени {at}", ok,
                        f"{value:.2f} (нужно 4.5)")
     return failures
 

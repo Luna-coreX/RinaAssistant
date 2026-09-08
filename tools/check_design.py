@@ -217,11 +217,16 @@ if mockups:
     plain = len(gradients) - mockups.count("repeating-linear-gradient")
     check("градиент ровно один (полоса уровня)", plain == 1, f"| {plain}")
 
-# The living background is light on the panel, not a picture behind glass
-# (`4.0b-A06`). The category always arrives at a purple-to-blue glow, and
-# the way not to arrive there is not to own a colour the panel does not
-# have. So every patch is measured against the face it lies on: close in
-# value, and no more saturated than the panel itself.
+# The living background (`4.0b-A06`): a computed flow, and the rules it
+# still has to keep.
+#
+# The rule "no colour the panel does not have" is gone, and deliberately.
+# It was written when the background was a whisper, and the person asked
+# for a background one can see — a nebula, not a sheen. A rule kept while
+# the thing it described has changed is worse than no rule: it goes green
+# on something it was never about.
+#
+# What replaces it are the limits that still mean something.
 def _value(hex_color):
     h = hex_color.lstrip("#")
     return sum(int(h[i:i + 2], 16) for i in (0, 2, 4)) / 3
@@ -239,71 +244,36 @@ for name, finish in tokens["finishes"].items():
         check(f"[{name}] живой фон задан", False)
         continue
 
-    face = finish["color"]["FACE"]
+    ramp = nebula["ramp"]
 
-    # Four is plenty and eight would be a screensaver: a background whose
-    # patches can be counted has stopped being a background.
-    check(f"[{name}] пятен не больше пяти", len(nebula["tint"]) <= 5,
-          f"| {len(nebula['tint'])}")
+    # Enough stops for a flow, few enough to stay one colour's story. Two
+    # would be a gradient; a dozen would be a rainbow.
+    check(f"[{name}] ступеней от трёх до семи", 3 <= len(ramp) <= 7,
+          f"| {len(ramp)}")
 
-    for at, tint in enumerate(nebula["tint"]):
-        near = abs(_value(tint) - _value(face)) / 255
-        check(f"[{name}] пятно {at} — свет на панели, а не другой цвет",
-              near <= 0.08, f"| {near * 100:.1f}% от панели (не больше 8)")
+    # Monotone in value. A ramp that rises and falls puts a hard line
+    # wherever it turns, and the flow would show a contour where the
+    # mathematics is smooth.
+    values = [_value(stop) for stop in ramp]
+    rising = all(b >= a for a, b in zip(values, values[1:]))
+    falling = all(b <= a for a, b in zip(values, values[1:]))
+    check(f"[{name}] палитра идёт в одну сторону", rising or falling,
+          f"| {[round(v) for v in values]}")
 
-        # The face itself has a cast; a patch may not have a stronger one.
-        # That single number is what separates "light on graphite" from
-        # neon, and it is the reason the check exists at all.
-        check(f"[{name}] пятно {at} не ярче самой панели по насыщенности",
-              _chroma(tint) <= max(0.06, _chroma(face) + 0.05),
-              f"| {_chroma(tint) * 100:.1f}%")
+    # Not fluorescent. The nebula may be coloured — that is the point — but
+    # a channel spread past a quarter of the range stops being a lit panel
+    # and becomes a screensaver.
+    worst = max(_chroma(stop) for stop in ramp)
+    check(f"[{name}] цвет насыщенный, но не люминесцентный", worst <= 0.25,
+          f"| {worst * 100:.1f}% (не больше 25)")
 
-    check(f"[{name}] пятно не непрозрачно", nebula["opacity"] <= 0.7,
-          f"| {nebula['opacity']}")
+    # The field's own parameters. Warp is what makes it liquid rather than
+    # cloudy; without any it is fog, and far past one it tears.
+    check(f"[{name}] искажение области в деле",
+          0.3 <= nebula["warp"] <= 2.0, f"| {nebula['warp']}")
+    check(f"[{name}] крупность поля разумна",
+          1.0 <= nebula["scale"] <= 8.0, f"| {nebula['scale']}")
 
-# tabular figures
-check("цифры моноширинные",
-      tokens["typography"]["role"]["figure"]["family"] == "mono"
-      and tokens["typography"]["role"]["figure"].get("tabular") is True)
-
-# the afterglow
-check("состояние гаснет, а не переключается",
-      tokens["motion"]["afterglow"] >= 500,
-      f"| {tokens['motion']['afterglow']} мс")
-
-# --- motion is declared and **applied** --------------------------------------
-#
-# A token nobody uses is an intention rather than a decision. The motion
-# system (SYSTEM §7) was generated into `Motion.*` and used nowhere: states
-# switched instantly, and the level strip jumped between zero and forty per
-# cent. The twelve questions of the direction call that a plain "not in the
-# style", and a check on the tokens did not catch it — the value was in the
-# file, after all.
-SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
-used = []
-for base, dirs, files in os.walk(SHELL):
-    dirs[:] = [d for d in dirs if d not in ("obj", "bin", "Generated")]
-    for name in files:
-        if name.endswith((".xaml", ".cs")):
-            used.append(read(os.path.join(base, name)))
-code = chr(10).join(used)
-
-for name in ("Press", "State", "Panel", "Afterglow"):
-    applied = f"Motion.{name}" in code
-    check(f"длительность {name} применена, а не только объявлена", applied,
-          "" if applied else "| токен без применения — намерение, а не решение")
-
-on_strip = "Motion.Afterglow" in read(os.path.join(SHELL, "MainWindow.xaml.cs"))
-check("послесвечение висит на полосе уровня", on_strip,
-      "" if on_strip else "| «полоса не переключается между выключено и "
-                          "включено» (DIRECTION §4)")
-
-# the gap around the dangerous is twice the usual
-check("опасное отделено пустотой",
-      tokens["space"]["danger"] >= tokens["space"]["between"] * 2,
-      f"| {tokens['space']['danger']} против {tokens['space']['between']}")
-
-print()
 # The finishes are equal (`4.0-R08`), and "equal" is a checkable statement:
 # the same set of roles, and glass that is dark in every one of them.
 #

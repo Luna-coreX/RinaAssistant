@@ -51,8 +51,8 @@
         The clipping is on the containing grid, so a patch never reaches
         the section column or the level strip.
       -->
-      <Canvas x:Name="Backdrop" Grid.ColumnSpan="2"
-              IsHitTestVisible="False" ClipToBounds="True" />
+      <Image x:Name="Backdrop" Grid.ColumnSpan="2" Stretch="Fill"
+             IsHitTestVisible="False" />
 
       <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
       <Grid Grid.Column="0" Background="{DynamicResource C.FaceLow}">

@@ -2,97 +2,87 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 using System.Windows.Threading;
 
 namespace Rina.Shell;
 
 /// <summary>
-/// The living background: patches of light drifting under the face.
+/// The living background: a slow flow of light under the working area.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Plan item <c>4.0b-A06</c>. Several large, very soft fields of light
-/// float under the working area, each on a period of its own. The periods
-/// do not divide into one another, so the picture never comes back round:
-/// there is no loop for the eye to catch and nothing to start counting.
+/// Plan item <c>4.0b-A06</c>. A field of fractal noise whose own domain is
+/// warped by more noise — the standard road to a liquid, marbled,
+/// nebula-like flow. It is computed rather than drawn: there is no picture
+/// to loop and nothing to come back round to.
 /// </para>
 /// <para>
-/// <b>The colours are the finish's own, and that is the whole defence
-/// against the cliché.</b> The category always arrives at a purple-to-blue
-/// glow (<c>4.0-R02</c>). The way not to arrive there is not to own a
-/// colour the panel does not have: every tint lies within a hair of
-/// <c>FACE</c> in value and differs only in cast — so what moves reads as
-/// light on a panel rather than as a picture behind glass.
+/// <b>Why not soft gradients.</b> The first edition drifted a few large
+/// radial patches and could not produce this: overlapping ellipses give
+/// smooth blobs, never a filament or an eddy. What makes a flow read as
+/// liquid is that its own coordinates are bent by noise, and that has to be
+/// evaluated per pixel.
 /// </para>
 /// <para>
-/// <b>Text stays readable wherever a patch drifts.</b> The tints are
-/// checked against the ink in <c>check_contrast.py</c>, not against the
-/// panel alone: a background that moves under the words has to be legible
-/// in every position it can reach. A living background that costs a person
-/// one line of unreadable text has not earned its place.
+/// <b>Computed small and stretched.</b> The field has no detail finer than
+/// its own features, so a low resolution loses nothing and costs a
+/// fraction: it is computed a couple of hundred points across and enlarged
+/// with smoothing. That is what makes a per-pixel effect affordable on the
+/// CPU at all, and it is why there is no shader — WPF's shader model is old
+/// enough that fitting this into it would cost more than the effect is
+/// worth.
 /// </para>
 /// <para>
-/// <b>No blur, deliberately.</b> A blurred layer this size costs real GPU
-/// time on every frame, and it would be spent softening an edge that need
-/// never be hard: a radial gradient fading to nothing has no edge to begin
-/// with. The design system's ban on blur survives intact — this never
-/// needed it.
+/// <b>Text stays readable, and this is the one limit that does not
+/// move.</b> Every stop of the ramp is checked against the ink <b>and</b>
+/// the legends at 4.5 in <c>check_contrast.py</c>. A background that moves
+/// under the words is not one surface but every colour it can reach, and a
+/// living background that costs a person one unreadable line has not earned
+/// its place. On a dark finish that ceiling is low, so the flow shows itself
+/// in hue rather than in brightness — which is how a dark nebula looks
+/// anyway.
 /// </para>
 /// <para>
-/// <b>It stops, and stopping is part of the task rather than an
-/// optimisation afterwards.</b> Usage mode number one is "in the
-/// background while working, the window minimised or in the tray"
-/// (<c>4.0-R01</c>). A window nobody is looking at has no right to turn
-/// frames. A <c>Storyboard</c> with <c>RepeatBehavior.Forever</c> would go
-/// on ticking while the window is hidden — WPF has no reason to think
-/// otherwise — so the clock is ours and can be stopped.
-/// </para>
-/// <para>
-/// <b>Reduced motion is obeyed.</b> A person who asked the system for
-/// fewer animations meant it: for some people a moving background brings on
-/// a headache. Then the patches stand still where they are. They do not
-/// vanish — the depth is not the movement.
+/// <b>It stops when nobody is looking</b>, and obeys the system's request
+/// for less movement. See <see cref="Follow"/> and
+/// <see cref="WantsStillness"/>: usage mode number one is "in the
+/// background while working, the window minimised or in the tray", and a
+/// window nobody sees has no right to turn frames.
 /// </para>
 /// </remarks>
 public sealed class Backdrop
 {
-    /// <summary>A patch of light and how it travels.</summary>
+    /// <summary>How many points across the field is computed.</summary>
     /// <remarks>
-    /// The shift is a <c>TranslateTransform</c> rather than
-    /// <c>Canvas.Left</c>. Setting an attached position asks for a layout
-    /// pass, and a layout pass thirty times a second for four ellipses is
-    /// paid by the same person whose battery this whole thing is careful
-    /// about. A render transform never leaves the composition.
+    /// Small on purpose. The flow has no detail finer than its own
+    /// features, so this is not a compromise on quality but the resolution
+    /// the picture actually has; anything above it would be spent computing
+    /// the same value twice.
     /// </remarks>
-    private sealed record Drift(Ellipse Shape, TranslateTransform Shift,
-                                double Turn, double Lean, double Phase);
+    private const int Wide = 288;
+    private const int High = 162;
 
-    /// <summary>
-    /// The rates the patches travel at, as multiples of the period.
-    /// </summary>
-    /// <remarks>
-    /// Chosen not to divide into one another. With round ratios the patches
-    /// would meet in the same arrangement every few minutes, and a
-    /// background that repeats is one a person starts waiting for.
-    /// </remarks>
-    private static readonly double[] Turns = [1.00, 0.61, 1.41, 0.79];
-    private static readonly double[] Leans = [0.83, 1.27, 0.55, 1.09];
-
-    private readonly Canvas _sky;
+    private readonly Image _view;
     private readonly DispatcherTimer _clock = new();
-    private readonly List<Drift> _drifts = [];
+    private readonly WriteableBitmap _film;
+    private readonly byte[] _pixels = new byte[Wide * High * 4];
 
     private readonly double _period;
-    private readonly double _amplitude;
+    private double _scale = 2.6;
+    private double _warp = 1.1;
+    private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
 
-    public Backdrop(Canvas sky)
+    public Backdrop(Image view)
     {
-        _sky = sky;
-        _period = Token("Background.Period", 42);
-        _amplitude = Token("Background.Amplitude", 0.34);
-        var fps = Token("Background.Fps", 30);
+        _view = view;
+        _period = Token("Background.Period", 90);
+        var fps = Token("Background.Fps", 20);
+
+        _film = new WriteableBitmap(Wide, High, 96, 96, PixelFormats.Bgra32,
+                                    null);
+        _view.Source = _film;
+        RenderOptions.SetBitmapScalingMode(_view, BitmapScalingMode.Fant);
 
         _clock.Interval = TimeSpan.FromMilliseconds(1000.0 / Math.Max(1, fps));
         _clock.Tick += (_, _) => Advance();
@@ -103,11 +93,10 @@ public sealed class Backdrop
         SystemParameters.StaticPropertyChanged += (_, _) => Settle();
         Asked += Settle;
 
-        _sky.SizeChanged += (_, _) => Render();
         Build();
     }
 
-    /// <summary>How far along its period the drift is, in [0, 1).</summary>
+    /// <summary>How far along its period the flow is, in [0, 1).</summary>
     /// <remarks>
     /// Public because it is the only honest way to check that the backdrop
     /// stopped. "It is not moving" cannot be seen in a screenshot, and a
@@ -120,8 +109,17 @@ public sealed class Backdrop
     /// <summary>Is the clock ticking right now.</summary>
     public bool Running => _clock.IsEnabled;
 
-    /// <summary>How many patches of light there are.</summary>
-    public int Patches => _drifts.Count;
+    /// <summary>How many stops the flow's ramp has.</summary>
+    public int Steps => _ramp.Length;
+
+    /// <summary>How long the last frame took to compute, in milliseconds.</summary>
+    /// <remarks>
+    /// Measured and asserted, not assumed. The whole argument for stopping
+    /// the background when nobody looks is that frames cost a person
+    /// something; a frame whose cost was never measured makes that argument
+    /// on trust. This is the number the motion check holds to a ceiling.
+    /// </remarks>
+    public double LastFrameMs { get; private set; }
 
     /// <summary>Does the system want less movement.</summary>
     public static bool WantsStillness =>
@@ -150,111 +148,26 @@ public sealed class Backdrop
     private static event Action? Asked;
 
     /// <summary>
-    /// Build the patches for the finish that is on now.
+    /// Take the ramp of the finish that is on now, and repaint.
     /// </summary>
     /// <remarks>
-    /// The finish is swapped as a whole resource dictionary, and the
-    /// patches are brushes built in code from its colours — a dynamic
-    /// reference cannot reach inside a gradient stop. So they are built
-    /// again, and the phase is kept: the background must not jump when a
-    /// person tries a finish on.
+    /// The finish is swapped as a whole resource dictionary, so the colours
+    /// have to be read again. The phase is kept: the flow must not jump when
+    /// a person tries a finish on.
     /// </remarks>
     public void Build()
     {
-        _sky.Children.Clear();
-        _drifts.Clear();
-
-        var count = (int)Token("Nebula.Count", 4);
-        var opacity = Token("Nebula.Opacity", 0.55);
-
-        for (var at = 0; at < count; at++)
-        {
+        var steps = (int)Token("Nebula.Steps", 5);
+        var ramp = new List<(byte, byte, byte)>();
+        for (var at = 0; at < steps; at++)
             if (Application.Current?.TryFindResource($"Color.Nebula{at}")
-                is not Color tint) continue;
+                is Color stop)
+                ramp.Add((stop.R, stop.G, stop.B));
 
-            var shape = new Ellipse
-            {
-                IsHitTestVisible = false,
-                Fill = new RadialGradientBrush
-                {
-                    GradientStops =
-                    [
-                        new GradientStop(tint, 0),
-                        // Fading to the same colour at zero alpha rather
-                        // than to "Transparent": WPF interpolates through
-                        // the colour it is given, and fading to a
-                        // transparent black would drag every patch through
-                        // a grey haze on its way out.
-                        new GradientStop(
-                            Color.FromArgb(0, tint.R, tint.G, tint.B), 1),
-                    ],
-                },
-                Opacity = opacity,
-            };
-            var shift = new TranslateTransform();
-            shape.RenderTransform = shift;
-            _sky.Children.Add(shape);
-            _drifts.Add(new Drift(shape, shift, Turns[at % Turns.Length],
-                                  Leans[at % Leans.Length],
-                                  at / (double)Math.Max(1, count)));
-        }
-
-        // The grain goes on top of the patches and stays there: it is not
-        // decoration but the cure for what they do to an 8-bit screen.
-        _sky.Children.Add(Grain());
-
-        Render();
-    }
-
-    /// <summary>
-    /// A grain of noise over the patches — against banding.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// A large, very soft gradient rendered in eight bits per channel comes
-    /// out in concentric rings: the eye finds an edge between two
-    /// neighbouring values where the mathematics has a smooth slope. This
-    /// was plainly visible on the first screenshot, and no amount of
-    /// choosing colours removes it — the rings are quantisation, not
-    /// colour.
-    /// </para>
-    /// <para>
-    /// The cure is the ordinary one: a per-pixel dither of about one value,
-    /// which pushes the boundary of a band back and forth and leaves the
-    /// eye nothing straight to catch. A tile of 64 is enough — larger costs
-    /// memory, smaller starts to read as a pattern of its own.
-    /// </para>
-    /// </remarks>
-    private static UIElement Grain()
-    {
-        const int side = 64;
-        var pixels = new byte[side * side * 4];
-        var random = new Random(20260909);
-        for (var at = 0; at < pixels.Length; at += 4)
-        {
-            // White or black, and almost entirely transparent: what is
-            // needed is a nudge of one value, not a visible speckle.
-            var lit = random.Next(2) == 0;
-            var value = (byte)(lit ? 255 : 0);
-            pixels[at] = pixels[at + 1] = pixels[at + 2] = value;
-            pixels[at + 3] = 6;
-        }
-
-        var tile = BitmapSource.Create(side, side, 96, 96,
-                                       PixelFormats.Bgra32, null, pixels,
-                                       side * 4);
-        return new Rectangle
-        {
-            IsHitTestVisible = false,
-            Width = 4096,
-            Height = 4096,
-            Fill = new ImageBrush(tile)
-            {
-                TileMode = TileMode.Tile,
-                Viewport = new Rect(0, 0, side, side),
-                ViewportUnits = BrushMappingMode.Absolute,
-            },
-        };
+        _ramp = [.. ramp];
+        _scale = Token("Nebula.Scale", 2.6);
+        _warp = Token("Nebula.Warp", 1.1);
+        Paint();
     }
 
     /// <summary>Run or stop, to match whether there is anybody to look.</summary>
@@ -298,50 +211,141 @@ public sealed class Backdrop
         }
 
         // A fraction of the period per tick, from the interval rather than
-        // from a count of ticks: a tick that arrived late must move the
-        // drift further, or the movement slows down under load instead of
-        // keeping its promised period.
+        // from a count of ticks: a tick that arrived late must move the flow
+        // further, or the movement slows down under load instead of keeping
+        // its promised period.
         Phase = (Phase + _clock.Interval.TotalSeconds / _period) % 1.0;
-        Render();
+        Paint();
     }
 
-    private void Render()
+    /// <summary>Compute one frame of the flow.</summary>
+    private void Paint()
     {
-        var width = _sky.ActualWidth > 0 ? _sky.ActualWidth : 900;
-        var height = _sky.ActualHeight > 0 ? _sky.ActualHeight : 600;
-        var size = Math.Min(width, height) * Token("Nebula.Spread", 1.15);
+        if (_ramp.Length == 0) return;
+        var started = System.Diagnostics.Stopwatch.GetTimestamp();
 
-        foreach (var drift in _drifts)
+        // Time is the third and fourth coordinate of the noise, and it goes
+        // round a circle rather than along a line: at the end of the period
+        // the field is where it started, so there is no seam — and no drift
+        // into ever-larger numbers, where floating point starts to grain.
+        var angle = Phase * 2 * Math.PI;
+        var zx = (float)(Math.Cos(angle) * 0.8);
+        var zy = (float)(Math.Sin(angle) * 0.8);
+
+        var scale = (float)_scale;
+        var warp = (float)_warp;
+        var ramp = _ramp;
+        var pixels = _pixels;
+
+        Parallel.For(0, High, y =>
         {
-            // `IsNaN` first, and not for tidiness: an Ellipse starts with
-            // a Width of NaN, and every comparison with NaN is false — so
-            // `Math.Abs(NaN - size) > 0.5` said "the size is right" and the
-            // patches were never given one. They came out zero-sized, and
-            // the background was simply absent: no error anywhere, nothing
-            // in the journal, just a flat panel.
-            if (double.IsNaN(drift.Shape.Width)
-                || Math.Abs(drift.Shape.Width - size) > 0.5)
+            var v = (float)y / High * scale;
+            var row = y * Wide * 4;
+            for (var x = 0; x < Wide; x++)
             {
-                // Size only when it actually changed: this is the one thing
-                // here that does cost a layout pass, and it belongs to the
-                // window being resized rather than to every frame.
-                drift.Shape.Width = size;
-                drift.Shape.Height = size;
-                Canvas.SetLeft(drift.Shape, width / 2 - size / 2);
-                Canvas.SetTop(drift.Shape, height / 2 - size / 2);
+                var u = (float)x / Wide * scale * ((float)Wide / High);
+
+                // Domain warping: the field's own coordinates are bent by
+                // the field, twice. One level gives clouds; two give the
+                // filaments and eddies that read as liquid.
+                var qx = Fbm(u, v, zx, zy);
+                var qy = Fbm(u + 5.2f, v + 1.3f, zx, zy);
+
+                var rx = Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f,
+                             zx, zy);
+                var ry = Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f,
+                             zx, zy);
+
+                var f = Fbm(u + warp * rx, v + warp * ry, zx, zy);
+
+                var (red, green, blue) = Shade(ramp, f);
+                var at = row + x * 4;
+                pixels[at] = blue;
+                pixels[at + 1] = green;
+                pixels[at + 2] = red;
+                pixels[at + 3] = 255;
             }
+        });
 
-            // Two circles at different rates make a curve that does not
-            // close: the patch wanders instead of going round. That is the
-            // whole of the flowing — no noise, no shader, nothing computed
-            // per pixel.
-            var a = (Phase * drift.Turn + drift.Phase) * 2 * Math.PI;
-            var b = (Phase * drift.Lean + drift.Phase) * 2 * Math.PI;
+        _film.WritePixels(new Int32Rect(0, 0, Wide, High), pixels, Wide * 4, 0);
 
-            drift.Shift.X = Math.Sin(a) * width * _amplitude
-                            + Math.Cos(b) * width * _amplitude * 0.4;
-            drift.Shift.Y = Math.Cos(a) * height * _amplitude
-                            + Math.Sin(b) * height * _amplitude * 0.4;
+        LastFrameMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started)
+                      * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+    }
+
+    /// <summary>A value of the field -> a colour of the ramp.</summary>
+    private static (byte R, byte G, byte B) Shade(
+        (byte R, byte G, byte B)[] ramp, float value)
+    {
+        value = Math.Clamp(value * 0.5f + 0.5f, 0f, 0.999f);
+        var place = value * (ramp.Length - 1);
+        var low = (int)place;
+        var mix = place - low;
+        var a = ramp[low];
+        var b = ramp[Math.Min(low + 1, ramp.Length - 1)];
+        return ((byte)(a.R + (b.R - a.R) * mix),
+                (byte)(a.G + (b.G - a.G) * mix),
+                (byte)(a.B + (b.B - a.B) * mix));
+    }
+
+    /// <summary>Fractal noise: four octaves, each finer and quieter.</summary>
+    /// <remarks>
+    /// Four and not seven. Every further octave is another pass over every
+    /// pixel, and past this its features fall below what the enlargement can
+    /// show — it would be paid for and not seen. The number was raised from
+    /// three once the frame was measured and found to cost a fifth of its
+    /// budget: detail one can afford is detail worth having.
+    /// </remarks>
+    private static float Fbm(float x, float y, float zx, float zy)
+    {
+        var sum = 0f;
+        var weight = 0.5f;
+        for (var octave = 0; octave < 4; octave++)
+        {
+            sum += weight * Noise(x, y, zx, zy);
+            x *= 2.03f;
+            y *= 2.03f;
+            zx *= 2.03f;
+            zy *= 2.03f;
+            weight *= 0.5f;
+        }
+        return sum * 2f - 1f;
+    }
+
+    /// <summary>Smooth value noise on a lattice.</summary>
+    /// <remarks>
+    /// Four coordinates, because time here is a circle: two are the place
+    /// and two are where we are on that circle. Going round rather than
+    /// along is what lets the flow return to itself without a jump.
+    /// </remarks>
+    private static float Noise(float x, float y, float zx, float zy)
+    {
+        int xi = (int)MathF.Floor(x), yi = (int)MathF.Floor(y);
+        int ax = (int)MathF.Floor(zx * 8), ay = (int)MathF.Floor(zy * 8);
+        float xf = x - xi, yf = y - yi;
+
+        // Smoothstep on both axes: linear interpolation would leave the
+        // lattice visible as a grid of creases.
+        float u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+
+        float c00 = Hash(xi, yi, ax, ay);
+        float c10 = Hash(xi + 1, yi, ax, ay);
+        float c01 = Hash(xi, yi + 1, ax, ay);
+        float c11 = Hash(xi + 1, yi + 1, ax, ay);
+
+        return (c00 * (1 - u) + c10 * u) * (1 - v)
+             + (c01 * (1 - u) + c11 * u) * v;
+    }
+
+    /// <summary>A repeatable number in [0, 1) from four whole coordinates.</summary>
+    private static float Hash(int x, int y, int zx, int zy)
+    {
+        unchecked
+        {
+            var n = x * 374761393 + y * 668265263 + zx * 1274126177
+                    + zy * 1103515245;
+            n = (n ^ (n >> 13)) * 1274126177;
+            return ((n ^ (n >> 16)) & 0x7fffffff) / (float)0x7fffffff;
         }
     }
 

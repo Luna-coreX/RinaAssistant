@@ -89,14 +89,14 @@ def finish_xaml(name: str, finish: dict) -> str:
     nebula = finish.get("nebula")
     if nebula:
         lines.append("")
-        for at, tint in enumerate(nebula["tint"]):
-            lines.append(f'  <Color x:Key="Color.Nebula{at}">{tint}</Color>')
-        lines.append(f'  <sys:Int32 x:Key="Nebula.Count">'
-                     f'{len(nebula["tint"])}</sys:Int32>')
-        lines.append(f'  <sys:Double x:Key="Nebula.Opacity">'
-                     f'{nebula["opacity"]}</sys:Double>')
-        lines.append(f'  <sys:Double x:Key="Nebula.Spread">'
-                     f'{nebula["spread"]}</sys:Double>')
+        for at, stop in enumerate(nebula["ramp"]):
+            lines.append(f'  <Color x:Key="Color.Nebula{at}">{stop}</Color>')
+        lines.append(f'  <sys:Double x:Key="Nebula.Steps">'
+                     f'{len(nebula["ramp"])}</sys:Double>')
+        lines.append(f'  <sys:Double x:Key="Nebula.Scale">'
+                     f'{nebula["scale"]}</sys:Double>')
+        lines.append(f'  <sys:Double x:Key="Nebula.Warp">'
+                     f'{nebula["warp"]}</sys:Double>')
 
     lines.append("</ResourceDictionary>")
     return "\n".join(lines) + "\n"
@@ -200,9 +200,14 @@ def common_xaml(tokens: dict) -> str:
         lines.append("")
         lines.append("  <!-- Дыхание фона (4.0b-A06). Когда фон замирает, "
                      "решает оболочка, а не эти числа -->")
-        for name in ("period", "amplitude", "fps"):
+        # From the tokens themselves, not from a list written out here:
+        # the field's parameters changed once already, and a hand-written
+        # tuple would have quietly stopped emitting the new one.
+        for name, value in background.items():
+            if name == "note":
+                continue
             lines.append(f'  <sys:Double x:Key="Background.{key(name)}">'
-                         f'{background[name]}</sys:Double>')
+                         f'{value}</sys:Double>')
 
     lines.append("")
     lines.append("  <!-- Штриховка опасного (§6): единственный признак необратимого -->")
