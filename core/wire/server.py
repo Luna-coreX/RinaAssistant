@@ -687,29 +687,53 @@ class ProtocolServer:
         work, and the core cannot do it anyway. The core hands over the
         content.
         """
-        return {"commands": [dict(c) for c in self._commands().all()]}
+        from core import data_transfer
+
+        store = self._commands()
+        # Статистика запусков едет вместе с командами: она про них и без
+        # них бессмысленна. Лежит она в настройках, а не в хранилище команд,
+        # поэтому берётся отсюда.
+        stats = self._settings().get("command_stats", {}) or {}
+        return data_transfer.commands_payload(
+            [dict(c) for c in store.all()], stats)
 
     def _commands_import(self, message: Envelope) -> dict:
         """
-        Accept commands. Existing ones are not overwritten in silence.
+        Accept a commands file. The shell read it; the judgement is here.
 
-        A match by identifier means the command already exists, and the
-        import skips it: "carry them over to another machine" and "overwrite
-        what the person has already set up" are different intents, and by
-        default it is right not to do the second.
+        **Everything imported arrives switched off.** A command is the
+        launching of a program, and this file could have been written by
+        anyone; switching on is a deliberate step taken after looking at
+        what exactly was added.
+
+        **A duplicate is the same set of phrases, not the same number.** A
+        file from another machine carries identifiers of its own, while the
+        phrases are what the command is to a person. Matching by identifier
+        let a file imported twice arrive twice — it was written by 4.0 with
+        fresh numbers each time.
+
+        Both rules came back from 3.1.0 along with `core/data_transfer.py`:
+        the 4.0 path had quietly grown its own, shorter, set.
         """
+        from core import data_transfer
+        from core.wire.errors import fault
+
+        payload = message.payload
+        # `file` is what the shell read; the older shape is still taken —
+        # the file may have been made by hand.
+        data = payload.get("file")
+        if data is None:
+            data = payload.get("commands")
+        try:
+            incoming = data_transfer.commands_from_data(data, source="оболочка")
+        except data_transfer.TransferError as problem:
+            raise fault(problem.code, str(problem))
+
         store = self._commands()
-        known = {c.get("id") for c in store.all()}
-        added, skipped = 0, 0
-        for command in message.payload.get("commands") or []:
-            if not isinstance(command, dict):
-                skipped += 1
-                continue
-            if command.get("id") in known:
-                skipped += 1
-                continue
-            store.add(dict(command))
-            added += 1
+        merged, added, skipped = data_transfer.merge_commands(
+            [dict(c) for c in store.all()], incoming,
+            lambda: "cmd_" + secrets.token_hex(3))
+        store.save_all(merged)
         return {"added": added, "skipped": skipped}
 
     # -- the conversation's history ------------------------------------------------
@@ -731,7 +755,11 @@ class ProtocolServer:
         return {"cleared": was}
 
     def _history_export(self, message: Envelope) -> dict:
-        return {"items": [dict(i) for i in self._history().all()]}
+        """Содержимое файла истории — в том же конверте, что и команды."""
+        from core import data_transfer
+
+        return data_transfer.history_payload(
+            [dict(i) for i in self._history().all()])
 
     # -- plugins ---------------------------------------------------------------------
 

@@ -420,8 +420,13 @@ work.ask("commands.list")
 items = work.read(1)[0].payload["items"]
 check("список своих команд отдаётся", isinstance(items, list), f"| {items}")
 
-work.ask("commands.save", {"command": {"name": "мой дискорд",
-                                       "kind": "app", "target": "Discord",
+# Команда — в том виде, в каком её кладёт конструктор: фразы и вид, а не
+# «имя». Первая редакция слала `name`/`kind`, которых у хранилища нет
+# вовсе, и проверка проходила только потому, что импорт тогда ничего не
+# разбирал: приехала бы такая команда и осталась бы мусором в списке.
+work.ask("commands.save", {"command": {"type": "app", "target": "Discord",
+                                       "triggers": ["мой дискорд"],
+                                       "match": "contains",
                                        "enabled": True}})
 saved = work.read(1)[0].payload["command"]
 check("команда создана и получила номер", bool(saved.get("id")), f"| {saved}")
@@ -433,19 +438,61 @@ check("команду можно выключить, а не только уда
       mine and mine[0].get("enabled") is False, f"| {mine}")
 
 work.ask("commands.export")
-dump = work.read(1)[0].payload["commands"]
+carried = work.read(1)[0].payload
+dump = (carried.get("payload") or {}).get("commands")
 check("экспорт отдаёт содержимое, а не пишет файл",
-      isinstance(dump, list) and len(dump) == len(after), f"| {len(dump)}")
+      isinstance(dump, list) and len(dump) == len(after), f"| {dump and len(dump)}")
 
-work.ask("commands.import", {"commands": dump})
+# Конверт. Без него файл команд неотличим от любого другого массива —
+# в том числе от файла истории, и импорт не туда разберётся как свой.
+check("выгрузка в конверте: вид назван",
+      carried.get("kind") == "rina.commands", f"| {carried.get('kind')}")
+check("и версия формата тоже",
+      isinstance(carried.get("format"), int), f"| {carried.get('format')}")
+check("и версия приложения, которой её сделали",
+      bool(carried.get("app_version")), f"| {carried.get('app_version')}")
+
+work.ask("commands.import", {"file": carried})
 merged = work.read(1)[0].payload
 check("импорт не затирает уже настроенное",
       merged["added"] == 0 and merged["skipped"] == len(dump), f"| {merged}")
 
-work.ask("commands.import", {"commands": [{"id": "cmd_new", "name": "чужая",
-                                           "kind": "app", "target": "X"}]})
+# Тот же файл, но с чужими номерами: так и выглядит выгрузка с другой
+# машины. Совпадение по номеру её бы пропустило, и команды приехали бы
+# вторым экземпляром.
+foreign = json.loads(json.dumps(carried))
+for i, command in enumerate(foreign["payload"]["commands"]):
+    command["id"] = f"cmd_чужой{i}"
+work.ask("commands.import", {"file": foreign})
+check("дубликат узнан по фразам, а не по номеру",
+      work.read(1)[0].payload["added"] == 0, "| приехал вторым экземпляром")
+
+# Файл истории вместо файла команд — обычная ошибка человека, и ответ на
+# неё обязан быть внятным, а не «добавлено 0».
+work.ask("history.export")
+history_file = work.read(1)[0].payload
+work.ask("commands.import", {"file": history_file})
+refused = work.read(1)[0]
+check("чужой вид файла отвергнут",
+      refused.type == "error"
+      and refused.payload.get("code") == "transfer.wrong_kind",
+      f"| {refused.payload}")
+
+# Команда — это запуск программы, а файл мог написать кто угодно.
+work.ask("commands.import", {"file": {
+    "kind": "rina.commands", "format": 1,
+    "payload": {"commands": [{"id": "cmd_new", "enabled": True,
+                              "type": "app", "triggers": ["чужая фраза"],
+                              "target": "X"}]}}})
 check("новая команда из импорта принята",
       work.read(1)[0].payload["added"] == 1)
+
+work.ask("commands.list")
+imported = [c for c in work.read(1)[0].payload["items"]
+            if "чужая фраза" in (c.get("triggers") or [])]
+check("ввезённая команда приехала выключенной",
+      imported and imported[0].get("enabled") is False,
+      f"| {imported}")
 
 work.ask("commands.delete", {"id": saved["id"]})
 check("команда удаляется", work.read(1)[0].payload["deleted"] is True)
@@ -461,8 +508,13 @@ check("записи описаны полями",
       f"| {told['items'][:1]}")
 
 work.ask("history.export")
+carried_history = work.read(1)[0].payload
 check("история выгружается",
-      len(work.read(1)[0].payload["items"]) == told["total"])
+      len((carried_history.get("payload") or {}).get("history") or [])
+      == told["total"])
+check("и тоже в конверте, со своим видом",
+      carried_history.get("kind") == "rina.history",
+      f"| {carried_history.get('kind')}")
 
 work.ask("history.clear")
 cleared = work.read(1)[0].payload["cleared"]

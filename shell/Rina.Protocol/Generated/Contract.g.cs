@@ -313,6 +313,12 @@ public static class ErrorCodes
     public const string ToolInvalidArguments = "tool.invalid_arguments";
     /// <summary>protocol, неповторяемая.</summary>
     public const string ToolUnknown = "tool.unknown";
+    /// <summary>user, неповторяемая.</summary>
+    public const string TransferTooNew = "transfer.too_new";
+    /// <summary>user, неповторяемая.</summary>
+    public const string TransferUnreadable = "transfer.unreadable";
+    /// <summary>user, неповторяемая.</summary>
+    public const string TransferWrongKind = "transfer.wrong_kind";
     /// <summary>system, неповторяемая.</summary>
     public const string TtsUnavailable = "tts.unavailable";
 
@@ -346,6 +352,9 @@ public static class ErrorCodes
             ["task.cancelled"] = new(ErrorCategory.User, false),
             ["tool.invalid_arguments"] = new(ErrorCategory.Protocol, false),
             ["tool.unknown"] = new(ErrorCategory.Protocol, false),
+            ["transfer.too_new"] = new(ErrorCategory.User, false),
+            ["transfer.unreadable"] = new(ErrorCategory.User, false),
+            ["transfer.wrong_kind"] = new(ErrorCategory.User, false),
             ["tts.unavailable"] = new(ErrorCategory.System, false),
         };
 }

@@ -213,6 +213,18 @@
       "category": "protocol",
       "retryable": false
     },
+    "transfer.too_new": {
+      "category": "user",
+      "retryable": false
+    },
+    "transfer.unreadable": {
+      "category": "user",
+      "retryable": false
+    },
+    "transfer.wrong_kind": {
+      "category": "user",
+      "retryable": false
+    },
     "tts.unavailable": {
       "category": "system",
       "retryable": false

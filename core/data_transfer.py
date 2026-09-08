@@ -22,7 +22,19 @@ KIND_HISTORY = "rina.history"
 
 
 class TransferError(Exception):
-    """The file would not do: the wrong format, broken JSON, somebody else's data."""
+    """
+    The file would not do: the wrong format, broken JSON, somebody else's
+    data.
+
+    Carries a protocol error code alongside the words. The shell branches on
+    the code and shows the words: a person picking a history file where
+    commands were asked for needs a sentence, and the shell needs something
+    it can tell from "the file is unreadable" without matching on prose.
+    """
+
+    def __init__(self, message, code="transfer.unreadable"):
+        super().__init__(message)
+        self.code = code
 
 
 def _envelope(kind, payload):
@@ -49,6 +61,83 @@ def export_commands(path, commands, stats=None):
     return len(data["payload"]["commands"])
 
 
+def commands_payload(commands, stats=None):
+    """
+    The content of a commands file — without writing it anywhere.
+
+    Splitting this out of `export_commands` is what lets the protocol hand
+    the file's content over the wire (§6: the shell picks the place and
+    writes; the core hands over the content) and still produce **the same
+    file** as 3.1.0. Two ways of assembling one format would part company,
+    and the divergence would show up as "the export from the new version
+    does not open in the old one".
+    """
+    return _envelope(KIND_COMMANDS, {
+        "commands": list(commands or []),
+        "stats": dict(stats or {}),
+    })
+
+
+def history_payload(entries):
+    """The content of a history file. Same reasoning as `commands_payload`."""
+    return _envelope(KIND_HISTORY, {"history": list(entries or [])})
+
+
+def commands_from_data(data, source="файл"):
+    """
+    Parsed JSON -> commands fit to be added. Raises TransferError.
+
+    Takes data rather than a path because the file is read by whoever has
+    the file dialogue — in 4.0 that is the shell. What must not move with
+    the file is the **judgement**: which kind this is, whether the format is
+    ours, what may be let through. That is meaning, and meaning lives in the
+    core.
+
+    A command is the launching of a program, and this file could have been
+    written by anyone. So everything that comes through here is brought to a
+    safe shape and arrives switched off.
+    """
+    if isinstance(data, list):
+        # A bare list is easy to get by hand, and refusing it would mean
+        # refusing the obvious for the sake of tidiness.
+        commands = data
+    elif isinstance(data, dict):
+        if "payload" not in data and isinstance(data.get("commands"), list):
+            commands = data["commands"]
+        else:
+            if data.get("kind") != KIND_COMMANDS:
+                raise TransferError("Это не файл команд", "transfer.wrong_kind")
+            try:
+                file_format = int(data.get("format", 0))
+            except (TypeError, ValueError):
+                raise TransferError("Не удалось прочитать версию формата файла",
+                                    "transfer.unreadable")
+            if file_format > FORMAT_VERSION:
+                raise TransferError(
+                    "Файл сделан более новой версией Рины — обновите приложение",
+                    "transfer.too_new")
+            commands = (data.get("payload") or {}).get("commands", [])
+    else:
+        raise TransferError("Файл не похож на экспорт Рины",
+                            "transfer.unreadable")
+
+    if not isinstance(commands, list):
+        raise TransferError("В файле нет списка команд", "transfer.unreadable")
+    if len(commands) > MAX_COMMANDS:
+        raise TransferError(
+            f"Слишком много команд в файле (больше {MAX_COMMANDS})",
+            "transfer.unreadable")
+
+    clean = [_sanitize_command(c) for c in commands
+             if isinstance(c, dict) and c.get("triggers")]
+    from core.logging_setup import security_log
+    security_log().info(
+        "Импорт команд из %s: в файле %d, принято %d, отброшено %d, "
+        "все выключены", source, len(commands), len(clean),
+        len(commands) - len(clean))
+    return clean
+
+
 def read_commands(path):
     """
     Reads a file of commands. Returns a list of commands.
@@ -58,39 +147,9 @@ def read_commands(path):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
-        raise TransferError(f"Не удалось прочитать файл: {e}")
-
-    if not isinstance(data, dict):
-        raise TransferError("Файл не похож на экспорт Рины")
-
-    # we also allow a "bare" list of commands — it is easy to get one by hand
-    if "payload" not in data and isinstance(data.get("commands"), list):
-        commands = data["commands"]
-    else:
-        if data.get("kind") != KIND_COMMANDS:
-            raise TransferError("Это не файл команд")
-        try:
-            file_format = int(data.get("format", 0))
-        except (TypeError, ValueError):
-            raise TransferError("Не удалось прочитать версию формата файла")
-        if file_format > FORMAT_VERSION:
-            raise TransferError(
-                "Файл сделан более новой версией Рины — обновите приложение")
-        commands = (data.get("payload") or {}).get("commands", [])
-
-    if not isinstance(commands, list):
-        raise TransferError("В файле нет списка команд")
-    if len(commands) > MAX_COMMANDS:
-        raise TransferError(
-            f"Слишком много команд в файле (больше {MAX_COMMANDS})")
-    clean = [_sanitize_command(c) for c in commands
-             if isinstance(c, dict) and c.get("triggers")]
-    from core.logging_setup import security_log
-    security_log().info(
-        "Импорт команд из %s: в файле %d, принято %d, отброшено %d, "
-        "все выключены", path, len(commands), len(clean),
-        len(commands) - len(clean))
-    return clean
+        raise TransferError(f"Не удалось прочитать файл: {e}",
+                            "transfer.unreadable")
+    return commands_from_data(data, source=path)
 
 
 # A file of commands could have been written by anyone, and a command is the

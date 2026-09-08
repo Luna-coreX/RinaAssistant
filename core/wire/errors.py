@@ -88,6 +88,19 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
     _spec("tool.invalid_arguments", "protocol", False,
           "аргументы не проходят схему инструмента"),
 
+    # --- carrying data between machines ---------------------------------------
+    #
+    # `user`, not `protocol`: picking a history file where commands were
+    # asked for is a person choosing the wrong file, not a defect of either
+    # side. The category decides how the shell speaks about it, and calling
+    # this a protocol defect would tell the person their program is broken.
+    _spec("transfer.wrong_kind", "user", False,
+          "файл не того вида: это не выгрузка команд"),
+    _spec("transfer.too_new", "user", False,
+          "файл сделан более новой версией — обновите приложение"),
+    _spec("transfer.unreadable", "user", False,
+          "файл не разобрать: не похоже на выгрузку Рины"),
+
     # --- settings -------------------------------------------------------------
     _spec("settings.unknown_key", "protocol", False,
           "такой настройки нет"),

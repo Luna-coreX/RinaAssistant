@@ -213,6 +213,9 @@
 | `confirmation.expired` | user | нет | срок истёк; нужно новое, а не повтор того же |
 | `tool.unknown` | protocol | нет | вызвана несуществующая возможность |
 | `tool.invalid_arguments` | protocol | нет | аргументы не проходят схему инструмента |
+| `transfer.wrong_kind` | user | нет | файл не того вида: это не выгрузка команд |
+| `transfer.too_new` | user | нет | файл сделан более новой версией — обновите приложение |
+| `transfer.unreadable` | user | нет | файл не разобрать: не похоже на выгрузку Рины |
 | `settings.unknown_key` | protocol | нет | такой настройки нет |
 | `settings.invalid_value` | user | нет | значение не проходит ограничения ключа |
 | `llm.remote_address` | user | да | адрес модели не локальный: значение принято, человека предупреждают |
@@ -267,11 +270,11 @@
 | `commands.save` | `command` | сохранённая команда; создание и правка — один метод |
 | `commands.delete` | `id` | удалено ли |
 | `commands.set_enabled` | `id`, `enabled` | список после изменения |
-| `commands.export` | — | `commands` — содержимое, файл пишет оболочка |
-| `commands.import` | `commands` | `added`, `skipped` |
+| `commands.export` | — | содержимое файла целиком: `kind`, `format`, `app_version`, `exported_at`, `payload.commands`, `payload.stats`. Файл пишет оболочка |
+| `commands.import` | `file` — содержимое, прочитанное оболочкой | `added`, `skipped`. Чужой вид файла отвергается кодом `transfer.wrong_kind` |
 | `history.list` | `limit` | `items`, `total` |
 | `history.clear` | — | сколько стёрто |
-| `history.export` | — | `items` — содержимое, файл пишет оболочка |
+| `history.export` | — | содержимое файла целиком: `kind`, `format`, `app_version`, `exported_at`, `payload.history`. Файл пишет оболочка |
 | `task.cancel` | `task_id` | принята ли просьба, см. §9 |
 | `core.shutdown` | — | подтверждение |
 

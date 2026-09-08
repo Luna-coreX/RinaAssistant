@@ -147,11 +147,6 @@ public static partial class Loc
                 {
                     ["English"] = "the release has no manifest.json",
                 },
-            ["В файле не список команд."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The file isn’t a list of commands.",
-                },
             ["Версии, ссылки, из чего собрана"] =
                 new Dictionary<string, string>
                 {
@@ -1633,6 +1628,14 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The .onnx model file",
+                },
+            ["Файл не разобрался как JSON."] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Die Datei ließ sich nicht als JSON lesen.",
+                    ["English"] = "The file did not parse as JSON.",
+                    ["Español"] = "El archivo no se pudo analizar como JSON.",
+                    ["Українська"] = "Файл не розібрався як JSON.",
                 },
             ["формат настроек и истории"] =
                 new Dictionary<string, string>

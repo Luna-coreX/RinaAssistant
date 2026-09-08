@@ -191,13 +191,17 @@ public partial class DialoguePage : UserControl
     {
         // The shell picks the file and writes it: the save dialogue is its
         // job, and the core hands over the content (§6 of the spec).
+        // Содержимое файла целиком, вместе с видом и версией формата: файл
+        // истории обязан отличаться от файла команд, иначе первый же импорт
+        // не туда разберётся как свой.
         var told = await Ask(Methods.HistoryExport);
-        if (told?["items"] is not JsonArray items) return;
+        if (told is null) return;
 
         var path = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
             $"rina-history-{DateTime.Now:yyyy-MM-dd-HHmm}.json");
-        await File.WriteAllTextAsync(path, items.ToJsonString());
+        await File.WriteAllTextAsync(path, told.ToJsonString(
+            new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         Add("", S("Разговор выгружен: {0}", path));
     }
 

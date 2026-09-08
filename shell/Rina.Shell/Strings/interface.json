@@ -71,9 +71,6 @@
   "Быстрее ста — торопится, медленнее — растягивает": {
     "English": "Above 100 she hurries, below she drawls"
   },
-  "В файле не список команд.": {
-    "English": "The file isn’t a list of commands."
-  },
   "Версии, ссылки, из чего собрана": {
     "English": "Versions, links, what it’s made of"
   },
@@ -1141,5 +1138,11 @@
   },
   "ядро не отвечает": {
     "English": "the core isn’t responding"
+  },
+  "Файл не разобрался как JSON.": {
+    "English": "The file did not parse as JSON.",
+    "Українська": "Файл не розібрався як JSON.",
+    "Español": "El archivo no se pudo analizar como JSON.",
+    "Deutsch": "Die Datei ließ sich nicht als JSON lesen."
   }
 }
