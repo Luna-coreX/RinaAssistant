@@ -44,12 +44,33 @@ class LaunchOutcome:
 # ---------------------------------------------------------------------------
 # Programs the user has remembered
 # ---------------------------------------------------------------------------
-def _aliases():
-    from core.settings_store import settings
-    return dict(settings.get("app_aliases", {}) or {})
+def _store(settings=None):
+    """
+    Где лежит выученное.
+
+    Хранилище передают снаружи — то самое, с которым работает ядро. Раньше
+    эти три функции брали **модульный синглтон**, и выученное уезжало в
+    настоящие настройки человека мимо того ядра, которое его выучило: два
+    ядра в одном процессе молча делили соответствия, а проверка с
+    подставным хранилищем писала в чужой файл. Ровно та скрытая глобалка,
+    ради которой делались `4.0-B05` и `4.0-B06`, — просто дожившая здесь до
+    беты.
+
+    Умолчание оставлено для голосового пути, который зовёт эти функции без
+    ядра под рукой.
+    """
+    if settings is not None:
+        return settings
+    from core.settings_store import settings as shared
+
+    return shared
 
 
-def remember(query, path, kind="file", name=None):
+def _aliases(settings=None):
+    return dict(_store(settings).get("app_aliases", {}) or {})
+
+
+def remember(query, path, kind="file", name=None, settings=None):
     """
     Remember that "ренпай" is this particular program.
 
@@ -57,28 +78,30 @@ def remember(query, path, kind="file", name=None):
     remembered: Store applications have an AppUserModelID instead of a file,
     and checking whether it exists on disk is meaningless.
     """
-    from core.settings_store import settings
+    store = _store(settings)
     key = normalize(query)
     if not key or not path:
         return False
-    aliases = _aliases()
-    aliases[key] = {
-        "path": path,
-        "kind": kind,
-        "name": name or os.path.splitext(os.path.basename(path))[0],
-    }
-    settings.set("app_aliases", aliases)
-    settings.save()
+    with store.transaction():
+        aliases = _aliases(store)
+        aliases[key] = {
+            "path": path,
+            "kind": kind,
+            "name": name or os.path.splitext(os.path.basename(path))[0],
+        }
+        store.set("app_aliases", aliases)
+        store.save()
     return True
 
 
-def forget(query):
-    from core.settings_store import settings
-    aliases = _aliases()
-    if aliases.pop(normalize(query), None) is None:
-        return False
-    settings.set("app_aliases", aliases)
-    settings.save()
+def forget(query, settings=None):
+    store = _store(settings)
+    with store.transaction():
+        aliases = _aliases(store)
+        if aliases.pop(normalize(query), None) is None:
+            return False
+        store.set("app_aliases", aliases)
+        store.save()
     return True
 
 

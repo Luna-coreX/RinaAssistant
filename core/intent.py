@@ -40,6 +40,16 @@ INTENTS = {
     "app.not_found":      "Программа не найдена. Аргументы: query",
     "app.launch_failed":  "Программа найдена, но не запустилась. Аргументы: app",
 
+    # what a person taught explicitly (4.0b-A04)
+    #
+    # Only explicit corrections and rules. There is deliberately no implicit
+    # learning from the whole conversation: memory would fill with rubbish,
+    # and a person would not know where the behaviour came from.
+    "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app",
+    "alias.correct":      "Человек поправил прошлый запуск. Аргументы: app",
+    "alias.ambiguous":    "Учить нечему: названная программа сама неоднозначна. Аргументы: options, query, word",
+    "alias.unknown":      "Учить нечему: названной программы нет. Аргументы: query, word",
+
     # reminders
     "reminder.create":    "Создать напоминание. Аргументы: kind, seconds или at, text",
     "reminder.list":      "Показать запланированное. Аргументы: empty",

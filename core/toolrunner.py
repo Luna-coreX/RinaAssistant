@@ -396,9 +396,41 @@ def _ask_model(ctx, args):
     return ToolResult.done(answer, answer)
 
 
+def _teach_alias(ctx, args):
+    """
+    Запомнить, что этим словом человек зовёт эту программу (`4.0b-A04`).
+
+    Через реестр, а не мимо него, хотя ничего опасного тут не делается:
+    выученное соответствие меняет поведение запуска, то есть меняет мир —
+    просто не сейчас, а в следующий раз. Инструмент, меняющий поведение и
+    не попавший в журнал вызовов, — это ровно та запись, которой не хватит
+    при разборе «почему она открыла не то».
+    """
+    from voice import app_launcher
+
+    word = str(args["word"]).strip()
+    app_launcher.remember(word, str(args["launch"]),
+                          str(args.get("kind") or "file"), str(args["name"]),
+                          settings=ctx.settings)
+    return ToolResult.done(
+        tr("Запомнила: «{word}» — это {app}.", word=word, app=args["name"]),
+        {"word": word, "app": args["name"]})
+
+
+def _forget_alias(ctx, args):
+    """Забыть одно выученное соответствие."""
+    from voice import app_launcher
+
+    word = str(args["word"]).strip()
+    app_launcher.forget(word, settings=ctx.settings)
+    return ToolResult.done(tr("Забыла «{word}».", word=word), {"word": word})
+
+
 IMPLEMENTATIONS = {
     "launch_app": _launch_app,
     "list_apps": _list_apps,
+    "teach_alias": _teach_alias,
+    "forget_alias": _forget_alias,
     "set_volume": _set_volume,
     "media_control": _media_control,
     "lock_screen": _lock_screen,

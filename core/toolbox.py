@@ -43,6 +43,39 @@ LAUNCH_APP = Tool(
     errors=("app.not_found", "app.launch_failed"),
 )
 
+TEACH_ALIAS = Tool(
+    name="teach_alias",
+    summary="Запомнить, что этим словом человек зовёт эту программу.",
+    params=(
+        Param("word", "string",
+              "Как человек говорит: «код», «браузер», «студия»."),
+        Param("name", "string",
+              "Отображаемое имя программы, как оно записано в индексе."),
+        Param("launch", "string",
+              "Что запускать: путь или идентификатор пакета."),
+        Param("kind", "string", "file | uwp", required=False,
+              choices=("file", "uwp"), default="file"),
+    ),
+    # Ничего не запускает и в систему не лезет: пишет в свои настройки.
+    # Разрешения на запуск здесь не нужны — они понадобятся тому запуску,
+    # который случится потом, и спросятся тогда же.
+    permissions=set(),
+    # Выучить дважды одно и то же — то же самое, что выучить один раз.
+    idempotent=True,
+    returns="Слово и программа, которую оно теперь означает.",
+    errors=(),
+)
+
+FORGET_ALIAS = Tool(
+    name="forget_alias",
+    summary="Забыть выученное соответствие для одного слова.",
+    params=(Param("word", "string", "Слово, которое надо забыть."),),
+    permissions=set(),
+    idempotent=True,
+    returns="Слово, которое перестало что-либо означать.",
+    errors=(),
+)
+
 LIST_APPS = Tool(
     name="list_apps",
     summary="Найденные на компьютере программы.",
@@ -255,7 +288,7 @@ ASK_MODEL = Tool(
 
 
 ALL_TOOLS = (
-    LAUNCH_APP, LIST_APPS,
+    LAUNCH_APP, LIST_APPS, TEACH_ALIAS, FORGET_ALIAS,
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     RUN_USER_COMMAND, DISPATCH_PLUGIN_COMMAND,

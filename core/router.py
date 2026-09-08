@@ -29,8 +29,10 @@ in the core. Both steps will move here along with 4.0-B03 and 4.0-B04. Until
 then the core asks them before the router, exactly as before.
 """
 
+import re
 from dataclasses import dataclass, field
 
+from core import apps as apps_mod
 from core.intent import Intent
 
 
@@ -76,6 +78,17 @@ class RouterContext:
     yes_words: tuple = YES_WORDS
     no_words: tuple = NO_WORDS
 
+    #: What was last asked to be launched, as the person said it (4.0b-A04).
+    #:
+    #: Needed by a correction: "нет, я имел в виду Chrome" says what was
+    #: meant and not what was asked for. Without this the correction has
+    #: nothing to attach the lesson to.
+    #:
+    #: It is a phrase rather than a program: what is being taught is the
+    #: word the person uses, and it is that word which will be said next
+    #: time.
+    last_launch_query: str = ""
+
 
 def route(text, ctx=None):
     """Text -> Intent. Performs nothing."""
@@ -94,7 +107,15 @@ def route(text, ctx=None):
             return Intent("silence", stage="wake", text=text)
         return Intent("ask.wake", stage="wake", text=text)
 
-    for stage in (_answer_to_question, _reminder, _system, _launch,
+    # `_teach` стоит перед `_launch` и после всего остального: выигрывать
+    # ему надо только у запуска. «Когда я говорю "код", открывай VS Code»
+    # содержит «открывай VS Code», и разбор запуска забрал бы фразу себе,
+    # запустив редактор вместо того, чтобы выучить правило.
+    #
+    # А после `_answer_to_question` — потому что «нет» при заданном вопросе
+    # остаётся отказом. Поправка приходит тогда, когда вопроса нет: Рина
+    # уже запустила не то, и её поправляют вслед.
+    for stage in (_answer_to_question, _reminder, _system, _teach, _launch,
                   _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
@@ -202,6 +223,81 @@ def _system(command, ctx):
     return Intent(name, {"action": action_id}, stage="system")
 
 
+#: «Когда я говорю "код", открывай VS Code» — правило, названное вслух.
+#:
+#: Кавычки необязательны: распознавание речи их не выдаёт вовсе, и
+#: требовать их значило бы сделать правило доступным только с клавиатуры.
+_RULE = re.compile(
+    r"\b(?:когда|если)\s+я\s+(?:говорю|скажу)\s+"
+    r"[«\"']?(?P<word>[^«»\"',]+?)[»\"']?\s*,?\s+"
+    r"(?:открывай|запускай|открой|запусти|это)\s+(?P<app>.+)$",
+    re.IGNORECASE)
+
+#: «Нет, я имел в виду Chrome» — поправка вслед запущенному.
+#:
+#: Род не важен и не должен быть: «имела» ничем не отличается от «имел».
+_CORRECTION = re.compile(
+    r"^(?:нет[,\s]+|не\s+т[оа]т[,\s]+|)?"
+    r"я\s+имел[а]?\s+в\s+виду\s+(?P<app>.+)$",
+    re.IGNORECASE)
+
+
+def _teach(command, ctx):
+    """
+    Человек назвал правило или поправил прошлый запуск (`4.0b-A04`).
+
+    **Учится только названное вслух.** Неявного обучения на всех разговорах
+    здесь нет и не будет: память наполнилась бы мусором, а человек не смог
+    бы понять, откуда взялось поведение — и, что хуже, не смог бы это
+    отменить, потому что не знал бы, что отменять.
+
+    **Спорное не сохраняется молча.** Если названная программа сама
+    неоднозначна или её нет вовсе, возвращается намерение спросить, а не
+    записать. Выученное соответствие живёт долго, и ошибка в нём тем
+    неприятнее, чем позже её заметят.
+    """
+    rule = _RULE.search(command)
+    if rule:
+        return _teaching(rule.group("word"), rule.group("app"), ctx,
+                         word_said=True)
+
+    fix = _CORRECTION.search(command.strip())
+    if fix and ctx.last_launch_query:
+        return _teaching(ctx.last_launch_query, fix.group("app"), ctx,
+                         word_said=False)
+    return None
+
+
+def _teaching(word, app, ctx, word_said):
+    """Слово и программа -> намерение выучить, спросить или отказать."""
+    word = (word or "").strip(" \"'«».,")
+    app = (app or "").strip(" \"'«».,")
+    if not word or not app:
+        return None
+
+    found = apps_mod.find(app, limit=5, entries=ctx.apps)
+    if not found:
+        return Intent("alias.unknown", {"query": app, "word": word},
+                      stage="teach")
+    if len(found) > 1:
+        # Спрашиваем всегда, когда кандидатов больше одного, — без порогов
+        # и без догадок. Запуск можно переиграть следующей фразой, а
+        # выученное соответствие живёт годами: цена вопроса здесь ниже
+        # цены ошибки, и это тот случай, когда лучше переспросить.
+        #
+        # Варианты — словарями: это состояние вопроса, и оно обязано
+        # пережить запись в файл и дорогу по протоколу (4.0-B03).
+        return Intent("alias.ambiguous",
+                      {"options": tuple(e.to_dict() for e in found[:5]),
+                       "query": app, "word": word}, stage="teach")
+
+    entry = found[0]
+    return Intent("alias.teach",
+                  {"word": word, "app": entry.name,
+                   "launch": entry.launch, "kind": entry.kind,
+                   "said": word_said}, stage="teach")
+
+
 def _launch(command, ctx):
     from voice import app_launcher
 
@@ -210,7 +306,13 @@ def _launch(command, ctx):
     if decision is None:
         return None
     if decision.status == "launch":
-        return Intent("app.launch", {"app": decision.entry.name},
+        # Сказанное едет вместе с решением. Инструмент запуска давно ждёт
+        # `query` — «что пользователь сказал, чтобы запомнить выбор», — а
+        # роутер его не клал, и параметр всё это время приходил пустым.
+        # Он же нужен поправке: «нет, я имел в виду Chrome» учит слову, а
+        # не программе (`4.0b-A04`).
+        return Intent("app.launch",
+                      {"app": decision.entry.name, "query": decision.query},
                       stage="launcher")
     if decision.status == "ambiguous":
         # The options as dicts rather than objects: this is the question's

@@ -101,6 +101,13 @@ class RinaEngine:
         # cleared the flag, the microphone opened under speech still
         # sounding, and Rina heard herself.
         self._speaking = threading.Event()
+
+        #: Что запускали последним — как это сказал человек (`4.0b-A04`).
+        #:
+        #: В памяти, а не в хранилище: поправка идёт следом за запуском, в
+        #: том же разговоре. Пережившее перезапуск «последнее» относилось бы
+        #: к сеансу, которого человек уже не помнит, и учило бы не тому.
+        self._last_launch_query = ""
         self._speak_lock = threading.Lock()
         self._speak_count = 0
         self._reminders = ReminderStore(settings)
@@ -508,12 +515,14 @@ class RinaEngine:
             reminders_active=len(self._reminders.active()),
             llm_enabled=llm.is_enabled(),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
+            last_launch_query=self._last_launch_query,
         )
 
     def _remember_choice(self, query, entry):
         from voice import app_launcher
 
-        app_launcher.remember(query, entry.launch, entry.kind, entry.name)
+        app_launcher.remember(query, entry.launch, entry.kind, entry.name,
+                              settings=self._settings)
 
     def _ask(self, question):
         """Ask a question and say it out loud."""
@@ -654,6 +663,16 @@ class RinaEngine:
         log.info("Команда (%s): %s", source, safe(command))
         self._history.add("user", command, source=source)
         self._emit(Events.HISTORY_CHANGED)
+
+        # Запомнить, что запускали, — чтобы поправку было к чему привязать
+        # (`4.0b-A04`). Запоминается **сказанное слово**, а не программа:
+        # учить надо тому, как человек называет, и «нет, я имел в виду
+        # Chrome» относится к слову, а не к тому, что открылось.
+        #
+        # Только удачный запуск: поправлять «не нашла» нечего, там ошибся
+        # не выбор, а поиск.
+        if intent.name == "app.launch":
+            self._last_launch_query = intent.arg("query") or ""
 
         # The phrase was an answer to the question asked — the router has already worked that out.
         if intent.stage == "pending":

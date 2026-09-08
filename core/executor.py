@@ -72,6 +72,40 @@ class Executor:
         return self._fail(tr("Не нашла программу «{name}».", name=query),
                           "app.not_found")
 
+    # ---------- выученное (4.0b-A04) ----------
+    def _do_alias_teach(self, intent, source):
+        """
+        Запомнить названное правило.
+
+        Разное «уже знала» и «выучила» — не украшение: человек, назвавший
+        правило дважды, должен понять, что второй раз ничего не изменил, а
+        не решить, что его не услышали.
+        """
+        return self._run("teach_alias", {
+            "word": intent.arg("word"),
+            "name": intent.arg("app"),
+            "launch": intent.arg("launch"),
+            "kind": intent.arg("kind") or "file",
+        }, source=source)
+
+    def _do_alias_ambiguous(self, intent, source):
+        """
+        Названная программа сама неоднозначна — спрашиваем, а не гадаем.
+
+        Выученное живёт годами, и ошибка в нём обнаружится тем позже, чем
+        реже человек говорит это слово. Запуск можно переиграть следующей
+        фразой; правило — нельзя, пока не вспомнишь, что оно есть.
+        """
+        names = ", ".join(o.get("name", "") for o in intent.arg("options"))
+        return self._ok(
+            tr("Не одна такая: {names}. Какую запомнить под «{word}»?",
+               names=names, word=intent.arg("word")))
+
+    def _do_alias_unknown(self, intent, source):
+        return self._fail(
+            tr("Не нашла программу «{name}» — нечего запоминать.",
+               name=intent.arg("query")), "app.not_found")
+
     def _do_app_launch_failed(self, intent, source):
         return self._fail(
             tr("Не получилось запустить {app} — программу удалили "
