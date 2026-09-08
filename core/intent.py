@@ -45,8 +45,11 @@ INTENTS = {
     # Only explicit corrections and rules. There is deliberately no implicit
     # learning from the whole conversation: memory would fill with rubbish,
     # and a person would not know where the behaviour came from.
-    "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app",
-    "alias.correct":      "Человек поправил прошлый запуск. Аргументы: app",
+    # Поправка вслед запуску — то же самое намерение: слово берётся из
+    # прошлого запуска, а не из фразы. Отдельного имени у неё нет намеренно
+    # — исполнялись бы они одинаково, и каталог обещал бы различие, которого
+    # в поведении нет. Разница записана аргументом `said`.
+    "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app, said",
     "alias.ambiguous":    "Учить нечему: названная программа сама неоднозначна. Аргументы: options, query, word",
     "alias.unknown":      "Учить нечему: названной программы нет. Аргументы: query, word",
 
