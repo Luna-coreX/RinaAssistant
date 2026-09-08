@@ -1,32 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Точка входа ядра: Рина без окна.
+The core's entry point: Rina with no window.
 
-Задача плана 4.0-E01.
+Plan item 4.0-E01.
 
-До сих пор ядро было библиотекой, которую поднимал `main.py` вместе с окном.
-Здесь оно становится процессом, у которого своя жизнь: аргументы, журнал,
-канал к оболочке и корректное завершение.
+Until now the core was a library that `main.py` raised together with the
+window. Here it becomes a process with a life of its own: arguments, a
+journal, a channel to the shell and an orderly shutdown.
 
-Запуск (обычно это делает оболочка, 4.0-E07):
+To run (usually the shell does this, 4.0-E07):
 
     python rina_core.py --transport pipe --session 3f0c1a2b
-    python rina_core.py --transport stdio          # отладка руками
+    python rina_core.py --transport stdio          # debugging by hand
 
-**Qt не импортируется.** Это не пожелание, а проверяемое свойство: ядро,
-затянувшее интерфейсную библиотеку, перестанет запускаться там, где её нет, и
-разделение окажется на бумаге. Проверяется прямо здесь, при старте.
+**Qt is not imported.** This is not a wish but a checkable property: a
+core that has dragged in the interface library will stop starting where
+that library is absent, and the split will exist only on paper. Checked
+right here, at startup.
 
-**Кто кого переживает.** Оболочка запускает ядро и держит канал; ядро,
-увидевшее обрыв, завершается (§13 спецификации). Отдельного «спящего режима»
-нет намеренно: ядро, пережившее свою оболочку, — это процесс, который никто
-не закроет и который держит микрофон.
+**Who outlives whom.** The shell starts the core and holds the channel; a
+core that sees the channel break shuts down (§13 of the specification).
+There is deliberately no "sleep mode": a core that outlived its shell is a
+process nobody will close and that is holding the microphone.
 
-Коды возврата:
+Exit codes:
 
-    0   завершились нормально: попросили или оболочка ушла
-    2   аргументы не разобраны
-    3   канал не открылся
+    0   finished normally: asked to, or the shell went away
+    2   the arguments could not be parsed
+    3   the channel did not open
 """
 
 import argparse
@@ -77,11 +78,11 @@ def parse_args(argv):
 
 def stop_plugins(plugins):
     """
-    Остановить процессы плагинов.
+    Stop the plugin processes.
 
-    Плагин — наш дочерний процесс, и оставить его после себя значит
-    оставить в системе python, который ничего не делает и никому не
-    подчиняется. То же правило, по которому ядро не переживает оболочку.
+    A plugin is our child process, and leaving one behind means leaving a
+    python in the system that does nothing and obeys nobody. The same rule
+    by which the core does not outlive the shell.
     """
     try:
         plugins.stop_all()
@@ -91,10 +92,11 @@ def stop_plugins(plugins):
 
 def check_headless():
     """
-    Убедиться, что интерфейсная библиотека не затянулась.
+    Make sure the interface library has not been dragged in.
 
-    Проверка стоит до создания ядра: если Qt приедет транзитивно, узнать об
-    этом надо здесь, а не на машине, где его нет.
+    The check stands before the core is created: if Qt arrives
+    transitively, this is where we have to find out, not on a machine
+    where it is absent.
     """
     if "PySide6" in sys.modules:
         raise RuntimeError(
@@ -104,11 +106,12 @@ def check_headless():
 
 def manage_backups(args):
     """
-    Показать копии или вернуться к одной из них.
+    List the backups, or go back to one of them.
 
-    Обе половины `4.0-I02` в одном месте: копия снимается перед миграцией
-    сама, а возвращает её человек — и ему надо сказать, что вообще есть.
-    Откат, который нельзя позвать, — это не возможность откатиться.
+    Both halves of `4.0-I02` in one place: the backup is taken before a
+    migration by itself, and the person restores it — so they have to be
+    told what there is. A rollback that cannot be called is not the
+    ability to roll back.
     """
     from core.settings_store import config_dir, settings
 
@@ -138,9 +141,9 @@ def manage_backups(args):
 
     took = available[-1] if wanted is None else wanted
     print(f"вернули из backup-v{took}")
-    # Замещённое не стёрто, и об этом надо сказать: человек, откатившийся по
-    # ошибке, иначе будет думать, что потерял всё, что накопил после
-    # миграции.
+    # What was displaced has not been erased, and that has to be said:
+    # otherwise a person who rolled back by mistake will think they lost
+    # everything accumulated since the migration.
     print(f"то, что заменили, отложено в "
           f"{os.path.join(config_dir(), f'backup-v{took}', 'replaced')}")
     return EXIT_OK
@@ -167,10 +170,11 @@ def main(argv=None):
         print("capabilities: " + ", ".join(CORE_CAPABILITIES))
         return EXIT_OK
 
-    # Копии и откат — до всего остального: у миграции есть вторая половина
-    # (`4.0-I02`), и без способа её позвать копия остаётся папкой, которая
-    # занимает место. Здесь, а не в окне: откатываются один раз и обычно
-    # тогда, когда окно как раз и не открывается.
+    # Backups and rollback come before everything else: a migration has a
+    # second half (`4.0-I02`), and without a way to call it the backup
+    # stays a folder taking up space. Here rather than in the window: one
+    # rolls back once, and usually exactly when the window will not
+    # open.
     if args.list_backups or args.restore_backup is not None:
         return manage_backups(args)
 
@@ -192,39 +196,43 @@ def main(argv=None):
     try:
         channels = open_channels(args.transport, args.session)
         if args.transport == "stdio":
-            # Случайный print() в любом модуле испортил бы кадр посреди
-            # длины. Транспорт уже забрал двоичный буфер, поэтому сам
-            # sys.stdout можно увести в поток ошибок: печать останется
-            # видимой, но в провод не попадёт.
+            # A stray print() in any module would spoil a frame in the
+            # middle of its length. The transport has already taken the
+            # binary buffer, so sys.stdout itself can be pointed at the
+            # error stream: printing stays visible but does not reach the
+            # wire.
             sys.stdout = sys.stderr
     except (TransportClosed, ValueError) as exc:
         log.error("Канал не открылся: %s", exc)
         print(f"канал не открылся: {exc}", file=sys.stderr)
         return EXIT_TRANSPORT
 
-    # Настройки читаются до всего остального и вслух: на них смотрят и
-    # движок распознавания, и голос, и планировщик. Хранилище прочитает
-    # себя и само при первом обращении, но тогда в журнале не будет ни
-    # строки о том, откуда взялись значения, — а это первый вопрос, когда
-    # программа ведёт себя не так, как настроена.
+    # The settings are read before everything else, and out loud: the
+    # recognition engine, the voice and the scheduler all look at them.
+    # The store would read itself on first access anyway, but then there
+    # would not be a line in the journal about where the values came from
+    # — and that is the first question when the program behaves
+    # differently from how it is set up.
     from core.settings_store import settings as settings_store
     settings_store.load()
     log.info("Настройки прочитаны: %s", settings_store.path)
 
-    # Язык реплик Рины (4.0-F08). Слова интерфейса переводит оболочка, но
-    # то, что Рина говорит, — её собственная речь, и язык ей задаёт ядро.
-    # Раньше это делало окно 3.1.0, единственный вход в программу; в
-    # разделённой программе входов два, и ядро обязано уметь само.
+    # The language of Rina's lines (4.0-F08). The shell translates the
+    # interface's words, but what Rina says is her own speech, and the
+    # core sets its language. This used to be done by the 3.1.0 window,
+    # the program's only entrance; a split program has two entrances, and
+    # the core is obliged to manage on its own.
     from core import i18n
     i18n.set_language(str(settings_store.get("ui_language", "Русский")))
     log.info("Язык реплик: %s", i18n.get_language())
 
-    # Плагины принадлежат ядру: они отвечают на команды, а команды
-    # обрабатывает ядро. Но живут они **в своих процессах** (4.0-H07):
-    # плагин, ушедший в бесконечный цикл, иначе забирал бы поток ядра, и
-    # Рина замолкала бы целиком из-за чужого кода. Поверхность у
-    # `HostedPlugins` та же, что у менеджера в процессе, — ядру не нужно
-    # знать, где живёт плагин.
+    # Plugins belong to the core: they answer commands, and commands are
+    # handled by the core. But they live **in processes of their own**
+    # (4.0-H07): otherwise a plugin that went into an endless loop would
+    # take the core's thread with it, and Rina would fall silent entirely
+    # because of somebody else's code. `HostedPlugins` has the same
+    # surface as the in-process manager — the core does not need to know
+    # where a plugin lives.
     from core.plugin_host import HostedPlugins
     from core.settings_store import settings as core_settings
 
@@ -232,21 +240,21 @@ def main(argv=None):
     try:
         plugins.discover()
     except Exception:                                    # noqa: BLE001
-        # Битый каталог плагинов не повод не запускать помощника.
+        # A broken plugin catalogue is no reason not to start the assistant.
         log.exception("Плагины не собрались")
 
     engine = RinaEngine(plugin_manager=plugins, event_bus=EventBus())
     server = ProtocolServer(engine, channels, app_version=APP_VERSION)
 
-    # Таймеры живут в ядре (4.0-E05). Раньше планировщик запускало окно; в
-    # разделённой программе это неверно вдвойне: напоминание, поставленное
-    # голосом, обязано сработать независимо от того, открыто ли окно, а
-    # оболочка вправе быть закрытой в трей.
+    # Timers live in the core (4.0-E05). The scheduler used to be started
+    # by the window; in a split program that is doubly wrong: a reminder
+    # set by voice must fire regardless of whether the window is open, and
+    # the shell is entitled to be closed into the tray.
     engine.start_reminders()
 
-    # Сигналы: завершаться корректно, а не падать. SIGTERM приходит от
-    # оболочки при остановке, SIGINT — от человека в консоли; для ядра
-    # разницы нет, и обрабатываются они одинаково.
+    # Signals: shut down properly rather than fall over. SIGTERM comes
+    # from the shell when stopping, SIGINT from a person at the console;
+    # for the core there is no difference, and they are handled alike.
     stopping = threading.Event()
 
     def on_signal(signum, _frame):
@@ -262,22 +270,22 @@ def main(argv=None):
             try:
                 signal.signal(number, on_signal)
             except (ValueError, OSError):
-                pass          # не главный поток или сигнала нет на платформе
+                pass          # not the main thread, or no such signal here
 
     try:
         why = server.serve_forever()
     finally:
-        # Порядок важен: сначала отпустить летучее состояние (§13), потом
-        # гасить ядро. Наоборот — значит сбрасывать разрешения у уже
-        # разобранного исполнителя.
+        # The order matters: release the volatile state first (§13), then
+        # shut the core down. The other way round means clearing
+        # permissions on an executor that has already been taken apart.
         dropped = server.on_disconnect()
         try:
             engine.shutdown()
         except Exception:                                  # noqa: BLE001
             log.exception("Ядро завершилось с ошибкой")
-        # Процессы плагинов — наши дочерние: оставить их после себя значит
-        # оставить в системе python, который ничего не делает и никому не
-        # подчиняется (4.0-H07).
+        # The plugin processes are our children: leaving them behind
+        # means leaving a python in the system that does nothing and obeys
+        # nobody (4.0-H07).
         stop_plugins(plugins)
         channels.close()
 

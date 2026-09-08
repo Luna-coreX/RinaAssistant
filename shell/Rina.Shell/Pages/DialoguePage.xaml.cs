@@ -191,9 +191,10 @@ public partial class DialoguePage : UserControl
     {
         // The shell picks the file and writes it: the save dialogue is its
         // job, and the core hands over the content (§6 of the spec).
-        // Содержимое файла целиком, вместе с видом и версией формата: файл
-        // истории обязан отличаться от файла команд, иначе первый же импорт
-        // не туда разберётся как свой.
+        // The whole contents of the file, together with its kind and
+        // format version: a history file must be distinguishable from a
+        // command file, or the first import into the wrong place will
+        // parse it as its own.
         var told = await Ask(Methods.HistoryExport);
         if (told is null) return;
 

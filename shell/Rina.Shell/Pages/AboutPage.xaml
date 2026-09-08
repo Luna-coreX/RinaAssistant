@@ -61,9 +61,10 @@
         <StackPanel x:Name="Places" />
       </Border>
 
-      <!-- Собрать всё это в архив одним нажатием. Человек, пришедший с
-           неполадкой, не обязан знать, какие журналы нам нужны и где они
-           лежат; а мы не обязаны просить его открывать десять папок. -->
+      <!-- Collect all of this into one archive with a single press. A
+           person who came here with a fault is not obliged to know which
+           journals we need or where they lie; and we are not obliged to
+           ask them to open ten folders. -->
       <TextBlock Text="{loc:S 'ДИАГНОСТИКА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <StackPanel Orientation="Horizontal" Margin="0,0,0,8">

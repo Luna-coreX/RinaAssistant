@@ -421,10 +421,11 @@ work.ask("commands.list")
 items = work.read(1)[0].payload["items"]
 check("список своих команд отдаётся", isinstance(items, list), f"| {items}")
 
-# Команда — в том виде, в каком её кладёт конструктор: фразы и вид, а не
-# «имя». Первая редакция слала `name`/`kind`, которых у хранилища нет
-# вовсе, и проверка проходила только потому, что импорт тогда ничего не
-# разбирал: приехала бы такая команда и осталась бы мусором в списке.
+# A command in the form the constructor puts it in: phrases and a kind,
+# not a "name". The first edition sent `name`/`kind`, which the store does
+# not have at all, and the check passed only because the import parsed
+# nothing back then: such a command would have arrived and stayed in the
+# list as rubbish.
 work.ask("commands.save", {"command": {"type": "app", "target": "Discord",
                                        "triggers": ["мой дискорд"],
                                        "match": "contains",
@@ -444,8 +445,9 @@ dump = (carried.get("payload") or {}).get("commands")
 check("экспорт отдаёт содержимое, а не пишет файл",
       isinstance(dump, list) and len(dump) == len(after), f"| {dump and len(dump)}")
 
-# Конверт. Без него файл команд неотличим от любого другого массива —
-# в том числе от файла истории, и импорт не туда разберётся как свой.
+# The envelope. Without it a command file is indistinguishable from any
+# other array — the history file among them, and an import into the wrong
+# place will parse it as its own.
 check("выгрузка в конверте: вид назван",
       carried.get("kind") == "rina.commands", f"| {carried.get('kind')}")
 check("и версия формата тоже",
@@ -458,9 +460,9 @@ merged = work.read(1)[0].payload
 check("импорт не затирает уже настроенное",
       merged["added"] == 0 and merged["skipped"] == len(dump), f"| {merged}")
 
-# Тот же файл, но с чужими номерами: так и выглядит выгрузка с другой
-# машины. Совпадение по номеру её бы пропустило, и команды приехали бы
-# вторым экземпляром.
+# The same file but with somebody else's ids: that is what an export from
+# another machine looks like. Matching by id would let it through, and the
+# commands would arrive as a second copy.
 foreign = json.loads(json.dumps(carried))
 for i, command in enumerate(foreign["payload"]["commands"]):
     command["id"] = f"cmd_чужой{i}"
@@ -468,8 +470,8 @@ work.ask("commands.import", {"file": foreign})
 check("дубликат узнан по фразам, а не по номеру",
       work.read(1)[0].payload["added"] == 0, "| приехал вторым экземпляром")
 
-# Файл истории вместо файла команд — обычная ошибка человека, и ответ на
-# неё обязан быть внятным, а не «добавлено 0».
+# A history file instead of a command file is an ordinary human mistake,
+# and the answer to it has to be intelligible rather than "0 added".
 work.ask("history.export")
 history_file = work.read(1)[0].payload
 work.ask("commands.import", {"file": history_file})
@@ -479,7 +481,8 @@ check("чужой вид файла отвергнут",
       and refused.payload.get("code") == "transfer.wrong_kind",
       f"| {refused.payload}")
 
-# Команда — это запуск программы, а файл мог написать кто угодно.
+# A command launches a program, and the file could have been written by
+# anybody.
 work.ask("commands.import", {"file": {
     "kind": "rina.commands", "format": 1,
     "payload": {"commands": [{"id": "cmd_new", "enabled": True,

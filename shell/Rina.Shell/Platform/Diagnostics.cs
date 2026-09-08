@@ -10,45 +10,50 @@ using static Rina.Shell.Strings.Loc;
 namespace Rina.Shell.Platform;
 
 /// <summary>
-/// Диагностический пакет: журналы обоих слоёв, версии и состояние — в архив.
+/// A diagnostic bundle: both layers' journals, the versions and the state,
+/// into one archive.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Задача плана <c>4.0-I03</c>. Разбор жалобы начинается с вопросов, ответы
-/// на которые человек не знает и не обязан знать: какая версия ядра, какая
-/// протокола, что было в журнале, включено ли распознавание. Собрать это
-/// руками — десять шагов по папкам, которые спрятаны в <c>AppData</c>.
+/// Plan item <c>4.0-I03</c>. Looking into a complaint begins with
+/// questions whose answers a person does not know and is not obliged to
+/// know: which version of the core, which of the protocol, what was in the
+/// journal, whether recognition is on. Collecting that by hand is ten
+/// steps through folders hidden away in <c>AppData</c>.
 /// </para>
 /// <para>
-/// <b>Собирает оболочка.</b> Архив, файлы и сведения об операционной
-/// системе — системный слой (ADR 0009). Ядро отдаёт то, что знает только
-/// оно, и отдаёт обычными методами: секретные ключи оно наружу не выдаёт
-/// само, и здесь это не приходится повторять.
+/// <b>The shell collects it.</b> The archive, the files and the details
+/// of the operating system are the system layer (ADR 0009). The core hands
+/// over what only it knows, and hands it over by ordinary methods: it does
+/// not give secret keys out by itself, and that does not have to be
+/// repeated here.
 /// </para>
 /// <para>
-/// <b>Свободный текст не уезжает.</b> Значение, выбранное из перечня, —
-/// это не текст человека, и оно пишется как есть; всё остальное
-/// заменяется длиной. Правило то же, что в журнале вызовов
-/// (<c>core/audit.py</c>), и оно намеренно строгое: под него попадает и
-/// безобидное сочетание клавиш, и путь к модели, в котором стоит имя
-/// человека. Одно объяснимое правило лучше списка исключений, который
-/// однажды забудут пополнить.
+/// <b>Free text does not travel.</b> A value picked from an enumeration
+/// is not the person's own text, and it is written as it is; everything
+/// else is replaced by its length. The rule is the same as in the call
+/// journal (<c>core/audit.py</c>), and it is deliberately strict: it
+/// catches both a harmless key combination and a path to a model with the
+/// person's name in it. One explainable rule is better than a list of
+/// exceptions that one day nobody remembers to extend.
 /// </para>
 /// <para>
-/// <b>Журналы едут как есть, и об этом сказано.</b> В них и есть ответ на
-/// «что произошло», ради которого пакет собирают. Но настройка
-/// <c>log_texts</c> разрешает писать в журнал тексты реплик — и если она
-/// включена, человек обязан узнать об этом **до** того, как отправит
-/// архив, а не после. Поэтому её значение стоит в пояснении первой
-/// строкой.
+/// <b>The journals travel as they are, and that is said out loud.</b>
+/// They are where the answer to "what happened" lives, which is what the
+/// bundle is collected for. But the <c>log_texts</c> setting permits the
+/// text of spoken lines to be written into the journal — and if it is on,
+/// the person must find out **before** they send the archive, not after.
+/// That is why its value stands in the explanation's first line.
 /// </para>
 /// </remarks>
 public static class Diagnostics
 {
-    /// <summary>Что получилось: путь к архиву либо причина отказа.</summary>
+    /// <summary>What came of it: the path to the archive, or the reason
+    /// for refusing.</summary>
     public sealed record Result(bool Ok, string Path, string Problem);
 
-    /// <summary>Куда предложить сохранить: имя со временем, чтобы не затирать.</summary>
+    /// <summary>Where to suggest saving: a name with a timestamp, so that
+    /// nothing is overwritten.</summary>
     public static string SuggestedName() =>
         $"rina-diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.zip";
 
@@ -57,13 +62,14 @@ public static class Diagnostics
         "RinaAssistant");
 
     /// <summary>
-    /// Собрать пакет.
+    /// Collect the bundle.
     /// </summary>
     /// <remarks>
-    /// Ядро может быть не на связи — и это самый частый случай, ради
-    /// которого пакет и собирают. Тогда версии и настройки недоступны, а
-    /// журналы доступны; пакет собирается из того, что есть, и отсутствие
-    /// названо, а не пропущено молча.
+    /// The core may be off the line — and that is the commonest case the
+    /// bundle is collected for. Then the versions and the settings are
+    /// unavailable while the journals are available; the bundle is built
+    /// from what there is, and what is missing is named rather than
+    /// skipped silently.
     /// </remarks>
     public static async Task<Result> CollectAsync(string zipPath, CoreLink? link)
     {
@@ -98,7 +104,8 @@ public static class Diagnostics
         writer.Write(body);
     }
 
-    /// <summary>Журналы обоих слоёв. Ротации тоже: сбой мог быть до неё.</summary>
+    /// <summary>Both layers' journals. The rotated ones too: the failure
+    /// may have happened before the rotation.</summary>
     private static void AddLogs(ZipArchive archive)
     {
         var logs = Path.Combine(DataDir, "logs");
@@ -107,10 +114,11 @@ public static class Diagnostics
         {
             try
             {
-                // Читаем, не мешая писать: журнал открыт на дозапись обоими
-                // процессами, и обычное чтение спотыкается о разделяемый
-                // доступ. Пакет, который не собирается, пока программа
-                // работает, бесполезен — её ровно тогда и разбирают.
+                // We read without getting in the way of writing: the
+                // journal is open for appending by both processes, and an
+                // ordinary read trips over the sharing mode. A bundle
+                // that cannot be collected while the program is running
+                // is useless — that is exactly when it is looked into.
                 using var source = new FileStream(
                     file, FileMode.Open, FileAccess.Read,
                     FileShare.ReadWrite | FileShare.Delete);
@@ -121,7 +129,7 @@ public static class Diagnostics
             }
             catch (IOException)
             {
-                // Один недочитанный журнал — не повод остаться без пакета.
+                // One journal read short is no reason to end up with no bundle.
             }
         }
     }
@@ -190,7 +198,8 @@ public static class Diagnostics
         return lines.ToString();
     }
 
-    /// <summary>Настройки и то, писались ли в журнал тексты реплик.</summary>
+    /// <summary>The settings, and whether the text of spoken lines was
+    /// written into the journal.</summary>
     private sealed record Settings(string Text, bool TextsLogged, bool Known);
 
     private static async Task<Settings> SettingsAsync(CoreConnection? connection)
@@ -231,13 +240,13 @@ public static class Diagnostics
     }
 
     /// <summary>
-    /// Значение в виде, пригодном для отправки.
+    /// A value in a form fit for sending.
     /// </summary>
     /// <remarks>
-    /// Выбранное из перечня — это не текст человека, и оно едет как есть.
-    /// Свободный текст, список и словарь превращаются в длину и размер:
-    /// «сколько» отвечает почти на все вопросы разбора, «что именно» — ни на
-    /// один из них.
+    /// A value picked from an enumeration is not the person's own text,
+    /// and it travels as it is. Free text, a list and a dictionary turn
+    /// into a length and a size: "how much" answers almost every question
+    /// an investigation asks, "what exactly" answers none of them.
     /// </remarks>
     private static string Safe(JsonObject? spec, JsonNode value)
     {
@@ -263,8 +272,8 @@ public static class Diagnostics
         lines.AppendLine("==========================");
         lines.AppendLine();
 
-        // Первой строкой — потому что это единственное, что человек обязан
-        // узнать до отправки, а не после.
+        // The first line, because this is the one thing the person must
+        // find out before sending rather than after.
         lines.AppendLine(settings.Known
             ? (settings.TextsLogged
                 ? "ВНИМАНИЕ: запись текстов реплик была ВКЛЮЧЕНА "

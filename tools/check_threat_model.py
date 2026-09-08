@@ -1,30 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-S02: модель угроз сверяется с тем, что есть на самом деле.
+S02: the threat model is checked against what is actually there.
 
-Задача плана `4.0-S02`. Критерий приёмки записан так: «каждое требование
-безопасности в этом плане возводится к пункту модели, а не к интуиции». Это
-проверяемое утверждение, и здесь оно проверяется.
+Plan item `4.0-S02`. The acceptance criterion is written like this:
+"every security requirement in this plan traces back to a point of the
+model rather than to intuition". That is a checkable statement, and here it
+is checked.
 
-Документ прозой проверить нельзя, и попытка была бы обманом. Зато можно
-проверить три вещи, соврать в которых прозой особенно легко:
+Prose cannot be checked as prose, and an attempt would be a deception. What
+can be checked is three things that prose makes it especially easy to lie
+about:
 
-    1. **Названная защита существует.** Пункт плана есть в `ROADMAP.md`,
-       файл есть на диске. Модель, ссылающаяся на несуществующий файл, —
-       описание программы, которой нет.
-    2. **Названное доказательство запускается.** Проверка есть, и регресс
-       её находит. Защита без доказательства держится на том, что её никто
-       не трогал.
-    3. **Обратная связь.** Каждое требование безопасности из плана
-       возводится хотя бы к одной угрозе. Это и есть критерий приёмки:
-       без него в план можно добавить защиту, не ответив «от чего».
+    1. **The named defence exists.** The plan item is in `ROADMAP.md`, the
+       file is on disk. A model referring to a file that does not exist is
+       a description of a program that does not exist.
+    2. **The named proof runs.** The check exists, and the regression run
+       finds it. A defence without a proof rests on nobody having touched
+       it.
+    3. **The reverse link.** Every security requirement in the plan traces
+       back to at least one threat. That is the acceptance criterion
+       itself: without it a defence can be added to the plan without
+       answering "against what".
 
-Список требований ведётся здесь руками — как `NEEDS` в
-`check_surface_reachable.py`. Выводить его из текста плана нельзя:
-«требование безопасности» — суждение, а не признак строки, и автоматика
-угадывала бы его по словам, то есть неверно и молча.
+The list of requirements is kept here by hand — like `NEEDS` in
+`check_surface_reachable.py`. It cannot be derived from the plan's text:
+"security requirement" is a judgement, not a property of a line, and
+automation would guess it from the words — that is, wrongly and silently.
 
-Запуск:
+To run:
     python tools/check_threat_model.py
 """
 import io
@@ -53,13 +56,12 @@ def check(label, ok, detail=""):
     print(("OK   " if ok else "FAIL "), label, detail)
 
 
-#: Требования безопасности плана и угрозы, к которым они возводятся.
+#: The plan's security requirements and the threats they trace back to.
 #:
-#: Пункт, попавший сюда, обязан быть назван хотя бы в одной угрозе. Пункт,
-#: которого здесь нет, — это либо не про безопасность, либо забытый: и то и
-#: другое стоит того, чтобы проверка покраснела, потому что молчаливое
-#: «наверное, не про безопасность» и есть та самая интуиция, вместо которой
-#: писалась модель.
+#: An item that gets in here must be named by at least one threat. An item
+#: that is not here is either not about security or was forgotten: both are
+#: worth turning the check red, because a silent "probably not about
+#: security" is the very intuition the model was written to replace.
 SECURITY_ITEMS = {
     "4.0-C04": "каталог разрешений",
     "4.0-C05": "контур подтверждения",
@@ -85,11 +87,12 @@ SECURITY_ITEMS = {
 text = io.open(MODEL, encoding="utf-8").read()
 roadmap = io.open(ROADMAP, encoding="utf-8").read()
 
-#: Угроза и строка «Чем:» под ней.
+#: A threat and the "Чем:" line under it.
 #:
-#: Формат нарочно простой: заголовок `### T-NN · имя`, а дальше где-то до
-#: следующего заголовка — строка, начинающаяся с `Чем:`. Разбирать прозу
-#: тоньше — значит завести второй язык описания рядом с первым.
+#: The format is deliberately simple: a heading `### T-NN · name`, and
+#: then somewhere before the next heading a line beginning with `Чем:`.
+#: Parsing the prose more finely would mean introducing a second
+#: description language beside the first.
 threats = {}
 current = None
 for line in text.split("\n"):
@@ -120,21 +123,23 @@ for tid in sorted(threats):
     threat = threats[tid]
     check(f"{tid} — чем защищаем сказано", bool(threat["why"]),
           f"| {threat['name']}")
-    # Остаток называется всегда: строка «остатка нет» тоже строка, и её
-    # приходится написать. Молчание значило бы, что о нём не подумали.
+    # The residue is always named: "there is no residue" is a line too,
+    # and it has to be written. Silence would mean nobody thought about
+    # it.
     check(f"{tid} — остаток назван", threat["rest"], f"| {threat['name']}")
 
 print()
 print("=== названная защита существует ===")
 
-# Всё, на что модель ссылается: пункты плана, файлы, режимы оболочки.
+# Everything the model refers to: plan items, files, shell modes.
 named_items, named_files, named_modes = set(), set(), set()
 for threat in threats.values():
     for token in re.findall(r"`([^`]+)`", threat["why"]):
-        # `4.0b-` тоже: защита, дописанная в бете, — такое же требование
-        # безопасности, как и любое другое, и возводиться к модели обязана
-        # наравне. Без этой буквы пункт молча выпадал бы из сверки в обе
-        # стороны, то есть выглядел бы связанным, не будучи связанным.
+        # `4.0b-` as well: a defence added during the beta is as much a
+        # security requirement as any other, and is obliged to trace back
+        # to the model on the same terms. Without that letter such an item
+        # would drop out of the check in both directions silently — that
+        # is, it would look linked without being linked.
         if re.fullmatch(r"4\.0b?-[A-Z]\d+[a-z]?", token):
             named_items.add(token)
         elif token.startswith("--check-"):
@@ -151,10 +156,10 @@ for path in sorted(named_files):
 print()
 print("=== названное доказательство запускается ===")
 
-# Регресс выводит список сам: `tools/test_*.py`, `tools/check_*.py` и
-# режимы `--check-*`, объявленные оболочкой. Значит достаточно проверить,
-# что названное доказательство попадает под это правило, — тогда оно
-# запускается регрессом, а не лежит рядом с ним.
+# The regression run derives its list itself: `tools/test_*.py`,
+# `tools/check_*.py` and the `--check-*` modes the shell declares. So it is
+# enough to check that the named proof falls under that rule — then it is
+# run by the regression rather than lying next to it.
 startup = io.open(STARTUP, encoding="utf-8").read()
 declared_modes = set(re.findall(r'"(--check-[a-z]+)"', startup))
 
@@ -173,14 +178,15 @@ for mode in sorted(named_modes):
 print()
 print("=== требования плана возводятся к модели ===")
 
-# Та самая обратная связь. Без неё модель — сочинение: она описывает те
-# защиты, которые автор вспомнил, и молчит о тех, которые забыл.
+# That reverse link. Without it the model is an essay: it describes the
+# defences its author remembered and says nothing about the ones they
+# forgot.
 for item, what in sorted(SECURITY_ITEMS.items()):
     check(f"{item} ({what}) возводится к угрозе", item in named_items,
           "| требование безопасности, не названное ни одной угрозой")
 
-# И в обратную сторону: пункт, названный моделью, но не признанный
-# требованием безопасности, — расхождение того же рода.
+# And the other way round: an item named by the model but not recognised
+# as a security requirement is a discrepancy of the same kind.
 for item in sorted(named_items):
     check(f"{item} назван требованием безопасности", item in SECURITY_ITEMS,
           "| модель ссылается на него, а список требований о нём не знает")

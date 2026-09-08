@@ -939,20 +939,22 @@ public partial class App
     /// </para>
     /// </remarks>
     /// <summary>
-    /// I03: диагностический пакет собирается и не увозит лишнего.
+    /// I03: the diagnostic bundle is collected and carries nothing
+    /// extra away.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// На живом ядре: пакет собирают ради версий и состояния связи, а их
-    /// неоткуда взять, пока ядра нет. Проверка на подставном ядре
-    /// проверяла бы, что мы умеем писать zip.
+    /// Against a live core: a bundle is collected for the versions and
+    /// the state of the link, and there is nowhere to take those from
+    /// while there is no core. A check against a stand-in core would be
+    /// checking that we can write a zip.
     /// </para>
     /// <para>
-    /// Главное здесь — не «архив собрался», а **чего в нём нет**. Пакет
-    /// человек отправляет чужим людям, и обещание «историю разговора не
-    /// берём» стоит ровно столько, сколько стоит его проверка: в настройки
-    /// кладётся приметное слово, и проверка ищет его во всём архиве
-    /// целиком.
+    /// What matters here is not "the archive was built" but **what is
+    /// not in it**. A person sends the bundle to strangers, and the
+    /// promise "we do not take the conversation" is worth exactly what
+    /// checking it is worth: a distinctive word is put into the settings,
+    /// and the check looks for it through the whole archive.
     /// </para>
     /// </remarks>
     private async Task CheckDiagnosticsAsync()
@@ -985,9 +987,9 @@ public partial class App
             Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
                   $"| {link.State}");
 
-            // Приметное слово в настройку со свободным текстом. Оно обязано
-            // не доехать: путь к модели — это путь на диске человека, и в
-            // нём стоит его имя.
+            // A distinctive word into a free-text setting. It must not
+            // travel: the path to the model is a path on the person's
+            // disk, and their name is in it.
             const string secretish = "СЕКРЕТНАЯ-ТРОПИНКА-42";
             if (link.Connection is { Ready: true } live)
             {
@@ -1043,7 +1045,7 @@ public partial class App
             Check("версия протокола названа",
                   !versions.Contains("протокол: —"));
 
-            // То, ради чего проверка и написана.
+            // The thing this whole check was written for.
             var everything = string.Join("\n", inside.Values);
             Check("свободный текст настройки не уехал",
                   !everything.Contains(secretish),
@@ -1056,10 +1058,10 @@ public partial class App
             Check("число уехало как есть",
                   inside.GetValueOrDefault("settings.txt", "")
                         .Contains("volume = "));
-            // Ни одного файла хранилища: пакет — это пояснения и журналы, а
-            // не копия данных. Утверждение шире, чем «нет истории», и не
-            // называет файлов по именам: имя, написанное здесь, пришлось бы
-            // помнить и здесь, и в хранилище.
+            // Not one store file: a bundle is explanations and journals,
+            // not a copy of the data. The assertion is wider than "no
+            // history" and names no files: a name written here would have
+            // to be remembered both here and in the store.
             Check("файлов хранилища в пакете нет",
                   !inside.Keys.Any(k => k.EndsWith(".json")),
                   "| " + string.Join(", ", inside.Keys.Where(
@@ -1067,8 +1069,9 @@ public partial class App
             Check("текста разговора в пакете нет",
                   !everything.Contains("\"kind\": \"assistant\""));
 
-            // Человек обязан узнать про запись текстов до отправки, а не
-            // после: в журнале они могут быть, и это его решение.
+            // The person must find out about the recording of texts
+            // before sending rather than after: they may be in the
+            // journal, and that is their own decision.
             Check("про запись текстов сказано в пояснении",
                   inside.GetValueOrDefault("README.txt", "")
                         .Contains("текстов реплик"));
@@ -1090,9 +1093,10 @@ public partial class App
             Shutdown();
         }
 
-        // Настройки под проверкой настоящие: приметное слово надо убрать за
-        // собой. То же правило, по которому проверка автозапуска возвращает
-        // запись в реестре.
+        // The settings under this check are the real ones: the
+        // distinctive word has to be cleared away afterwards. The same
+        // rule by which the autostart check puts the registry entry
+        // back.
         static async Task live_reset(CoreLink link)
         {
             if (link.Connection is not { Ready: true } live) return;

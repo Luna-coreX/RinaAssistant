@@ -12,7 +12,7 @@ How complete the coverage is can be seen with the core.i18n.coverage()
 function.
 """
 
-# --- Українська ---
+# --- Ukrainian ---
 UK = {
     # navigation and pages
     'Рина': 'Ріна',

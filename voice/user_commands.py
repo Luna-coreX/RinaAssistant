@@ -128,16 +128,18 @@ class UserCommandStore:
 
     def save_all(self, commands):
         """
-        Записать список целиком.
+        Write the list as a whole.
 
-        Под транзакцией, как и всё остальное здесь: соседние методы её
-        открывают, а этот — не открывал. Замок повторно входимый, поэтому
-        вложенный вызов изнутри чужой транзакции работает как прежде.
+        Under a transaction, like everything else here: the neighbouring
+        methods open one and this one did not. The lock is reentrant, so a
+        nested call from inside somebody else's transaction works as
+        before.
 
-        **Одного этого мало, и стоит сказать почему.** Замок здесь делает
-        неделимой запись, но не «прочитать — изменить — записать»: два
-        потока, прочитавшие один и тот же список, допишут каждый своё и
-        второй затрёт первого целиком. Для этого есть `merge`.
+        **This alone is not enough, and it is worth saying why.** The lock
+        makes the write indivisible but not the read-modify-write: two
+        threads that read the same list will each append their own, and the
+        second will overwrite the first entirely. That is what `merge` is
+        for.
         """
         with self._settings.transaction():
             self._settings.set("custom_commands", commands)
@@ -145,16 +147,17 @@ class UserCommandStore:
 
     def merge(self, incoming, new_id):
         """
-        Добавить пришедшие команды к своим. Возвращает (добавлено, пропущено).
+        Add the incoming commands to our own. Returns (added, skipped).
 
-        Чтение, сведение и запись — под одной транзакцией. Врозь они
-        теряют чужую правку целиком: ввоз из файла и ответ Рины идут
-        разными потоками, оба читают список, оба дописывают своё, и
-        сохраняет тот, кто успел вторым.
+        Reading, merging and writing under one transaction. Apart they lose
+        somebody else's edit entirely: an import from a file and an answer
+        from Rina run on different threads, both read the list, both append
+        their own, and whoever got there second is the one who saves.
 
-        Сведение живёт здесь, а не у вызывающего, именно поэтому: границы
-        транзакции должны совпадать с границами «прочитать — изменить —
-        записать», а вызывающий об этом помнить не обязан.
+        The merging lives here rather than in the caller for exactly that
+        reason: a transaction's boundaries must coincide with the
+        boundaries of read-modify-write, and the caller is not obliged to
+        remember it.
         """
         from core.data_transfer import merge_commands
 

@@ -1,31 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-I01: собранный выпуск запускается — привезённым интерпретатором.
+I01: the built release starts — with the interpreter we shipped.
 
-Задача плана `4.0-I01`; решение по рантайму —
+Plan item `4.0-I01`; the decision about the runtime is
 [ADR 0011](../docs/adr/0011-python-runtime.md).
 
-**Установщик, который ставит нерабочее, — худший из возможных: он выглядит
-успешным.** Сборка отрабатывает с нулевым кодом ровно так же, когда всё
-хорошо и когда в рантайм не доехала половина; разницу видно только у
-человека, и видно как «программа не запускается».
+**An installer that installs something broken is the worst kind: it looks
+successful.** The build finishes with a zero exit code exactly the same way
+whether all is well or half the runtime failed to arrive; the difference
+shows only on the person's machine, and shows as "the program does not
+start".
 
-Поэтому проверяется не раскладка, а **поведение**: ядро поднимается
-`runtime/python/python.exe` из выпуска, и с ним доводится до рукопожатия по
-проводу. Файл на месте и файл работает — разные утверждения, и первое
-проверять бессмысленно.
+So what is checked is not the layout but the **behaviour**: the core is
+raised by `runtime/python/python.exe` from the release, and carried with it
+as far as a handshake over the wire. "The file is there" and "the file
+works" are different statements, and checking the first is pointless.
 
-Проверяется и обещание ADR 0011, ради которого встроенный дистрибутив и
-выбран: **в привезённый рантайм можно доставить пакет**. Без этого выбор
-теряет главный довод, а человек, решивший поставить Vosk, узнаёт об этом
-первым.
+The promise of ADR 0011, for whose sake the embedded distribution was
+chosen, is checked as well: **a package can be installed into the runtime
+we shipped**. Without that the choice loses its main argument, and the
+person who decides to install Vosk is the first to find out.
 
-Хранилище уводится во временную папку: проверка выпуска, которая пишет в
-настоящие настройки человека, — та же беда, от которой бережёт песочница.
+The store is moved into a temporary folder: a release check that writes
+into the person's real settings is the same trouble the sandbox guards
+against.
 
-Запуск:
+To run:
     python tools/check_release.py                  dist/Rina
-    python tools/check_release.py build/try        другая папка
+    python tools/check_release.py build/try        another folder
 """
 import io
 import json
@@ -47,8 +49,9 @@ use_utf8()
 from core.wire import (Envelope, FrameDecoder, IdGenerator, MessageType,
                        Session, Side, encode_frame)
 
-#: Та же версия, что прибита в сборке. Две копии числа разошлись бы, и
-#: проверка перестала бы проверять именно то, что собрано.
+#: The same version as the one nailed into the build. Two copies of the
+#: number would drift apart, and the check would stop checking the very
+#: thing that was built.
 from build_release import PYTHON_VERSION
 
 fails = 0
@@ -80,15 +83,17 @@ check("ядро на месте", os.path.isfile(entry))
 for name in ("core", "voice", "plugins"):
     check(f"пакет {name} уехал", os.path.isdir(os.path.join(where, name)))
 
-# Оболочка публикуется отдельным шагом: сборку можно гонять и без неё
-# (`--skip-shell`), поэтому её отсутствие — не провал, а сказанное вслух.
+# The shell is published as a separate step: the build can be run without
+# it (`--skip-shell`), so its absence is not a failure but something said
+# out loud.
 shell = os.path.join(where, "Rina.Shell.exe")
 if os.path.isfile(shell):
     check("оболочка на месте", True, f"| {os.path.getsize(shell) // 1024} КБ")
 else:
     print("     оболочка не публиковалась (--skip-shell) — проверяем ядро")
 
-# Чужие пути внутри `.pyc` — след машины разработчика, уехавший к человеку.
+# Foreign paths inside a `.pyc` are a trace of the developer's machine
+# that travelled to the person.
 strays = []
 for base, dirs, files in os.walk(where):
     if "__pycache__" in base or "site-packages" in base:
@@ -112,8 +117,8 @@ check(f"версия та, что прибита ({PYTHON_VERSION})",
       said.stdout.strip().startswith(PYTHON_VERSION),
       f"| {said.stdout.strip().splitlines()[0] if said.stdout else '—'}")
 
-# Он не должен быть тем, что стоит на машине: весь смысл ADR 0011 в том,
-# что мы привезли свой.
+# It must not be the one installed on the machine: the whole point of
+# ADR 0011 is that we brought our own.
 own = subprocess.run([python, "-c", "import sys; print(sys.prefix)"],
                      capture_output=True, text=True, encoding="utf-8",
                      errors="replace", env=child_env())
@@ -124,8 +129,9 @@ check("это наш рантайм, а не системный",
 print()
 print("=== в рантайм можно доставить пакет ===")
 
-# Обещание ADR 0011. Без него выбор встроенного дистрибутива теряет
-# главный довод: движки речи и зависимости плагинов ставятся **потом**.
+# The promise of ADR 0011. Without it the choice of an embedded
+# distribution loses its main argument: speech engines and plugins'
+# dependencies are installed **later**.
 pip = subprocess.run([python, "-c", "import pip; print(pip.__version__)"],
                      capture_output=True, text=True, encoding="utf-8",
                      errors="replace", env=child_env())
@@ -142,8 +148,8 @@ check("зависимости ядра импортируются", deps.returnc
 print()
 print("=== ядро поднимается и здоровается ===")
 
-# Настройки — во временную папку. Проверка выпуска не имеет права трогать
-# настоящее хранилище человека.
+# The settings go into a temporary folder. A release check has no right
+# to touch the person's real store.
 home = tempfile.mkdtemp(prefix="rina-release-")
 core = None
 try:

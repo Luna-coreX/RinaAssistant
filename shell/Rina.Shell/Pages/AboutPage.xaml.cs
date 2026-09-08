@@ -229,19 +229,20 @@ public partial class AboutPage : UserControl
     }
 
     /// <summary>
-    /// Собрать диагностический пакет и показать, куда он лёг.
+    /// Collect a diagnostic bundle and show where it landed.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Куда сохранить — спрашиваем окном: архив уедет из программы, и место
-    /// для него выбирает человек (§6, ADR 0009). Предлагается имя со
-    /// временем — второй пакет не должен затирать первый, когда просят
-    /// «соберите ещё раз после того, как повторится».
+    /// Where to save it we ask with a dialog: the archive is going to
+    /// leave the program, and the person chooses the place for it
+    /// (§6, ADR 0009). A name with a timestamp is offered — a second
+    /// bundle must not overwrite the first when the request is "collect
+    /// one more after it happens again".
     /// </para>
     /// <para>
-    /// Папка открывается сразу: пакет собирают, чтобы отправить, а перед
-    /// отправкой в него стоит заглянуть — что там внутри, написано в нём
-    /// самом первой строкой.
+    /// The folder opens straight away: a bundle is collected in order to
+    /// be sent, and before sending it is worth looking inside — what is in
+    /// it is written in its own first line.
     /// </para>
     /// </remarks>
     private async void OnCollectDiagnostics(object sender, RoutedEventArgs e)

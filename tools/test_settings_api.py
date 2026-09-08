@@ -102,11 +102,12 @@ check("без аргумента берётся общее хранилище",
 print()
 print("=== список целиком пишется под замком ===")
 
-# «Прочитать — изменить — записать» без общего замка теряет чужую правку
-# целиком, а не по ключу: второй поток пишет свой список поверх первого. У
-# своих команд таких потока два — ввоз из файла и ответ Рины; у напоминаний
-# тоже два — планировщик, помечающий сработавшее, и человек, заводящий
-# новое.
+# Read-modify-write without a shared lock loses somebody else's edit
+# entirely rather than key by key: the second thread writes its own list
+# over the first. The user's commands have two such threads — an import
+# from a file and an answer from Rina; the reminders have two as well —
+# the scheduler marking what fired and the person creating something
+# new.
 import threading
 
 from core.settings_api import MemorySettings
@@ -115,21 +116,22 @@ from voice.user_commands import UserCommandStore
 
 class RaceSettings(MemorySettings):
     """
-    Хранилище, на котором гонка происходит **обязательно**, а не иногда.
+    A store on which the race happens **always**, not sometimes.
 
-    Две предыдущие редакции этой проверки были негодными, и обе по одной
-    причине: полагались на удачу планировщика. Первая запускала сорок
-    потоков в цикле, и каждый успевал закончить до старта следующего.
-    Вторая добавила барьер и задержку — и повела себя непристойно: на
-    двадцати потоках из двадцати записей доживала одна, на сорока не
-    терялось ничего. Проверка, зелёная через раз, хуже отсутствующей: ей
-    перестают верить, а потом перестают верить и остальным.
+    The two previous editions of this check were no good, and both for
+    the same reason: they relied on the scheduler's luck. The first ran
+    forty threads in a loop, and each finished before the next started.
+    The second added a barrier and a delay — and behaved indecently: with
+    twenty threads one record out of twenty survived, with forty nothing
+    was lost at all. A check that is green every other time is worse than
+    no check: people stop believing it, and then stop believing the rest.
 
-    Здесь удачи нет. Потока два, и чтение не возвращается, пока не
-    прочитал второй. Нет общего замка — оба увидят один и тот же список, и
-    второй затрёт первого; всегда. Есть замок — второй до чтения не
-    доберётся, встреча не состоится, ожидание истечёт по сроку и всё
-    пройдёт как надо; тоже всегда.
+    There is no luck here. There are two threads, and the read does not
+    return until the second has read as well. With no shared lock both see
+    the same list and the second overwrites the first; always. With the
+    lock the second never gets as far as reading, the rendezvous does not
+    happen, the wait times out and everything goes as it should; always
+    too.
     """
 
     def __init__(self, values, meeting):
@@ -140,9 +142,10 @@ class RaceSettings(MemorySettings):
         value = super().get(key, default)
         if key == "custom_commands":
             try:
-                # Срок — для случая «замок на месте»: там встреча не
-                # состоится никогда, и ждать её вечно значило бы повесить
-                # проверку вместо того, чтобы её пройти.
+                # The timeout is for the case where the lock is in
+                # place: there the rendezvous never happens, and waiting
+                # for it for ever would hang the check instead of passing
+                # it.
                 self._meeting.wait(timeout=1.0)
             except threading.BrokenBarrierError:
                 pass
@@ -155,9 +158,10 @@ store = UserCommandStore(shared)
 
 
 def add_one(number):
-    # Транзакции здесь нет нарочно: её обязан держать сам `merge`, и весь
-    # смысл проверки в этом. Оберни мы вызов снаружи — проверка прошла бы
-    # и с прежним кодом, то есть согласилась бы со своим автором.
+    # There is deliberately no transaction here: `merge` itself is
+    # obliged to hold one, and that is the whole point of the check. Had
+    # we wrapped the call from outside, the check would have passed with
+    # the old code too — that is, it would have agreed with its author.
     store.merge([{"id": f"cmd_{number}", "type": "speak",
                   "triggers": [f"фраза {number}"], "enabled": False}],
                 lambda n=number: f"cmd_{n}")
@@ -179,10 +183,11 @@ check("и номера не задвоились",
 print()
 print("ИТОГО ошибок:", fails)
 
-# `os._exit` нужен потому, что фоновые потоки ядра держат процесс живым.
-# Но он не сбрасывает буферы, и до этой строки весь вывод проверки уходил
-# в никуда: в регрессе она показывалась пустой строкой, и при провале
-# нельзя было узнать, что именно провалилось.
+# `os._exit` is needed because the core's background threads keep the
+# process alive. But it does not flush the buffers, and until this line
+# the whole output of the check went nowhere: in the regression run it
+# showed as an empty line, and on a failure there was no way to find out
+# what exactly had failed.
 sys.stdout.flush()
 sys.stderr.flush()
 os._exit(1 if fails else 0)

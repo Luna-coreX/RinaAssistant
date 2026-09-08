@@ -1,4 +1,4 @@
-"""Версия приложения и ссылки (без зависимостей от Qt)."""
+"""The application's version and links (with no dependency on Qt)."""
 
 APP_VERSION = "3.1.0"
 BUILD = "2026.08"

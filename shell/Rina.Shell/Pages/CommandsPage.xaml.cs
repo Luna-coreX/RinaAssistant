@@ -317,11 +317,12 @@ public partial class CommandsPage : UserControl
 
     private async void OnExport(object sender, RoutedEventArgs e)
     {
-        // Ядро отдаёт **содержимое файла целиком**, вместе с видом и
-        // версией формата (§6). Оболочка его не разбирает и не
-        // пересобирает: она выбирает место и пишет. Раньше она доставала
-        // отсюда список и писала голым массивом — и файл переставал
-        // отличаться от любого другого массива, в том числе от истории.
+        // The core hands over **the whole contents of the file**,
+        // together with its kind and format version (§6). The shell
+        // neither parses nor reassembles it: it picks a place and writes.
+        // It used to pull the list out of here and write a bare array —
+        // and the file stopped being distinguishable from any other
+        // array, the history among them.
         var told = await Ask(Methods.CommandsExport);
         if (told is null) return;
 
@@ -344,10 +345,11 @@ public partial class CommandsPage : UserControl
 
         try
         {
-            // Файл читает оболочка — у неё окно выбора; судит о нём ядро.
-            // «Тот ли это файл», «не новее ли формат», «что из него можно
-            // пустить» — это смысл, а смысл живёт в ядре (ADR 0006). Здесь
-            // остаётся разобрать JSON и передать как есть.
+            // The shell reads the file — it has the picker; the core
+            // judges it. "Is this the right file", "is the format newer
+            // than ours", "what of it may be let through" are meaning,
+            // and meaning lives in the core (ADR 0006). What is left here
+            // is to parse the JSON and pass it on as it is.
             var text = await File.ReadAllTextAsync(dialog.FileName);
             if (JsonNode.Parse(text) is not JsonNode content)
             {
@@ -358,10 +360,10 @@ public partial class CommandsPage : UserControl
             {
                 ["file"] = content.DeepClone(),
             });
-            // Отказ ядра уже назван подписью — «Это не файл команд».
-            // Пройти дальше значило бы затереть причину отчётом
-            // «добавлено 0», то есть сказать, что ничего не случилось,
-            // вместо того, что случилось на самом деле.
+            // The core's refusal has already been put into the label —
+            // "this is not a command file". Carrying on would overwrite
+            // the reason with a report of "0 added", that is, say that
+            // nothing happened instead of what actually did.
             if (done is null) return;
 
             var added = done["added"]?.GetValue<int>() ?? 0;
