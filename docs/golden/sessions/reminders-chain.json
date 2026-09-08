@@ -13,7 +13,8 @@
         "reminders": [
           {
             "kind": "timer",
-            "text": ""
+            "text": "",
+            "on": null
           }
         ]
       },
@@ -29,7 +30,8 @@
         "reminders": [
           {
             "kind": "reminder",
-            "text": "проверить тесты"
+            "text": "проверить тесты",
+            "on": null
           }
         ]
       },

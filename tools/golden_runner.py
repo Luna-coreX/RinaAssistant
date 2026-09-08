@@ -165,10 +165,11 @@ class InProcessDriver(Driver):
 
         real_add = reminders.ReminderStore.add
 
-        def spy_add(store, kind, fire_at, text=""):
-            obs.reminders.append({"kind": kind, "fire_at": fire_at,
-                                  "text": text})
-            return real_add(store, kind, fire_at, text)
+        def spy_add(store, *args, **kwargs):
+            # Записывается сложенное, а не переданное: см. tools/sandbox.py.
+            item = real_add(store, *args, **kwargs)
+            obs.reminders.append(dict(item))
+            return item
 
         reminders.ReminderStore.add = spy_add
 

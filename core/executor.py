@@ -163,11 +163,32 @@ class Executor:
     # ---------- reminders ----------
     def _do_reminder_create(self, intent, source):
         args = {"kind": intent.arg("kind")}
-        for key in ("seconds", "at", "text"):
+        # `on` — повод вместо часов (`4.0b-A03`). Перечень ключей здесь
+        # закрытый, и это ровно тот случай, когда добавленный роутером
+        # аргумент теряется молча: намерение верное, вызов без него.
+        for key in ("seconds", "at", "text", "on"):
             value = intent.arg(key)
             if value:
                 args[key] = value
         return self._run("create_reminder", args, source=source)
+
+    def _do_reminder_ambiguous(self, intent, source):
+        """
+        Кандидатов несколько — спрашиваем (`4.0b-A03`).
+
+        Причина та же, что при обучении: несработавшее напоминание ничем
+        себя не проявляет. Человек узнает об ошибке ровно тогда, когда
+        рассчитывал на обратное, — а поставить напоминание заново будет
+        уже поздно.
+        """
+        names = ", ".join(o.get("name", "") for o in intent.arg("options"))
+        return self._ok(
+            tr("Не одна такая: {names}. К какой привязать?", names=names))
+
+    def _do_reminder_unknown_app(self, intent, source):
+        return self._fail(
+            tr("Не нашла программу «{name}» — не к чему привязать.",
+               name=intent.arg("query")), "app.not_found")
 
     def _do_reminder_list(self, intent, source):
         return self._run("list_reminders", {}, source=source)

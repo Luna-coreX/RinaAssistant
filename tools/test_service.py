@@ -347,8 +347,8 @@ items = answers[-1].payload["items"] if answers else []
 check("ядро знает о запланированном", len(items) == 1, f"| {items}")
 if items:
     check("напоминание описано по форме §10",
-          set(items[0]) == {"id", "kind", "text", "fire_at", "created_at",
-                            "done"},
+          set(items[0]) == {"id", "kind", "text", "fire_at", "on",
+                            "created_at", "done"},
           f"| {sorted(items[0])}")
     check("это таймер", items[0]["kind"] == "timer",
           f"| {items[0]['kind']}")
@@ -359,7 +359,8 @@ check("сработавшее напоминание пришло push-собы�
 if fired:
     item = fired[0].payload["item"]
     check("событие несёт само напоминание",
-          set(item) == {"id", "kind", "text", "fire_at", "created_at", "done"},
+          set(item) == {"id", "kind", "text", "fire_at", "on", "created_at",
+                        "done"},
           f"| {sorted(item)}")
     check("оно помечено сработавшим", item["done"] is True)
     check("у срабатывания своя цепочка трассировки",

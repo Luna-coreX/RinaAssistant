@@ -93,6 +93,12 @@ GROUPS = {
         "llm_model": "",
         "llm_persona": "",
         "llm_timeout": 30,
+        # Напоминания по программам (4.0b-A03). Выключено по умолчанию, и
+        # это не осторожность ради осторожности: знать, какие программы
+        # человек открывает, — сведения того же рода, что тексты реплик.
+        # Включение — решение человека, а не побочный эффект установки
+        # (T-19).
+        "watch_apps": False,
         # journalling. The text of lines is the content of a conversation, so
         # it is written only with explicit consent and only at DEBUG level.
         "log_level": "INFO",

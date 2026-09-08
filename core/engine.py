@@ -386,6 +386,47 @@ class RinaEngine:
             target=self._reminder_worker, daemon=True)
         self._reminder_thread.start()
 
+    def note_foreground(self, launch):
+        """
+        Оболочка сообщает: человек перешёл в эту программу (`4.0b-A03`).
+
+        **Ядро ничего не запоминает.** Ни какая программа впереди сейчас,
+        ни какая была раньше, ни сколько времени в ней провели: событие
+        сравнивается с ожидающими напоминаниями и тут же забывается. Знать,
+        какие программы человек открывает, — сведения того же рода, что
+        тексты реплик (T-19), и единственный способ не потерять такую
+        историю — не заводить её.
+
+        Приходит **путь**, а не имя окна: заголовок окна человек меняет
+        сам, открыв в редакторе чужой файл, и сравнивать по нему значило бы
+        сравнивать с содержимым чужого документа.
+        """
+        launch = str(launch or "")
+        if not launch:
+            return 0
+        fired = self._reminders.triggered(
+            {"kind": "app.foreground", "launch": launch})
+        for item in fired:
+            self._fire_reminder(item)
+        return len(fired)
+
+    def _fire_reminder(self, item):
+        """
+        Одно срабатывание — своя цепочка следов (4.0-D15).
+
+        Общая для часов и для повода: срабатывание есть срабатывание, и
+        расходиться этим двум путям не с чего. Когда они расходились,
+        привязанное к событию не попадало в журнал так же, как остальное.
+        """
+        with trace_scope():
+            self._reminders.mark_done(item["id"])
+            # The snapshot was taken before the mark and still says
+            # done: false. Sending it as it is means telling the shell that
+            # a reminder fired which by its own words did not: the event
+            # would contradict the store, from which the shell will take
+            # the list a second later.
+            self._emit(Events.REMINDER_FIRED, item={**item, "done": True})
+
     def _reminder_worker(self):
         """
         The scheduler: once a second it looks whether it is time.
@@ -402,16 +443,7 @@ class RinaEngine:
         while not self._stop_reminders.wait(1.0):
             try:
                 for item in store.due():
-                    with trace_scope():
-                        store.mark_done(item["id"])
-                        # The snapshot from due() was taken before the mark
-                        # and still says done: false. Sending it as it is
-                        # means telling the shell that a reminder fired which
-                        # by its own words did not: the event would
-                        # contradict the store, from which the shell will
-                        # take the list a second later.
-                        self._emit(Events.REMINDER_FIRED,
-                                   item={**item, "done": True})
+                    self._fire_reminder(item)
             except Exception:
                 pass          # a read failure must not kill the scheduler
 

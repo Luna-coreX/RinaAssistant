@@ -204,13 +204,93 @@ def _reminder(command, ctx):
                       {"empty": ctx.reminders_active == 0}, stage="reminders")
 
     args = {"kind": parsed.kind}
-    if parsed.delay:
-        args["seconds"] = parsed.delay
-    if parsed.at:
-        args["at"] = parsed.at
-    if parsed.text:
-        args["text"] = parsed.text
+    text = parsed.text
+
+    # Напоминание, привязанное к программе (`4.0b-A03`).
+    if parsed.when_app:
+        entry, leftover, found, asked = _when_app(parsed.when_app, ctx)
+        if entry is None:
+            if len(found) > 1:
+                return Intent("reminder.ambiguous",
+                              {"options": tuple(e.to_dict() for e in found[:5]),
+                               "query": asked}, stage="reminders")
+            return Intent("reminder.unknown_app",
+                          {"query": asked}, stage="reminders")
+        # Слова, не вошедшие в название, — это дело, а не программа:
+        # «напомни когда открою студию проверить почту».
+        text = (text + " " + leftover).strip() if leftover else text
+        args["on"] = {"kind": "app.foreground", "app": entry.name,
+                      "launch": entry.launch}
+    else:
+        if parsed.delay:
+            args["seconds"] = parsed.delay
+        if parsed.at:
+            args["at"] = parsed.at
+
+    if text:
+        args["text"] = text
     return Intent("reminder.create", args, stage="reminders")
+
+
+def _when_app(candidate, ctx):
+    """
+    Из «студию проверить почту» вытащить программу и остаток.
+
+    Речь не даёт запятых, а `normalize` убирает их и у набранного текста,
+    поэтому границу между названием программы и делом провести нечем —
+    кроме знания о том, что на машине установлено.
+
+    **Слово входит в название, только если оно меняет ответ.** Поиск по
+    индексу нестрогий, и «visual studio code слить» находит ровно то же,
+    что «visual studio code»: идти от длинного к короткому и брать первое
+    попавшееся значило бы вобрать в название лишние слова — так и вышло с
+    первой попытки, дело потеряло свой глагол. Поэтому берётся **самое
+    короткое** написание, дающее ту же программу: слова, ничего не
+    изменившие, к названию не относятся.
+
+    Возвращает (программа | None, остаток слов, кандидаты, слова, о
+    которых речь). Спорное не
+    решается молча — по той же причине, что и при обучении: несработавшее
+    напоминание ничем себя не проявляет, и человек узнает об ошибке
+    тогда, когда рассчитывал на обратное.
+    """
+    from voice.textmatch import normalize
+
+    words = candidate.split()
+    unique = {}                      # размер -> единственный найденный
+    plural = {}                      # размер -> несколько кандидатов
+    for size in range(1, len(words) + 1):
+        found = apps_mod.find(" ".join(words[:size]), limit=5,
+                              entries=ctx.apps)
+        if len(found) == 1:
+            unique[size] = found[0]
+        elif found:
+            plural[size] = found
+
+    if not unique:
+        # Ни одного однозначного написания. Если хоть где-то нашлось
+        # несколько — это и есть спор, и спрашивать надо о нём: о тех
+        # словах, которые кандидатов и дали, а не обо всей фразе.
+        if not plural:
+            return None, "", [], candidate
+        size = min(plural)
+        return None, "", plural[size], " ".join(words[:size])
+
+    longest = max(unique)
+    entry = unique[longest]
+    size = min(s for s, e in unique.items()
+               if e.name == entry.name and e.launch == entry.launch)
+
+    # Слово, которое ничего не изменило, но **стоит в названии**, к
+    # названию и относится: «обс» уже находит OBS Studio однозначно, но
+    # «студио» из «обс студио» — это программа, а не дело. Проверка идёт
+    # по самому найденному названию, а не по догадке о том, что человек
+    # мог иметь в виду.
+    known = set(normalize(entry.name).split())
+    while size < len(words) and normalize(words[size]) in known:
+        size += 1
+
+    return entry, " ".join(words[size:]), [entry], " ".join(words[:size])
 
 
 def _system(command, ctx):

@@ -173,6 +173,9 @@ CREATE_REMINDER = Tool(
         Param("at", "number", "Точный момент срабатывания, секунды с эпохи.",
               required=False),
         Param("text", "string", "О чём напомнить.", required=False),
+        Param("on", "object",
+              "Повод вместо часов: {kind, app, launch} (4.0b-A03).",
+              required=False),
     ),
     permissions=set(),
     idempotent=False,           # two calls, two reminders

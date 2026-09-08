@@ -65,12 +65,28 @@ def normalise(text):
     return text
 
 
+#: Поля напоминания, которые и есть поведение.
+#:
+#: Список **разрешительный**, а не запретительный, и это разные вещи.
+#: Запретительный молчит о новом поле: оно приезжает в сравнение само и
+#: делает проверку красной там, где поведение не менялось. Разрешительный
+#: молчит тоже — но в другую сторону, и о добавлении поля приходится
+#: решить вслух, здесь.
+#:
+#: Чего здесь нет: момент срабатывания, момент заведения и случайный
+#: номер — они разные при каждом запуске по устройству, а не по ошибке.
+#: И `done`: при заведении оно всегда `false` и не различает ничего.
+BEHAVIOUR = ("kind", "text", "on")
+
+
 def normalise_effects(effects):
+
     """Timestamps in the side effects are not behaviour either."""
     clean = {}
     for name, items in (effects or {}).items():
         if name == "reminders":
-            clean[name] = [{k: v for k, v in item.items() if k != "fire_at"}
+            clean[name] = [{k: v for k, v in item.items()
+                            if k in BEHAVIOUR}
                            for item in items]
         else:
             clean[name] = list(items)

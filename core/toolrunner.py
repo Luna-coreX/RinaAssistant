@@ -275,8 +275,31 @@ def _create_reminder(ctx, args):
     seconds = args.get("seconds")
     at = args.get("at")
     text = args.get("text") or ""
+    on = reminders.clean_trigger(args.get("on"))
+
+    # Выключенная слежка — отказ, а не тихое согласие. Завести напоминание,
+    # которое никогда не сработает, хуже, чем не завести никакого: человек
+    # рассчитывает на него и узнаёт правду в тот момент, когда рассчитывал
+    # зря.
+    if on and not (ctx.settings and ctx.settings.get("watch_apps", False)):
+        return ToolResult.failed(
+            tr("Не могу: я не слежу за тем, какие программы открыты. "
+               "Это включается в настройках, в разделе «Программы»."),
+            "permission.denied")
+
     fire_at = at if at else time.time() + (seconds or 0)
-    ctx.reminders.add(args["kind"], fire_at, text)
+    ctx.reminders.add(args["kind"], fire_at, text, on=on)
+
+    # Привязанное к поводу отвечает про повод, а не про часы: сказать
+    # «напомню в 03:17» о напоминании, которое ждёт программу, значило бы
+    # назвать время, которого никто не обещал.
+    if on:
+        if text:
+            return ToolResult.done(
+                tr("Напомню, когда откроешь {app}: {text}.",
+                   app=on.get("app") or "", text=text))
+        return ToolResult.done(
+            tr("Напомню, когда откроешь {app}.", app=on.get("app") or ""))
 
     if seconds:
         left = reminders.humanize_left(seconds)
