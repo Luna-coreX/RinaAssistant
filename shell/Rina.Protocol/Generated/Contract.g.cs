@@ -118,6 +118,8 @@ public static class Methods
     public const string StreamOpen = "stream.open";
     /// <summary>Возможность: system.</summary>
     public const string SystemDo = "system.do";
+    /// <summary>Возможность: apps.watch.</summary>
+    public const string SystemForeground = "system.foreground";
     /// <summary>Возможность: tasks.</summary>
     public const string TaskCancel = "task.cancel";
     /// <summary>Возможность: actuation.</summary>
@@ -177,6 +179,7 @@ public static class Methods
             ["stream.credit"] = null,
             ["stream.open"] = null,
             ["system.do"] = "system",
+            ["system.foreground"] = "apps.watch",
             ["task.cancel"] = "tasks",
             ["window.focus"] = "actuation",
             ["window.list"] = "actuation",
@@ -366,6 +369,8 @@ public static class Capabilities
     public const string Actuation = "actuation";
     /// <summary>Объявляет shell.</summary>
     public const string Apps = "apps";
+    /// <summary>Объявляет core.</summary>
+    public const string AppsWatch = "apps.watch";
     /// <summary>Объявляет shell.</summary>
     public const string AudioInput = "audio.input";
     /// <summary>Объявляет shell.</summary>

@@ -135,6 +135,11 @@ class InProcessDriver(Driver):
         settings.update({
             "first_run": False, "check_updates": False, "llm_enabled": False,
             "web_search_fallback": True, "save_history": True,
+            # Слежка включена: набор проверяет разбор и решение, а не то,
+            # что настройка выключена по умолчанию. Отказ при выключенной
+            # проверяется отдельно (`tools/test_context_reminders.py`) —
+            # там он и есть предмет проверки.
+            "watch_apps": True,
             "custom_commands": [], "app_aliases": {}, "reminders": [],
             "history": [], "ui_language": "Русский", "search_engine": "google",
             "wake_words": ["Рина", "Rina"],
@@ -339,6 +344,11 @@ def classify(obs, text=""):
         args = {"kind": item["kind"]}
         if item["text"]:
             args["text"] = item["text"]
+        # Повод виден по самой записи, а не по ответу Рины (`4.0b-A03`):
+        # ответ — это слова, а набор описывает решение. Имя программы, а не
+        # путь: пути в наборе зависели бы от машины.
+        if item.get("on"):
+            args["on"] = item["on"].get("app")
         return intent("reminder.create", **args)
     if obs.actions:
         return intent("system.action", action=obs.actions[-1])
@@ -399,7 +409,9 @@ def classify(obs, text=""):
         # порядок здесь несущий. Отказ выучить и ненайденную программу
         # разводит хвост, а не начало.
         ("Не нашла программу", lambda r: intent(
-            "alias.unknown" if "нечего запоминать" in r else "app.not_found",
+            "alias.unknown" if "нечего запоминать" in r
+            else "reminder.unknown_app" if "не к чему привязать" in r
+            else "app.not_found",
             query=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
         ("Не получилось запустить", lambda r: intent("app.launch_failed")),
         ("Запомнила: «", lambda r: intent(
@@ -407,7 +419,7 @@ def classify(obs, text=""):
             word=r.split("«", 1)[1].split("»")[0],
             app=r.split("— это ", 1)[1].rstrip(".") if "— это " in r else None)),
         ("Не одна такая: ", lambda r: intent(
-            "alias.ambiguous",
+            "reminder.ambiguous" if "привязать" in r else "alias.ambiguous",
             options=[n.strip() for n in
                      r[len("Не одна такая: "):].split(".", 1)[0].split(",")],
             word=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
@@ -430,6 +442,12 @@ def matches(expected, got):
         if key in ("intent", "note"):
             continue
         value = got.arg(key)
+        # Повод роутер отдаёт словарём — это состояние записи, обязанное
+        # пережить хранилище и дорогу по протоколу, — а по наблюдаемому
+        # поведению видно имя программы. Набор описывает имя: путь зависел
+        # бы от машины, на которой прогоняют.
+        if isinstance(value, dict) and isinstance(want, str):
+            value = value.get("app")
         if isinstance(want, list):
             if isinstance(value, (list, tuple)):
                 # Варианты приходят по-разному: роутер отдаёт словари —

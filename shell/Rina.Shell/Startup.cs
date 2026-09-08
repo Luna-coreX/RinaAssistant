@@ -159,6 +159,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-watch"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckWatchAsync(window);
+            return;
+        }
+
         // A screenshot of the floating bar: it lives on top of other
         // people's windows and does not get into a screenshot of the main
         // window at all.
@@ -608,6 +615,90 @@ public partial class App
     /// suite will not run on a machine without a microphone — that is, on
     /// any build server.
     /// </remarks>
+    /// <summary>
+    /// <c>4.0b-A03</c>: the watch starts only when asked, and reports a
+    /// change once.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// What is checked here is the gate, not Windows. Whether
+    /// <c>SetWinEventHook</c> delivers foreground events is Windows'
+    /// business and cannot be asserted without a second application
+    /// switching windows. What can be asserted, and matters more, is that
+    /// nothing is watched until the person says so — that is the promise
+    /// in <c>T-19</c>.
+    /// </para>
+    /// <para>
+    /// The reporting is exercised through the real window of this very
+    /// application: it is in front, so switching the watch on must produce
+    /// exactly one report, and switching it on again after off must not
+    /// produce a stale repeat.
+    /// </para>
+    /// </remarks>
+    private async Task CheckWatchAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== 4.0b-A03: слежка за тем, что открыто ===");
+
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.Activate();
+        await Task.Delay(400);
+
+        var seen = new List<string>();
+        var watch = new Platform.Foreground(path => seen.Add(path));
+
+        Check("пока не просили — не следит", !watch.Watching);
+        Check("и ничего не сообщила", seen.Count == 0, $"| {seen.Count}");
+
+        watch.Follow(true);
+        Check("попросили — следит", watch.Watching);
+        // Окно этого же приложения впереди: включение обязано сообщить о
+        // нём сразу. Ждать, пока человек уйдёт в другое окно и вернётся,
+        // значило бы выглядеть как невключившаяся настройка.
+        Check("о том, что уже впереди, сказано сразу", seen.Count == 1,
+              $"| {string.Join(", ", seen)}");
+        Check("сказан путь программы, а не заголовок окна",
+              seen.Count == 1 && seen[0].EndsWith(".exe",
+                  StringComparison.OrdinalIgnoreCase),
+              $"| {(seen.Count == 1 ? seen[0] : "")}");
+
+        watch.Follow(true);
+        Check("повторная просьба ничего не меняет", seen.Count == 1,
+              $"| {seen.Count}");
+
+        watch.Follow(false);
+        Check("выключили — не следит", !watch.Watching);
+
+        var before = seen.Count;
+        watch.Follow(true);
+        // Прошлый путь забыт вместе со слежкой, поэтому то же самое окно
+        // — это снова новость. Держать его выключенной значило бы хранить
+        // след того, чем человек занимался, когда выключал.
+        Check("после включения снова сообщает", seen.Count == before + 1,
+              $"| {seen.Count - before}");
+
+        watch.Dispose();
+        Check("после Dispose не следит", !watch.Watching);
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
     private async Task CheckAudioAsync()
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
@@ -2131,7 +2222,7 @@ public partial class App
         var values = await _link.GetAsync("autostart", "minimize_to_tray",
                                           "start_minimized", "hotkey",
                                           "action_hotkeys", "notifications",
-                                          "floating_command_bar");
+                                          "floating_command_bar", "watch_apps");
         if (values is null) return;
 
         var wanted = values["autostart"]?.GetValue<bool>() ?? false;
@@ -2156,12 +2247,48 @@ public partial class App
         if (values["floating_command_bar"]?.GetValue<bool>() == true)
             ShowFloatingBar(window);
 
+        // The watch starts only if the person switched it on
+        // (4.0b-A03, T-19). The default of false is not tidiness: without
+        // an explicit yes it does not begin.
+        FollowApps(values["watch_apps"]?.GetValue<bool>() ?? false);
+
         if (values["start_minimized"]?.GetValue<bool>() == true)
             window.Hide();
     }
 
     private bool _notify = true;
     private FloatingBar? _bar;
+    private Platform.Foreground? _foreground;
+
+    /// <summary>
+    /// Start or stop watching which program is in front (<c>4.0b-A03</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The watch is created on first use and disposed when switched off,
+    /// rather than kept idle: an object that exists but is not watching
+    /// looks the same from the outside as one that is, and the difference
+    /// here is whether we know what the person is doing.
+    /// </para>
+    /// <para>
+    /// What goes to the core is a path and nothing else — see
+    /// <c>T-19</c> in the threat model. The core answers how many
+    /// reminders fired; the shell does nothing with that number, and does
+    /// not keep it.
+    /// </para>
+    /// </remarks>
+    private void FollowApps(bool wanted)
+    {
+        if (!wanted)
+        {
+            _foreground?.Dispose();
+            _foreground = null;
+            return;
+        }
+        _foreground ??= new Platform.Foreground(
+            path => _ = _link?.ForegroundAsync(path));
+        _foreground.Follow(true);
+    }
 
     /// <summary>
     /// Bind hotkeys to actions.
@@ -2251,6 +2378,9 @@ public partial class App
             case "floating_command_bar":
                 if (value.GetValue<bool>()) ShowFloatingBar(window!);
                 else _bar?.Hide();
+                break;
+            case "watch_apps":
+                FollowApps(value.GetValue<bool>());
                 break;
             case "action_hotkeys":
                 if (window is not null && value is JsonObject bound)

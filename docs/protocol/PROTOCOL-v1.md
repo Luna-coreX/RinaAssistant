@@ -258,6 +258,7 @@
 | `reminders.list` | — | список |
 | `reminders.create` | `text`, `fire_at`, `kind` | заведённое напоминание |
 | `reminders.cancel` | `id` либо `all` | сколько снято |
+| `system.foreground` | `launch` | сколько напоминаний сработало и следим ли (`4.0b-A03`) |
 | `plugins.list` | — | список с состоянием |
 | `plugins.set_enabled` | `plugin_id`, `enabled` | состояние |
 | `plugins.page` | `plugin_id` | декларативное описание страницы |

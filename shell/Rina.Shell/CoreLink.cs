@@ -252,6 +252,35 @@ public sealed class CoreLink : IAsyncDisposable
         catch { return null; }
     }
 
+    /// <summary>
+    /// Tell the core which program the person switched to
+    /// (<c>4.0b-A03</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A path and nothing else — see <c>T-19</c> in the threat model. The
+    /// core answers how many reminders fired; nothing here uses that
+    /// number, and nothing keeps it.
+    /// </para>
+    /// <para>
+    /// Failures are silent on purpose. A switch between windows is not a
+    /// person's request, and a note saying "could not reach the core"
+    /// after every alt-tab would be noise about something they never
+    /// asked for.
+    /// </para>
+    /// </remarks>
+    public async Task ForegroundAsync(string launch)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        try
+        {
+            await connection.CallAsync(Methods.SystemForeground,
+                new JsonObject { ["launch"] = launch },
+                TimeSpan.FromSeconds(5));
+        }
+        catch { /* см. выше */ }
+    }
+
     /// <summary>Change the finish and remember the choice in the core.</summary>
     public async Task SetFinishAsync(string finish)
     {

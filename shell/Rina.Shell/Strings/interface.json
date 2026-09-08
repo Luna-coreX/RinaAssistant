@@ -1144,5 +1144,11 @@
     "Українська": "Файл не розібрався як JSON.",
     "Español": "El archivo no se pudo analizar como JSON.",
     "Deutsch": "Die Datei ließ sich nicht als JSON lesen."
+  },
+  "Замечать, какие программы открыты": {
+    "English": "Notice which programs are open"
+  },
+  "Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает": {
+    "English": "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once"
   }
 }

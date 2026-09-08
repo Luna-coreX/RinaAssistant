@@ -142,6 +142,15 @@
     {"id": "alias.fix.female", "say": "я имела в виду Visual Studio 2022", "keep_state": true, "expect": {"intent": "alias.teach", "app": "Visual Studio 2022", "note": "род говорящего ничего не меняет и не должен"}},
     {"id": "alias.fix.nothing", "say": "нет, я имел в виду Discord", "expect": {"intent": "fallback.search", "note": "поправка без запуска перед ней ничего не выдумывает"}},
 
+    {"id": "reminder.when.tail", "say": "напомни проверить пиар когда открою visual studio code", "expect": {"intent": "reminder.create", "kind": "reminder", "on": "Visual Studio Code", "text": "проверить пиар"}},
+    {"id": "reminder.when.head", "say": "напомни когда открою obs studio включить микрофон", "expect": {"intent": "reminder.create", "kind": "reminder", "on": "OBS Studio", "text": "включить микрофон", "note": "условие впереди дела: границу проводит индекс, запятых речь не даёт"}},
+    {"id": "reminder.when.short", "say": "напомни когда открою обс включить микрофон", "expect": {"intent": "reminder.create", "kind": "reminder", "on": "OBS Studio", "text": "включить микрофон", "note": "«обс» уже однозначно, и «студио» из «обс студио» тоже часть названия, а не дела"}},
+    {"id": "reminder.when.greedy", "say": "напомни при запуске visual studio code слить ветку", "expect": {"intent": "reminder.create", "kind": "reminder", "on": "Visual Studio Code", "text": "слить ветку", "note": "поиск нестрогий, и «visual studio code слить» находит то же, что без «слить»: лишнее слово не должно уехать в название и забрать у дела глагол"}},
+    {"id": "reminder.when.launch", "say": "напомни при запуске блендера размять шею", "expect": {"intent": "reminder.create", "kind": "reminder", "on": "Blender", "text": "размять шею"}},
+    {"id": "reminder.when.ambiguous", "say": "напомни когда открою visual studio проверить почту", "expect": {"intent": "reminder.ambiguous", "options": ["Visual Studio Code", "Visual Studio 2022"], "note": "привязка живёт до срабатывания, и ошибка в ней обнаружится тогда, когда на неё рассчитывали"}},
+    {"id": "reminder.when.unknown", "say": "напомни когда открою фотошоп что-нибудь", "expect": {"intent": "reminder.unknown_app"}},
+    {"id": "reminder.when.time_still_works", "say": "напомни через 20 минут проверить тесты", "expect": {"intent": "reminder.create", "kind": "reminder", "text": "проверить тесты", "note": "часы никуда не делись"}},
+
     {"id": "degenerate.empty", "say": "", "expect": {"intent": "silence"}},
     {"id": "degenerate.spaces", "say": "     ", "expect": {"intent": "ask.wake", "note": "странность 3.1.0: пустая строка молчит, а строка из пробелов отвечает «Да? Слушаю.» — обрезка даёт пустую команду, а не пустой ввод"}},
     {"id": "degenerate.punctuation", "say": "?!.,;", "expect": {"intent": "fallback.search"}},

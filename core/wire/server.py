@@ -279,6 +279,7 @@ class ProtocolServer:
             "settings.options": self._settings_options,
             "reminders.list": self._reminders_list,
             "reminders.cancel": self._reminders_cancel,
+            "system.foreground": self._foreground,
             "reminders.create": self._reminders_create,
             "commands.list": self._commands_list,
             "commands.kinds": self._commands_kinds,
@@ -489,6 +490,25 @@ class ProtocolServer:
     def _reminders_list(self, message: Envelope) -> dict:
         store = self._reminders()
         return {"items": [dict(item) for item in store.active()]}
+
+    def _foreground(self, message: Envelope) -> dict:
+        """
+        Оболочка сообщает: человек перешёл в эту программу (`4.0b-A03`).
+
+        **Отправляет только оболочка и только при включённой слежке.** Ядро
+        всё равно проверяет настройку у себя: между тем, как человек её
+        выключил, и тем, как оболочка это заметила, проходит время, и в
+        этот промежуток ядро обязано молчать само.
+
+        Ответ — сколько напоминаний сработало, и ноль здесь обычное дело.
+        Оболочка ничего с этим числом не делает; оно есть, потому что
+        «принято» без единого различимого исхода нечем проверить.
+        """
+        if not self._settings().get("watch_apps", False):
+            return {"fired": 0, "watching": False}
+        launch = str(message.payload.get("launch") or "")
+        return {"fired": self.engine.note_foreground(launch),
+                "watching": True}
 
     def _reminders_create(self, message: Envelope) -> dict:
         """

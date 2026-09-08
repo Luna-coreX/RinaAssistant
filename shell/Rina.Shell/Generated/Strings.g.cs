@@ -430,6 +430,11 @@ public static partial class Loc
                 {
                     ["English"] = "Replaced: {0}. It is off — turn it on if you trust it.",
                 },
+            ["Замечать, какие программы открыты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Notice which programs are open",
+                },
             ["Записать"] =
                 new Dictionary<string, string>
                 {
@@ -916,6 +921,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "At least one phrase is needed.",
+                },
+            ["Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once",
                 },
             ["Нужно указать, что делать."] =
                 new Dictionary<string, string>
