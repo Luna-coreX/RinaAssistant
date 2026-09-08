@@ -149,10 +149,16 @@ RinaAssistant/
 │   └── Rina.Protocol/  the client half of the protocol (C#)
 ├── tools/        checks, runners, generators
 ├── docs/         plan, specification, decisions, design system, guides
+├── archive/      the 3.1.0 single-process application, kept for reference
 │
-├── rina_core.py  the core's entry point
-└── main.py       the 3.1.0 single-process application (still runs)
+└── rina_core.py  the core's entry point
 ```
+
+The 3.1.0 application is in [`archive/`](archive/README.md) and no longer
+runs from the tree: it was one process with the interface and the core in
+shared memory, and 4.0 replaced it with two programs. It is kept because
+the port promised not to lose behaviour, and reading how something worked
+is cheaper than reconstructing it from the log.
 
 ---
 

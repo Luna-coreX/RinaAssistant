@@ -117,6 +117,77 @@ for doc in WATCHED:
               f"| {os.path.getsize(path)} байт")
 
 print()
+print("=== план не ссылается на исчезнувшее ===")
+
+# План читают чаще всех и правят чаще всех, поэтому гниёт он первым.
+# Проверяются только **закрытые** задачи: у открытой файл и не должен
+# существовать, она про будущее.
+#
+# Имя ищется по дереву, а не по буквальному пути: в плане пишут
+# `Platform/Journal.cs`, а лежит он в `shell/Rina.Shell/Platform/`. Строгая
+# сверка пути краснела бы на прозе, а не на гнили.
+#: `archive/` из обхода не исключается нарочно: перенос в архив не делает
+#: прозу о прошлом ложью. Задача, рассказывающая, что чинили в
+#: `voice/service.py`, остаётся правдой и после того, как файл уехал
+#: туда, — а вот исчезнувший бесследно файл проверка поймает.
+SKIP_TREE = {".git", "obj", "bin", "__pycache__", "venv", "dist", "build",
+             "node_modules"}
+tree = {}
+for base, dirs, files in os.walk("."):
+    dirs[:] = [d for d in dirs if d not in SKIP_TREE]
+    for name in files:
+        tree.setdefault(name, []).append(
+            os.path.join(base, name).replace("\\", "/")[2:])
+
+roadmap = io.open(os.path.join("docs", "ROADMAP.md"), encoding="utf-8").read()
+chunks = re.split(r"^\*\*((?:4\.0|4\.0b|5\.0|N|V)-[A-Za-z0-9]+)\s*·\s*([^*]+)\*\*",
+                  roadmap, flags=re.M)
+
+#: Пути, которых нет и не должно быть. Поимённо и с причиной.
+#:
+#: Не всякое имя файла в плане — обещание. Бывает рассказ о том, что файл
+#: переехал, и разбор чужой библиотеки, которую мы отвергли: там имя
+#: принадлежит истории или соседу, а не нашему дереву. Список короткий и
+#: с объяснениями нарочно — молчаливое исключение превращает правило в
+#: пожелание.
+NOT_OURS = {
+    ("4.0-E05", "core/wire/trace.py"):
+        "рассказ о переезде: файл теперь core/trace.py",
+    ("4.0-F01b", "Button.xaml"):
+        "внутренности WPF-UI — библиотеки, которую отвергли",
+}
+
+stale = []
+for i in range(1, len(chunks) - 1, 3):
+    task, body = chunks[i], chunks[i + 2]
+    if "ВЫПОЛНЕНО" not in body.split("\n")[0]:
+        continue
+    named = set(re.findall(
+        r"`([A-Za-z0-9_./\\-]+\.(?:py|cs|xaml|json|iss))`", body))
+    for path in named:
+        path = path.replace("\\", "/").lstrip("./")
+        if os.path.exists(path):
+            continue
+        tail = path.split("/")[-1]
+        if any(hit.endswith(path) for hit in tree.get(tail, [])):
+            continue
+        if (task, path) in NOT_OURS:
+            continue
+        stale.append((task, path))
+
+check("закрытые задачи ссылаются на существующее", not stale,
+      "| " + ", ".join(f"{t}: {p}" for t, p in stale[:4]))
+
+# И обратно: исключение, переставшее быть нужным, — это забытая строка,
+# которая однажды прикроет настоящую гниль.
+for (task, path), why in sorted(NOT_OURS.items()):
+    tail = path.split("/")[-1]
+    exists = os.path.exists(path) or any(
+        hit.endswith(path) for hit in tree.get(tail, []))
+    check(f"исключение {task}: {path} ещё нужно", not exists,
+          f"| файл появился — исключение пора убрать ({why})")
+
+print()
 print("=== названные команды существуют ===")
 
 startup = io.open(STARTUP, encoding="utf-8").read()

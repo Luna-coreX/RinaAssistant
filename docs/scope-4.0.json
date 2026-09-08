@@ -456,7 +456,7 @@
     "title": "Плагин в отдельном процессе"
   },
   "4.0-I01": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-port",
     "size": "L",
     "title": "Сборка и установщик"
@@ -480,7 +480,7 @@
     "title": "Полный регресс"
   },
   "4.0-I05": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-port",
     "size": "M",
     "title": "Документация архитектуры и дизайна"
@@ -558,7 +558,7 @@
     "title": "ADR: лицензия и модель вкладов"
   },
   "4.0-S02": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-port",
     "size": "M",
     "title": "Threat model"
