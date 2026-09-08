@@ -1,36 +1,38 @@
 # -*- coding: utf-8 -*-
 """
-I01: собрать выпуск — два рантайма и обе программы в одной папке.
+I01: build a release — two runtimes and both programs in one folder.
 
-Задача плана `4.0-I01`. Решение по интерпретатору —
-[ADR 0011](../docs/adr/0011-python-runtime.md): встроенный дистрибутив
-Python едет с нами.
+Plan item `4.0-I01`. The decision about the interpreter is
+[ADR 0011](../docs/adr/0011-python-runtime.md): an embedded Python
+distribution travels with us.
 
-Собирается раскладка, которую установщику остаётся положить на диск:
+What is built is the layout the installer only has to put on disk:
 
     Rina/
-        Rina.Shell.exe          оболочка, самодостаточная
-        runtime/python/         интерпретатор и зависимости ядра
-        core/  voice/  plugins/ ядро
-        rina_core.py            точка входа ядра
+        Rina.Shell.exe          the shell, self-contained
+        runtime/python/         the interpreter and the core's dependencies
+        core/  voice/  plugins/ the core
+        rina_core.py            the core's entry point
 
-**Почему `embed`, а не распакованный установщик Python.** Встроенный
-дистрибутив — это тот же CPython без установщика, реестра и `PATH`. Но он
-неполон нарочно: в нём нет `pip`, нет `ensurepip`, а `site-packages`
-выключен файлом `._pth`. Всё это включается здесь, один раз, при сборке —
-человек, распаковавший `embed` руками, получит **не то же самое**, и на
-это надо смотреть как на часть сборки, а не как на настройку среды.
+**Why `embed` rather than an unpacked Python installer.** The embedded
+distribution is the same CPython without an installer, the registry or
+`PATH`. But it is deliberately incomplete: it has no `pip`, no `ensurepip`,
+and `site-packages` is switched off by the `._pth` file. All of that is
+switched on here, once, at build time — a person who unpacks `embed` by
+hand gets **something different**, and this has to be looked at as part of
+the build rather than as configuring an environment.
 
-**Зависимости ядра — не зависимости приложения 3.1.0.** В `requirements.txt`
-первой строкой стоит PySide6, и ядру он не нужен вовсе: `rina_core.py`
-проверяет это `check_headless()`. Список ниже собран из того, что ядро
-действительно импортирует, и он короткий — тяжёлых импортов на уровне
-модуля в ядре нет ни одного, движки подгружаются по надобности.
+**The core's dependencies are not the 3.1.0 application's.** The first line
+of `requirements.txt` is PySide6, and the core does not need it at all:
+`rina_core.py` checks that with `check_headless()`. The list below is put
+together from what the core actually imports, and it is short — the core
+has not one heavy module-level import, and the engines are loaded on
+demand.
 
-Запуск:
-    python tools/build_release.py                собрать всё
-    python tools/build_release.py --skip-shell   без .NET (быстро)
-    python tools/build_release.py --out D:/rina  куда собрать
+To run:
+    python tools/build_release.py                build everything
+    python tools/build_release.py --skip-shell   without .NET (fast)
+    python tools/build_release.py --out D:/rina  where to build
 """
 import argparse
 import io
@@ -48,38 +50,39 @@ os.chdir(ROOT)
 from console import use_utf8, child_env
 use_utf8()
 
-#: Какой Python едет к человеку.
+#: Which Python travels to the person.
 #:
-#: Версия прибита нарочно: «тот, на котором проверяли» — это конкретный
-#: номер, а не диапазон. Обновление рантайма — решение выпуска, и принимать
-#: его должен человек, а не сборка, скачавшая сегодня то, чего вчера не
-#: было.
+#: The version is nailed down on purpose: "the one we tested against" is a
+#: particular number, not a range. Updating the runtime is a release
+#: decision, and it has to be made by a person rather than by a build that
+#: downloaded today what did not exist yesterday.
 PYTHON_VERSION = "3.12.8"
 PYTHON_ZIP = (f"https://www.python.org/ftp/python/{PYTHON_VERSION}/"
               f"python-{PYTHON_VERSION}-embed-amd64.zip")
 
-#: `pip` в `embed` не входит; берём официальный установщик.
+#: `pip` is not part of `embed`; we take the official installer.
 GET_PIP = "https://bootstrap.pypa.io/get-pip.py"
 
-#: Что нужно **ядру**, а не приложению 3.1.0.
+#: What the **core** needs, not the 3.1.0 application.
 #:
-#: Голое ядро поднимается и на стандартной библиотеке: всё тяжёлое
-#: импортируется лениво и каждый импорт обёрнут отказом «движка нет».
-#: Здесь — то, без чего работает, но заметно хуже: чтение звуковых файлов
-#: для синтеза и разбор PCM.
+#: A bare core comes up on the standard library alone: everything heavy is
+#: imported lazily and every import is wrapped in a "no such engine"
+#: refusal. Here is what it works without but noticeably worse: reading
+#: sound files for synthesis, and parsing PCM.
 CORE_REQUIREMENTS = [
     "numpy>=1.24",
     "soundfile>=0.12",
 ]
 
-#: Что уезжает из дерева проекта в выпуск.
+#: What travels from the project tree into the release.
 CORE_TREE = ["core", "voice", "plugins"]
 CORE_FILES = ["rina_core.py", "version.py"]
 
-#: Чего в выпуске быть не должно.
+#: What must not be in the release.
 #:
-#: `__pycache__` — чужие пути внутри `.pyc`; `venv` — не наш рантайм;
-#: `tools` — проверки, они разработчику, а не человеку.
+#: `__pycache__` carries foreign paths inside the `.pyc`; `venv` is not
+#: our runtime; `tools` are the checks, and they are for the developer,
+#: not for the person.
 SKIP_DIRS = {"__pycache__", ".git", "venv", ".venv", "node_modules"}
 
 CACHE = os.path.join(ROOT, "build", "cache")
@@ -90,7 +93,7 @@ def say(step, detail=""):
 
 
 def fetch(url, into):
-    """Скачать один раз и запомнить: пересборка не должна ходить в сеть."""
+    """Download once and remember: a rebuild must not go to the network."""
     os.makedirs(CACHE, exist_ok=True)
     target = os.path.join(CACHE, os.path.basename(url))
     if os.path.isfile(target) and os.path.getsize(target) > 0:
@@ -106,12 +109,12 @@ def fetch(url, into):
 
 def build_shell(out):
     """
-    Опубликовать оболочку самодостаточной.
+    Publish the shell as self-contained.
 
-    Самодостаточной, а не «требует .NET»: рантайм .NET на машине человека —
-    та же зависимость, от которой мы отказались в случае Python, и
-    отказываться от одной, оставляя другую, значило бы решить вопрос
-    наполовину.
+    Self-contained rather than "requires .NET": a .NET runtime on the
+    person's machine is the same dependency we refused in Python's case,
+    and refusing one while leaving the other would settle the question by
+    half.
     """
     project = os.path.join("shell", "Rina.Shell", "Rina.Shell.csproj")
     command = [
@@ -132,18 +135,19 @@ def build_shell(out):
 
 def _enable_site_packages(path_file):
     """
-    Включить `site-packages` в `._pth` и убедиться, что включилось.
+    Switch `site-packages` on in `._pth` and make sure it went on.
 
-    **Разбирается построчно, а не поиском подстроки.** Первая редакция
-    спрашивала `"import site" not in body` — и всегда получала «уже есть»,
-    потому что в файле стоит `#import site`, а строкой выше пояснение со
-    словами `import site` внутри. Патч не применялся, шаг рапортовал успех,
-    и `pip` вставал в папку, которой нет на пути. Проверять вхождение там,
-    где речь о строке целиком, — способ починить то, что не сломано, и не
-    починить то, что сломано.
+    **Parsed line by line rather than by a substring search.** The first
+    edition asked `"import site" not in body` — and always got "already
+    there", because the file contains `#import site` and a line above it an
+    explanation with the words `import site` inside. The patch was not
+    applied, the step reported success, and `pip` was installed into a
+    folder that is not on the path. Testing for containment where a whole
+    line is meant is a way to fix what is not broken and not fix what is.
 
-    Здесь же и утверждение: раскладка `embed` могла измениться, и молча
-    собранный нерабочий рантайм хуже несобранного.
+    The assertion belongs here too: the `embed` layout could have changed,
+    and a silently built non-working runtime is worse than one not built at
+    all.
     """
     lines = io.open(path_file, encoding="utf-8").read().splitlines()
     out_lines, enabled, has_packages = [], False, False
@@ -162,10 +166,10 @@ def _enable_site_packages(path_file):
     if not enabled:
         out_lines.append("import site")
         enabled = True
-    # `site.main()` добавляет `Lib\site-packages` сам, но только если она
-    # существует к моменту запуска. Пишем её и явно: пути в `._pth`
-    # проверяются на существование, лишняя строка безвредна, а отсутствие
-    # обнаружится у человека.
+    # `site.main()` adds `Lib\site-packages` by itself, but only if it
+    # exists by the time it runs. We write it explicitly as well: the paths
+    # in `._pth` are checked for existence, a spare line is harmless, and
+    # an absent one would be discovered on the person's machine.
     if not has_packages:
         out_lines.insert(max(0, len(out_lines) - 1), "Lib\\site-packages")
 
@@ -179,12 +183,12 @@ def _enable_site_packages(path_file):
 
 def build_runtime(out):
     """
-    Распаковать встроенный Python и доукомплектовать его.
+    Unpack the embedded Python and complete it.
 
-    Три шага, и ни один нельзя пропустить: распаковать, включить
-    `site-packages`, поставить `pip`. Пропущенный второй даёт рантайм, в
-    который нельзя ничего доставить, — и обнаружится это не здесь, а у
-    человека, который решил поставить Vosk.
+    Three steps, and not one of them can be skipped: unpack, switch
+    `site-packages` on, install `pip`. Skipping the second gives a runtime
+    into which nothing can be installed — and that is discovered not here
+    but by the person who decided to install Vosk.
     """
     runtime = os.path.join(out, "runtime", "python")
     if os.path.isdir(runtime):
@@ -195,10 +199,10 @@ def build_runtime(out):
         archive.extractall(runtime)
     say("рантайм распакован", f"Python {PYTHON_VERSION}")
 
-    # `._pth` выключает site-packages: это и есть то, чем `embed`
-    # отличается от обычного дистрибутива. Строка `import site` его
-    # включает — без неё `pip install` отработает, а импорт не найдёт
-    # поставленного.
+    # `._pth` switches site-packages off: that is exactly what makes
+    # `embed` different from an ordinary distribution. The line
+    # `import site` switches it on — without it `pip install` succeeds
+    # while the import does not find what was installed.
     pth = [n for n in os.listdir(runtime) if n.endswith("._pth")]
     if not pth:
         raise SystemExit("в рантайме нет ._pth — раскладка embed изменилась")
@@ -210,9 +214,10 @@ def build_runtime(out):
     subprocess.run([python, fetch(GET_PIP, CACHE), "--no-warn-script-location"],
                    check=True, capture_output=True, env=child_env())
 
-    # Поставить и суметь позвать — разные вещи, и разошлись они здесь же:
-    # `get-pip.py` отработал с нулевым кодом, положив pip в папку, которой
-    # не было на пути. Спрашиваем сам рантайм, а не установщик.
+    # Installing and being able to call are different things, and they
+    # parted company right here: `get-pip.py` finished with a zero exit
+    # code having put pip into a folder that was not on the path. We ask
+    # the runtime itself rather than the installer.
     seen = subprocess.run([python, "-c", "import pip; print(pip.__version__)"],
                           capture_output=True, text=True, encoding="utf-8",
                           errors="replace", env=child_env())
@@ -229,7 +234,7 @@ def build_runtime(out):
 
 
 def copy_core(out):
-    """Ядро — исходниками, как есть."""
+    """The core, as sources, as they are."""
     for name in CORE_TREE:
         target = os.path.join(out, name)
         if os.path.isdir(target):
@@ -292,13 +297,13 @@ def main(argv):
 
 def wrap_installer(wanted):
     """
-    Завернуть раскладку в установщик, если есть чем.
+    Wrap the layout into an installer, if there is anything to do it with.
 
-    Компилятор Inno Setup — сторонняя программа, и её может не быть. Тогда
-    сборка **не молчит и не притворяется**: раскладка собрана и годится,
-    а недостающий шаг назван вместе с тем, чем он чинится. Сборка,
-    сообщающая «готово» там, где установщика не появилось, — это то же
-    самое враньё, что зелёная проверка непроверенного.
+    The Inno Setup compiler is a third-party program and may be absent.
+    Then the build **neither keeps quiet nor pretends**: the layout is
+    built and is fit for use, and the missing step is named together with
+    what would fix it. A build that reports "done" where no installer
+    appeared is the same lie as a green check of something unchecked.
     """
     script = os.path.join(ROOT, "packaging", "rina.iss")
     if not os.path.isfile(script):

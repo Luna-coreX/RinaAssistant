@@ -1,16 +1,16 @@
 using System.Text.Json.Nodes;
 using Rina.Protocol;
 
-// F02: оболочка запускает настоящее ядро и разговаривает с ним по
-// именованному каналу.
+// F02: the shell starts a real core and talks to it over a named pipe.
 //
-// Это вторая половина требования 4.0-D16: conformance-набор на Python гонял
-// mock-оболочку против настоящего ядра, здесь настоящая оболочка идёт против
-// настоящего ядра. Никаких заглушек — процесс, труба, байты.
+// This is the second half of requirement 4.0-D16: the conformance suite in
+// Python ran a mock shell against a real core; here a real shell goes
+// against a real core. No stand-ins — a process, a pipe, bytes.
 //
-// Проверка написана консольной, а не на xunit: у неё нет ни одной внешней
-// зависимости, и она выглядит так же, как проверки на стороне ядра. Набор,
-// который не собрать без сети, однажды не соберётся.
+// The check is written as a console program rather than on xunit: it has
+// not one external dependency, and it looks the same as the checks on the
+// core's side. A suite that cannot be built without the network will one
+// day fail to build.
 
 var root = FindRoot();
 var checks = 0;
@@ -28,13 +28,14 @@ Console.WriteLine($"корень: {root}");
 
 var launch = new CoreLaunch(
     Python: "python",
-    // Ядро под песочницей: побочные эффекты обезврежены в самом дочернем
-    // процессе, и хранилище уведено во временную папку. Запускать здесь
-    // rina_core.py напрямую значило бы писать в данные пользователя.
+    // The core under the sandbox: the side effects are disarmed inside
+    // the child process itself, and the store is moved into a temporary
+    // folder. Starting rina_core.py directly here would mean writing into
+    // the user's data.
     Script: Path.Combine(root, "tools", "_core_sandboxed.py"),
     WorkingDirectory: root,
-    // Подробный журнал: если проба упадёт, причина должна быть видна сразу,
-    // а не после второго запуска с другими ключами.
+    // A verbose journal: if the probe fails, the reason must be visible
+    // at once rather than after a second run with different flags.
     ExtraArguments: ["--log-level", "DEBUG"]);
 
 await using var core = new CoreConnection();
@@ -63,7 +64,8 @@ try
           !core.MayCall(Methods.WindowFocus));
     Check("выдуманный метод звать нельзя", !core.MayCall("рина.станцуй"));
 
-    // --- команда: ответ «принято», сам ответ приходит событием ---
+    // --- a command: the reply is "accepted", the answer itself arrives
+    //     as an event ---
     var heard = new List<string>();
     var texts = new List<string>();
     core.EventReceived += e =>
@@ -85,10 +87,10 @@ try
           $"| {accepted.Payload.ToJsonString()}");
     Check("ответ несёт трассировку запроса", accepted.TraceId == trace);
 
-    // Ждём щедро. Первая нераспознанная команда в чистом профиле стоит
-    // около тридцати секунд: индекс установленных программ строится по
-    // требованию, обходом диска. Тридцать секунд ожидания давали провал
-    // ровно на границе — событие приходило секундой позже.
+    // We wait generously. The first unrecognised command in a clean
+    // profile costs about thirty seconds: the index of installed programs
+    // is built on demand, by walking the disk. A thirty-second wait failed
+    // right on the boundary — the event arrived a second later.
     var said = await core.WaitForEventAsync(Events.AssistantResponse,
                                             TimeSpan.FromSeconds(120));
     Check("Рина ответила событием, а не ответом на запрос", said is not null,
@@ -100,7 +102,7 @@ try
         Console.WriteLine($"      сказано: «{texts.FirstOrDefault()}»");
     }
 
-    // --- неизвестный метод: ошибка кодом, а не обрыв ---
+    // --- an unknown method: an error code, not a broken link ---
     var refused = await core.CallAsync("рина.станцуй");
     Check("неизвестный метод даёт ошибку",
           refused.IsError && refused.ErrorCode == ErrorCodes.ProtocolUnknownMethod,
@@ -109,11 +111,12 @@ try
           ErrorCodes.Catalogue[refused.ErrorCode].Category == ErrorCategory.Protocol
           && !ErrorCodes.Catalogue[refused.ErrorCode].Retryable);
 
-    // --- незнакомое событие: молчание, а не падение ---
+    // --- an unfamiliar event: silence, not a crash ---
     Check("незнакомых событий не приходило", core.IgnoredEvents.Count == 0,
           "| " + string.Join(", ", core.IgnoredEvents));
 
-    // --- настройки: смысл от ядра, вид от оболочки (ADR 0006) ---
+    // --- settings: the meaning from the core, the appearance from the
+    //     shell (ADR 0006) ---
     var described = await core.CallAsync(Methods.SettingsDescribe, new JsonObject
     {
         ["keys"] = new JsonArray("volume", "log_level"),
@@ -146,7 +149,7 @@ catch (Exception e)
 }
 
 // ---------------------------------------------------------------------------
-// E07: надзор — запустить, заметить смерть, поднять заново.
+// E07: supervision — start it, notice the death, raise it again.
 Console.WriteLine();
 Console.WriteLine("=== E07: оболочка следит за ядром ===");
 
@@ -168,7 +171,7 @@ await using (var boss = new CoreSupervisor(launch)
     var firstSession = boss.Connection!.SessionId;
     Check("сессия получена", firstSession.Length == 32);
 
-    // Убиваем ядро так, как это сделал бы сбой: без предупреждения.
+    // We kill the core the way a failure would: without warning.
     KillCore(boss.Connection!);
 
     var restored = await WaitUntil(() => boss.State == CoreState.Ready
@@ -192,7 +195,8 @@ await using (var boss = new CoreSupervisor(launch)
     }
 }
 
-// Ядро, которое не поднимается вовсе: надзор обязан сдаться, а не крутиться.
+// A core that does not come up at all: the supervisor must give up rather
+// than spin.
 await using (var doomed = new CoreSupervisor(
                  launch with { Script = Path.Combine(root, "нет-такого-ядра.py") })
              {
@@ -225,9 +229,10 @@ return fails == 0 ? 0 : 1;
 
 static void KillCore(CoreConnection connection)
 {
-    // Аварийная смерть: ядру не дают ни попрощаться, ни закрыть хранилище.
-    // Именно так это выглядит при настоящем сбое, и надзор обязан справиться
-    // с этим, а не только с вежливым завершением.
+    // A crash death: the core is given no chance to say goodbye or close
+    // the store. That is exactly what a real failure looks like, and the
+    // supervisor has to cope with it rather than only with a polite
+    // shutdown.
     if (connection.CorePid is not { } pid) return;
     try
     {

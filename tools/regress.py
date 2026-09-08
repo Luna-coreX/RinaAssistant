@@ -1,40 +1,45 @@
 # -*- coding: utf-8 -*-
 """
-Полный регресс: один вызов, один отчёт (задача плана 4.0-I04).
+The full regression: one call, one report (plan item 4.0-I04).
 
-Проверок к рубежу набралось около тридцати, и каждая запускается своим
-именем. Пока их было пять, это работало; на тридцати перестаёт — не потому,
-что тяжело, а потому, что надо **помнить**. Проверка, о которой забыли,
-неотличима от отсутствующей: сессии с записанным поведением были красными
-неделю, и узнали об этом случайно.
+By the end of the milestone there were about thirty checks, each started by
+its own name. While there were five that worked; at thirty it stops
+working — not because it is hard but because it has to be **remembered**. A
+check that was forgotten is indistinguishable from one that does not exist:
+the recorded-behaviour sessions were red for a week, and that was
+discovered by accident.
 
-Что здесь есть, кроме удобства.
+What is here besides convenience.
 
-**Список проверок выводится, а не пишется руками.** Всякий `tools/test_*.py`
-и `tools/check_*.py` — проверка; порождатели проверяются своим `--check`;
-режимы оболочки читаются из `Startup.cs`. Написанный руками перечень
-разошёлся бы с каталогом на первой же новой проверке — ровно так, как это
-уже записано про каталог ошибок в `test_wire.py`.
+**The list of checks is derived, not written by hand.** Every
+`tools/test_*.py` and `tools/check_*.py` is a check; the generators are
+checked by their own `--check`; the shell's modes are read from
+`Startup.cs`. A hand-written list would part company with the catalogue at
+the first new check — exactly as is already recorded about the error
+catalogue in `test_wire.py`.
 
-**То, что не проверка, названо поимённо и с причиной.** Иначе «выводится»
-превращается в «выводится, кроме того, что забыли»: файл, выпавший из
-обеих категорий, проходил бы молча. Регресс на таком падает.
+**What is not a check is named by name and with a reason.** Otherwise
+"derived" turns into "derived, apart from what we forgot": a file that fell
+out of both categories would pass silently. The regression fails on such a
+file.
 
-**Пропуск виден и считается.** Проверке оболочки нужен `dotnet`; если его
-нет, честнее сказать «пропущено», чем показать зелёный итог. `--strict`
-делает пропуск ошибкой — для сборочной линии, где пропускать нечего.
+**A skip is visible and counted.** The shell's checks need `dotnet`; if it
+is absent, saying "skipped" is more honest than showing a green total.
+`--strict` makes a skip an error — for the build line, where there is
+nothing to skip.
 
-**Что трогает машину, отделено.** `--check-voice` говорит вслух,
-`--check-hover` водит мышью, `--check-tray` заводит значок. Их место в
-группе `машина`, и по умолчанию они не идут: регресс, который посреди
-работы начинает говорить и двигать курсор, запускают один раз.
+**What touches the machine is set apart.** `--check-voice` speaks aloud,
+`--check-hover` moves the mouse, `--check-tray` creates an icon. Their
+place is the `машина` group, and by default they do not run: a regression
+that starts talking and moving the cursor in the middle of the working day
+gets run once.
 
-Запуск:
-    python tools/regress.py               ядро и оболочка
-    python tools/regress.py --group ядро  только питон, без dotnet
-    python tools/regress.py --all         вместе с тем, что трогает машину
-    python tools/regress.py --strict      пропуск считается ошибкой
-    python tools/regress.py --list        только показать, что будет запущено
+To run:
+    python tools/regress.py               core and shell
+    python tools/regress.py --group `ядро`  python only, no dotnet
+    python tools/regress.py --all         including what touches the machine
+    python tools/regress.py --strict      a skip counts as an error
+    python tools/regress.py --list        only show what would be run
 """
 import io
 import os
@@ -59,13 +64,13 @@ STARTUP = os.path.join("shell", "Rina.Shell", "Startup.cs")
 
 
 # ---------------------------------------------------------------------------
-# Что не является проверкой
+# What is not a check
 # ---------------------------------------------------------------------------
-#: Поимённо и с причиной.
+#: By name and with a reason.
 #:
-#: Список нужен не для порядка, а чтобы «выводится» осталось правдой. Файл,
-#: который не проверка и здесь не назван, — это либо забытая проверка, либо
-#: забытое объяснение; и то и другое стоит того, чтобы регресс покраснел.
+#: The list is not for tidiness but so that "derived" stays true. A file
+#: that is not a check and is not named here is either a forgotten check or
+#: a forgotten explanation; both are worth turning the regression red.
 NOT_A_CHECK = {
     "_core_sandboxed.py": "запускатель ядра под песочницей, не проверка",
     "build_mockups.py": "собирает макеты, ничего не сверяет",
@@ -77,59 +82,60 @@ NOT_A_CHECK = {
     "voice_bench.py": "стенд замеров: меряет, а не проверяет",
 }
 
-#: Проверки, которым нужен собранный выпуск, и где он лежит.
+#: The checks that need a built release, and where it lies.
 #:
-#: Собирать выпуск внутри регресса нельзя: это минуты, сеть и четверть
-#: гигабайта на диске. Но и молчать о непроверенном установщике нельзя,
-#: поэтому без выпуска проверка не исчезает, а становится «пропущено» с
-#: указанием, чем это чинится.
+#: Building a release inside the regression is not on: that is minutes,
+#: the network and a quarter of a gigabyte on disk. But keeping quiet about
+#: an unchecked installer is not on either, so without a release the check
+#: does not disappear — it becomes "skipped", saying what would fix it.
 NEEDS_RELEASE = {
     "check_release.py": os.path.join(ROOT, "dist", "Rina"),
 }
 
-#: Порождатели: проверка у них — сверить порождённое с источником.
+#: Generators: their check is to compare what was generated with its source.
 GENERATORS = ("gen_csharp_contract.py", "gen_shell_strings.py",
               "gen_xaml_tokens.py")
 
-#: Проверки, которые зовутся не по имени файла.
+#: The checks that are not called by a file name.
 BY_HAND = {
     "session.py": ["--replay-all"],
-    # Сверке по пикселям нужен снимок, а снимок делает сама оболочка. Она в
-    # группе «снимок» и собирается из двух шагов — см. `render_checks`.
+    # A pixel comparison needs a screenshot, and the screenshot is taken
+    # by the shell itself. It is in the `снимок` group and is assembled
+    # from two steps — see `render_checks`.
     "check_shell_render.py": None,
 }
 
-#: Отделки, каждая со своим снимком.
+#: The finishes, each with its own screenshot.
 #:
-#: Обе равноправны (`4.0-R08`), и проверять одну значило бы проверять
-#: половину: значения у них разные, и разойтись они могут порознь.
+#: The two are equals (`4.0-R08`), and checking one would mean checking
+#: half: their values differ, and they can drift apart independently.
 FINISHES = ("silver", "black")
 
-#: Режимы оболочки, которые трогают машину или человека.
+#: The shell modes that touch the machine or the person.
 #:
-#: Не «медленные» и не «капризные»: они говорят вслух, водят мышью и заводят
-#: значок в трее. Регресс, делающий это без спроса посреди рабочего дня,
-#: перестают запускать — и тогда он не проверяет ничего.
+#: Not "slow" and not "fragile": they speak aloud, move the mouse and put
+#: an icon in the tray. A regression that does that unasked in the middle
+#: of a working day stops being run — and then it checks nothing.
 TOUCHES_MACHINE = {"--check-voice", "--check-hover", "--check-tray",
                    "--check-audio", "--check-system"}
 
 
 class Check:
-    """Одна проверка: как её зовут, чем запускают и к какой группе она."""
+    """One check: its name, what runs it, and which group it is in."""
 
     def __init__(self, name, group, command, note="", skip=""):
         self.name = name
         self.group = group
         self.command = command
         self.note = note
-        #: Непустое — проверку не запускаем, а называем причину. Пропуск
-        #: должен объяснять себя сам: строка «пропущено» без «почему»
-        #: читается как «сломано, но мы не смотрели».
+        #: Non-empty means we do not run the check but name the reason.
+        #: A skip has to explain itself: a "skipped" line without a "why"
+        #: reads as "broken, but we did not look".
         self.skip = skip
 
 
 def python_checks():
-    """`tools/test_*.py`, `tools/check_*.py` и порождатели со сверкой."""
+    """`tools/test_*.py`, `tools/check_*.py` and generators with a check."""
     found = []
     for name in sorted(os.listdir(TOOLS)):
         if not name.endswith(".py"):
@@ -149,9 +155,10 @@ def python_checks():
             found.append(Check(name, "ядро", [sys.executable, path] + args))
             continue
         if name in NEEDS_RELEASE and not os.path.isdir(NEEDS_RELEASE[name]):
-            # Выпуска нет — проверять нечего, и это «пропущено», а не
-            # «успех»: зелёная строка про непроверенный установщик хуже
-            # красной, потому что ей верят.
+            # No release means nothing to check, and that is "skipped"
+            # rather than "passed": a green line about an unchecked
+            # installer is worse than a red one, because it is
+            # believed.
             found.append(Check(name, "выпуск", [sys.executable, path],
                                skip="нет dist/Rina — "
                                     "python tools/build_release.py"))
@@ -164,25 +171,25 @@ def python_checks():
 
 def unclassified():
     """
-    Файлы, которые не проверка и не названы таковыми.
+    Files that are not checks and are not named as such.
 
-    Это и есть цена вывода списка: без такой сверки «выводится» означает
-    «выводится то, что подошло под шаблон», и новый инструмент с непривычным
-    именем выпадает молча.
+    That is the price of deriving the list: without this comparison
+    "derived" means "derived from whatever matched the pattern", and a new
+    tool with an unusual name drops out silently.
     """
     known = {c.name for c in python_checks()}
     out = []
     for name in sorted(os.listdir(TOOLS)):
         if not name.endswith(".py") or name in NOT_A_CHECK or name in known:
             continue
-        if name in BY_HAND:            # названа отдельно, см. группу «снимок»
+        if name in BY_HAND:            # named separately, see the `снимок` group
             continue
         out.append(name)
     return out
 
 
 def shell_modes():
-    """Режимы `--check-*`, объявленные самой оболочкой."""
+    """The `--check-*` modes the shell itself declares."""
     text = io.open(STARTUP, encoding="utf-8").read()
     return sorted(set(re.findall(r'"(--check-[a-z]+)"', text)))
 
@@ -199,11 +206,12 @@ def shell_checks():
 
 def render_checks(shots_dir):
     """
-    Нарисованное окно против токенов — в два шага.
+    The drawn window against the tokens — in two steps.
 
-    Снимок делает сама оболочка (`--shot`), сверяет по точкам
-    `check_shell_render.py`. Двумя шагами потому, что рисует и меряет разное:
-    рисует WPF, меряет питон, и связать их можно только через файл.
+    The screenshot is taken by the shell itself (`--shot`) and compared
+    point by point by `check_shell_render.py`. In two steps because
+    drawing and measuring are done by different things: WPF draws, python
+    measures, and the only way to connect them is through a file.
     """
     found = []
     for finish in FINISHES:
@@ -223,10 +231,10 @@ def all_checks(shots_dir):
 
 
 # ---------------------------------------------------------------------------
-# Прогон
+# The run
 # ---------------------------------------------------------------------------
 def run(check, timeout):
-    """Запустить и вернуть (исход, секунды, последняя внятная строка)."""
+    """Run it and return (outcome, seconds, the last intelligible line)."""
     if check.skip:
         return "пропущено", 0.0, check.skip
     started = time.monotonic()
@@ -256,8 +264,8 @@ def main(argv):
         wanted = {argv[argv.index("--group") + 1]}
     strict = "--strict" in argv
 
-    # Снимки — во временную папку: регресс не должен оставлять после себя
-    # картинок в дереве проекта.
+    # Screenshots go into a temporary folder: the regression must not
+    # leave pictures behind in the project tree.
     shots = tempfile.mkdtemp(prefix="rina-regress-")
     stray = unclassified()
     checks = [c for c in all_checks(shots) if c.group in wanted]
@@ -274,7 +282,8 @@ def main(argv):
 
     failed, skipped, spent_total = [], [], 0.0
     for c in checks:
-        # Оболочке нужно поднять ядро и подождать связи; питону — нет.
+        # The shell has to raise the core and wait for the link; python
+        # does not.
         timeout = 600 if c.group != "ядро" else 300
         verdict, spent, tail = run(c, timeout)
         spent_total += spent

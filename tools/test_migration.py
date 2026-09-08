@@ -1,30 +1,34 @@
 # -*- coding: utf-8 -*-
 """
-I02: данные 3.0.0 переживают переезд, и есть куда вернуться.
+I02: 3.0.0's data survives the move, and there is somewhere to go back to.
 
-Задача плана 4.0-I02. Миграция была написана вместе с разделением файлов и с
-тех пор не проверялась ни разу — а это тот код, который выполняется **один
-раз на чужой машине** и молча. Ошибка в нём выглядит не как ошибка: человек
-запускает новую версию и видит настройки по умолчанию, пустой список команд
-и чистую историю. Списать это на «переустановил» проще, чем найти причину.
+Plan item 4.0-I02. The migration was written together with the splitting
+of the files and has not been checked once since — and this is code that
+runs **once, on somebody else's machine**, and silently. A fault in it does
+not look like a fault: a person starts the new version and sees the default
+settings, an empty list of commands and a clean history. Putting that down
+to "I reinstalled" is easier than finding the cause.
 
-Конфиг 3.0.0 — один файл со всем сразу: настройки, команды, плагины,
-история, напоминания. Версии формата в нём нет, потому что тогда её ещё не
-записывали; язык распознавания лежит отдельным ключом `language`, а
-выученные программы — строками пути, а не записями.
+A 3.0.0 config is one file with everything at once: settings, commands,
+plugins, history, reminders. It has no format version, because back then
+none was written; the recognition language lies in a separate `language`
+key, and the learned programs are path strings rather than records.
 
-Проверяется три вещи, и третья — та, ради которой задача помечена
-«обязательно»:
+Three things are checked, and the third is the one for whose sake the item
+is marked "mandatory":
 
-    1. ничего не потеряно: пять групп разъехались по файлам, значения целы;
-    2. форма приведена к нынешней: язык перенесён, записи программ подняты;
-    3. **есть куда вернуться**: копия сделана до правок и содержит исходное.
+    1. nothing is lost: five groups went off into their files, the values
+       are intact;
+    2. the shape is brought up to the present: the language was carried
+       over, the program records were lifted;
+    3. **there is somewhere to go back to**: the backup was taken before
+       the edits and holds the original.
 
-Хранилище работает во временном каталоге: проверка миграции, которая
-мигрирует настоящие настройки человека, — это ровно та беда, от которой она
-должна защищать.
+The store works in a temporary directory: a migration check that migrates
+the person's real settings is exactly the trouble it is supposed to guard
+against.
 
-Запуск:
+To run:
     python tools/test_migration.py
 """
 import io
@@ -52,10 +56,12 @@ def check(label, cond, detail=""):
     print(("OK   " if cond else "FAIL "), label, detail)
 
 
-#: Конфиг в форме 3.0.0: один файл, всё вместе, версии формата нет.
+#: A config in 3.0.0 shape: one file, everything together, no format
+#: version.
 #:
-#: Значения выбраны так, чтобы отличались от умолчаний: настройка, совпавшая
-#: с заводской, не отличима от потерянной, и проверка на ней всегда зелёная.
+#: The values are chosen to differ from the defaults: a setting that
+#: matches the factory one is indistinguishable from a lost one, and a
+#: check on it is always green.
 LEGACY = {
     "voice": "ru-RU-SvetlanaNeural",
     "volume": 42,
@@ -66,16 +72,17 @@ LEGACY = {
     "hotkey": "Ctrl+Alt+Z",
     "search_engine": "duckduckgo",
 
-    # Ключ 3.0.0: язык распознавания жил отдельно от языка интерфейса.
+    # A 3.0.0 key: the recognition language lived separately from the
+    # interface language.
     "language": "English",
 
-    # Выученные программы — строками пути (форма до v2).
+    # The learned programs as path strings (the shape before v2).
     "app_aliases": {
         "ренпай": r"C:\Games\RenPy\renpy.exe",
         "студия": r"D:\Tools\Studio\studio.exe",
     },
 
-    # Данные, которые накапливались годами и терять которые больнее всего.
+    # The data that accumulated over years and hurts most to lose.
     "custom_commands": [
         {"id": "cmd_a1", "enabled": True, "type": "app",
          "triggers": ["запусти блокнот"], "target": "notepad.exe"},
@@ -98,7 +105,7 @@ LEGACY = {
 
 
 def make_legacy(where):
-    """Положить конфиг 3.0.0 так, как он лежал у человека."""
+    """Put a 3.0.0 config down the way it lay on the person's machine."""
     os.makedirs(where, exist_ok=True)
     with io.open(os.path.join(where, "settings.json"), "w",
                  encoding="utf-8") as f:
@@ -107,11 +114,11 @@ def make_legacy(where):
 
 def fresh_store(data_dir):
     """
-    Хранилище, смотрящее в подставной каталог.
+    A store looking into a stand-in directory.
 
-    Модули перезагружаются: каталог вычисляется при первом обращении и
-    запоминается, и второе хранилище в том же процессе смотрело бы туда же,
-    куда первое.
+    The modules are reloaded: the directory is computed on first access and
+    remembered, and a second store in the same process would look where the
+    first one looks.
     """
     os.environ["APPDATA"] = data_dir
     for name in list(sys.modules):
@@ -171,8 +178,8 @@ check("версия формата записана",
       store.get("config_version") == module.CONFIG_VERSION,
       f"| {store.get('config_version')}")
 
-# Язык распознавания 3.0.0 не должен молча переехать на другой: человек его
-# выбирал, а объединённая настройка по умолчанию русская.
+# The 3.0.0 recognition language must not silently move to another one:
+# the person chose it, and the merged setting defaults to Russian.
 check("язык распознавания перенесён в язык интерфейса",
       store.get("ui_language") == "English", f"| {store.get('ui_language')}")
 
@@ -197,8 +204,9 @@ check("копия сделана", os.path.isdir(backup), f"| {backup}")
 
 saved = os.path.join(backup, "settings.json")
 if os.path.isfile(saved):
-    # Копия обязана содержать **исходное**, а не уже переписанное: копия,
-    # снятая после правки, — это не копия, а вторая порция того же.
+    # The backup must hold **the original**, not what has already been
+    # rewritten: a backup taken after the edit is not a backup but a second
+    # helping of the same thing.
     check("в копии лежит исходный конфиг",
           io.open(saved, encoding="utf-8").read() == before,
           "| копия снята после правок")
@@ -215,8 +223,9 @@ if callable(restored):
     ok = store.restore_backup()
     check("откат состоялся", ok)
 
-    # Смотрим на диск **до** загрузки: загрузка мигрирует заново и перепишет
-    # файлы. Проверять после неё значило бы проверять миграцию, а не откат.
+    # We look at the disk **before** loading: loading migrates again and
+    # will rewrite the files. Checking after it would mean checking the
+    # migration rather than the rollback.
     after = io.open(os.path.join(data, "settings.json"),
                     encoding="utf-8").read()
     check("на диске снова исходный конфиг", after == before,
@@ -225,8 +234,8 @@ if callable(restored):
           not os.path.isfile(os.path.join(data, "commands.json")),
           "| иначе на диске смесь, какой ни одна версия не писала")
 
-    # Замещённое отложено, а не стёрто: откат, уничтожающий то, что он
-    # заменяет, сам необратим.
+    # What was displaced is set aside, not erased: a rollback that
+    # destroys what it replaces is itself irreversible.
     aside = os.path.join(backup, "replaced", "settings.json")
     check("замещённое отложено", os.path.isfile(aside), f"| {aside}")
     if os.path.isfile(aside):
@@ -234,8 +243,8 @@ if callable(restored):
         check("и это именно то, что заменили", put.get("volume") == 3,
               f"| {put.get('volume')}")
 
-    # А теперь — что этим можно пользоваться: новое ядро поднимается на
-    # возвращённом конфиге и мигрирует его заново, как в первый раз.
+    # And now that it can actually be used: a new core comes up on the
+    # restored config and migrates it again, as if for the first time.
     module2, store2 = fresh_store(home)
     store2.load()
     check("на возвращённом конфиге всё снова поднимается",
@@ -247,8 +256,8 @@ if callable(restored):
 print()
 print("=== позвать откат может человек, а не только код ===")
 
-# Метод, который нельзя позвать, — это не возможность откатиться. Проверяем
-# тем же способом, каким это сделает человек: запуском ядра с ключом.
+# A method that cannot be called is not the ability to roll back. We check
+# it the same way a person would: by starting the core with the flag.
 import subprocess
 from console import child_env
 
@@ -271,17 +280,18 @@ check("несуществующую копию не выдумывает",
 code, said = core_says("--restore-backup")
 check("откат по ключу срабатывает", code == 0 and "вернули" in said,
       f"| {said.strip().splitlines()[:1]}")
-# И говорит, куда делось замещённое: человек, откатившийся по ошибке, иначе
-# решит, что потерял всё, что накопил после миграции.
+# And it says where what was displaced went: otherwise a person who rolled
+# back by mistake will decide they lost everything accumulated since the
+# migration.
 check("и сказано, куда отложено замещённое", "replaced" in said,
       f"| {said.strip()}")
 
 print()
 print("=== возвращаться некуда ===")
 
-# Самый частый случай: миграции не было вовсе. Откат обязан ответить «нет»,
-# а не упасть и не сделать вид, что получилось: и то и другое человек
-# прочитает как «вернули», ничего не вернув.
+# The commonest case: there was no migration at all. The rollback must
+# answer "no" rather than fall over or pretend it worked: a person will
+# read either of those as "restored" while nothing was restored.
 clean_home = tempfile.mkdtemp(prefix="rina-nomigration-")
 _, untouched = fresh_store(clean_home)
 untouched.load()

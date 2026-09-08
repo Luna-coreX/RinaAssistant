@@ -5,36 +5,40 @@ using Rina.Protocol.Transport;
 
 namespace Rina.Protocol;
 
-/// <summary>Как запускать ядро.</summary>
-/// <param name="Python">Интерпретатор.</param>
-/// <param name="Script">Путь к <c>rina_core.py</c>.</param>
-/// <param name="WorkingDirectory">Корень проекта.</param>
-/// <param name="ExtraArguments">Что дописать к строке запуска, например уровень журнала.</param>
+/// <summary>How to start the core.</summary>
+/// <param name="Python">The interpreter.</param>
+/// <param name="Script">The path to <c>rina_core.py</c>.</param>
+/// <param name="WorkingDirectory">The project root.</param>
+/// <param name="ExtraArguments">What to append to the command line, the
+/// journal level for instance.</param>
 public sealed record CoreLaunch(string Python, string Script,
                                 string WorkingDirectory,
                                 IReadOnlyList<string>? ExtraArguments = null);
 
 /// <summary>
-/// Одна связь оболочки с ядром: процесс, каналы, рукопожатие, разговор.
+/// One link between the shell and the core: the process, the channels,
+/// the handshake, the conversation.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Порядок обязателен и неочевиден: <b>сначала подняты трубы, потом запущено
-/// ядро</b>. Ядро подключается клиентом и ждёт появления канала; если запустить
-/// его раньше, оно будет ждать впустую ровно столько, сколько мы провозимся с
-/// созданием труб. Обратный порядок работал бы почти всегда — и тем хуже.
+/// The order is mandatory and not obvious: <b>the pipes are raised first,
+/// the core is started after</b>. The core connects as a client and waits
+/// for the channel to appear; started earlier, it waits for nothing for
+/// exactly as long as we spend creating the pipes. The reverse order would
+/// work almost always — and that is what makes it worse.
 /// </para>
 /// <para>
-/// <b>Канал читает один насос, а не тот, кто спросил.</b> Первая редакция
-/// читала прямо в <c>CallAsync</c>, и это работало ровно до второго читателя:
-/// события приходят без запроса, и услышать их некому, пока никто ничего не
-/// спрашивает. Теперь ответы разбираются по <c>correlation_id</c>, а события
-/// уходят подписчикам — это же нужно и надзору (<c>4.0-E07</c>), которому
-/// слышать канал надо постоянно.
+/// <b>One pump reads the channel, not whoever asked.</b> The first
+/// edition read inside <c>CallAsync</c>, and that worked exactly until the
+/// second reader: events arrive unrequested, and there is nobody to hear
+/// them while nobody is asking anything. Now the answers are sorted by
+/// <c>correlation_id</c> and the events go to subscribers — which is also
+/// what the supervisor (<c>4.0-E07</c>) needs, as it has to hear the
+/// channel all the time.
 /// </para>
 /// <para>
-/// Ответ на команду — <c>accepted</c>, а не текст: сам ответ приходит событием
-/// <c>assistant.response</c>, когда появится.
+/// The reply to a command is <c>accepted</c>, not text: the answer itself
+/// arrives as an <c>assistant.response</c> event, when there is one.
 /// </para>
 /// </remarks>
 public sealed class CoreConnection : IAsyncDisposable
@@ -55,36 +59,38 @@ public sealed class CoreConnection : IAsyncDisposable
     public string CoreVersion { get; private set; } = "";
 
     /// <summary>
-    /// Версия формата данных на диске (ADR 0004).
+    /// The version of the data format on disk (ADR 0004).
     /// </summary>
     /// <remarks>
-    /// Четвёртая независимая версия. Приходит в рукопожатии, а не
-    /// настройкой: `config_version` — состояние хранилища, и наружу как
-    /// настройка не отдаётся. Но откат ограничен именно ею.
+    /// The fourth independent version. It arrives in the handshake rather
+    /// than as a setting: `config_version` is the store's state and is not
+    /// given out as a setting. But it is what limits a rollback.
     /// </remarks>
     public int DataVersion { get; private set; }
     public string SessionId { get; private set; } = "";
     public bool Ready { get; private set; }
 
-    /// <summary>События ядра, пришедшие без запроса (§10).</summary>
+    /// <summary>The core's events, arriving unrequested (§10).</summary>
     public event Action<Envelope>? EventReceived;
 
-    /// <summary>Связь оборвалась: ядро умерло или закрыло канал.</summary>
+    /// <summary>The link broke: the core died or closed the channel.</summary>
     public event Action<string>? Broken;
 
     /// <summary>
-    /// Ядро о чём-то просит (§1: у него ровно два вида запросов — разрешение
-    /// и данные, которыми владеет оболочка).
+    /// The core is asking for something (§1: it has exactly two kinds of
+    /// request — a permission, and data the shell owns).
     /// </summary>
     public event Action<Envelope>? RequestReceived;
 
-    /// <summary>Незнакомые события: их игнорируют молча, но считать полезно.</summary>
+    /// <summary>Unfamiliar events: ignored silently, but worth
+    /// counting.</summary>
     public List<string> IgnoredEvents { get; } = [];
 
-    /// <summary>Канал данных: звук и кадры экрана, мимо JSON (§2).</summary>
+    /// <summary>The data channel: sound and screen frames, past the JSON
+    /// (§2).</summary>
     public DataChannel Data => _data;
 
-    /// <summary>Когда в последний раз что-либо пришло от ядра (§13).</summary>
+    /// <summary>When anything last arrived from the core (§13).</summary>
     public DateTimeOffset LastHeard { get; private set; } = DateTimeOffset.UtcNow;
 
     public CoreConnection(string? session = null)
@@ -116,19 +122,21 @@ public sealed class CoreConnection : IAsyncDisposable
         _core = Process.Start(start)
             ?? throw new InvalidOperationException("ядро не запустилось");
 
-        // Журнал ядра вычитывается сразу и в фоне. Не только ради отладки:
-        // труба невелика, и процесс, которому некуда писать в поток ошибок,
-        // однажды встанет на записи в него. К тому же 4.0-F12 обязан
-        // показывать состояние связи, а последняя строка журнала ядра —
-        // самое внятное, что можно показать при обрыве.
+        // The core's journal is read straight away and in the background.
+        // Not only for debugging: the pipe is not large, and a process
+        // with nowhere to write its error stream will one day block on
+        // writing to it. Besides, 4.0-F12 is obliged to show the state of
+        // the link, and the last line of the core's journal is the most
+        // intelligible thing to show when it breaks.
         _core.ErrorDataReceived += (_, e) =>
         {
             if (e.Data is not null) lock (_coreLog) _coreLog.AppendLine(e.Data);
         };
         _core.BeginErrorReadLine();
 
-        // Ядро может умереть, не подключившись, — и тогда ждать трубу до
-        // конца срока бессмысленно. Ждём оба исхода сразу.
+        // The core may die without connecting — and then waiting for the
+        // pipe until the deadline is pointless. We wait for both outcomes
+        // at once.
         var exited = WaitForExitAsync(_core);
         var done = await Task.WhenAny(accepting, exited, Task.Delay(timeout, token))
                              .ConfigureAwait(false);
@@ -152,7 +160,7 @@ public sealed class CoreConnection : IAsyncDisposable
         return tcs.Task;
     }
 
-    /// <summary>Единственный читатель канала.</summary>
+    /// <summary>The channel's only reader.</summary>
     private async Task PumpAsync()
     {
         try
@@ -174,8 +182,9 @@ public sealed class CoreConnection : IAsyncDisposable
                 if (message.CorrelationId is { } id
                     && _pending.TryRemove(id, out var waiting))
                     waiting.TrySetResult(message);
-                // Ответ на запрос, которого никто не ждёт, — не повод падать:
-                // ждавший мог сдаться по своему сроку.
+                // A reply to a request nobody is waiting for is no reason
+                // to fall over: whoever waited may have given up on their
+                // own deadline.
             }
         }
         catch (OperationCanceledException) { /* закрываемся */ }
@@ -194,7 +203,8 @@ public sealed class CoreConnection : IAsyncDisposable
                 waiting.TrySetException(cause);
     }
 
-    /// <summary>Рукопожатие (§4): версии наборами, возможности списком.</summary>
+    /// <summary>The handshake (§4): versions as sets, capabilities as a
+    /// list.</summary>
     public async Task HandshakeAsync(CancellationToken token = default)
     {
         var hello = new JsonObject
@@ -226,7 +236,7 @@ public sealed class CoreConnection : IAsyncDisposable
         Ready = true;
     }
 
-    /// <summary>Умеет ли ядро этот метод (§4).</summary>
+    /// <summary>Whether the core can do this method (§4).</summary>
     public bool MayCall(string method)
     {
         if (!Ready) return false;
@@ -235,7 +245,7 @@ public sealed class CoreConnection : IAsyncDisposable
         return capability is null || CoreCapabilities.Contains(capability);
     }
 
-    /// <summary>Запрос и ответ на него.</summary>
+    /// <summary>A request and the reply to it.</summary>
     public async Task<Envelope> CallAsync(string method, JsonObject? payload = null,
                                           TimeSpan? timeout = null,
                                           CancellationToken token = default,
@@ -265,11 +275,12 @@ public sealed class CoreConnection : IAsyncDisposable
     }
 
     /// <summary>
-    /// Ответить на запрос ядра.
+    /// Reply to a request from the core.
     /// </summary>
     /// <remarks>
-    /// Трассировка и версия наследуются от запроса: сквозная цепочка (§14)
-    /// обязана быть свойством конструкции, иначе её однажды забудут.
+    /// The trace and the version are inherited from the request: an
+    /// end-to-end chain (§14) has to be a property of the construction, or
+    /// it will one day be forgotten.
     /// </remarks>
     public async Task ReplyAsync(Envelope request, JsonObject payload,
                                  CancellationToken token = default)
@@ -287,7 +298,7 @@ public sealed class CoreConnection : IAsyncDisposable
         await _control.SendAsync(answer, token).ConfigureAwait(false);
     }
 
-    /// <summary>Дождаться названного события.</summary>
+    /// <summary>Wait for the named event.</summary>
     public async Task<Envelope?> WaitForEventAsync(string method, TimeSpan timeout,
                                                    CancellationToken token = default)
     {
@@ -311,12 +322,13 @@ public sealed class CoreConnection : IAsyncDisposable
     }
 
     /// <summary>
-    /// Спросить «жив ли» (§13).
+    /// Ask whether it is alive (§13).
     /// </summary>
     /// <remarks>
-    /// Отдельный метод, а не таймер внутри: решать, когда спрашивать, — дело
-    /// надзора, который знает и про тишину, и про то, сколько раз уже не
-    /// ответили. Здесь только сам вопрос.
+    /// A method of its own rather than a timer inside: deciding when to
+    /// ask is the supervisor's business, as it knows both about the
+    /// silence and about how many times there has been no answer. Here
+    /// there is only the question itself.
     /// </remarks>
     public Task<Envelope> PingAsync(TimeSpan timeout,
                                     CancellationToken token = default) =>
@@ -326,20 +338,22 @@ public sealed class CoreConnection : IAsyncDisposable
     {
         if (!Events.All.Contains(message.Method ?? ""))
         {
-            // §3: неизвестное событие игнорируется молча. Асимметрия с
-            // запросом намеренна — пропущенный запрос есть потерянное
-            // действие, пропущенное событие лишь потерянное уведомление.
+            // §3: an unknown event is ignored silently. The asymmetry
+            // with a request is deliberate — a missed request is a lost
+            // action, a missed event only a lost notification.
             IgnoredEvents.Add(message.Method ?? "");
             return;
         }
         EventReceived?.Invoke(message);
     }
 
-    /// <summary>Что ядро написало в поток ошибок к этому моменту.</summary>
+    /// <summary>What the core has written to its error stream by
+    /// now.</summary>
     public string CoreLog { get { lock (_coreLog) return _coreLog.ToString(); } }
 
-    /// <summary>Номер процесса ядра. Нужен надзору и журналу: в двух
-    /// процессах «какое из ядер» — вопрос, который задают часто.</summary>
+    /// <summary>The core's process id. Needed by the supervisor and the
+    /// journal: with two processes, "which of the cores" is a question
+    /// asked often.</summary>
     public int? CorePid => _core?.Id;
 
     public bool CoreAlive => _core is { HasExited: false };
@@ -365,8 +379,9 @@ public sealed class CoreConnection : IAsyncDisposable
 
         if (_core is { HasExited: false })
         {
-            // Ядро завершается само, увидев обрыв (§13). Ждём недолго и лишь
-            // потом убиваем: убить сразу значит не дать ему закрыть хранилище.
+            // The core shuts down by itself when it sees the break
+            // (§13). We wait a little and only then kill it: killing at
+            // once means not letting it close the store.
             if (!_core.WaitForExit(5000)) _core.Kill(entireProcessTree: true);
         }
         _core?.Dispose();

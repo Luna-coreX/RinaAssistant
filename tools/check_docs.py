@@ -1,25 +1,26 @@
 # -*- coding: utf-8 -*-
 """
-I05: документация ссылается на то, что существует.
+I05: the documentation refers to things that exist.
 
-Задача плана `4.0-I05`. Документ гниёт молча и особенным образом: код
-ломается заметно, а README продолжает выглядеть правдой ещё год после того,
-как перестал ею быть. Единственный читатель, который это заметит, — новый
-человек, и заметит он это как «здесь всё врёт».
+Plan item `4.0-I05`. A document rots silently and in a particular way:
+code breaks noticeably, while a README goes on looking true for another
+year after it stopped being so. The only reader who will notice is a new
+person, and they will notice it as "everything here lies".
 
-Прозу проверить нельзя. Зато можно проверить всё, что в прозе выглядит как
-обещание:
+Prose cannot be checked. What can be checked is everything in the prose
+that looks like a promise:
 
-    ссылка на файл        — файл есть в дереве
-    ссылка на картинку    — картинка есть и не пустая
-    путь в тексте         — существует
-    команда `--check-*`   — объявлена оболочкой
-    команда `tools/x.py`  — такой инструмент есть
+    a link to a file      — the file is in the tree
+    a link to a picture   — the picture exists and is not empty
+    a path in the text    — it exists
+    a `--check-*` command — the shell declares it
+    a `tools/x.py`        — such a tool is there
 
-Дополнительно — то, ради чего задача попала в блок выпуска: **обещанные
-документы написаны**. Список ниже — это I05 в машинном виде.
+And on top of that, the thing that put this task into the release block:
+**the promised documents have been written**. The list below is I05 in
+machine-readable form.
 
-Запуск:
+To run:
     python tools/check_docs.py
 """
 import io
@@ -45,11 +46,11 @@ def check(label, ok, detail=""):
     print(("OK   " if ok else "FAIL "), label, detail)
 
 
-#: Что обещано задачей `4.0-I05`, и где это лежит.
+#: What plan item `4.0-I05` promised, and where it lies.
 #:
-#: Формулировка задачи — «README, схема слоёв, дизайн-система как документ,
-#: как писать плагины, как отлаживать» — списком, а не прозой: иначе
-#: «выполнено» решается на глаз.
+#: The task's wording — "a README, a diagram of the layers, the design
+#: system as a document, how to write plugins, how to debug" — as a list
+#: rather than prose: otherwise "done" is decided by eye.
 REQUIRED = {
     "README.md": "README",
     "docs/ARCHITECTURE.md": "схема слоёв",
@@ -58,14 +59,14 @@ REQUIRED = {
     "docs/DEBUGGING.md": "как отлаживать",
 }
 
-#: Документы, которые сверяются на ссылки.
+#: The documents whose links are checked.
 WATCHED = [
     "README.md",
-    # План — документ, обещающий больше всех: он называет и режимы
-    # оболочки, и файлы проверок. Его тут не было, и обещание «названные
-    # `--check-*` объявлены оболочкой» держалось только на тех семи
-    # документах, где таких обещаний почти нет. Выдуманный режим в плане
-    # проходил молча — проверено сломом.
+    # The plan is the document that promises the most: it names both the
+    # shell's modes and the files of the checks. It was not here, and the
+    # promise "the named `--check-*` are declared by the shell" rested on
+    # the seven documents that make almost no such promises. A made-up
+    # mode in the plan passed silently — verified by breaking it.
     "docs/ROADMAP.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
@@ -85,8 +86,8 @@ for path, what in REQUIRED.items():
 print()
 print("=== ссылки ведут туда, где что-то есть ===")
 
-# Ссылки markdown: [текст](цель). Внешние и якоря пропускаем — проверять
-# сеть значило бы краснеть от чужого сбоя.
+# Markdown links: [text](target). External ones and anchors are skipped —
+# checking the network would mean going red at somebody else's outage.
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 IMG = re.compile(r'<img\s+src="([^"]+)"')
 
@@ -101,18 +102,18 @@ for doc in WATCHED:
         target = target.split("#")[0].strip()
         if not target or target.startswith(("http://", "https://", "mailto:")):
             continue
-        # Пробел в имени файла пишется в ссылке как `%20` — это не
-        # украшение, а единственный способ сослаться на такой файл из
-        # markdown. Не раскодировав, проверка объявляла бы верную ссылку
-        # битой, то есть требовала бы переименовать файл ради себя.
+        # A space in a file name is written as `%20` in a link — not an
+        # ornament but the only way to refer to such a file from markdown.
+        # Without decoding it, the check would call a valid link broken —
+        # that is, it would demand renaming the file for its own sake.
         path = os.path.normpath(os.path.join(base, unquote(target)))
         check(f"{doc} → {target}", os.path.exists(path), "| нет такого пути")
 
 print()
 print("=== картинки настоящие ===")
 
-# Пустой или крошечный PNG — след неудачного снимка. Он выглядит как
-# ссылка, которая работает, и потому хуже отсутствующей.
+# An empty or tiny PNG is the trace of a failed screenshot. It looks like
+# a link that works, and is therefore worse than a missing one.
 for doc in WATCHED:
     if not os.path.isfile(doc):
         continue
@@ -130,17 +131,19 @@ for doc in WATCHED:
 print()
 print("=== план не ссылается на исчезнувшее ===")
 
-# План читают чаще всех и правят чаще всех, поэтому гниёт он первым.
-# Проверяются только **закрытые** задачи: у открытой файл и не должен
-# существовать, она про будущее.
+# The plan is read most often and edited most often, so it rots first.
+# Only **closed** items are checked: an open one's file is not supposed to
+# exist, it is about the future.
 #
-# Имя ищется по дереву, а не по буквальному пути: в плане пишут
-# `Platform/Journal.cs`, а лежит он в `shell/Rina.Shell/Platform/`. Строгая
-# сверка пути краснела бы на прозе, а не на гнили.
-#: `archive/` из обхода не исключается нарочно: перенос в архив не делает
-#: прозу о прошлом ложью. Задача, рассказывающая, что чинили в
-#: `voice/service.py`, остаётся правдой и после того, как файл уехал
-#: туда, — а вот исчезнувший бесследно файл проверка поймает.
+# The name is looked for across the tree rather than by a literal path:
+# the plan writes `Platform/Journal.cs` while it lies in
+# `shell/Rina.Shell/Platform/`. A strict path comparison would go red at
+# the prose rather than at the rot.
+#: `archive/` is deliberately not excluded from the walk: moving
+#: something into the archive does not make prose about the past a lie. An
+#: item describing what was fixed in `voice/service.py` stays true after
+#: the file has gone there — whereas a file that vanished without trace is
+#: something the check will catch.
 SKIP_TREE = {".git", "obj", "bin", "__pycache__", "venv", "dist", "build",
              "node_modules"}
 tree = {}
@@ -154,13 +157,13 @@ roadmap = io.open(os.path.join("docs", "ROADMAP.md"), encoding="utf-8").read()
 chunks = re.split(r"^\*\*((?:4\.0|4\.0b|5\.0|N|V)-[A-Za-z0-9]+)\s*·\s*([^*]+)\*\*",
                   roadmap, flags=re.M)
 
-#: Пути, которых нет и не должно быть. Поимённо и с причиной.
+#: Paths that do not exist and should not. By name and with a reason.
 #:
-#: Не всякое имя файла в плане — обещание. Бывает рассказ о том, что файл
-#: переехал, и разбор чужой библиотеки, которую мы отвергли: там имя
-#: принадлежит истории или соседу, а не нашему дереву. Список короткий и
-#: с объяснениями нарочно — молчаливое исключение превращает правило в
-#: пожелание.
+#: Not every file name in the plan is a promise. There are accounts of a
+#: file having moved, and reviews of somebody else's library that we
+#: rejected: there the name belongs to history or to a neighbour, not to
+#: our tree. The list is short and annotated on purpose — a silent
+#: exception turns a rule into a wish.
 NOT_OURS = {
     ("4.0-E05", "core/wire/trace.py"):
         "рассказ о переезде: файл теперь core/trace.py",
@@ -189,8 +192,8 @@ for i in range(1, len(chunks) - 1, 3):
 check("закрытые задачи ссылаются на существующее", not stale,
       "| " + ", ".join(f"{t}: {p}" for t, p in stale[:4]))
 
-# И обратно: исключение, переставшее быть нужным, — это забытая строка,
-# которая однажды прикроет настоящую гниль.
+# And the other way round: an exception that has stopped being needed is
+# a forgotten line that will one day cover up real rot.
 for (task, path), why in sorted(NOT_OURS.items()):
     tail = path.split("/")[-1]
     exists = os.path.exists(path) or any(
@@ -225,14 +228,15 @@ print("=== README говорит о нынешней версии ===")
 
 readme = io.open("README.md", encoding="utf-8").read()
 
-# Версий четыре (ADR 0004), и сверять README надо с версией **продукта** —
-# то есть оболочки. `version.py` описывает приложение 3.1.0, которое живёт
-# рядом, и сверка с ним говорила бы неправду.
+# There are four versions (ADR 0004), and the README has to be compared
+# with the version of the **product** — that is, of the shell.
+# `version.py` describes the 3.1.0 application living alongside, and
+# comparing with that would tell an untruth.
 #
-# Разбор, который ничего не нашёл, — это провал, а не пропуск. Первая
-# редакция этой проверки искала `__version__`, которого в проекте нет, и
-# молча зеленела: `if current:` пропускал утверждение целиком. Проверка,
-# умеющая пропустить себя, хуже отсутствующей — на неё полагаются.
+# A parse that found nothing is a failure, not a skip. The first edition
+# of this check looked for `__version__`, which the project does not have,
+# and went green silently: `if current:` skipped the assertion entirely. A
+# check that can skip itself is worse than no check — it is relied on.
 props = io.open(os.path.join("shell", "Directory.Build.props"),
                 encoding="utf-8").read()
 found = re.search(r"<Version>([^<]+)</Version>", props)
@@ -245,8 +249,8 @@ if found:
           f"Version {major}." in readme,
           "| README пережил смену версии, и это заметит только новый человек")
 
-# Скриншоты 3.0.0 сняты с программы, которой больше нет. Ссылка на них —
-# не мёртвая ссылка, а живая ложь: картинка откроется.
+# The 3.0.0 screenshots were taken of a program that no longer exists. A
+# link to them is not a dead link but a living lie: the picture opens.
 check("старых скриншотов в README нет",
       not re.search(r"docs/0\d-\w+\.png", readme),
       "| это интерфейс, которого больше не существует")

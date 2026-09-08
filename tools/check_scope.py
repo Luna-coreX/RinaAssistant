@@ -1,42 +1,45 @@
 # -*- coding: utf-8 -*-
 """
-Сверка границ рубежа со снимком: что вошло, что вышло и было ли это решено.
+Comparing a milestone's boundaries with a snapshot: what came in, what
+went out, and whether that was decided.
 
-Задача плана 4.0-S03. Список того, что входит в 4.0 и не входит, — раздел
-«Рубежи 4.0» самого плана, и записан он словами. Словами он бы и остался:
-задачу дописывают там же, где пишут код, между делом и в том же коммите.
-Тогда рубеж расширяется не решением, а привычкой — и «сделаем в 4.0»
-превращается в «4.0 никогда не выйдет».
+Plan item 4.0-S03. The list of what is in 4.0 and what is not is the
+"Рубежи 4.0" section of the plan itself, and it is written in words. In
+words it would have stayed: an item gets added in the same place the code
+is written, in passing and in the same commit. Then the milestone grows not
+by decision but by habit — and "we will do it in 4.0" turns into "4.0 will
+never ship".
 
-Формулировка задачи прямая: **закрыта, пока список не меняется молча.**
-Значит нужен не документ, а точка отсчёта. Снимок —
-`docs/scope-4.0.json`; сверка отвечает не «правильные ли границы», а «что
-изменилось с прошлого раза и было ли это намерением».
+The task's wording is plain: **closed as long as the list does not change
+silently.** So what is needed is not a document but a point of reference.
+The snapshot is `docs/scope-4.0.json`; the comparison answers not "are the
+boundaries right" but "what has changed since last time, and was it
+intended".
 
-Разрешено молча — ровно одно:
+Exactly one thing is allowed silently:
 
-    задача сделана: открытая стала **ВЫПОЛНЕНО**
+    an item was done: an open one became `ВЫПОЛНЕНО`
 
-Это не изменение границ, а работа: список тот же, продвинулись по нему.
+That is not a change of boundaries but work: the same list, moved along.
 
-Требует переписать снимок осознанно:
+These require rewriting the snapshot deliberately:
 
-    добавить задачу в рубеж, убрать её оттуда
-    переименовать задачу
-    перенести её в другой рубеж (`[port]` ↔ `[stable]` ↔ `[4.1+]`)
-    изменить оценку размера
-    **отменить сделанное**: ВЫПОЛНЕНО обратно в открытую
+    adding an item to a milestone, removing it from one
+    renaming an item
+    moving it to another milestone (`[port]` ↔ `[stable]` ↔ `[4.1+]`)
+    changing its size estimate
+    **undoing what was done**: `ВЫПОЛНЕНО` back to open
 
-Последнее — отдельной строкой, потому что выглядит безобидно. Снятая
-пометка означает, что задачу переоткрыли; это бывает законно, но узнать об
-этом надо от человека, а не из молчания.
+The last one has a line of its own because it looks harmless. A mark
+removed means the item was reopened; that can be legitimate, but it has to
+be learned from a person rather than from silence.
 
-Размер сверяется, потому что он и есть граница: задача, у которой S тихо
-стала L, — это другая задача, даже если название прежнее.
+The size is compared because the size *is* a boundary: an item whose S
+quietly became an L is a different item, even under the same name.
 
-Запуск:
-    python tools/check_scope.py            сверить
-    python tools/check_scope.py --update   переписать снимок
+To run:
+    python tools/check_scope.py            compare
+    python tools/check_scope.py --update   rewrite the snapshot
 """
 
 import io
@@ -53,32 +56,35 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROADMAP = os.path.join(ROOT, "docs", "ROADMAP.md")
 SNAPSHOT = os.path.join(ROOT, "docs", "scope-4.0.json")
 
-#: Как пометка в строке задачи называется рубежом. Пометка пишется коротко
-#: (`[stable]`), а рубеж зовётся полно — и без приведения задача осела бы в
-#: ключе, которого нет в сводке, то есть пропала бы из счёта молча.
+#: How a mark in an item's line names a milestone. The mark is written
+#: short (`[stable]`) while the milestone has a full name — and without
+#: the mapping the item would settle under a key the summary does not
+#: have, that is, drop out of the count silently.
 BY_MARK = {"port": "4.0-port", "stable": "4.0-stable", "4.1+": "4.1+"}
 
-#: В каком порядке показывать рубежи. Незнакомый допечатывается следом:
-#: сводка, которая молчит о том, чего не ждали, — это та же тихая правка
-#: границ, только с нашей стороны.
+#: The order in which to show the milestones. An unfamiliar one is
+#: printed after them: a summary that keeps quiet about what was not
+#: expected is the same silent change of boundaries, only from our side.
 ORDER = ("4.0-port", "4.0-beta", "4.0-stable", "4.1+")
 
-#: Строка задачи: **4.0-D04 · Конверт** — M — D03 — **[port]** — **ВЫПОЛНЕНО …**
+#: An item's line: **4.0-D04 · Конверт** — M — D03 — **[port]** — **ВЫПОЛНЕНО …**
 #:
-#: Хвост забирается целиком и разбирается отдельно: у задач он разной формы —
-#: где-то есть пометка рубежа, где-то нет, где-то стоит дата выполнения.
-#: Требовать одной формы значило бы править план ради удобства сверки.
+#: The tail is taken whole and parsed separately: items have it in
+#: different shapes — some carry a milestone mark, some do not, some carry
+#: a completion date. Demanding one shape would mean editing the plan for
+#: the comparison's convenience.
 TASK = re.compile(r"^\*\*(4\.0-[A-Z]\d+|V-\d+) · ([^*]+?)\*\*(.*)$", re.M)
 
-#: Оценка размера сразу после названия: «— M —» или «— L —».
+#: The size estimate right after the name: "— M —" or "— L —".
 SIZE = re.compile(r"^\s*—\s*([SML])\s*(?:—|$)")
 
-#: В какой рубеж отнесена задача. Нет пометки — в тот, в чьём разделе стоит.
+#: Which milestone an item belongs to. With no mark, the one whose
+#: section it stands in.
 MARK = re.compile(r"\[(port|stable|4\.1\+)\]")
 
 
 def milestones(text):
-    """Разделы плана по рубежам: имя -> кусок текста."""
+    """The plan's sections by milestone: name -> a piece of text."""
     heads = [(m.start(), m.group(1))
              for m in re.finditer(r"^# РУБЕЖ (\S+)", text, re.M)]
     out = {}
@@ -89,7 +95,7 @@ def milestones(text):
 
 
 def current():
-    """Границы, как их описывает план прямо сейчас."""
+    """The boundaries as the plan describes them right now."""
     text = io.open(ROADMAP, encoding="utf-8").read()
     scope = {}
     for name, body in milestones(text).items():
@@ -100,8 +106,9 @@ def current():
             scope[task] = {
                 "title": title.strip(),
                 "size": size.group(1) if size else "",
-                # Пометка сильнее раздела: задача, лежащая в разделе port с
-                # пометкой [stable], относится к stable — так её и читают.
+                # The mark beats the section: an item lying in the port
+                # section with a [stable] mark belongs to stable — that is
+                # how it is read.
                 "milestone": (BY_MARK[mark.group(1)] if mark else name),
                 "done": "ВЫПОЛНЕНО" in tail,
             }
@@ -109,7 +116,7 @@ def current():
 
 
 def diff(old, new):
-    """Вернуть (то, что просто сделано; то, что меняет границы)."""
+    """Return (what was simply done; what changes the boundaries)."""
     progress, changed = [], []
 
     for task in sorted(set(new) - set(old)):
@@ -138,7 +145,7 @@ def diff(old, new):
 
 
 def counts(scope):
-    """Сколько в каком рубеже и сколько из этого сделано."""
+    """How many are in each milestone, and how many of those are done."""
     out = {}
     for item in scope.values():
         was_done, total = out.get(item["milestone"], (0, 0))
@@ -180,8 +187,9 @@ def main(argv):
         if total:
             shown += total
             print(f"  {name}: {done} из {total}")
-    # Счёт обязан сойтись: задача, не попавшая ни в один рубеж, — это как раз
-    # тихо изменившаяся граница, только замеченная с нашей стороны.
+    # The count has to add up: an item that fell into no milestone is
+    # exactly a boundary that changed quietly, only noticed from our
+    # side.
     if shown != len(scope):
         print(f"  ВНИМАНИЕ: задач {len(scope)}, а в рубежах {shown}")
 
