@@ -24,6 +24,7 @@ I05: документация ссылается на то, что сущест�
 """
 import io
 import os
+from urllib.parse import unquote
 import re
 import sys
 
@@ -60,6 +61,12 @@ REQUIRED = {
 #: Документы, которые сверяются на ссылки.
 WATCHED = [
     "README.md",
+    # План — документ, обещающий больше всех: он называет и режимы
+    # оболочки, и файлы проверок. Его тут не было, и обещание «названные
+    # `--check-*` объявлены оболочкой» держалось только на тех семи
+    # документах, где таких обещаний почти нет. Выдуманный режим в плане
+    # проходил молча — проверено сломом.
+    "docs/ROADMAP.md",
     "CONTRIBUTING.md",
     "SECURITY.md",
     "docs/ARCHITECTURE.md",
@@ -94,7 +101,11 @@ for doc in WATCHED:
         target = target.split("#")[0].strip()
         if not target or target.startswith(("http://", "https://", "mailto:")):
             continue
-        path = os.path.normpath(os.path.join(base, target))
+        # Пробел в имени файла пишется в ссылке как `%20` — это не
+        # украшение, а единственный способ сослаться на такой файл из
+        # markdown. Не раскодировав, проверка объявляла бы верную ссылку
+        # битой, то есть требовала бы переименовать файл ради себя.
+        path = os.path.normpath(os.path.join(base, unquote(target)))
         check(f"{doc} → {target}", os.path.exists(path), "| нет такого пути")
 
 print()
