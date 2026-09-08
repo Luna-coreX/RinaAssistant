@@ -108,8 +108,8 @@
   <sys:Double x:Key="Lift.Overlay.Opacity">0.36</sys:Double>
 
   <!-- Дыхание фона (4.0b-A06). Когда фон замирает, решает оболочка, а не эти числа -->
-  <sys:Double x:Key="Background.Period">24</sys:Double>
-  <sys:Double x:Key="Background.Amplitude">0.06</sys:Double>
+  <sys:Double x:Key="Background.Period">42</sys:Double>
+  <sys:Double x:Key="Background.Amplitude">0.34</sys:Double>
   <sys:Double x:Key="Background.Fps">30</sys:Double>
 
   <!-- Штриховка опасного (§6): единственный признак необратимого -->

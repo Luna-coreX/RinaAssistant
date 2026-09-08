@@ -78,19 +78,25 @@ def finish_xaml(name: str, finish: dict) -> str:
         lines.append("")
         lines.append(f'  <Color x:Key="Color.Shadow">{shadow}</Color>')
 
-    # The sheen is a gradient, and it is named that way on purpose:
-    # "gradient" in this category means the purple-to-blue glow that
-    # `4.0-R02` rejected by name. This is light falling on a panel from
-    # above — a few per cent between top and bottom, noticeable only in
-    # that the panel stops looking like a sticker.
-    sheen = finish.get("sheen")
-    if sheen:
+    # The nebula: patches of light under the face, each drifting at a
+    # period of its own (4.0b-A06). Colours only — the geometry and the
+    # motion are shared and live in the common dictionary, and the drift
+    # itself is the shell's, because it has to be able to stop.
+    #
+    # Every tint is a tint of **this** finish and of nothing else: the
+    # category's cliché is a purple-to-blue glow, and the way not to
+    # arrive at it is not to have a colour that the panel does not have.
+    nebula = finish.get("nebula")
+    if nebula:
         lines.append("")
-        lines.append('  <LinearGradientBrush x:Key="C.FaceSheen" '
-                     'StartPoint="0,0" EndPoint="0,1">')
-        lines.append(f'    <GradientStop Offset="0" Color="{sheen["top"]}" />')
-        lines.append(f'    <GradientStop Offset="1" Color="{sheen["bottom"]}" />')
-        lines.append('  </LinearGradientBrush>')
+        for at, tint in enumerate(nebula["tint"]):
+            lines.append(f'  <Color x:Key="Color.Nebula{at}">{tint}</Color>')
+        lines.append(f'  <sys:Int32 x:Key="Nebula.Count">'
+                     f'{len(nebula["tint"])}</sys:Int32>')
+        lines.append(f'  <sys:Double x:Key="Nebula.Opacity">'
+                     f'{nebula["opacity"]}</sys:Double>')
+        lines.append(f'  <sys:Double x:Key="Nebula.Spread">'
+                     f'{nebula["spread"]}</sys:Double>')
 
     lines.append("</ResourceDictionary>")
     return "\n".join(lines) + "\n"

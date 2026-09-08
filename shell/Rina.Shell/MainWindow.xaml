@@ -43,18 +43,16 @@
       </Grid.ColumnDefinitions>
 
       <!--
-        The living background (4.0b-A06). It lies under everything in the
-        working area and is deliberately larger than it: the sheen drifts,
-        and a panel exactly the size of its place would show its own edge
-        at the far end of the travel.
+        The living background (4.0b-A06): patches of light drifting under
+        the working area. The canvas is empty here — the patches are built
+        in code from the current finish's colours, because a dynamic
+        resource cannot reach inside a gradient stop.
 
-        The clipping is on the containing grid, so the drift never reaches
+        The clipping is on the containing grid, so a patch never reaches
         the section column or the level strip.
       -->
-      <Rectangle x:Name="Backdrop" Grid.ColumnSpan="2"
-                 Margin="-120" IsHitTestVisible="False"
-                 RenderTransformOrigin="0.5,0.5"
-                 Fill="{DynamicResource C.FaceSheen}" />
+      <Canvas x:Name="Backdrop" Grid.ColumnSpan="2"
+              IsHitTestVisible="False" ClipToBounds="True" />
 
       <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
       <Grid Grid.Column="0" Background="{DynamicResource C.FaceLow}">

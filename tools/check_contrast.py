@@ -72,6 +72,36 @@ PAIRS = (
 )
 
 
+def check_nebula(tokens, report):
+    """
+    Text has to be readable wherever a patch of the living background
+    drifts.
+
+    The background moves under the words (`4.0b-A06`), and a surface that
+    moves is not one surface but every position it can reach. Checking the
+    ink against `FACE` alone would be checking the panel the patches are
+    not on.
+
+    The soft ones are checked too, at the same 4.5: a legend that a patch
+    swallows is a legend that was there for nothing.
+    """
+    failures = 0
+    for key, finish in tokens["finishes"].items():
+        nebula = finish.get("nebula")
+        if not nebula:
+            report(f"{key}: живой фон задан", False, "—")
+            failures += 1
+            continue
+        for at, tint in enumerate(nebula["tint"]):
+            for ink in ("INK", "INK_SOFT"):
+                value = contrast(finish["color"][ink], tint)
+                ok = value >= 4.5
+                failures += 0 if ok else 1
+                report(f"{key}: {ink.lower()} поверх пятна {at}", ok,
+                       f"{value:.2f} (нужно 4.5)")
+    return failures
+
+
 def check_accents(tokens, report):
     """
     Every accent is checked in the same place the original was.
@@ -113,6 +143,10 @@ def main():
 
     def report(label, ok, detail):
         print(f"  {'OK  ' if ok else 'МАЛО'} {detail:>22}  {label}")
+
+    print()
+    print("=== живой фон: текст поверх любого пятна ===")
+    failures += check_nebula(tokens, report)
 
     accents = sum(len(f.get("accents") or {})
                   for f in tokens["finishes"].values())

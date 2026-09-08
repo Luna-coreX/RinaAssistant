@@ -217,23 +217,49 @@ if mockups:
     plain = len(gradients) - mockups.count("repeating-linear-gradient")
     check("градиент ровно один (полоса уровня)", plain == 1, f"| {plain}")
 
-# The sheen is light on the panel, not a second gradient in the system: the
-# level strip stays the only place where a gradient is seen as a gradient.
-# The measure of that is exactly this — a few per cent. Anything further
-# apart is a colour ramp, and that is what `4.0-R02` rejected by name.
+# The living background is light on the panel, not a picture behind glass
+# (`4.0b-A06`). The category always arrives at a purple-to-blue glow, and
+# the way not to arrive there is not to own a colour the panel does not
+# have. So every patch is measured against the face it lies on: close in
+# value, and no more saturated than the panel itself.
 def _value(hex_color):
     h = hex_color.lstrip("#")
     return sum(int(h[i:i + 2], 16) for i in (0, 2, 4)) / 3
 
 
+def _chroma(hex_color):
+    h = hex_color.lstrip("#")
+    channels = [int(h[i:i + 2], 16) for i in (0, 2, 4)]
+    return (max(channels) - min(channels)) / 255
+
+
 for name, finish in tokens["finishes"].items():
-    sheen = finish.get("sheen")
-    if not sheen:
-        check(f"[{name}] налёт задан", False)
+    nebula = finish.get("nebula")
+    if not nebula:
+        check(f"[{name}] живой фон задан", False)
         continue
-    spread = abs(_value(sheen["top"]) - _value(sheen["bottom"])) / 255
-    check(f"[{name}] налёт — свет, а не переход цвета", spread <= 0.05,
-          f"| {spread * 100:.1f}% (не больше 5)")
+
+    face = finish["color"]["FACE"]
+
+    # Four is plenty and eight would be a screensaver: a background whose
+    # patches can be counted has stopped being a background.
+    check(f"[{name}] пятен не больше пяти", len(nebula["tint"]) <= 5,
+          f"| {len(nebula['tint'])}")
+
+    for at, tint in enumerate(nebula["tint"]):
+        near = abs(_value(tint) - _value(face)) / 255
+        check(f"[{name}] пятно {at} — свет на панели, а не другой цвет",
+              near <= 0.08, f"| {near * 100:.1f}% от панели (не больше 8)")
+
+        # The face itself has a cast; a patch may not have a stronger one.
+        # That single number is what separates "light on graphite" from
+        # neon, and it is the reason the check exists at all.
+        check(f"[{name}] пятно {at} не ярче самой панели по насыщенности",
+              _chroma(tint) <= max(0.06, _chroma(face) + 0.05),
+              f"| {_chroma(tint) * 100:.1f}%")
+
+    check(f"[{name}] пятно не непрозрачно", nebula["opacity"] <= 0.7,
+          f"| {nebula['opacity']}")
 
 # tabular figures
 check("цифры моноширинные",

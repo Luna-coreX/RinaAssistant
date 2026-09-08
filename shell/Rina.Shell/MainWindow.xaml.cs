@@ -522,7 +522,14 @@ public partial class MainWindow : Window
         .ToArray();
 
     /// <summary>The finish the window is showing.</summary>
-    public void ShowFinish(string finish) => _finish = finish;
+    public void ShowFinish(string finish)
+    {
+        _finish = finish;
+        // The patches are made of the finish's colours, and the finish is
+        // swapped as a whole dictionary: they have to be built again, or
+        // the background would keep the colours of the finish before last.
+        _backdrop.Build();
+    }
 
     private async void OnSwitchFinish(object sender, RoutedEventArgs e)
     {

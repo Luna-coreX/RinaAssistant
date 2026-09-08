@@ -43,8 +43,11 @@
 
   <Color x:Key="Color.Shadow">#05070a</Color>
 
-  <LinearGradientBrush x:Key="C.FaceSheen" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Offset="0" Color="#232629" />
-    <GradientStop Offset="1" Color="#191c1e" />
-  </LinearGradientBrush>
+  <Color x:Key="Color.Nebula0">#1d282e</Color>
+  <Color x:Key="Color.Nebula1">#26202e</Color>
+  <Color x:Key="Color.Nebula2">#1a2b26</Color>
+  <Color x:Key="Color.Nebula3">#2a241b</Color>
+  <sys:Int32 x:Key="Nebula.Count">4</sys:Int32>
+  <sys:Double x:Key="Nebula.Opacity">0.55</sys:Double>
+  <sys:Double x:Key="Nebula.Spread">1.15</sys:Double>
 </ResourceDictionary>

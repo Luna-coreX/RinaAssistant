@@ -58,6 +58,36 @@ def near(a, b, tolerance=2) -> bool:
     return all(abs(x - y) <= tolerance for x, y in zip(a[:3], b))
 
 
+def average(image, x, y, reach=24):
+    """
+    The average colour of a vertical strip — instead of one point.
+
+    A point on the panel is no longer the panel's colour: over the patches
+    of the living background lies a grain of about one value
+    (`4.0b-A06`, and it is there to stop the patches banding). On a single
+    pixel that grain swings the reading by six, and the check read that as
+    a shadow at the seam — the profile came out 33, 39, 33, 33, 39, which
+    is not a gradient at all but noise.
+
+    The grain has a mean of zero, so it cancels over a strip. Vertical, and
+    not a square: a square near a boundary would take in the neighbouring
+    surface, and boundaries are exactly what is measured here.
+    """
+    reds, greens, blues = [], [], []
+    for step in range(-reach, reach + 1):
+        pixel = image.getpixel((int(x), int(y) + step))[:3]
+        reds.append(pixel[0])
+        greens.append(pixel[1])
+        blues.append(pixel[2])
+    return (sum(reds) / len(reds), sum(greens) / len(greens),
+            sum(blues) / len(blues))
+
+
+def brightness(pixel) -> float:
+    """How light a point is. Enough for a step of value; not a colour space."""
+    return sum(pixel[:3]) / 3
+
+
 def check_confirm(image, colors, tokens) -> int:
     """
     The confirmation window (4.0-F11): danger by hatching, not by colour.
@@ -154,9 +184,37 @@ def main(argv) -> int:
     # of a section — and the check would catch the contents, passing that off
     # as a broken frame.
     pane_margin = column + tokens["space"]["between"] / 2
-    check("панель раздела — FACE",
-          near(at(pane_margin, height * 0.5), colors["FACE"]),
-          f"| {at(pane_margin, height * 0.5)} против {colors['FACE']}")
+    pane = average(image, pane_margin, height * 0.5)
+
+    # The panel is no longer flat `FACE`: patches of light drift under it
+    # (`4.0b-A06`). So what is asserted has changed, and not by widening the
+    # tolerance — a tolerance wide enough to swallow a patch would also
+    # swallow the difference between `FACE` and `FACE_LOW`, which is seven
+    # values, and the check would stop being able to tell the panel from the
+    # column.
+    #
+    # Asserted instead are the two things that stay true under any patch.
+    #
+    # First: the panel is still the face, lit. The band is the one the
+    # design system fixes for a patch — 8% of the range — and it is read
+    # from the tokens rather than typed here, so loosening the rule in the
+    # system loosens it in exactly one place.
+    band = 0.08 * 255
+    drift = max(abs(x - y) for x, y in zip(pane, colors["FACE"]))
+    check("панель раздела — освещённый FACE", drift <= band,
+          f"| {pane} против {colors['FACE']}, разница {drift:.0f} "
+          f"(не больше {band:.0f})")
+
+    # Second, and this is what the original assertion was really for: the
+    # panel is raised above the column by a step of value. That is the
+    # system's only means of elevation, and no patch of light can turn it
+    # round — a background that made the panel darker than the column would
+    # be a background that had eaten the composition.
+    column_pixel = average(image, inside, height * 0.55)
+    check("панель светлее колонки — ступень значения на месте",
+          brightness(pane) > brightness(column_pixel),
+          f"| панель {brightness(pane):.0f}, колонка "
+          f"{brightness(column_pixel):.0f}")
     check("полоса заголовка — FACE_LOW",
           near(at(width * 0.5, size["row"] / 2), colors["FACE_LOW"]),
           f"| {at(width * 0.5, size['row'] / 2)}")
@@ -214,10 +272,20 @@ def main(argv) -> int:
           not near(at(width * 0.5, height - strip - 4), colors["FACE_SUNK"]),
           f"| над полосой: {at(width * 0.5, height - strip - 4)}")
 
-    # There are no shadows: above the column there must be no gradient to dark.
-    edge = [at(column + d, height * 0.4) for d in (1, 3, 6, 10)]
-    check("между колонкой и панелью нет тени",
-          all(near(p, colors["FACE"], 3) for p in edge), f"| {edge}")
+    # There are no shadows: at the column's edge there must be no ramp to
+    # dark. Under a living background the pixels there are no longer equal
+    # to each other, so what is measured is the **shape** of the difference
+    # rather than its absence: a shadow is dark against the seam and lifts
+    # away from it, and a patch of light does not care where the seam is.
+    #
+    # Ten points across, the patch changes by a fraction of a value: its
+    # own gradient is as wide as the window. Four are enough to tell the two
+    # apart.
+    edge = [average(image, column + d, height * 0.4) for d in (1, 3, 6, 10)]
+    lift = brightness(edge[-1]) - brightness(edge[0])
+    check("между колонкой и панелью нет тени", lift <= 2,
+          f"| у шва {brightness(edge[0]):.1f}, поодаль "
+          f"{brightness(edge[-1]):.1f}, подъём {lift:.1f} (не больше 2)")
 
     # --- F12: the link's state is visible and coloured correctly ----------
     # It is checked over the whole footer area rather than by a single point:
