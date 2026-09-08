@@ -671,8 +671,14 @@ class RinaEngine:
         #
         # Только удачный запуск: поправлять «не нашла» нечего, там ошибся
         # не выбор, а поиск.
-        if intent.name == "app.launch":
-            self._last_launch_query = intent.arg("query") or ""
+        #
+        # И только на один ход. «Следом за запуском» значит именно следом:
+        # без обнуления память жила весь сеанс, и сказанное через час «нет,
+        # я имел в виду Chrome» молча переписывало слово, о котором человек
+        # давно не говорил. Набор поймал это сам — поправка прицепилась к
+        # запуску из чужого случая.
+        self._last_launch_query = (intent.arg("query") or ""
+                                   if intent.name == "app.launch" else "")
 
         # The phrase was an answer to the question asked — the router has already worked that out.
         if intent.stage == "pending":

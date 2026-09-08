@@ -125,6 +125,23 @@
     {"id": "wake.fuzzy.1", "say": "Рита запусти дискорд", "wake": true, "expect": {"intent": "silence", "note": "«Рита» похожа на «Рина» лишь на 0.75 при пороге 0.8 — активации нет"}},
     {"id": "wake.fuzzy.2", "say": "ирина громче", "wake": true, "expect": {"intent": "system.action", "action": "volume_up"}},
 
+    {"id": "alias.teach.rule", "say": "когда я говорю писалка, запускай Notepad", "expect": {"intent": "alias.teach", "word": "писалка", "app": "Notepad"}},
+    {"id": "alias.teach.works", "say": "запусти писалка", "keep_state": true, "expect": {"intent": "app.launch", "app": "Notepad", "note": "слово, которого индекс не знает: запуск возможен только через выученное"}},
+    {"id": "alias.teach.otkryvaj", "say": "когда я говорю мессенджер, открывай Telegram Desktop", "expect": {"intent": "alias.teach", "word": "мессенджер", "app": "Telegram Desktop"}},
+    {"id": "alias.teach.eto", "say": "когда я говорю блендер, это Blender", "expect": {"intent": "alias.teach", "word": "блендер", "app": "Blender"}},
+    {"id": "alias.teach.uwp", "say": "когда я говорю счёты, запускай Калькулятор", "expect": {"intent": "alias.teach", "word": "счёты", "app": "Калькулятор"}},
+    {"id": "alias.teach.uwp.works", "say": "запусти счёты", "keep_state": true, "expect": {"intent": "app.launch", "app": "Калькулятор", "note": "у приложения Магазина вместо пути идентификатор — проверять его на диске нечего"}},
+
+    {"id": "alias.unknown", "say": "когда я говорю жаба, запускай Eclipse", "expect": {"intent": "alias.unknown", "query": "Eclipse", "note": "нечего запоминать — отказ, а не запись наугад"}},
+    {"id": "alias.ambiguous", "say": "когда я говорю среда, запускай visual studio", "expect": {"intent": "alias.ambiguous", "word": "среда", "options": ["Visual Studio Code", "Visual Studio 2022"], "note": "выученное живёт годами: спрашиваем всегда, когда кандидатов больше одного"}},
+
+    {"id": "alias.fix.launch", "say": "запусти обс", "expect": {"intent": "app.launch", "app": "OBS Studio"}},
+    {"id": "alias.fix.correct", "say": "нет, я имел в виду Visual Studio 2022", "keep_state": true, "expect": {"intent": "alias.teach", "word": "обс", "app": "Visual Studio 2022"}},
+    {"id": "alias.fix.stale", "say": "нет, я имел в виду Discord", "keep_state": true, "expect": {"intent": "fallback.search", "note": "поправка живёт один ход: прошлый ход её уже израсходовал, и цепляться ей больше не к чему"}},
+    {"id": "alias.fix.female.launch", "say": "запусти обс", "expect": {"intent": "app.launch", "app": "OBS Studio"}},
+    {"id": "alias.fix.female", "say": "я имела в виду Visual Studio 2022", "keep_state": true, "expect": {"intent": "alias.teach", "app": "Visual Studio 2022", "note": "род говорящего ничего не меняет и не должен"}},
+    {"id": "alias.fix.nothing", "say": "нет, я имел в виду Discord", "expect": {"intent": "fallback.search", "note": "поправка без запуска перед ней ничего не выдумывает"}},
+
     {"id": "degenerate.empty", "say": "", "expect": {"intent": "silence"}},
     {"id": "degenerate.spaces", "say": "     ", "expect": {"intent": "ask.wake", "note": "странность 3.1.0: пустая строка молчит, а строка из пробелов отвечает «Да? Слушаю.» — обрезка даёт пустую команду, а не пустой ввод"}},
     {"id": "degenerate.punctuation", "say": "?!.,;", "expect": {"intent": "fallback.search"}},

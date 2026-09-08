@@ -239,17 +239,26 @@ class RouterDriver(Driver):
 
         self.apps = [app_index.AppEntry(*a) for a in FAKE_APPS]
         self.aliases = {}
+        self.last_launch_query = ""
         self.reminders_active = 0
         self.pending = None
         self.ctx = RouterContext(apps=self.apps)
 
     def send(self, text, source="typed", require_wake=False, keep_state=False):
         from core.router import route
+        from voice.textmatch import normalize
 
         if not keep_state:
             self.pending = None
             self.reminders_active = 0
+            # Выученное и память о последнем запуске сбрасываются вместе с
+            # остальным: иначе правило из одного случая доучивало бы
+            # следующий, и набор зависел бы от своего же порядка.
+            self.aliases = {}
+            self.last_launch_query = ""
 
+        self.ctx.aliases = self.aliases
+        self.ctx.last_launch_query = self.last_launch_query
         self.ctx.pending = self.pending
         self.ctx.source = source
         self.ctx.require_wake = require_wake
@@ -260,6 +269,21 @@ class RouterDriver(Driver):
         # The consequences that change the next step's state. The executor
         # applies them; reproduced here is exactly as much as the suite's
         # multi-step cases need.
+        # Последствия, которые меняют состояние следующего шага. Их
+        # применяет исполнитель; здесь воспроизведено ровно столько,
+        # сколько нужно многошаговым случаям набора.
+        if intent.name == "alias.teach":
+            entry = next((e for e in self.apps
+                          if e.name == intent.arg("app")), None)
+            if entry is not None:
+                self.aliases[normalize(intent.arg("word"))] = {
+                    "path": entry.launch, "kind": entry.kind,
+                    "name": entry.name}
+        # Один ход, как и в ядре: без обнуления поправка цеплялась бы к
+        # запуску из чужого случая, и набор зависел бы от своего порядка.
+        self.last_launch_query = (intent.arg("query") or ""
+                                  if intent.name == "app.launch" else "")
+
         if intent.name == "reminder.create":
             self.reminders_active += 1
         elif intent.name == "reminder.cancel":
@@ -370,8 +394,22 @@ def classify(obs, text=""):
             "fallback.search", query=r.split("«", 1)[1].split("»")[0])),
         ("Запланировано:", lambda r: intent("reminder.list", empty=False)),
         ("Отменила:", lambda r: intent("reminder.cancel", empty=False)),
-        ("Не нашла программу", lambda r: intent("app.not_found")),
+        # Раньше «нечего запоминать»: обе фразы начинаются одинаково, и
+        # порядок здесь несущий. Отказ выучить и ненайденную программу
+        # разводит хвост, а не начало.
+        ("Не нашла программу", lambda r: intent(
+            "alias.unknown" if "нечего запоминать" in r else "app.not_found",
+            query=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
         ("Не получилось запустить", lambda r: intent("app.launch_failed")),
+        ("Запомнила: «", lambda r: intent(
+            "alias.teach",
+            word=r.split("«", 1)[1].split("»")[0],
+            app=r.split("— это ", 1)[1].rstrip(".") if "— это " in r else None)),
+        ("Не одна такая: ", lambda r: intent(
+            "alias.ambiguous",
+            options=[n.strip() for n in
+                     r[len("Не одна такая: "):].split(".", 1)[0].split(",")],
+            word=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
         ("Меня зовут", lambda r: intent("builtin.answer", topic="name")),
         ("Я могу запускать",
          lambda r: intent("builtin.answer", topic="capabilities")),
@@ -392,6 +430,14 @@ def matches(expected, got):
             continue
         value = got.arg(key)
         if isinstance(want, list):
+            if isinstance(value, (list, tuple)):
+                # Варианты приходят по-разному: роутер отдаёт словари —
+                # это состояние вопроса, обязанное пережить запись в файл
+                # и дорогу по протоколу (4.0-B03), — а по наблюдаемому
+                # поведению видны только имена. Набор описывает имена: он
+                # про решение, а не про то, каким драйвером его получили.
+                value = [v.get("name") if isinstance(v, dict) else v
+                         for v in value]
             if not isinstance(value, list) or set(want) - set(value):
                 return False
         elif str(value) != str(want):
