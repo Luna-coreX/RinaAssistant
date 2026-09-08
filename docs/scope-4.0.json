@@ -1,0 +1,710 @@
+{
+  "4.0-A01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Инвентаризация поведения 3.1.0"
+  },
+  "4.0-A02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Набор golden utterances"
+  },
+  "4.0-A03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Прогонщик тестов"
+  },
+  "4.0-A04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Эталонная ветка и регламент заморозки"
+  },
+  "4.0-A05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Запись и воспроизведение сессий"
+  },
+  "4.0-A06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Инвентаризация поверхности"
+  },
+  "4.0-B01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Модель данных намерений и действий"
+  },
+  "4.0-B02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Выделить Router"
+  },
+  "4.0-B03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Выделить машину состояний"
+  },
+  "4.0-B04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Выделить Executor"
+  },
+  "4.0-B05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Убрать неявные связи"
+  },
+  "4.0-B06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Настройки за интерфейсом"
+  },
+  "4.0-B07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Контрольный прогон"
+  },
+  "4.0-B08": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "FeatureProvider"
+  },
+  "4.0-C01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Модель инструмента"
+  },
+  "4.0-C02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Валидация аргументов по схеме"
+  },
+  "4.0-C03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Обёртки существующих действий"
+  },
+  "4.0-C04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Каталог разрешений"
+  },
+  "4.0-C05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Контур подтверждения"
+  },
+  "4.0-C06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Аудит вызовов"
+  },
+  "4.0-C07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Реестр — единственный путь исполнения"
+  },
+  "4.0-D01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: транспорт"
+  },
+  "4.0-D02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Спецификация протокола v1"
+  },
+  "4.0-D03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Handshake и согласование возможностей"
+  },
+  "4.0-D04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Конверт сообщения"
+  },
+  "4.0-D05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Каталог кодов ошибок"
+  },
+  "4.0-D06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Стриминг текста"
+  },
+  "4.0-D07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Бинарный канал"
+  },
+  "4.0-D08": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Backpressure"
+  },
+  "4.0-D09": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Lifecycle долгой задачи"
+  },
+  "4.0-D10": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Кооперативная отмена"
+  },
+  "4.0-D11": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Push-события"
+  },
+  "4.0-D12": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Канал разрешений"
+  },
+  "4.0-D13": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Канал актуации: только спецификация"
+  },
+  "4.0-D14": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Heartbeat, обрыв, переподключение"
+  },
+  "4.0-D15": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Сквозная трассировка"
+  },
+  "4.0-D16": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Conformance-тесты протокола"
+  },
+  "4.0-D17": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Правила совместимости версий"
+  },
+  "4.0-E01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Точка входа сервиса"
+  },
+  "4.0-E02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Серверная сторона протокола"
+  },
+  "4.0-E03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "STT в ядре"
+  },
+  "4.0-E04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Синтез TTS в ядре"
+  },
+  "4.0-E05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Напоминания как сервис ядра"
+  },
+  "4.0-E06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Настройки по протоколу"
+  },
+  "4.0-E07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Управление жизненным циклом ядра"
+  },
+  "4.0-F01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: UI-фреймворк — WPF"
+  },
+  "4.0-F02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Каркас проекта и клиент протокола"
+  },
+  "4.0-F03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Главное окно и навигация"
+  },
+  "4.0-F04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Страницы"
+  },
+  "4.0-F05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Трей и автозапуск"
+  },
+  "4.0-F06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Глобальные хоткеи"
+  },
+  "4.0-F07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Темы"
+  },
+  "4.0-F08": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "ADR + реализация локализации"
+  },
+  "4.0-F09": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Захват микрофона"
+  },
+  "4.0-F10": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Воспроизведение речи"
+  },
+  "4.0-F11": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Диалог подтверждения"
+  },
+  "4.0-F12": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Индикация связи с ядром"
+  },
+  "4.0-G01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Громкость и медиа"
+  },
+  "4.0-G02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Питание"
+  },
+  "4.0-G03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Скриншот"
+  },
+  "4.0-G04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Индексация установленных программ"
+  },
+  "4.0-G05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Запуск процессов"
+  },
+  "4.0-G06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: где живёт сопоставление имён"
+  },
+  "4.0-G07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Транслитерация и фаззи-матчинг в ядре"
+  },
+  "4.0-G08": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Политика источников индекса"
+  },
+  "4.0-G09": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Происхождение и доверие в записи индекса"
+  },
+  "4.0-G10": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Предупреждение о первом запуске недоверенного"
+  },
+  "4.0-G11": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Canonical path и вычистка индекса"
+  },
+  "4.0-G12": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Запуски в журнале безопасности"
+  },
+  "4.0-H01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Схема декларативного интерфейса"
+  },
+  "4.0-H02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Рендерер в C#"
+  },
+  "4.0-H03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Plugin API нового поколения"
+  },
+  "4.0-H04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Миграция встроенных плагинов"
+  },
+  "4.0-H05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Депрекация старого API"
+  },
+  "4.0-H06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Границы плагинов"
+  },
+  "4.0-H07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Плагин в отдельном процессе"
+  },
+  "4.0-I01": {
+    "done": false,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Сборка и установщик"
+  },
+  "4.0-I02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Миграция данных из 3.0.0"
+  },
+  "4.0-I03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Диагностический пакет"
+  },
+  "4.0-I04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Полный регресс"
+  },
+  "4.0-I05": {
+    "done": false,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Документация архитектуры и дизайна"
+  },
+  "4.0-R01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Продуктовый и дизайн-бриф"
+  },
+  "4.0-R02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Визуальное направление"
+  },
+  "4.0-R03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Дизайн-система"
+  },
+  "4.0-R04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Информационная архитектура"
+  },
+  "4.0-R05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "L",
+    "title": "Экраны"
+  },
+  "4.0-R06": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Состояния и краевые случаи"
+  },
+  "4.0-R07": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Движение"
+  },
+  "4.0-R08": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Темы"
+  },
+  "4.0-R09": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Иконки и графика"
+  },
+  "4.0-R10": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Раскладки под локализацию"
+  },
+  "4.0-R11": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Сверка с инвентарём"
+  },
+  "4.0-S01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: лицензия и модель вкладов"
+  },
+  "4.0-S02": {
+    "done": false,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Threat model"
+  },
+  "4.0-S03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Границы 4.0 зафиксированы"
+  },
+  "4.0-U01": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: версии и совместимость"
+  },
+  "4.0-U02": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Метаданные релиза"
+  },
+  "4.0-U03": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Клиент обновлений"
+  },
+  "4.0-U04": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "M",
+    "title": "Скачивание и целостность"
+  },
+  "4.0-U05": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "Журнал обновлений"
+  },
+  "4.0-U06": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Каналы обновлений"
+  },
+  "4.0-U07": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Подпись релизов"
+  },
+  "4.0-U08": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Подпись метаданных"
+  },
+  "4.0-U09": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Обязательные обновления"
+  },
+  "4.0-U10": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Защита от понижения версии"
+  },
+  "4.0-U11": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Хранение предыдущей версии"
+  },
+  "4.0-U12": {
+    "done": false,
+    "milestone": "4.1+",
+    "size": "L",
+    "title": "Откат версий"
+  },
+  "4.0-U13": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Сервер метаданных"
+  },
+  "4.0-U14": {
+    "done": false,
+    "milestone": "4.1+",
+    "size": "M",
+    "title": "Certificate pinning и CDN"
+  },
+  "V-01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "ADR: что значит «свой голос»"
+  },
+  "V-02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Стенд замеров"
+  },
+  "V-03": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Прогон кандидатов на русском"
+  },
+  "V-04": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "ADR: стриминг против выразительности"
+  },
+  "V-05": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Протокол записи датасета"
+  },
+  "V-06": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "",
+    "title": "Сбор датасета"
+  },
+  "V-07": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "",
+    "title": "Обучение или интерполяция"
+  },
+  "V-08": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Оценка"
+  },
+  "V-09": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Интеграция как движок ядра"
+  }
+}
