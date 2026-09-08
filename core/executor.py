@@ -72,14 +72,15 @@ class Executor:
         return self._fail(tr("Не нашла программу «{name}».", name=query),
                           "app.not_found")
 
-    # ---------- выученное (4.0b-A04) ----------
+    # ---------- what was learned (4.0b-A04) ----------
     def _do_alias_teach(self, intent, source):
         """
-        Запомнить названное правило.
+        Remember the rule that was stated.
 
-        Разное «уже знала» и «выучила» — не украшение: человек, назвавший
-        правило дважды, должен понять, что второй раз ничего не изменил, а
-        не решить, что его не услышали.
+        Telling "I knew that already" apart from "learned it" is not
+        decoration: a person who states a rule twice has to understand that
+        the second time changed nothing, rather than decide they were not
+        heard.
         """
         return self._run("teach_alias", {
             "word": intent.arg("word"),
@@ -90,11 +91,12 @@ class Executor:
 
     def _do_alias_ambiguous(self, intent, source):
         """
-        Названная программа сама неоднозначна — спрашиваем, а не гадаем.
+        The named program is itself ambiguous — we ask rather than guess.
 
-        Выученное живёт годами, и ошибка в нём обнаружится тем позже, чем
-        реже человек говорит это слово. Запуск можно переиграть следующей
-        фразой; правило — нельзя, пока не вспомнишь, что оно есть.
+        What is learned lives for years, and a mistake in it surfaces the
+        later the more rarely the person says that word. A launch can be
+        replayed by the next phrase; a rule cannot, until you remember that
+        it exists.
         """
         names = ", ".join(o.get("name", "") for o in intent.arg("options"))
         return self._ok(
@@ -163,9 +165,10 @@ class Executor:
     # ---------- reminders ----------
     def _do_reminder_create(self, intent, source):
         args = {"kind": intent.arg("kind")}
-        # `on` — повод вместо часов (`4.0b-A03`). Перечень ключей здесь
-        # закрытый, и это ровно тот случай, когда добавленный роутером
-        # аргумент теряется молча: намерение верное, вызов без него.
+        # `on` is an occasion instead of a clock (`4.0b-A03`). The list of
+        # keys here is closed, and this is exactly the case where an
+        # argument the router added is lost silently: the intent is right,
+        # the call is without it.
         for key in ("seconds", "at", "text", "on"):
             value = intent.arg(key)
             if value:
@@ -174,12 +177,12 @@ class Executor:
 
     def _do_reminder_ambiguous(self, intent, source):
         """
-        Кандидатов несколько — спрашиваем (`4.0b-A03`).
+        There is more than one candidate — we ask (`4.0b-A03`).
 
-        Причина та же, что при обучении: несработавшее напоминание ничем
-        себя не проявляет. Человек узнает об ошибке ровно тогда, когда
-        рассчитывал на обратное, — а поставить напоминание заново будет
-        уже поздно.
+        The reason is the same as with learning: a reminder that did not
+        fire shows nothing of itself. The person finds out about the
+        mistake at exactly the moment when they were counting on the
+        opposite — and by then it is too late to set the reminder again.
         """
         names = ", ".join(o.get("name", "") for o in intent.arg("options"))
         return self._ok(

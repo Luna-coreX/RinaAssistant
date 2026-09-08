@@ -46,18 +46,18 @@ class LaunchOutcome:
 # ---------------------------------------------------------------------------
 def _store(settings=None):
     """
-    Где лежит выученное.
+    Where the learned matches live.
 
-    Хранилище передают снаружи — то самое, с которым работает ядро. Раньше
-    эти три функции брали **модульный синглтон**, и выученное уезжало в
-    настоящие настройки человека мимо того ядра, которое его выучило: два
-    ядра в одном процессе молча делили соответствия, а проверка с
-    подставным хранилищем писала в чужой файл. Ровно та скрытая глобалка,
-    ради которой делались `4.0-B05` и `4.0-B06`, — просто дожившая здесь до
-    беты.
+    The store is passed in from outside — the very one the core works
+    with. These three functions used to take a **module singleton**, and
+    what had been learned went off into the person's real settings past the
+    core that learned it: two cores in one process silently shared their
+    matches, and a check with a stand-in store wrote into somebody else's
+    file. Exactly the hidden global for whose sake `4.0-B05` and `4.0-B06`
+    were done — simply one that survived here until the beta.
 
-    Умолчание оставлено для голосового пути, который зовёт эти функции без
-    ядра под рукой.
+    The default is left for the voice path, which calls these functions
+    with no core at hand.
     """
     if settings is not None:
         return settings

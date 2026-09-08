@@ -56,11 +56,11 @@ TEACH_ALIAS = Tool(
         Param("kind", "string", "file | uwp", required=False,
               choices=("file", "uwp"), default="file"),
     ),
-    # Ничего не запускает и в систему не лезет: пишет в свои настройки.
-    # Разрешения на запуск здесь не нужны — они понадобятся тому запуску,
-    # который случится потом, и спросятся тогда же.
+    # Launches nothing and touches no system: it writes to its own
+    # settings. Launch permissions are not needed here — they will be
+    # needed by the launch that happens later, and asked for then.
     permissions=set(),
-    # Выучить дважды одно и то же — то же самое, что выучить один раз.
+    # Learning the same thing twice is the same as learning it once.
     idempotent=True,
     returns="Слово и программа, которую оно теперь означает.",
     errors=(),

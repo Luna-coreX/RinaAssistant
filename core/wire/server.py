@@ -493,16 +493,17 @@ class ProtocolServer:
 
     def _foreground(self, message: Envelope) -> dict:
         """
-        Оболочка сообщает: человек перешёл в эту программу (`4.0b-A03`).
+        The shell reports: the person switched to this program
+        (`4.0b-A03`).
 
-        **Отправляет только оболочка и только при включённой слежке.** Ядро
-        всё равно проверяет настройку у себя: между тем, как человек её
-        выключил, и тем, как оболочка это заметила, проходит время, и в
-        этот промежуток ядро обязано молчать само.
+        **Only the shell sends this, and only while the watch is on.** The
+        core checks the setting at its own end all the same: time passes
+        between the person switching it off and the shell noticing, and in
+        that gap the core is obliged to keep quiet by itself.
 
-        Ответ — сколько напоминаний сработало, и ноль здесь обычное дело.
-        Оболочка ничего с этим числом не делает; оно есть, потому что
-        «принято» без единого различимого исхода нечем проверить.
+        The answer is how many reminders fired, and zero is the ordinary
+        case. The shell does nothing with that number; it exists because
+        "accepted" with no distinguishable outcome cannot be checked.
         """
         if not self._settings().get("watch_apps", False):
             return {"fired": 0, "watching": False}
@@ -710,9 +711,10 @@ class ProtocolServer:
         from core import data_transfer
 
         store = self._commands()
-        # Статистика запусков едет вместе с командами: она про них и без
-        # них бессмысленна. Лежит она в настройках, а не в хранилище команд,
-        # поэтому берётся отсюда.
+        # The run statistics travel together with the commands: they are
+        # about them and mean nothing without them. They live in the
+        # settings rather than in the command store, which is why they are
+        # taken from here.
         stats = self._settings().get("command_stats", {}) or {}
         return data_transfer.commands_payload(
             [dict(c) for c in store.all()], stats)
@@ -749,9 +751,9 @@ class ProtocolServer:
         except data_transfer.TransferError as problem:
             raise fault(problem.code, str(problem))
 
-        # Сведение и запись — одним вызовом: границы транзакции обязаны
-        # совпадать с границами «прочитать — изменить — записать», а здесь
-        # об этом помнить не надо.
+        # Merging and writing in one call: a transaction's boundaries must
+        # coincide with the boundaries of read-modify-write, and the caller
+        # should not have to remember that.
         added, skipped = self._commands().merge(
             incoming, lambda: "cmd_" + secrets.token_hex(3))
         return {"added": added, "skipped": skipped}
@@ -775,7 +777,8 @@ class ProtocolServer:
         return {"cleared": was}
 
     def _history_export(self, message: Envelope) -> dict:
-        """Содержимое файла истории — в том же конверте, что и команды."""
+        """The contents of a history file — in the same envelope as the
+        commands."""
         from core import data_transfer
 
         return data_transfer.history_payload(

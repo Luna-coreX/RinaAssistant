@@ -107,14 +107,16 @@ def route(text, ctx=None):
             return Intent("silence", stage="wake", text=text)
         return Intent("ask.wake", stage="wake", text=text)
 
-    # `_teach` стоит перед `_launch` и после всего остального: выигрывать
-    # ему надо только у запуска. «Когда я говорю "код", открывай VS Code»
-    # содержит «открывай VS Code», и разбор запуска забрал бы фразу себе,
-    # запустив редактор вместо того, чтобы выучить правило.
+    # `_teach` stands before `_launch` and after everything else: the only
+    # stage it has to beat is launching. "Когда я говорю «код», открывай VS
+    # Code" contains "открывай VS Code", and the launch parsing would take
+    # the phrase for itself, starting the editor instead of learning the
+    # rule.
     #
-    # А после `_answer_to_question` — потому что «нет» при заданном вопросе
-    # остаётся отказом. Поправка приходит тогда, когда вопроса нет: Рина
-    # уже запустила не то, и её поправляют вслед.
+    # And after `_answer_to_question`, because "no" while a question is
+    # pending stays a refusal. A correction comes when there is no
+    # question: Rina has already launched the wrong thing and is being
+    # corrected after the fact.
     for stage in (_answer_to_question, _reminder, _system, _teach, _launch,
                   _builtin, _tail):
         intent = stage(command, ctx)
@@ -206,7 +208,7 @@ def _reminder(command, ctx):
     args = {"kind": parsed.kind}
     text = parsed.text
 
-    # Напоминание, привязанное к программе (`4.0b-A03`).
+    # A reminder bound to a program (`4.0b-A03`).
     if parsed.when_app:
         entry, leftover, found, asked = _when_app(parsed.when_app, ctx)
         if entry is None:
@@ -216,8 +218,8 @@ def _reminder(command, ctx):
                                "query": asked}, stage="reminders")
             return Intent("reminder.unknown_app",
                           {"query": asked}, stage="reminders")
-        # Слова, не вошедшие в название, — это дело, а не программа:
-        # «напомни когда открою студию проверить почту».
+        # The words that did not go into the name are the thing to do,
+        # not the program: "напомни когда открою студию проверить почту".
         text = (text + " " + leftover).strip() if leftover else text
         args["on"] = {"kind": "app.foreground", "app": entry.name,
                       "launch": entry.launch}
@@ -234,31 +236,32 @@ def _reminder(command, ctx):
 
 def _when_app(candidate, ctx):
     """
-    Из «студию проверить почту» вытащить программу и остаток.
+    Pull the program and the remainder out of "студию проверить почту".
 
-    Речь не даёт запятых, а `normalize` убирает их и у набранного текста,
-    поэтому границу между названием программы и делом провести нечем —
-    кроме знания о том, что на машине установлено.
+    Speech gives no commas, and `normalize` removes them from typed text as
+    well, so there is nothing to draw the boundary between the program's
+    name and the thing to do — except knowledge of what is installed on the
+    machine.
 
-    **Слово входит в название, только если оно меняет ответ.** Поиск по
-    индексу нестрогий, и «visual studio code слить» находит ровно то же,
-    что «visual studio code»: идти от длинного к короткому и брать первое
-    попавшееся значило бы вобрать в название лишние слова — так и вышло с
-    первой попытки, дело потеряло свой глагол. Поэтому берётся **самое
-    короткое** написание, дающее ту же программу: слова, ничего не
-    изменившие, к названию не относятся.
+    **A word belongs to the name only if it changes the answer.** The index
+    search is not strict, and "visual studio code слить" finds exactly what
+    "visual studio code" finds: going from long to short and taking the
+    first hit would absorb spare words into the name — which is what
+    happened on the first attempt, and the thing to do lost its verb. So
+    the **shortest** spelling that yields the same program is taken: words
+    that changed nothing do not belong to the name.
 
-    Возвращает (программа | None, остаток слов, кандидаты, слова, о
-    которых речь). Спорное не
-    решается молча — по той же причине, что и при обучении: несработавшее
-    напоминание ничем себя не проявляет, и человек узнает об ошибке
-    тогда, когда рассчитывал на обратное.
+    Returns (program | None, the remaining words, the candidates, the words
+    actually in question). What is disputed is not settled silently — for
+    the same reason as when learning: a reminder that did not fire shows
+    nothing of itself, and the person finds out about the mistake when they
+    were counting on the opposite.
     """
     from voice.textmatch import normalize
 
     words = candidate.split()
-    unique = {}                      # размер -> единственный найденный
-    plural = {}                      # размер -> несколько кандидатов
+    unique = {}                      # size -> the single entry found
+    plural = {}                      # size -> several candidates
     for size in range(1, len(words) + 1):
         found = apps_mod.find(" ".join(words[:size]), limit=5,
                               entries=ctx.apps)
@@ -268,9 +271,9 @@ def _when_app(candidate, ctx):
             plural[size] = found
 
     if not unique:
-        # Ни одного однозначного написания. Если хоть где-то нашлось
-        # несколько — это и есть спор, и спрашивать надо о нём: о тех
-        # словах, которые кандидатов и дали, а не обо всей фразе.
+        # Not one unambiguous spelling. If several were found anywhere,
+        # that is the dispute, and that is what to ask about: about the
+        # words that produced the candidates, not about the whole phrase.
         if not plural:
             return None, "", [], candidate
         size = min(plural)
@@ -281,11 +284,11 @@ def _when_app(candidate, ctx):
     size = min(s for s, e in unique.items()
                if e.name == entry.name and e.launch == entry.launch)
 
-    # Слово, которое ничего не изменило, но **стоит в названии**, к
-    # названию и относится: «обс» уже находит OBS Studio однозначно, но
-    # «студио» из «обс студио» — это программа, а не дело. Проверка идёт
-    # по самому найденному названию, а не по догадке о том, что человек
-    # мог иметь в виду.
+    # A word that changed nothing but **stands in the name** belongs to
+    # the name: "обс" already finds OBS Studio unambiguously, yet "студио"
+    # in "обс студио" is the program, not the thing to do. The test is
+    # against the found name itself, not against a guess at what the person
+    # might have meant.
     known = set(normalize(entry.name).split())
     while size < len(words) and normalize(words[size]) in known:
         size += 1
@@ -303,19 +306,21 @@ def _system(command, ctx):
     return Intent(name, {"action": action_id}, stage="system")
 
 
-#: «Когда я говорю "код", открывай VS Code» — правило, названное вслух.
+#: "Когда я говорю «код», открывай VS Code" — a rule stated aloud.
 #:
-#: Кавычки необязательны: распознавание речи их не выдаёт вовсе, и
-#: требовать их значило бы сделать правило доступным только с клавиатуры.
+#: The quotation marks are optional: speech recognition does not produce
+#: them at all, and requiring them would make the rule available only from
+#: the keyboard.
 _RULE = re.compile(
     r"\b(?:когда|если)\s+я\s+(?:говорю|скажу)\s+"
     r"[«\"']?(?P<word>[^«»\"',]+?)[»\"']?\s*,?\s+"
     r"(?:открывай|запускай|открой|запусти|это)\s+(?P<app>.+)$",
     re.IGNORECASE)
 
-#: «Нет, я имел в виду Chrome» — поправка вслед запущенному.
+#: "Нет, я имел в виду Chrome" — a correction following a launch.
 #:
-#: Род не важен и не должен быть: «имела» ничем не отличается от «имел».
+#: The speaker's gender does not matter and must not: "имела" is no
+#: different from "имел".
 _CORRECTION = re.compile(
     r"^(?:нет[,\s]+|не\s+т[оа]т[,\s]+|)?"
     r"я\s+имел[а]?\s+в\s+виду\s+(?P<app>.+)$",
@@ -324,17 +329,19 @@ _CORRECTION = re.compile(
 
 def _teach(command, ctx):
     """
-    Человек назвал правило или поправил прошлый запуск (`4.0b-A04`).
+    The person stated a rule or corrected the previous launch
+    (`4.0b-A04`).
 
-    **Учится только названное вслух.** Неявного обучения на всех разговорах
-    здесь нет и не будет: память наполнилась бы мусором, а человек не смог
-    бы понять, откуда взялось поведение — и, что хуже, не смог бы это
-    отменить, потому что не знал бы, что отменять.
+    **Only what is stated aloud is learned.** There is no implicit learning
+    from every conversation here and there will not be: the memory would
+    fill with rubbish, the person would not be able to work out where the
+    behaviour came from — and, worse, could not undo it, because they would
+    not know what there was to undo.
 
-    **Спорное не сохраняется молча.** Если названная программа сама
-    неоднозначна или её нет вовсе, возвращается намерение спросить, а не
-    записать. Выученное соответствие живёт долго, и ошибка в нём тем
-    неприятнее, чем позже её заметят.
+    **What is disputed is not stored silently.** If the named program is
+    itself ambiguous, or does not exist at all, an intent to ask is
+    returned rather than one to write. A learned match lives a long time,
+    and a mistake in it is the more unpleasant the later it is noticed.
     """
     rule = _RULE.search(command)
     if rule:
@@ -349,7 +356,7 @@ def _teach(command, ctx):
 
 
 def _teaching(word, app, ctx, word_said):
-    """Слово и программа -> намерение выучить, спросить или отказать."""
+    """A word and a program -> an intent to learn, to ask, or to refuse."""
     word = (word or "").strip(" \"'«».,")
     app = (app or "").strip(" \"'«».,")
     if not word or not app:
@@ -360,13 +367,15 @@ def _teaching(word, app, ctx, word_said):
         return Intent("alias.unknown", {"query": app, "word": word},
                       stage="teach")
     if len(found) > 1:
-        # Спрашиваем всегда, когда кандидатов больше одного, — без порогов
-        # и без догадок. Запуск можно переиграть следующей фразой, а
-        # выученное соответствие живёт годами: цена вопроса здесь ниже
-        # цены ошибки, и это тот случай, когда лучше переспросить.
+        # We always ask when there is more than one candidate — with no
+        # thresholds and no guessing. A launch can be replayed by the next
+        # phrase, while a learned match lives for years: the cost of asking
+        # is lower than the cost of being wrong, and this is the case where
+        # asking again is better.
         #
-        # Варианты — словарями: это состояние вопроса, и оно обязано
-        # пережить запись в файл и дорогу по протоколу (4.0-B03).
+        # The options are dicts: this is the state of a question, and it is
+        # obliged to survive being written to a file and travelling over
+        # the protocol (4.0-B03).
         return Intent("alias.ambiguous",
                       {"options": tuple(e.to_dict() for e in found[:5]),
                        "query": app, "word": word}, stage="teach")
@@ -386,11 +395,12 @@ def _launch(command, ctx):
     if decision is None:
         return None
     if decision.status == "launch":
-        # Сказанное едет вместе с решением. Инструмент запуска давно ждёт
-        # `query` — «что пользователь сказал, чтобы запомнить выбор», — а
-        # роутер его не клал, и параметр всё это время приходил пустым.
-        # Он же нужен поправке: «нет, я имел в виду Chrome» учит слову, а
-        # не программе (`4.0b-A04`).
+        # What was said travels with the decision. The launch tool has
+        # long expected `query` — "what the user said, so as to remember
+        # the choice" — but the router did not put it there, and the
+        # parameter had been arriving empty all along. A correction needs
+        # it too: "нет, я имел в виду Chrome" teaches the word, not the
+        # program (`4.0b-A04`).
         return Intent("app.launch",
                       {"app": decision.entry.name, "query": decision.query},
                       stage="launcher")

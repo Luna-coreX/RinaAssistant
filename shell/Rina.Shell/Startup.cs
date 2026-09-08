@@ -665,9 +665,10 @@ public partial class App
 
         watch.Follow(true);
         Check("попросили — следит", watch.Watching);
-        // Окно этого же приложения впереди: включение обязано сообщить о
-        // нём сразу. Ждать, пока человек уйдёт в другое окно и вернётся,
-        // значило бы выглядеть как невключившаяся настройка.
+        // This very application's window is in front: switching the watch
+        // on must report it at once. Waiting for the person to leave for
+        // another window and come back would look like a setting that did
+        // not take effect.
         Check("о том, что уже впереди, сказано сразу", seen.Count == 1,
               $"| {string.Join(", ", seen)}");
         Check("сказан путь программы, а не заголовок окна",
@@ -684,9 +685,10 @@ public partial class App
 
         var before = seen.Count;
         watch.Follow(true);
-        // Прошлый путь забыт вместе со слежкой, поэтому то же самое окно
-        // — это снова новость. Держать его выключенной значило бы хранить
-        // след того, чем человек занимался, когда выключал.
+        // The previous path was forgotten along with the watch, so the
+        // same window is news again. Holding on to it while switched off
+        // would mean keeping a trace of what the person was doing when
+        // they switched it off.
         Check("после включения снова сообщает", seen.Count == before + 1,
               $"| {seen.Count - before}");
 

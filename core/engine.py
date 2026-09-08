@@ -102,11 +102,12 @@ class RinaEngine:
         # sounding, and Rina heard herself.
         self._speaking = threading.Event()
 
-        #: Что запускали последним — как это сказал человек (`4.0b-A04`).
+        #: What was launched last — as the person said it (`4.0b-A04`).
         #:
-        #: В памяти, а не в хранилище: поправка идёт следом за запуском, в
-        #: том же разговоре. Пережившее перезапуск «последнее» относилось бы
-        #: к сеансу, которого человек уже не помнит, и учило бы не тому.
+        #: In memory rather than in the store: a correction follows a
+        #: launch, in the same conversation. A "last" that survived a
+        #: restart would refer to a session the person no longer remembers,
+        #: and would teach the wrong thing.
         self._last_launch_query = ""
         self._speak_lock = threading.Lock()
         self._speak_count = 0
@@ -388,18 +389,20 @@ class RinaEngine:
 
     def note_foreground(self, launch):
         """
-        Оболочка сообщает: человек перешёл в эту программу (`4.0b-A03`).
+        The shell reports: the person switched to this program
+        (`4.0b-A03`).
 
-        **Ядро ничего не запоминает.** Ни какая программа впереди сейчас,
-        ни какая была раньше, ни сколько времени в ней провели: событие
-        сравнивается с ожидающими напоминаниями и тут же забывается. Знать,
-        какие программы человек открывает, — сведения того же рода, что
-        тексты реплик (T-19), и единственный способ не потерять такую
-        историю — не заводить её.
+        **The core remembers nothing.** Not which program is in front now,
+        nor which was before, nor how long was spent in it: the event is
+        compared with the waiting reminders and forgotten at once. Knowing
+        which programs somebody opens is information of the same kind as
+        the text of their words (T-19), and the only way not to lose such a
+        history is not to keep one.
 
-        Приходит **путь**, а не имя окна: заголовок окна человек меняет
-        сам, открыв в редакторе чужой файл, и сравнивать по нему значило бы
-        сравнивать с содержимым чужого документа.
+        What arrives is a **path**, not a window name: a person changes the
+        window title themselves by opening somebody else's file in an
+        editor, and matching on it would mean matching against the contents
+        of somebody else's document.
         """
         launch = str(launch or "")
         if not launch:
@@ -412,11 +415,12 @@ class RinaEngine:
 
     def _fire_reminder(self, item):
         """
-        Одно срабатывание — своя цепочка следов (4.0-D15).
+        One firing opens a trace chain of its own (4.0-D15).
 
-        Общая для часов и для повода: срабатывание есть срабатывание, и
-        расходиться этим двум путям не с чего. Когда они расходились,
-        привязанное к событию не попадало в журнал так же, как остальное.
+        Shared by the clock and by the occasion: a firing is a firing, and
+        these two paths have no reason to differ. While they did differ,
+        what was bound to an event did not reach the journal the way
+        everything else did.
         """
         with trace_scope():
             self._reminders.mark_done(item["id"])
@@ -696,19 +700,21 @@ class RinaEngine:
         self._history.add("user", command, source=source)
         self._emit(Events.HISTORY_CHANGED)
 
-        # Запомнить, что запускали, — чтобы поправку было к чему привязать
-        # (`4.0b-A04`). Запоминается **сказанное слово**, а не программа:
-        # учить надо тому, как человек называет, и «нет, я имел в виду
-        # Chrome» относится к слову, а не к тому, что открылось.
+        # Remember what was launched, so that a correction has something
+        # to attach to (`4.0b-A04`). What is remembered is **the word that
+        # was said**, not the program: what has to be learned is how the
+        # person names things, and "no, I meant Chrome" refers to the word
+        # rather than to what opened.
         #
-        # Только удачный запуск: поправлять «не нашла» нечего, там ошибся
-        # не выбор, а поиск.
+        # Only a successful launch: there is nothing to correct about "not
+        # found" — there it was the search that erred, not the choice.
         #
-        # И только на один ход. «Следом за запуском» значит именно следом:
-        # без обнуления память жила весь сеанс, и сказанное через час «нет,
-        # я имел в виду Chrome» молча переписывало слово, о котором человек
-        # давно не говорил. Набор поймал это сам — поправка прицепилась к
-        # запуску из чужого случая.
+        # And only for one turn. "Following a launch" means exactly
+        # following: without clearing it the memory lived for the whole
+        # session, and "no, I meant Chrome" said an hour later silently
+        # rewrote a word the person had long stopped talking about. The
+        # suite caught this itself — a correction attached to a launch from
+        # somebody else's case.
         self._last_launch_query = (intent.arg("query") or ""
                                    if intent.name == "app.launch" else "")
 

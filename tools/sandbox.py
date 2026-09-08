@@ -150,11 +150,12 @@ def neutralise(record=None, storage=True):
     real_add = reminders.ReminderStore.add
 
     def spy_add(store, *args, **kwargs):
-        # Записывается **сложенное**, а не переданное, и аргументы идут
-        # насквозь. Соглядатай, повторяющий подпись своими словами, молча
-        # расходится с ней при первом же новом поле: так и вышло, когда у
-        # напоминания появился повод (`4.0b-A03`) — двойник упал на
-        # незнакомом аргументе.
+        # What is recorded is what was **stored**, not what was passed,
+        # and the arguments go straight through. A spy that repeats the
+        # signature in its own words parts company with it silently at the
+        # first new field: that is what happened when reminders gained an
+        # occasion (`4.0b-A03`) — the stand-in fell over an unfamiliar
+        # argument.
         item = real_add(store, *args, **kwargs)
         box.reminders.append(dict(item))
         return item

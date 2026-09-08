@@ -277,10 +277,10 @@ def _create_reminder(ctx, args):
     text = args.get("text") or ""
     on = reminders.clean_trigger(args.get("on"))
 
-    # Выключенная слежка — отказ, а не тихое согласие. Завести напоминание,
-    # которое никогда не сработает, хуже, чем не завести никакого: человек
-    # рассчитывает на него и узнаёт правду в тот момент, когда рассчитывал
-    # зря.
+    # A switched-off watch is a refusal, not silent agreement. Creating a
+    # reminder that will never fire is worse than creating none: a person
+    # counts on it and learns the truth at exactly the moment when counting
+    # on it turned out to be in vain.
     if on and not (ctx.settings and ctx.settings.get("watch_apps", False)):
         return ToolResult.failed(
             tr("Не могу: я не слежу за тем, какие программы открыты. "
@@ -290,9 +290,9 @@ def _create_reminder(ctx, args):
     fire_at = at if at else time.time() + (seconds or 0)
     ctx.reminders.add(args["kind"], fire_at, text, on=on)
 
-    # Привязанное к поводу отвечает про повод, а не про часы: сказать
-    # «напомню в 03:17» о напоминании, которое ждёт программу, значило бы
-    # назвать время, которого никто не обещал.
+    # Something bound to an occasion answers about the occasion, not about
+    # the clock: saying "I will remind you at 03:17" about a reminder that
+    # is waiting for a program would name a time nobody promised.
     if on:
         if text:
             return ToolResult.done(
@@ -421,13 +421,14 @@ def _ask_model(ctx, args):
 
 def _teach_alias(ctx, args):
     """
-    Запомнить, что этим словом человек зовёт эту программу (`4.0b-A04`).
+    Remember that the person calls this program by this word (`4.0b-A04`).
 
-    Через реестр, а не мимо него, хотя ничего опасного тут не делается:
-    выученное соответствие меняет поведение запуска, то есть меняет мир —
-    просто не сейчас, а в следующий раз. Инструмент, меняющий поведение и
-    не попавший в журнал вызовов, — это ровно та запись, которой не хватит
-    при разборе «почему она открыла не то».
+    Through the registry rather than around it, although nothing dangerous
+    happens here: a learned match changes the behaviour of launching — that
+    is, it changes the world, only not now but next time. A tool that
+    changes behaviour and does not reach the call journal is precisely the
+    entry that will be missing when working out "why did she open the wrong
+    thing".
     """
     from voice import app_launcher
 
@@ -441,7 +442,7 @@ def _teach_alias(ctx, args):
 
 
 def _forget_alias(ctx, args):
-    """Забыть одно выученное соответствие."""
+    """Forget one learned match."""
     from voice import app_launcher
 
     word = str(args["word"]).strip()

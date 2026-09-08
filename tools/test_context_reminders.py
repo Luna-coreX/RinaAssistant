@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-4.0b-A03: напоминание, привязанное к программе, — сквозь всё ядро.
+4.0b-A03: a reminder bound to a program — through the whole core.
 
-Проверка идёт через `RinaEngine`: у задачи три стыка, и каждый умеет
-разойтись молча. Разбор фразы отделяет программу от дела; хранилище обязано
-пережить запись без часов; событие от оболочки обязано найти ожидающую
-запись и **не** найти чужую.
+The check goes through `RinaEngine`: the task has three joints, and each of
+them can part company silently. Parsing the phrase separates the program
+from the thing to do; the store has to survive an entry with no clock; an
+event from the shell has to find the waiting entry and **not** find
+somebody else's.
 
-Оболочки здесь нет: `note_foreground` зовётся напрямую. Это ровно тот
-вызов, который делает протокол, и подменять его нечем — а Windows,
-переключающая окна, в проверке не нужна.
+There is no shell here: `note_foreground` is called directly. That is
+exactly the call the protocol makes, and there is nothing to substitute for
+it — while Windows switching windows is not needed by the check.
 """
 import sys
 import time
@@ -75,9 +76,9 @@ check("дело отделено от программы", item.get("text") == "
       f"| {item.get('text')!r}")
 check("привязано к пути, а не к имени",
       (item.get("on") or {}).get("launch") == CODE, f"| {item.get('on')}")
-# Часов у такого напоминания нет вовсе. Ноль — это 1970 год, и планировщик
-# счёл бы запись просроченной на полвека: она сработала бы через секунду
-# после того, как её завели.
+# Such a reminder has no clock at all. Zero is the year 1970, and the
+# scheduler would consider the entry half a century overdue: it would fire
+# a second after it was created.
 check("часов нет, и они не в прошлом", not item.get("fire_at"),
       f"| {item.get('fire_at')}")
 check("планировщик его не берёт", not s.engine._reminders.due(time.time()),
@@ -109,9 +110,9 @@ s.say("напомни проверить pr когда открою visual studi
 again = RinaEngine(settings=s.settings)
 again.apps_source = s.engine.apps_source
 again.voice_out = lambda text, **kw: None
-# Хранилище выбрасывало всё, у чего нет разборчивых часов, — правило,
-# верное ровно до тех пор, пока других поводов не существовало. Запись,
-# привязанная к событию, часов не имеет по устройству.
+# The store used to throw away everything without an intelligible clock —
+# a rule that was right exactly as long as no other occasions existed. An
+# entry bound to an event has no clock by construction.
 check("новое ядро видит запланированное", len(again._reminders.active()) == 1,
       f"| {again._reminders.active()}")
 check("и оно срабатывает", again.note_foreground(CODE) == 1)
@@ -135,8 +136,8 @@ s = Session(watch=False)
 answer = s.say("напомни проверить pr когда открою visual studio code")
 check("отказ, а не тихое согласие", "не слежу" in answer, f"| {answer}")
 check("ничего не заведено", not s.planned, f"| {s.planned}")
-# Даже если запись возникнет иначе — событие её не разбудит: слежка
-# выключена, и оболочка вообще ничего не присылает.
+# Even if an entry appears by some other route, an event will not wake it:
+# the watch is off, and the shell sends nothing at all.
 check("обычное напоминание по часам работает и так",
       "10 мин" in s.say("напомни через 10 минут выключить чайник"),
       f"| {s.said}")

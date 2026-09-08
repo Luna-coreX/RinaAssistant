@@ -135,10 +135,11 @@ class InProcessDriver(Driver):
         settings.update({
             "first_run": False, "check_updates": False, "llm_enabled": False,
             "web_search_fallback": True, "save_history": True,
-            # Слежка включена: набор проверяет разбор и решение, а не то,
-            # что настройка выключена по умолчанию. Отказ при выключенной
-            # проверяется отдельно (`tools/test_context_reminders.py`) —
-            # там он и есть предмет проверки.
+            # The watch is on: the suite checks the parse and the
+            # decision, not the fact that the setting is off by default.
+            # The refusal while it is off is checked separately
+            # (`tools/test_context_reminders.py`) — there it is the
+            # subject of the check.
             "watch_apps": True,
             "custom_commands": [], "app_aliases": {}, "reminders": [],
             "history": [], "ui_language": "Русский", "search_engine": "google",
@@ -171,7 +172,8 @@ class InProcessDriver(Driver):
         real_add = reminders.ReminderStore.add
 
         def spy_add(store, *args, **kwargs):
-            # Записывается сложенное, а не переданное: см. tools/sandbox.py.
+            # What is recorded is what was stored, not what was passed:
+            # see tools/sandbox.py.
             item = real_add(store, *args, **kwargs)
             obs.reminders.append(dict(item))
             return item
@@ -257,9 +259,10 @@ class RouterDriver(Driver):
         if not keep_state:
             self.pending = None
             self.reminders_active = 0
-            # Выученное и память о последнем запуске сбрасываются вместе с
-            # остальным: иначе правило из одного случая доучивало бы
-            # следующий, и набор зависел бы от своего же порядка.
+            # What was learned and the memory of the last launch are
+            # cleared along with the rest: otherwise a rule from one case
+            # would go on teaching the next, and the suite would depend on
+            # its own order.
             self.aliases = {}
             self.last_launch_query = ""
 
@@ -275,9 +278,9 @@ class RouterDriver(Driver):
         # The consequences that change the next step's state. The executor
         # applies them; reproduced here is exactly as much as the suite's
         # multi-step cases need.
-        # Последствия, которые меняют состояние следующего шага. Их
-        # применяет исполнитель; здесь воспроизведено ровно столько,
-        # сколько нужно многошаговым случаям набора.
+        # The consequences that change the next step's state. The
+        # executor applies them; reproduced here is exactly as much as the
+        # suite's multi-step cases need.
         if intent.name == "alias.teach":
             entry = next((e for e in self.apps
                           if e.name == intent.arg("app")), None)
@@ -285,8 +288,9 @@ class RouterDriver(Driver):
                 self.aliases[normalize(intent.arg("word"))] = {
                     "path": entry.launch, "kind": entry.kind,
                     "name": entry.name}
-        # Один ход, как и в ядре: без обнуления поправка цеплялась бы к
-        # запуску из чужого случая, и набор зависел бы от своего порядка.
+        # One turn, as in the core: without clearing it a correction
+        # would attach to a launch from somebody else's case, and the
+        # suite would depend on its own order.
         self.last_launch_query = (intent.arg("query") or ""
                                   if intent.name == "app.launch" else "")
 
@@ -344,9 +348,10 @@ def classify(obs, text=""):
         args = {"kind": item["kind"]}
         if item["text"]:
             args["text"] = item["text"]
-        # Повод виден по самой записи, а не по ответу Рины (`4.0b-A03`):
-        # ответ — это слова, а набор описывает решение. Имя программы, а не
-        # путь: пути в наборе зависели бы от машины.
+        # The occasion is visible in the entry itself rather than in
+        # Rina's answer (`4.0b-A03`): the answer is words, and the suite
+        # describes the decision. The program's name, not its path: paths
+        # in the suite would depend on the machine.
         if item.get("on"):
             args["on"] = item["on"].get("app")
         return intent("reminder.create", **args)
@@ -405,9 +410,10 @@ def classify(obs, text=""):
             "fallback.search", query=r.split("«", 1)[1].split("»")[0])),
         ("Запланировано:", lambda r: intent("reminder.list", empty=False)),
         ("Отменила:", lambda r: intent("reminder.cancel", empty=False)),
-        # Раньше «нечего запоминать»: обе фразы начинаются одинаково, и
-        # порядок здесь несущий. Отказ выучить и ненайденную программу
-        # разводит хвост, а не начало.
+        # "Nothing to remember" comes first: both phrases begin the same
+        # way, and the order here is load-bearing. What tells a refusal to
+        # learn from a program that was not found is the tail, not the
+        # start.
         ("Не нашла программу", lambda r: intent(
             "alias.unknown" if "нечего запоминать" in r
             else "reminder.unknown_app" if "не к чему привязать" in r
@@ -442,19 +448,21 @@ def matches(expected, got):
         if key in ("intent", "note"):
             continue
         value = got.arg(key)
-        # Повод роутер отдаёт словарём — это состояние записи, обязанное
-        # пережить хранилище и дорогу по протоколу, — а по наблюдаемому
-        # поведению видно имя программы. Набор описывает имя: путь зависел
-        # бы от машины, на которой прогоняют.
+        # The router returns the occasion as a dict — that is the state
+        # of an entry, obliged to survive the store and the trip over the
+        # protocol — while the observable behaviour shows the program's
+        # name. The suite describes the name: a path would depend on the
+        # machine it is run on.
         if isinstance(value, dict) and isinstance(want, str):
             value = value.get("app")
         if isinstance(want, list):
             if isinstance(value, (list, tuple)):
-                # Варианты приходят по-разному: роутер отдаёт словари —
-                # это состояние вопроса, обязанное пережить запись в файл
-                # и дорогу по протоколу (4.0-B03), — а по наблюдаемому
-                # поведению видны только имена. Набор описывает имена: он
-                # про решение, а не про то, каким драйвером его получили.
+                # The options arrive differently: the router returns
+                # dicts — the state of a question, obliged to survive
+                # being written to a file and travelling over the protocol
+                # (4.0-B03) — while the observable behaviour shows only
+                # names. The suite describes names: it is about the
+                # decision, not about which driver obtained it.
                 value = [v.get("name") if isinstance(v, dict) else v
                          for v in value]
             if not isinstance(value, list) or set(want) - set(value):

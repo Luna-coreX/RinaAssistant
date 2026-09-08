@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 """
-4.0b-A04: обучение на исправлениях — сквозь всё ядро.
+4.0b-A04: learning from corrections — through the whole core.
 
-Проверка идёт через `RinaEngine`, а не через роутер: половина задачи в том,
-**куда** попадает выученное. Роутер на подставном контексте отвечал верно и
-тогда, когда запись уходила в настоящие настройки человека мимо ядра,
-которое её выучило, — сеанс с подставным хранилищем писал в чужой файл, а
-два ядра в одном процессе молча делили соответствия.
+The check goes through `RinaEngine` rather than through the router: half
+the task is **where** what is learned ends up. The router on a stand-in
+context answered correctly even while the entry went off into the person's
+real settings past the core that learned it — a session with a stand-in
+store wrote into somebody else's file, and two cores in one process
+silently shared their matches.
 
-Пути настоящие (`sys.executable`, `README.md`): выученное с несуществующим
-путём `alias_lookup` выбрасывает как устаревшее. На выдуманных путях эта
-проверка мерила бы не соответствие, а сам факт записи — и соглашалась бы с
-собой при сломанном чтении.
+The paths are real (`sys.executable`, `README.md`): `alias_lookup` throws
+away a learned entry whose path does not exist, as stale. On made-up paths
+this check would measure not the match but the mere fact of writing — and
+would agree with itself while the reading was broken.
 """
 import os
 import sys
@@ -49,7 +50,7 @@ APPS = [
 
 
 class Session:
-    """Ядро с подставным хранилищем и подставным запуском."""
+    """A core with a stand-in store and a stand-in launcher."""
 
     def __init__(self):
         self.settings = MemorySettings({
@@ -84,8 +85,8 @@ check("правило принято", "Visual Studio Code" in answer, f"| {answ
 check("правило записано в своё хранилище", "код" in s.learned,
       f"| {s.learned}")
 
-# Индекс слова «код» не находит (проверено ниже) — значит запуск возможен
-# только через выученное.
+# The index does not find the word "код" (checked below), so launching is
+# possible only through what was learned.
 answer = s.say("запусти код")
 check("выученное слово запускает", s.launched == [CODE], f"| {answer}")
 
@@ -99,11 +100,11 @@ s = Session()
 first = s.say("запусти хром")
 check("сначала запускается своё", s.launched == [CHROME], f"| {first}")
 
-# Запуск сам по себе тоже запоминает выбор — и обязан класть его в то же
-# хранилище. Утверждение здесь не про «запомнилось», а про «куда»: этот
-# путь идёт не через реестр инструментов, а через `on_alias`, и когда-то
-# писал в общий синглтон — то есть в настоящий файл человека из любой
-# проверки.
+# A launch by itself also remembers the choice — and is obliged to put it
+# in the same store. The assertion here is not about "it was remembered"
+# but about "where": this path does not go through the tool registry but
+# through `on_alias`, and once wrote into the shared singleton — that is,
+# into the person's real file, from any check.
 check("запуск запоминает в своё хранилище",
       s.learned.get("хром", {}).get("name") == "Google Chrome",
       f"| {s.learned}")
@@ -115,9 +116,9 @@ check("поправка записана", s.learned.get("хром", {}).get("na
 
 s.launched = []
 s.say("запусти хром")
-# Главное утверждение всей проверки: выученное **сильнее** того, что индекс
-# выбрал бы сам. Без этого «поправка» была бы записью, которую никто не
-# читает.
+# The main assertion of the whole check: what was learned is **stronger**
+# than what the index would have picked by itself. Without this a
+# "correction" would be an entry nobody reads.
 check("выученное сильнее индекса", s.launched == [CHROMIUM], f"| {s.launched}")
 
 print()

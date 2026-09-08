@@ -65,17 +65,18 @@ def normalise(text):
     return text
 
 
-#: Поля напоминания, которые и есть поведение.
+#: The fields of a reminder that are the behaviour.
 #:
-#: Список **разрешительный**, а не запретительный, и это разные вещи.
-#: Запретительный молчит о новом поле: оно приезжает в сравнение само и
-#: делает проверку красной там, где поведение не менялось. Разрешительный
-#: молчит тоже — но в другую сторону, и о добавлении поля приходится
-#: решить вслух, здесь.
+#: The list is a **permit** list rather than a deny list, and those are
+#: different things. A deny list says nothing about a new field: it arrives
+#: into the comparison by itself and turns the check red where the
+#: behaviour did not change. A permit list says nothing either — but in the
+#: other direction, and adding a field has to be decided aloud, here.
 #:
-#: Чего здесь нет: момент срабатывания, момент заведения и случайный
-#: номер — они разные при каждом запуске по устройству, а не по ошибке.
-#: И `done`: при заведении оно всегда `false` и не различает ничего.
+#: What is not here: the moment of firing, the moment of creation and the
+#: random number — they differ on every run by construction, not by
+#: mistake. And `done`: at creation it is always `false` and tells nothing
+#: apart.
 BEHAVIOUR = ("kind", "text", "on")
 
 

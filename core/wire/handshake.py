@@ -113,10 +113,11 @@ _CAPABILITY_LIST = (
                "синтез речи"),
     Capability("reminders", Side.CORE, ("reminders.list", "reminders.cancel", "reminders.create"),
                "таймеры и будильники живут в ядре (4.0-E05)"),
-    # Отдельная возможность, а не метод внутри `reminders`. Разница видна
-    # на рукопожатии: сторона объявляет, что **умеет наблюдать**, и это
-    # видно в журнале, в диагностике и человеку. Спрятанный среди
-    # напоминаний метод объявлялся бы вместе с таймерами — то есть молча.
+    # A capability of its own rather than a method inside `reminders`. The
+    # difference shows at the handshake: a side declares that it **can
+    # watch**, and that is visible in the journal, in the diagnostics and
+    # to the person. A method hidden among the reminders would be declared
+    # together with the timers — that is, silently.
     Capability("apps.watch", Side.CORE, ("system.foreground",),
                "напоминания по открытию программ (4.0b-A03, T-19)"),
     Capability("plugins", Side.CORE,

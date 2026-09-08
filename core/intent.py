@@ -45,10 +45,11 @@ INTENTS = {
     # Only explicit corrections and rules. There is deliberately no implicit
     # learning from the whole conversation: memory would fill with rubbish,
     # and a person would not know where the behaviour came from.
-    # Поправка вслед запуску — то же самое намерение: слово берётся из
-    # прошлого запуска, а не из фразы. Отдельного имени у неё нет намеренно
-    # — исполнялись бы они одинаково, и каталог обещал бы различие, которого
-    # в поведении нет. Разница записана аргументом `said`.
+    # A correction following a launch is the same intent: the word is
+    # taken from the previous launch rather than from the phrase. It has no
+    # name of its own on purpose — the two would be carried out
+    # identically, and the catalogue would promise a difference the
+    # behaviour does not have. The difference is recorded in `said`.
     "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app, said",
     "reminder.ambiguous": "Напоминание к программе: кандидатов несколько. Аргументы: options, query",
     "reminder.unknown_app": "Напоминание к программе: такой программы нет. Аргументы: query",

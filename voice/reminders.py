@@ -44,22 +44,24 @@ NUM_WORDS = {
     "пятьдесят": 50, "шестьдесят": 60, "девяносто": 90,
 }
 
-#: «когда открою VS Code», «как открою студию», «при запуске блокнота».
+#: "когда открою VS Code", "как открою студию", "при запуске блокнота".
 #:
-#: Только про открытие программы: закрытый список поводов (см.
-#: `TRIGGER_KINDS`) — это обещание, которое код держит. Расширять его
-#: словами раньше, чем оболочка научится их различать, значило бы завести
-#: напоминание, которое никогда не сработает.
+#: Only about a program being opened: a closed list of occasions (see
+#: `TRIGGER_KINDS`) is a promise the code keeps. Widening it with words
+#: before the shell can tell those apart would mean creating a reminder
+#: that will never fire.
 WHEN_APP = re.compile(
     r"[,\s]*(?:когда|как только|как|при)\s+"
     r"(?:я\s+)?(?:открою|открываю|запущу|запускаю|включу|"
     r"открытии|запуске|включении)\s+"
-    # Всё, что после глагола, — **кандидат**, а не название. Условие ставят
-    # и в начале фразы: «напомни, когда открою студию, проверить почту» —
-    # и границу между программой и делом здесь провести нечем. Запятой
-    # нет: `normalize` убирает её раньше, чем сюда дойдёт, а речь запятых
-    # не даёт вовсе. Границу проводит роутер — по индексу установленного,
-    # то есть по знанию, которого у разбора нет и не должно быть.
+    # Everything after the verb is a **candidate**, not a name. The
+    # condition is also put at the front of the phrase — "напомни, когда
+    # открою студию, проверить почту" — and there is nothing here to draw
+    # the boundary between the program and the thing to do. There is no
+    # comma: `normalize` removes it before this point, and speech gives no
+    # commas at all. The boundary is drawn by the router, from the index of
+    # what is installed — knowledge the parsing does not have and should
+    # not have.
     r"(?P<app>.+)$",
     re.IGNORECASE)
 
@@ -85,11 +87,12 @@ class Parsed:
         self.at = at              # an absolute time (timestamp)
         self.text = text          # what to remind about
         self.kind = kind          # "timer" | "reminder" | "alarm"
-        #: Названная программа, если напоминание привязано к ней, а не ко
-        #: времени (`4.0b-A03`). Здесь — **сказанное слово**: разбор фразы
-        #: не знает, какие программы стоят на машине, и знать не должен —
-        #: иначе он перестанет быть чистым и его нельзя будет проверить без
-        #: индекса. Разрешает слово в программу роутер.
+        #: The named program, if the reminder is bound to it rather than
+        #: to a time (`4.0b-A03`). Here it is **the word that was said**:
+        #: parsing a phrase does not know which programs are on the machine
+        #: and must not — otherwise it stops being pure and cannot be
+        #: checked without an index. The router resolves the word into a
+        #: program.
         self.when_app = when_app
 
 
@@ -190,9 +193,10 @@ def parse(text):
     if not (is_timer or is_remind or is_alarm):
         return None
 
-    # Повод разбирается **до** времени и отрезается от фразы: иначе «когда
-    # открою студию» осталось бы в тексте напоминания, и человек услышал
-    # бы обратно собственное условие вместо дела.
+    # The occasion is parsed **before** the time and cut off the phrase:
+    # otherwise "когда открою студию" would stay in the reminder's text,
+    # and the person would hear their own condition read back to them
+    # instead of the thing to do.
     when = WHEN_APP.search(low)
     when_app = ""
     if when:
@@ -215,10 +219,10 @@ def parse(text):
     # absolute time has priority: "напомни в 15:00" is not "через 15"
     if at is not None and (is_alarm or is_remind or not is_timer):
         delay = None
-    # Повод сильнее часов: «напомни через час, когда открою студию» —
-    # фраза, в которой человек сам себе противоречит, и выбирать надо
-    # что-то одно. Выбирается названное последним, потому что оно и есть
-    # уточнение.
+    # The occasion beats the clock: "напомни через час, когда открою
+    # студию" is a phrase in which the person contradicts themselves, and
+    # one of the two has to be picked. What was named last is picked,
+    # because that is the qualification.
     if when_app:
         delay = at = None
     return Parsed("create", delay=delay, at=at, text=label, kind=kind,
@@ -228,22 +232,23 @@ def parse(text):
 # ---------------------------------------------------------------------------
 # The store
 # ---------------------------------------------------------------------------
-#: Поводы, которые Рина умеет ждать (`4.0b-A03`).
+#: The occasions Rina can wait for (`4.0b-A03`).
 #:
-#: Список закрытый и лежит рядом с разбором: повод, которого здесь нет,
-#: не сохраняется. Иначе запись «жду события X» пережила бы версию, в
-#: которой X что-то значил, и осталась бы ждать вечно — молча, потому что
-#: не сработавшее напоминание ничем себя не проявляет.
+#: The list is closed and lies next to the parsing: an occasion that is not
+#: here is not stored. Otherwise an entry saying "waiting for event X"
+#: would outlive the version in which X meant something, and would go on
+#: waiting for ever — silently, because a reminder that did not fire shows
+#: nothing of itself.
 TRIGGER_KINDS = ("app.foreground",)
 
 
 def clean_trigger(on):
     """
-    Повод -> приведённый к ожидаемому виду словарь либо None.
+    An occasion -> a dict brought to the expected form, or None.
 
-    Одна дверь и для хранилища, и для сравнения: разные правила чтения в
-    двух местах — это способ завести напоминание, которое никогда не
-    сработает, и не узнать об этом.
+    One door for both the store and the comparison: different reading rules
+    in two places are a way to create a reminder that will never fire and
+    never find out about it.
     """
     if not isinstance(on, dict):
         return None
@@ -257,11 +262,11 @@ def clean_trigger(on):
 
 def _same_trigger(saved, want):
     """
-    Тот же повод.
+    The same occasion.
 
-    Путь сравнивается без учёта регистра: Windows не различает `Code.exe` и
-    `code.exe`, а оболочка берёт путь из окна, а не из нашего индекса — и
-    вернуть может любое написание.
+    The path is compared case-insensitively: Windows does not tell
+    `Code.exe` from `code.exe`, and the shell takes the path from the
+    window rather than from our index — so it may return any spelling.
     """
     return (saved.get("kind") == want.get("kind")
             and saved.get("launch", "").casefold()
@@ -285,14 +290,14 @@ class ReminderStore:
                 fire_at = float(item.get("fire_at", 0) or 0)
             except (TypeError, ValueError):
                 fire_at = 0.0
-            # Напоминание должно знать, когда ему сработать: по часам или по
-            # событию. Без того и другого ждать нечего, и такая запись —
-            # мусор, доживший до чтения.
+            # A reminder has to know when to fire: by the clock or by an
+            # event. With neither there is nothing to wait for, and such an
+            # entry is rubbish that survived until it was read.
             #
-            # Раньше «часов нет» значило «выбросить», и это было верно, пока
-            # других поводов не существовало. Теперь неверно: запись,
-            # привязанная к событию, часов не имеет по устройству, и старое
-            # правило вычистило бы её молча.
+            # "No clock" used to mean "throw away", and that was right
+            # while no other occasions existed. It is wrong now: an entry
+            # bound to an event has no clock by construction, and the old
+            # rule would have swept it away silently.
             if not fire_at and on is None:
                 continue
             clean.append({
@@ -311,11 +316,11 @@ class ReminderStore:
 
     def save_all(self, items):
         """
-        Записать список целиком — под транзакцией.
+        Write the list as a whole — under a transaction.
 
-        Сюда приходят и планировщик, помечающий сработавшее, и человек,
-        заводящий новое: два потока, одна запись. То же правило, что у
-        своих команд.
+        Both the scheduler marking what has fired and the person creating
+        something new come here: two threads, one write. The same rule as
+        for the user's own commands.
         """
         with self._settings.transaction():
             self._settings.set("reminders", items)
@@ -326,9 +331,10 @@ class ReminderStore:
     def add(self, kind, fire_at, text="", on=None):
         on = clean_trigger(on)
         if on is not None:
-            # У привязанного к событию часов нет вовсе, а не «ноль»:
-            # `fire_at = 0` в прошлом, и планировщик счёл бы такое
-            # напоминание просроченным на пятьдесят лет.
+            # Something bound to an event has no clock at all, rather
+            # than a "zero": `fire_at = 0` is in the past, and the
+            # scheduler would consider such a reminder fifty years
+            # overdue.
             fire_at = 0.0
         else:
             try:
@@ -380,13 +386,14 @@ class ReminderStore:
 
     def triggered(self, event):
         """
-        Что ждёт этого события (`4.0b-A03`).
+        What is waiting for this event (`4.0b-A03`).
 
-        Сравнение по пути запуска, а не по имени. Имя человек говорит как
-        придётся — «код», «вээс код», «студия», — и сравнивать сказанное с
-        тем, что оболочка видит в окне, значило бы гадать дважды. Путь
-        разрешён один раз, в момент заведения, тем же индексом, что и
-        запуск: дальше сравнение точное.
+        Matched by the launch path, not by name. A person says the name
+        however it comes out — "код", "вээс код", "студия" — and comparing
+        what was said with what the shell sees in a window would mean
+        guessing twice. The path is resolved once, at the moment the
+        reminder is created, by the same index as a launch: after that the
+        comparison is exact.
         """
         want = clean_trigger(event)
         if want is None:
