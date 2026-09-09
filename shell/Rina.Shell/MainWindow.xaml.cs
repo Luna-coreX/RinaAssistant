@@ -345,6 +345,17 @@ public partial class MainWindow : Window
     /// <summary>How much the background's picture moved — for the check.</summary>
     public double BackdropChange => _backdrop.FrameChange;
 
+    /// <summary>Run the background regardless of focus — for screenshots.</summary>
+    /// <remarks>
+    /// A screenshot is taken from a window drawn off the edge of the
+    /// screen, and such a window is not active. The background follows
+    /// activity on purpose — nobody is looking at an inactive window — so
+    /// every screenshot until now was of the field's opening phase, and two
+    /// shots of two runs looked identical for a reason that had nothing to
+    /// do with the field.
+    /// </remarks>
+    public void RunBackdropForShot() => _backdrop.Follow(true);
+
     /// <summary>How much the background moved over a second — for the check.</summary>
     public double BackdropDrift => _backdrop.DriftPerSecond;
 

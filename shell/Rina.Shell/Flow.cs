@@ -20,11 +20,43 @@ namespace Rina.Shell;
 /// </remarks>
 public static class Flow
 {
+    /// <summary>
+    /// Where the field sits, and how far it is stretched to fill the ramp.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Fractal noise does not fill its own range. Three octaves at halving
+    /// weights pile up around the middle, and measurement put the field's
+    /// fifth-to-ninety-fifth percentile at 0.27 to 0.61 — <b>a third of the
+    /// palette</b>, clustered on the centre.
+    /// </para>
+    /// <para>
+    /// That, and not the speed, is why a person called the background
+    /// static three times running. The field was already rearranging
+    /// completely every few seconds — two frames three seconds apart were
+    /// as unalike as two unrelated pictures — but what rearranged was a
+    /// nearly even wash, and an even wash looks the same however fast it
+    /// moves. Raising the speed could not have helped and did not: doubling
+    /// the drift measured the same, because the picture had nothing more to
+    /// give and the measure had saturated.
+    /// </para>
+    /// <para>
+    /// The ends keep a little room rather than being mapped exactly onto
+    /// the measured percentiles: clipping the darkest and lightest tenth
+    /// flat would trade one wash for two plateaus. Every stop of every ramp
+    /// is checked for contrast, so using all of them is no new risk — it is
+    /// using what was already paid for.
+    /// </para>
+    /// </remarks>
+    private const float Centre = 0.44f;
+    private const float Gain = 2.6f;
+
     /// <summary>A value of the field -> a colour of the ramp.</summary>
     public static (byte R, byte G, byte B) Shade(
         (byte R, byte G, byte B)[] ramp, float value)
     {
-        value = Math.Clamp(value * 0.5f + 0.5f, 0f, 0.999f);
+        value = (value * 0.5f + 0.5f - Centre) * Gain + 0.5f;
+        value = Math.Clamp(value, 0f, 0.999f);
         var place = value * (ramp.Length - 1);
         var low = (int)place;
         var mix = place - low;

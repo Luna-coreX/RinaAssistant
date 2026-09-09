@@ -285,9 +285,21 @@ public partial class App
         window.Left = -4000;              // рисуем за краем: снимок нужен,
         window.Top = -4000;               // мелькание окна — нет
         window.Show();
-        Dispatcher.BeginInvoke(new Action(() =>
+        window.RunBackdropForShot();
+
+        // `--after N` takes a second shot N seconds later, from the same
+        // run. One picture cannot answer "does it move", and two pictures
+        // of two runs cannot either — both start at the same phase.
+        var after = double.TryParse(Value(args, "--after"), out var wait)
+            ? wait : 0;
+        Dispatcher.BeginInvoke(new Action(async () =>
         {
             Save(window, shot);
+            if (after > 0)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(after));
+                Save(window, shot.Replace(".png", "-after.png"));
+            }
             Shutdown();
         }), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
