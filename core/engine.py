@@ -356,6 +356,18 @@ class RinaEngine:
         if on == self._always_listen:
             return
         self._always_listen = on
+
+        # Written down, not only remembered. The setting existed in the
+        # store's defaults and was read by nobody and written by nobody: the
+        # dialogue page asked settings for it and got the default every
+        # time, so the switch showed "off" while the mode was on. A person
+        # met that as the button resetting whenever they changed tabs.
+        try:
+            self._settings.set("always_listen", on)
+            self._settings.save()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось запомнить режим «всегда слушать»")
+
         self._emit(Events.ALWAYS_LISTEN, enabled=on)
         if on:
             # every start has its own stop flag: an old thread may still be

@@ -239,8 +239,21 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         return [{"value": i, "title": named(t), "available": bool(a)}
                 for i, t, a in tts.engine_choices()]
     if key == "stt_engine":
-        return [{"value": i, "title": named(t), "available": bool(a)}
-                for i, t, a in stt.engine_choices()]
+        # Only what the streaming path can actually build. The 3.1.0 list
+        # offers engines that open their own microphone, and offering one of
+        # those to a person whose sound arrives from the shell means
+        # promising recognition that will answer "unavailable" — which is
+        # exactly what happened with `whisper`.
+        from core.speech import RECOGNISERS
+
+        titles = {i: t for i, t, _ in stt.engine_choices()}
+        out = []
+        for name in RECOGNISERS:
+            probe = RECOGNISERS[name](settings)
+            out.append({"value": name,
+                        "title": named(titles.get(name, name)),
+                        "available": probe.available()})
+        return out
     if key == "voice":
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
         return [{"value": i, "title": named(t), "available": True}

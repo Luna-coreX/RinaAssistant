@@ -331,6 +331,16 @@ class ProtocolServer:
         self.engine.ears_outside = (
             "audio.input" in self.session.peer_capabilities)
 
+        # And the listening mode is restored here rather than at start-up:
+        # it needs to know whether the ears are outside, and that is settled
+        # by this very handshake. Restored at all because a setting saying
+        # "always listening" while nothing listens is the same lie as the
+        # switch that showed "off" while it was on — merely the other way
+        # round.
+        store = self._settings()
+        if store is not None and bool(store.get("always_listen", False)):
+            self.engine.set_always_listen(True)
+
         return answer
 
     def _shutdown(self, message: Envelope) -> dict:

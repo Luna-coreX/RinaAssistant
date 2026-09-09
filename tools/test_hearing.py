@@ -127,6 +127,33 @@ check("фраза дошла до распознавания", seen["phrases"] =
       f"| {seen['phrases']}")
 
 print()
+print("=== предлагается только то, что можно построить ===")
+# A person chose `whisper` in the settings and heard "recognition is
+# unavailable": the list of choices came from the 3.1.0 engines, which open
+# their own microphone, while the streaming path knew one name and quietly
+# answered "disabled" to every other. Two lists, one offering what the other
+# cannot do — and the person meets the gap as silence.
+from core.settings_schema import options_for
+from core.speech import RECOGNISERS
+
+offered = {o["value"]
+           for o in options_for("stt_engine", MemorySettings({}))}
+buildable = set(RECOGNISERS)
+check("каждый предлагаемый движок ядро умеет построить",
+      offered <= buildable, f"| лишние: {sorted(offered - buildable)}")
+check("и ни один умеемый не спрятан",
+      buildable <= offered, f"| спрятаны: {sorted(buildable - offered)}")
+
+# Availability is a separate question from being offered, and it is right
+# that it is: a person is entitled to see that an engine exists and is not
+# installed. What must never happen is an engine that can be chosen and
+# cannot be built.
+for name in sorted(buildable):
+    built = RECOGNISERS[name](MemorySettings({}))
+    check(f"«{name}» строится и отвечает про свою доступность",
+          hasattr(built, "available") and isinstance(built.available(), bool))
+
+print()
 print("ИТОГО ошибок:", fails)
 
 # `os._exit`, because recognition runs in daemon threads and one of them is

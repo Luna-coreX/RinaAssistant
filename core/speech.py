@@ -236,12 +236,90 @@ class VoskRecogniser:
             return Heard(ok=False, error=str(exc))
 
 
+class WhisperRecogniser:
+    """
+    Whisper over the bytes that were sent, without a microphone.
+
+    Whisper wants a whole phrase rather than a stream, and a whole phrase is
+    exactly what the segmenter hands over — so the fit is better here than
+    it was in 3.1.0, where the engine opened the device itself and decided
+    when a phrase had ended by its own clock.
+
+    The model is held open between phrases: loading it takes seconds and the
+    person is waiting.
+    """
+
+    name = "whisper"
+
+    def __init__(self, size: str = "base"):
+        self.size = size or "base"
+        self._model = None
+        self._error = ""
+
+    def available(self) -> bool:
+        if self._model is not None:
+            return True
+        try:
+            import whisper
+        except ImportError:
+            self._error = "пакет openai-whisper не установлен"
+            return False
+        try:
+            self._model = whisper.load_model(self.size)
+            return True
+        except Exception as exc:                        # noqa: BLE001
+            self._error = str(exc)
+            return False
+
+    def recognise(self, pcm: bytes, language: str = "ru") -> Heard:
+        if not self.available():
+            return Heard(ok=False, error=self._error or "stt.unavailable")
+        try:
+            import array
+
+            import numpy
+
+            samples = array.array("h")
+            samples.frombytes(pcm[:len(pcm) - len(pcm) % SAMPLE_BYTES])
+            # Whisper takes floats from minus one to one at 16 kHz, and the
+            # segmenter hands over exactly 16 kHz — the rate is fixed at the
+            # top of this module and declared to the shell when the stream
+            # is opened, so there is nothing to resample.
+            wave = numpy.frombuffer(samples.tobytes(),
+                                    dtype=numpy.int16).astype(
+                                        numpy.float32) / 32768.0
+            said = self._model.transcribe(
+                wave, language=language or None, fp16=False)
+            return Heard(text=str(said.get("text", "")).strip())
+        except Exception as exc:                        # noqa: BLE001
+            return Heard(ok=False, error=str(exc))
+
+
+#: Recognisers the streaming path can actually build (`4.0-E05`).
+#:
+#: A person picked `whisper` in the settings and heard "recognition is
+#: unavailable" for it: the list of choices came from the 3.1.0 engines,
+#: which open their own microphone, while this path knew one name and
+#: quietly answered `DisabledRecogniser` to every other. Two lists, one of
+#: them offering what the other cannot do.
+#:
+#: Now the offer is made from here, and `tools/test_hearing.py` holds the
+#: two together — a name that can be chosen and cannot be built is a defect
+#: the person meets as silence.
+RECOGNISERS = {
+    "vosk": lambda settings: VoskRecogniser(
+        str(settings.get("vosk_model", "") or "")),
+    "whisper": lambda settings: WhisperRecogniser(
+        str(settings.get("whisper_model", "base") or "base")),
+    "disabled": lambda settings: DisabledRecogniser(),
+}
+
+
 def recogniser_for(settings) -> Recogniser:
     """Which recognition is chosen in the settings."""
     engine = str(settings.get("stt_engine", "disabled") or "disabled")
-    if engine == "vosk":
-        return VoskRecogniser(str(settings.get("vosk_model", "") or ""))
-    return DisabledRecogniser()
+    build = RECOGNISERS.get(engine)
+    return build(settings) if build else DisabledRecogniser()
 
 
 # ---------------------------------------------------------------------------
