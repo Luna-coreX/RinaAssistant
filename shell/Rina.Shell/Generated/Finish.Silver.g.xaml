@@ -48,6 +48,7 @@
   <SolidColorBrush x:Key="C.Glass.Control" Color="#8cf0efeb" />
   <SolidColorBrush x:Key="C.Glass.Raised" Color="#80f0efeb" />
   <SolidColorBrush x:Key="C.Glass.Popup" Color="#e6f0efeb" />
+  <SolidColorBrush x:Key="C.Glass.Field" Color="#f217181a" />
   <SolidColorBrush x:Key="C.Edge" Color="#24232220" />
 
   <sys:Double x:Key="Nebula.Steps">5</sys:Double>

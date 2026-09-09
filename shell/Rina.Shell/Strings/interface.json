@@ -233,6 +233,9 @@
   "Думаю": {
     "English": "Thinking"
   },
+  "Думаю…": {
+    "English": "Thinking…"
+  },
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
@@ -774,10 +777,7 @@
     "English": "Recognition needs a package and a model — too large to put in the installer."
   },
   "Рина": {
-    "Deutsch": "Rina",
-    "English": "Rina",
-    "Español": "Rina",
-    "Українська": "Ріна"
+    "English": "Rina"
   },
   "Рина будет готова сразу после входа": {
     "English": "Rina will be ready right after you sign in"

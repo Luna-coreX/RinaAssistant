@@ -99,7 +99,8 @@ def finish_xaml(name: str, finish: dict, glass: dict) -> str:
     # would silently give back exactly what we are trying to move away from.
     for part, surface in (("Bar", "FACE_LOW"), ("Column", "FACE_LOW"),
                           ("Strip", "FACE_SUNK"), ("Control", "FACE_HIGH"),
-                          ("Raised", "FACE_HIGH"), ("Popup", "FACE_HIGH")):
+                          ("Raised", "FACE_HIGH"), ("Popup", "FACE_HIGH"),
+                          ("Field", "GLASS")):
         share = glass.get(part.lower())
         if share is None:
             continue

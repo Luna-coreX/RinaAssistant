@@ -249,18 +249,19 @@ def all_checks(shots_dir):
 # The run
 # ---------------------------------------------------------------------------
 def run(check, timeout):
-    """Run it and return (outcome, seconds, the last intelligible line)."""
+    """Run it: (outcome, seconds, the last line, why it failed)."""
     if check.skip:
-        return "пропущено", 0.0, check.skip
+        return "пропущено", 0.0, check.skip, []
     started = time.monotonic()
     try:
         done = subprocess.run(check.command, capture_output=True, text=True,
                               encoding="utf-8", errors="replace",
                               env=child_env(), timeout=timeout)
     except FileNotFoundError:
-        return "пропущено", 0.0, f"нет {check.command[0]}"
+        return "пропущено", 0.0, f"нет {check.command[0]}", []
     except subprocess.TimeoutExpired:
-        return "провал", time.monotonic() - started, f"не уложилась в {timeout} с"
+        return ("провал", time.monotonic() - started,
+                f"не уложилась в {timeout} с", [])
 
     spent = time.monotonic() - started
     tail = ""
@@ -268,7 +269,19 @@ def run(check, timeout):
         if line.strip():
             tail = line.strip()
             break
-    return ("успех" if done.returncode == 0 else "провал"), spent, tail
+    # What actually failed, not only that something did.
+    #
+    # Until this was here the summary said "провал: --check-dialogue" and no
+    # more, and finding out which line went red meant running the check by
+    # hand — where it passed, because what broke it was the run's own order.
+    # Half an hour of guessing at a suite that already knew the answer and
+    # was not saying it.
+    reasons = [line.strip() for line in (done.stdout or "").splitlines()
+               if "FAIL" in line or "МАЛО" in line]
+    if done.returncode != 0 and not reasons and (done.stderr or "").strip():
+        reasons = [(done.stderr or "").strip().splitlines()[-1]]
+    return (("успех" if done.returncode == 0 else "провал"), spent, tail,
+            reasons[:4])
 
 
 def main(argv):
@@ -300,12 +313,12 @@ def main(argv):
         # The shell has to raise the core and wait for the link; python
         # does not.
         timeout = 600 if c.group != "ядро" else 300
-        verdict, spent, tail = run(c, timeout)
+        verdict, spent, tail, reasons = run(c, timeout)
         spent_total += spent
         mark = {"успех": "OK  ", "провал": "FAIL", "пропущено": "----"}[verdict]
         print(f"  {mark}  {c.name:26} {spent:6.1f} с  {tail[:60]}")
         if verdict == "провал":
-            failed.append(c.name)
+            failed.append((c.name, reasons))
         elif verdict == "пропущено":
             skipped.append(f"{c.name} ({tail})")
 
@@ -319,8 +332,10 @@ def main(argv):
 
     print(f"Проверок: {len(checks)}, провалов: {len(failed)}, "
           f"пропущено: {len(skipped)}, за {spent_total:.0f} с")
-    for name in failed:
+    for name, reasons in failed:
         print(f"    провал: {name}")
+        for reason in reasons:
+            print(f"        {reason[:110]}")
     for name in skipped:
         print(f"    пропущено: {name}")
     if skipped and not strict:

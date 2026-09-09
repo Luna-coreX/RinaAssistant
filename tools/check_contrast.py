@@ -107,6 +107,46 @@ def check_nebula(tokens, report):
     return failures
 
 
+def check_glass_field(tokens, report):
+    """
+    The reading field is glass over the flow — so that is what text lies on.
+
+    The field stopped being opaque (`4.0b-A12`), and a colour with alpha is
+    not a colour: what the eye is given is the glass composited over
+    whatever the flow has underneath at that moment. Checking the ink
+    against the glass alone would check a surface that is never shown.
+
+    Every stop of every palette, because the flow moves: a field that reads
+    over the dark end of a ramp and not the light one becomes unreadable on
+    its own schedule.
+    """
+    from nebula import every_ramp, hexed, rgb
+
+    alpha = (tokens.get("glasswork") or {}).get("field")
+    if alpha is None:
+        report("поле диалога: прозрачность задана", False, "—")
+        return 1
+
+    failures = 0
+    for key, finish in tokens["finishes"].items():
+        glass = finish["color"]["GLASS"]
+        for role in ("GLASS_TEXT", "GLASS_DIM"):
+            ink = finish["color"][role]
+            worst, at_stop = 99.0, ""
+            for label, ramp in every_ramp(finish).items():
+                for stop in ramp:
+                    through = hexed(g * alpha + b * (1 - alpha)
+                                    for g, b in zip(rgb(glass), rgb(stop)))
+                    value = contrast(ink, through)
+                    if value < worst:
+                        worst, at_stop = value, f"{label} {stop}"
+            ok = worst >= 4.5
+            failures += 0 if ok else 1
+            report(f"{key}: {role.lower()} сквозь стекло", ok,
+                   f"{worst:.2f} на {at_stop}")
+    return failures
+
+
 def check_accents(tokens, report):
     """
     Every accent is checked in the same place the original was.
@@ -148,6 +188,10 @@ def main():
 
     def report(label, ok, detail):
         print(f"  {'OK  ' if ok else 'МАЛО'} {detail:>22}  {label}")
+
+    print()
+    print("=== поле диалога: стекло поверх течения ===")
+    failures += check_glass_field(tokens, report)
 
     print()
     print("=== живой фон: текст поверх любого пятна ===")

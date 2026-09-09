@@ -171,6 +171,13 @@ public partial class App
         // The wizard on its own, for a screenshot and for the eye. It is
         // shown once per install, so without this the only way to look at
         // it again would be to wipe the settings.
+        if (args.Contains("--check-dialogue"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckDialogueAsync(window, Value(args, "--shot"));
+            return;
+        }
+
         if (args.Contains("--check-settings"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -745,6 +752,152 @@ public partial class App
 
         watch.Dispose();
         Check("после Dispose не следит", !watch.Watching);
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The dialogue is a conversation: two sides, and a time on each.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Plan item <c>4.0b-A12</c>. Driven by a real command through a real
+    /// core: the page's whole job is turning events into messages, and
+    /// handing it an event by hand would check that the handler works —
+    /// which was never in doubt.
+    /// </para>
+    /// <para>
+    /// <b>Sides, not counts.</b> "Two messages appeared" would pass with
+    /// both of them on the same side, which is exactly what a list of lines
+    /// looked like before this item.
+    /// </para>
+    /// </remarks>
+    private async Task CheckDialogueAsync(MainWindow window, string? shot)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== Диалог: переписка, а не лента ===");
+        var link = new CoreLink(window, CoreLink.FindCore());
+        window.Link = link;
+        await link.StartAsync();
+        await Until(() => link.State == Rina.Protocol.CoreState.Ready, 12);
+        Check("ядро на связи",
+              link.State == Rina.Protocol.CoreState.Ready, $"| {link.State}");
+
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.Activate();
+        window.ShowSectionFor("dialog");
+
+        // Asked of the window each time: it rebuilds the section whenever
+        // the link is set again, so a page held in hand has been replaced.
+        Pages.DialoguePage Shown() => (Pages.DialoguePage)window.CurrentPage!;
+        await Until(() => window.CurrentPage is Pages.DialoguePage);
+
+        // **Not a round trip.** The first version typed a command and
+        // waited for the answer, and inside the full suite that is a race:
+        // the page is rebuilt, the history is read back, the core stores in
+        // its own time. It measured the timing rather than the layout, and
+        // failed in the run while passing by hand.
+        //
+        // The layout is what this item is about, so the sides are asked of
+        // messages the core already has. Which two they are comes from the
+        // core, not from a guess about what the history holds.
+        // The conversation is made here rather than hoped for: what a
+        // profile happens to hold is whatever earlier checks left in it,
+        // and one of them clears the history. A check that reads somebody
+        // else's leftovers passes or fails by the order it was run in.
+        await link.HandleAsync("посчитай 15 умножить на 12");
+
+        string? said = null, answered = null;
+        // Waited on the store, not on a clock: the page can only lay out
+        // what the core has written down.
+        //
+        // Awaited in a loop rather than blocked on inside a predicate. The
+        // first version called `GetAwaiter().GetResult()` in the condition
+        // and hung for good: that runs on the interface thread, and the
+        // answer it was waiting for needs the very same thread to arrive.
+        for (var tries = 0; tries < 40 && answered is null; tries++)
+        {
+            var told = await link.AskAsync(Rina.Protocol.Methods.HistoryList,
+                new JsonObject { ["limit"] = 50 });
+            said = null;
+            answered = null;
+            foreach (var item in told?["items"]?.AsArray() ?? [])
+            {
+                var kind = item?["kind"]?.GetValue<string>() ?? "";
+                var text = item?["text"]?.GetValue<string>() ?? "";
+                if (text.Length == 0) continue;
+                if (kind == "assistant") answered ??= text;
+                else said ??= text;
+            }
+            if (answered is null) await Task.Delay(500);
+        }
+
+        Check("разговор записан обеими сторонами",
+              said is not null && answered is not null,
+              $"| человек: {said is not null}, Рина: {answered is not null}");
+
+        // Read back from the store, as a person would see it after a
+        // restart: the page is opened again rather than watched live.
+        window.ShowSectionFor("home");
+        window.ShowSectionFor("dialog");
+        await Until(() => window.CurrentPage is Pages.DialoguePage);
+
+        if (said is not null && answered is not null)
+        {
+            await Until(() => Shown().SideOf(said) is not null, 15);
+            Check("сказанное человеком встало на его сторону",
+                  Shown().SideOf(said) is true,
+                  $"| сторона {Shown().SideOf(said)}");
+            Check("ответ Рины — на другой",
+                  Shown().SideOf(answered) is false,
+                  $"| сторона {Shown().SideOf(answered)}");
+        }
+
+        Check("у каждой реплики есть время", Shown().AllStamped,
+              "| время — часть сообщения, а не подпись вместо имени");
+
+        if (shot is not null)
+        {
+            Save(window, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
+
+        // --- and the message a person sees *before* the core answers ---
+        //
+        // Two lines of code build these messages: one as they arrive, one
+        // when the history is read back. After an exchange the second
+        // replaces the first, so a mistake in the first is invisible from
+        // outside — the check went green with every arriving message forced
+        // onto one side.
+        //
+        // Without a core there is no history to read back, so only the
+        // first runs. That is also the page's own promise: "what was said
+        // appears on the glass at once, without waiting for the core".
+        await link.DisposeAsync();
+        window.Link = null;
+        window.ShowSectionFor("dialog");
+        await Until(() => window.CurrentPage is Pages.DialoguePage);
+
+        const string alone = "это без ядра";
+        await Shown().SayForCheck(alone);
+        await Until(() => Shown().SideOf(alone) is not null, 5);
+        Check("без ядра сказанное всё равно видно и на своей стороне",
+              Shown().SideOf(alone) is true, $"| {Shown().SideOf(alone)}");
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");

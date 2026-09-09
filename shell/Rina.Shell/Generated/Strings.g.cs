@@ -414,6 +414,11 @@ public static partial class Loc
                 {
                     ["English"] = "Thinking",
                 },
+            ["Думаю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Thinking…",
+                },
             ["Если не ответить, действие не выполнится."] =
                 new Dictionary<string, string>
                 {
@@ -1427,10 +1432,7 @@ public static partial class Loc
             ["Рина"] =
                 new Dictionary<string, string>
                 {
-                    ["Deutsch"] = "Rina",
                     ["English"] = "Rina",
-                    ["Español"] = "Rina",
-                    ["Українська"] = "Ріна",
                 },
             ["Рина будет готова сразу после входа"] =
                 new Dictionary<string, string>

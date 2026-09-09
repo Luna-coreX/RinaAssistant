@@ -131,10 +131,24 @@ class Core:
         return got
 
     def handshake(self):
-        self.ask("hello", self.session.hello_payload())
-        answer = self.read(1)[0]
-        self.session.accept_hello_result(answer.payload)
-        return answer
+        """
+        Say hello and take **the reply**, not the first thing that arrives.
+
+        The core may emit an event before it answers — a plugin switching
+        on, a setting read — and taking the first message treated that as
+        the reply. The failure looked like "the core did not name a
+        protocol version", which is true of an event and says nothing about
+        what went wrong.
+        """
+        sent = self.ask("hello", self.session.hello_payload())
+        for _ in range(8):
+            got = self.read(1)
+            if not got:
+                break
+            if got[0].correlation_id == sent.id:
+                self.session.accept_hello_result(got[0].payload)
+                return got[0]
+        raise RuntimeError("ядро не ответило на приветствие")
 
     def stderr_text(self):
         try:

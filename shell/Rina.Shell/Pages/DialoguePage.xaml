@@ -34,19 +34,60 @@
 
       <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto">
         <ItemsControl x:Name="Turns">
+          <!--
+            A conversation, not a list of lines (4.0b-A12).
+
+            One template with two sides rather than two templates: what
+            differs between a person's message and Rina's is where it sits
+            and what it sits on, and everything else — the time, the
+            wrapping, the states — is the same. Two templates would be two
+            places to change whenever a message gains anything.
+          -->
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <Grid Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="56" />
-                  <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                <TextBlock Grid.Column="0" Text="{Binding Who}"
-                           Style="{StaticResource Text.Figure}"
-                           Foreground="{DynamicResource C.GlassDim}" />
-                <TextBlock Grid.Column="1" Text="{Binding Said}"
-                           Style="{StaticResource Text.Speech}" />
+              <Grid Margin="0,0,0,10">
+                <Border x:Name="Bubble" MaxWidth="440"
+                        HorizontalAlignment="Left"
+                        Background="{DynamicResource C.Glass.Raised}"
+                        CornerRadius="{StaticResource Radius.Max}"
+                        Padding="14,10">
+                  <StackPanel>
+                    <TextBlock Text="{Binding Said}" TextWrapping="Wrap"
+                               Style="{StaticResource Text.Speech}" />
+                    <TextBlock x:Name="Stamp" Text="{Binding When}"
+                               Style="{StaticResource Text.Meta}"
+                               HorizontalAlignment="Right"
+                               Margin="12,2,0,0"
+                               Foreground="{DynamicResource C.GlassDim}" />
+                  </StackPanel>
+                </Border>
               </Grid>
+              <DataTemplate.Triggers>
+                <!-- The person's own words stand on the other side, and on
+                     the accent: which of the two is speaking has to be
+                     legible without reading a word of it. -->
+                <DataTrigger Binding="{Binding Mine}" Value="True">
+                  <Setter TargetName="Bubble" Property="HorizontalAlignment"
+                          Value="Right" />
+                  <Setter TargetName="Bubble" Property="Background"
+                          Value="{DynamicResource C.Glass.Control}" />
+                </DataTrigger>
+                <!-- Thinking: the same bubble, dimmed. Not a spinner —
+                     movement here would compete with the figure, which is
+                     already saying the same thing. -->
+                <DataTrigger Binding="{Binding Pending}" Value="True">
+                  <Setter TargetName="Bubble" Property="Opacity" Value="0.55" />
+                </DataTrigger>
+                <!-- Went wrong: said in the accent rather than in red. There
+                     is one accent in the system and it means "attention
+                     here" (SYSTEM §6). -->
+                <DataTrigger Binding="{Binding Failed}" Value="True">
+                  <Setter TargetName="Bubble" Property="BorderBrush"
+                          Value="{DynamicResource C.Signal}" />
+                  <Setter TargetName="Bubble" Property="BorderThickness"
+                          Value="1" />
+                </DataTrigger>
+              </DataTemplate.Triggers>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>

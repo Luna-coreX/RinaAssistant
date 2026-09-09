@@ -685,9 +685,20 @@
     </Setter>
   </Style>
 
-  <!-- The glass field: the instrument's only glowing surface. -->
+  <!--
+    The glass field: the instrument's only glowing surface.
+
+    Nearly opaque, and the "nearly" is a measured number rather than a
+    taste. The flow shows through it faintly — it was the one place in the
+    window where the background stopped dead — but text lies on this field,
+    and what that text is read against is glass **composited over the
+    flow**, not the glass alone. `check_contrast.py` works that composite
+    out for every stop of every palette; at nine tenths the dim text on
+    silver falls to 4.20, so the ninety-five hundredths here is where
+    readability runs out, not where the effect stopped pleasing.
+  -->
   <Style x:Key="Glass" TargetType="Border">
-    <Setter Property="Background" Value="{DynamicResource C.Glass}" />
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Field}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
     <Setter Property="Padding" Value="16" />
   </Style>

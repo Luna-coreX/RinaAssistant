@@ -112,6 +112,7 @@
   <sys:Double x:Key="Glass.Bar">0.0</sys:Double>
   <sys:Double x:Key="Glass.Column">0.0</sys:Double>
   <sys:Double x:Key="Glass.Strip">0.62</sys:Double>
+  <sys:Double x:Key="Glass.Field">0.95</sys:Double>
   <sys:Double x:Key="Glass.Control">0.55</sys:Double>
   <sys:Double x:Key="Glass.Raised">0.5</sys:Double>
   <sys:Double x:Key="Glass.Edge">0.14</sys:Double>

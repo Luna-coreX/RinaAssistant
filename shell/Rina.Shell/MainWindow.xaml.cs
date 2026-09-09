@@ -406,10 +406,18 @@ public partial class MainWindow : Window
         get => _link;
         set
         {
+            var had = _link is not null;
             _link = value;
-            // A section shown before the link appeared has to be built
+            // A section shown **before** the link appeared has to be built
             // again: it has already told the person there is no core.
-            ShowSection(_section);
+            //
+            // One that was built with a link is left alone. Rebuilding it
+            // throws away what is on it, and the replacement shows only
+            // what the core has already stored — so a message typed a
+            // moment ago vanished, because storing it and showing it do not
+            // happen at the same instant. A person reconnecting mid-sentence
+            // watched their own words disappear.
+            if (!had || value is null) ShowSection(_section);
         }
     }
 

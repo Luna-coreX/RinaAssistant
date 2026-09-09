@@ -108,7 +108,9 @@ public partial class SetupWindow : Window
         _wake = new TextBox
         {
             Style = (Style)FindResource("Field"),
-            Text = "Рина",
+            // Through the translation like anything else a person sees:
+            // in an English window the word to call her by is "Rina".
+            Text = S("Рина"),
             Width = 260,
             HorizontalAlignment = HorizontalAlignment.Left,
         };
