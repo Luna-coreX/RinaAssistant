@@ -168,6 +168,17 @@ public partial class App
             return;
         }
 
+        // The wizard on its own, for a screenshot and for the eye. It is
+        // shown once per install, so without this the only way to look at
+        // it again would be to wipe the settings.
+        if (args.Contains("--check-setup"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckSetupAsync(Value(args, "--shot"),
+                                Value(args, "--step"));
+            return;
+        }
+
         if (args.Contains("--check-audio"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -723,6 +734,71 @@ public partial class App
         watch.Dispose();
         Check("после Dispose не следит", !watch.Watching);
 
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The setup wizard: does it hold together, and what does it look like.
+    /// </summary>
+    /// <remarks>
+    /// A live core, because the catalogue comes from it: a wizard checked
+    /// against an invented list would pass with a step that shows nothing
+    /// on a real machine.
+    /// </remarks>
+    private async Task CheckSetupAsync(string? shot, string? step)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== Мастер первого запуска ===");
+        var link = new CoreLink(new MainWindow(), CoreLink.FindCore());
+        await link.StartAsync();
+        for (var waited = 0; waited < 60
+             && link.State != Rina.Protocol.CoreState.Ready; waited++)
+            await Task.Delay(100);
+        Check("ядро на связи",
+              link.State == Rina.Protocol.CoreState.Ready, $"| {link.State}");
+
+        var wizard = new Pages.SetupWindow(link);
+        await wizard.LoadAsync();
+        Check("каталог моделей доехал до окна", wizard.Offered > 0,
+              $"| моделей {wizard.Offered}");
+
+        var at = int.TryParse(step, out var wanted) ? wanted : 2;
+        wizard.ShowFor(at);
+        Check($"шаг {at} рисуется", wizard.StageFilled);
+
+        // Counted on the step that has the boxes, which is the one just
+        // opened. Asked before it, this counted the greeting's boxes —
+        // there are none — and called that "nothing is ticked by default".
+        wizard.ShowFor(2);
+        Check("по умолчанию отмечено ровно одно", wizard.TickedNow == 1,
+              $"| отмечено {wizard.TickedNow}");
+        wizard.ShowFor(at);
+
+        wizard.Left = -4000;
+        wizard.Top = -4000;
+        wizard.Show();
+        await Task.Delay(500);
+        if (shot is not null)
+        {
+            Save(wizard, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
+        wizard.Close();
+
+        await link.DisposeAsync();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

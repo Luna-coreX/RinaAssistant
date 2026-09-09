@@ -38,9 +38,11 @@ log = get_logger("models")
 class Model:
     """One downloadable thing and what it is for."""
 
-    __slots__ = ("id", "title", "url", "size", "engine", "setting", "note")
+    __slots__ = ("id", "title", "url", "size", "engine", "setting", "note",
+                 "wanted")
 
-    def __init__(self, id, title, engine, size, url="", setting="", note=""):
+    def __init__(self, id, title, engine, size, url="", setting="", note="",
+                 wanted=False):
         self.id = id
         self.title = title
         #: Which engine setting this model belongs to (`stt_engine` value).
@@ -52,6 +54,14 @@ class Model:
         #: The settings key that must point at the unpacked model, if any.
         self.setting = setting
         self.note = note
+        #: Ticked by default in the setup wizard.
+        #:
+        #: Only the small one. The full Russian Vosk is nearly two
+        #: gigabytes, and a box ticked in advance is a box a person does not
+        #: read: they would agree to that download by not noticing it. What
+        #: is offered ready-ticked has to be something nobody minds having
+        #: agreed to.
+        self.wanted = wanted
 
     @property
     def ours(self) -> bool:
@@ -69,6 +79,7 @@ CATALOGUE = (
           url="https://alphacephei.com/vosk/models/"
               "vosk-model-small-ru-0.22.zip",
           setting="vosk_model",
+          wanted=True,
           note="Быстрый и нетребовательный. Хватает для команд."),
     Model("vosk-ru-full", "Vosk: русский, полный", "vosk",
           size=1938 * 1024 * 1024,
@@ -106,6 +117,7 @@ def catalogue(settings=None) -> list[dict]:
             "size": m.size,
             "note": m.note,
             "ours": m.ours,
+            "wanted": m.wanted,
             "installed": bool(installed(m)) if m.ours else False,
         }
         for m in CATALOGUE

@@ -75,6 +75,12 @@ public sealed class CoreLink : IAsyncDisposable
         // read — Rina answered in text and stayed silent.
         _boss.Connected += connection => OnUi(() => StartVoice(connection));
 
+        // The first run (`4.0b-A14`). Asked of the core rather than kept by
+        // the shell: reinstalling the shell over an old profile is not a
+        // first run, and reinstalling the core over none is. The core owns
+        // the settings, so the core owns the answer.
+        _boss.Connected += _ => OnUi(() => OfferSetupAsync());
+
         // Plugin sections appear once the core is connected: before that
         // there is nobody to ask.
         _boss.Connected += connection => OnUi(
@@ -264,6 +270,65 @@ public sealed class CoreLink : IAsyncDisposable
     /// system into line. The registry and the keyboard are the system, and
     /// in 4.0 the system layer belongs to the shell.
     /// </remarks>
+    /// <summary>Show the setup wizard, if this is a first run.</summary>
+    /// <remarks>
+    /// <para>
+    /// Once per install, and only when the core says so. The wizard is
+    /// marked done as soon as it closes, whatever the person chose: a
+    /// wizard that comes back because somebody skipped the downloads is a
+    /// wizard that punishes them for saying no.
+    /// </para>
+    /// <para>
+    /// The downloads are started **after** it closes and run in the
+    /// background. Making somebody watch a progress bar before they are
+    /// allowed to use the program would be charging them for the download
+    /// twice — once in traffic and once in waiting.
+    /// </para>
+    /// </remarks>
+    private async void OfferSetupAsync()
+    {
+        if (_setupShown) return;
+        var state = await AskAsync(Methods.SetupState);
+        if (state?["needed"]?.GetValue<bool>() != true) return;
+        _setupShown = true;
+
+        var wizard = new Pages.SetupWindow(this) { Owner = _window };
+        await wizard.LoadAsync();
+        wizard.ShowDialog();
+
+        await AskAsync(Methods.SetupFinish);
+
+        var wanted = wizard.Chosen;
+        if (wanted.Count == 0) return;
+        var ids = new JsonArray();
+        foreach (var id in wanted) ids.Add(id);
+        // The reply carries a task id per download; progress arrives as
+        // ordinary `task.progress` (§9), which the shell already shows.
+        await AskAsync(Methods.ModelsFetch, new JsonObject { ["ids"] = ids });
+    }
+
+    private bool _setupShown;
+
+    /// <summary>Ask the core a question and give back its answer.</summary>
+    /// <remarks>
+    /// On the link rather than in a page: the settings page had its own
+    /// copy, and the setup wizard would have made a second. Three copies of
+    /// "call, wait twenty seconds, swallow the error" drift apart at the
+    /// first change to any of them.
+    /// </remarks>
+    public async Task<JsonObject?> AskAsync(string method,
+                                            JsonObject? payload = null)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return null;
+        try
+        {
+            var answer = await connection.CallAsync(method, payload,
+                                                    TimeSpan.FromSeconds(20));
+            return answer.IsError ? null : answer.Payload;
+        }
+        catch { return null; }
+    }
+
     public async Task<JsonObject?> GetAsync(params string[] keys)
     {
         if (_boss.Connection is not { Ready: true } connection) return null;

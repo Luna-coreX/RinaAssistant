@@ -115,6 +115,9 @@ class ProtocolServer:
                 or "silent"))
         self.segmenter = speech.Segmenter()
         self._speech_stream = 0
+        #: Downloads in flight, by model id — so they can be
+        #: cancelled, and so the same one is not started twice.
+        self._fetching: dict = {}
         self._speech_rate = 0
 
         #: Where to put received sound if recognition is not needed.
@@ -289,6 +292,10 @@ class ProtocolServer:
             "commands.kinds": self._commands_kinds,
             "commands.builtin": self._commands_builtin,
             "hotkeys.actions": self._hotkey_actions,
+            "setup.state": self._setup_state,
+            "setup.finish": self._setup_finish,
+            "models.catalogue": self._models_catalogue,
+            "models.fetch": self._models_fetch,
             "speech.test": self._speech_test,
             "commands.save": self._commands_save,
             "commands.delete": self._commands_delete,
@@ -365,6 +372,115 @@ class ProtocolServer:
     def _command_by_id(self, message: Envelope) -> dict:
         self.engine.run_command_by_id(str(message.payload.get("command_id")))
         return {"accepted": True}
+
+    # -- the setup wizard (4.0b-A14) ----------------------------------------
+
+    def _setup_state(self, message: Envelope) -> dict:
+        """
+        Is this a first run.
+
+        Its own method rather than a settings key read out. `first_run` is
+        marked secret — it is the state of the store, not something a person
+        edits — and `settings.get` is right to withhold it. "Has this person
+        been set up yet" is a question about the session, and it gets its own
+        door rather than a hole cut in someone else's.
+        """
+        store = self._settings()
+        return {"needed": bool(store.get("first_run", True)) if store
+                else False}
+
+    def _setup_finish(self, message: Envelope) -> dict:
+        """The wizard is done: do not show it again."""
+        store = self._settings()
+        if store is not None:
+            store.set("first_run", False)
+            store.save()
+        return {"done": True}
+
+    def _models_catalogue(self, message: Envelope) -> dict:
+        from core import models
+
+        return {"items": models.catalogue(self._settings())}
+
+    def _models_fetch(self, message: Envelope) -> dict:
+        """
+        Start downloading the named models, as ordinary long tasks.
+
+        **No events of its own, and that is the specification's decision
+        rather than an omission** (§10). Progress goes as `task.progress`
+        and stopping as `task.cancel`, because a download is the same kind
+        of lasting work as a model thinking or an archive being unpacked.
+        Three `model.*` events were written once and removed before first
+        use: they said the same thing a second way, and two ways to say one
+        thing is exactly the case where one of them is later forgotten.
+
+        I wrote them a second time anyway, and the check for §6 caught it.
+
+        Returns at once: a download is minutes, and a call that waited for
+        one would hold the control channel for all of them.
+        """
+        from core import models
+
+        wanted = [str(i) for i in (message.payload.get("ids") or [])]
+        started = []
+        for model_id in wanted:
+            model = models.find(model_id)
+            # What the engine fetches for itself is skipped rather than
+            # reported as started: we do not drive that transfer, and saying
+            # we did would leave the shell waiting for progress that is
+            # never coming, with a cancel button that cancels nothing.
+            if model is None or not model.ours:
+                continue
+            if model_id in self._fetching:
+                continue
+            started.append(self._fetch_as_task(model))
+        return {"tasks": started}
+
+    def _fetch_as_task(self, model) -> dict:
+        """One download, wrapped in the task lifecycle."""
+        from core import models
+
+        task = self.tasks.create()
+        task.start()
+
+        def told(state: dict) -> None:
+            # Cancellation is noticed rather than pushed, because that is
+            # the contract `Task` states: "it is obliged to stop itself, on
+            # noticing the flag". Progress arrives every quarter-megabyte,
+            # which is often enough for "stop" to feel immediate — and the
+            # alternative was inventing a callback field on `Task` for one
+            # caller's convenience.
+            if task.cancel_requested:
+                fetch.cancel()
+
+            name = state.get("state")
+            if name == "downloading":
+                total = state.get("total") or 0
+                done = state.get("done") or 0
+                self.send(task.progress(
+                    tr("Скачиваю {name}: {done} из {total} МБ",
+                       name=model.title,
+                       done=done // (1024 * 1024),
+                       total=total // (1024 * 1024)),
+                    fraction=(done / total) if total else None))
+            elif name == "unpacking":
+                self.send(task.progress(tr("Распаковываю {name}",
+                                           name=model.title)))
+            elif name == "ready":
+                self._fetching.pop(model.id, None)
+                self.send(task.done({"id": model.id}))
+            elif name == "cancelled":
+                self._fetching.pop(model.id, None)
+                self.send(task.cancelled())
+            elif name == "failed":
+                self._fetching.pop(model.id, None)
+                self.send(task.failed(state.get("error", "")))
+
+        fetch = models.Fetch(model, on_progress=told,
+                             settings=self._settings())
+        self._fetching[model.id] = fetch
+        fetch.start()
+        return {"id": model.id, "task_id": task.id}
 
     def _listen_once(self, message: Envelope) -> dict:
         # The context is copied so that listening events land in the same

@@ -1,0 +1,49 @@
+<Window x:Class="Rina.Shell.Pages.SetupWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="clr-namespace:Rina.Shell.Strings"
+        Title="{loc:S 'Знакомство'}" Width="640"
+        SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen" ShowInTaskbar="False">
+  <!--
+    The first run (4.0b-A14). 3.1.0 had a setup wizard; the port lost it,
+    and with it the only place where anybody was ever told that recognition
+    needs a model at all. A person met an assistant that could not hear and
+    no explanation.
+
+    Not a page inside the window but a window of its own: the main window is
+    an instrument, and an instrument that reconfigures itself into a wizard
+    on its first run has two lives to keep working. This one appears once
+    and goes.
+  -->
+  <Border Background="{DynamicResource C.Face}"
+          BorderBrush="{DynamicResource C.Seam}" BorderThickness="1"
+          CornerRadius="{StaticResource Radius.Tight}" Padding="28">
+    <StackPanel>
+      <TextBlock x:Name="Heading" Style="{StaticResource Text.Title}"
+                 Margin="0,0,0,6" />
+      <TextBlock x:Name="Subheading" Style="{StaticResource Text.Body}"
+                 TextWrapping="Wrap" Margin="0,0,0,20"
+                 Foreground="{DynamicResource C.InkSoft}" />
+
+      <!-- The steps put their contents here; only one is ever shown. -->
+      <ContentControl x:Name="Stage" MinHeight="220" />
+
+      <Border Height="1" Background="{DynamicResource C.Seam}"
+              Margin="0,20,0,16" />
+
+      <Grid>
+        <TextBlock x:Name="Where" Style="{StaticResource Text.Meta}"
+                   VerticalAlignment="Center" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button x:Name="BtnBack" Style="{StaticResource Btn}"
+                  Content="{loc:S 'Назад'}" Click="OnBack" />
+          <Button x:Name="BtnNext" Style="{StaticResource Btn.Primary}"
+                  Margin="8,0,0,0" Content="{loc:S 'Дальше'}"
+                  Click="OnNext" />
+        </StackPanel>
+      </Grid>
+    </StackPanel>
+  </Border>
+</Window>

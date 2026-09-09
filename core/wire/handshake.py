@@ -82,6 +82,14 @@ BASE_METHODS = (
     "core.shutdown",
     "ping",
     "pong",
+    # The setup wizard (`4.0b-A14`). Base methods, not a capability: a shell
+    # that cannot ask whether this is a first run would simply never show
+    # the wizard, and a person would meet an assistant that cannot hear and
+    # no explanation of why.
+    "setup.state",
+    "setup.finish",
+    "models.catalogue",
+    "models.fetch",
     # Stream control is basic, whereas the kind of stream is unlocked by a
     # capability: the method always exists, but `audio.input` cannot be
     # opened on a correspondent without a microphone. See

@@ -70,6 +70,10 @@ public static class Methods
     public const string HistoryList = "history.list";
     /// <summary>Базовый метод.</summary>
     public const string HotkeysActions = "hotkeys.actions";
+    /// <summary>Базовый метод.</summary>
+    public const string ModelsCatalogue = "models.catalogue";
+    /// <summary>Базовый метод.</summary>
+    public const string ModelsFetch = "models.fetch";
     /// <summary>Возможность: permissions.</summary>
     public const string PermissionRequest = "permission.request";
     /// <summary>Базовый метод.</summary>
@@ -102,6 +106,10 @@ public static class Methods
     public const string SettingsReset = "settings.reset";
     /// <summary>Базовый метод.</summary>
     public const string SettingsSet = "settings.set";
+    /// <summary>Базовый метод.</summary>
+    public const string SetupFinish = "setup.finish";
+    /// <summary>Базовый метод.</summary>
+    public const string SetupState = "setup.state";
     /// <summary>Возможность: stt.</summary>
     public const string SpeechListenOnce = "speech.listen_once";
     /// <summary>Возможность: tts.</summary>
@@ -155,6 +163,8 @@ public static class Methods
             ["history.export"] = "history",
             ["history.list"] = "history",
             ["hotkeys.actions"] = null,
+            ["models.catalogue"] = null,
+            ["models.fetch"] = null,
             ["permission.request"] = "permissions",
             ["ping"] = null,
             ["plugins.action"] = "plugins",
@@ -171,6 +181,8 @@ public static class Methods
             ["settings.options"] = null,
             ["settings.reset"] = null,
             ["settings.set"] = null,
+            ["setup.finish"] = null,
+            ["setup.state"] = null,
             ["speech.listen_once"] = "stt",
             ["speech.say"] = "tts",
             ["speech.set_always_listen"] = "stt",

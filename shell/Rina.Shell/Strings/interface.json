@@ -17,6 +17,12 @@
   "http://localhost:11434": {
     "English": "http://localhost:11434"
   },
+  "{0} ГБ": {
+    "English": "{0} GB"
+  },
+  "{0} МБ": {
+    "English": "{0} MB"
+  },
   "{0} — сейчас недоступно": {
     "English": "{0} — unavailable right now"
   },
@@ -63,10 +69,10 @@
     "English": "Archives (*.zip)|*.zip|All files|*.*"
   },
   "Будильник": {
+    "Deutsch": "Wecker",
     "English": "Alarm",
-    "Українська": "Будильник",
     "Español": "Alarma",
-    "Deutsch": "Wecker"
+    "Українська": "Будильник"
   },
   "Быстрее ста — торопится, медленнее — растягивает": {
     "English": "Above 100 she hurries, below she drawls"
@@ -75,10 +81,10 @@
     "English": "Versions, links, what it’s made of"
   },
   "Внешний вид": {
+    "Deutsch": "Darstellung",
     "English": "Appearance",
-    "Українська": "Зовнішній вигляд",
     "Español": "Apariencia",
-    "Deutsch": "Darstellung"
+    "Українська": "Зовнішній вигляд"
   },
   "Время пишется как 19:30.": {
     "English": "Time is written like 19:30."
@@ -90,10 +96,10 @@
     "English": "Always trust"
   },
   "Всегда слушать": {
+    "Deutsch": "Immer zuhören",
     "English": "Always listen",
-    "Українська": "Завжди слухати",
     "Español": "Escuchar siempre",
-    "Deutsch": "Immer zuhören"
+    "Українська": "Завжди слухати"
   },
   "Всегда слушаю": {
     "English": "Always listening"
@@ -101,8 +107,14 @@
   "Вся поверхность целиком: цвета проверены парами": {
     "English": "The whole surface: colours verified in pairs"
   },
+  "Всё это потом можно поменять в настройках.": {
+    "English": "All of this can be changed later in the settings."
+  },
   "Выберите файл модели": {
     "English": "Choose the model file"
+  },
+  "Выбранное скачается в фоне. Пользоваться можно уже сейчас.": {
+    "English": "What you chose will download in the background. You can start using Rina now."
   },
   "Выгружено: {0}": {
     "English": "Exported: {0}"
@@ -111,10 +123,10 @@
     "English": "Quit"
   },
   "Выполнить": {
+    "Deutsch": "Ausführen",
     "English": "Run",
-    "Українська": "Виконати",
     "Español": "Ejecutar",
-    "Deutsch": "Ausführen"
+    "Українська": "Виконати"
   },
   "Выполняю…": {
     "English": "Working…"
@@ -141,10 +153,13 @@
     "English": "Speaking…"
   },
   "Голос": {
+    "Deutsch": "Stimme",
     "English": "Voice",
-    "Українська": "Голос",
     "Español": "Voz",
-    "Deutsch": "Stimme"
+    "Українська": "Голос"
+  },
+  "Голос и распознавание — на вашем компьютере.": {
+    "English": "Speech and recognition happen on your computer."
   },
   "Голоса зависят от выбранной системы синтеза": {
     "English": "Voices depend on the chosen synthesis engine"
@@ -159,13 +174,16 @@
     "English": "Done: {0}"
   },
   "Громкость": {
+    "Deutsch": "Lautstärke",
     "English": "Volume",
-    "Українська": "Гучність",
     "Español": "Volumen",
-    "Deutsch": "Lautstärke"
+    "Українська": "Гучність"
   },
   "ДИАГНОСТИКА": {
     "English": "DIAGNOSTICS"
+  },
+  "Дальше": {
+    "English": "Next"
   },
   "Данные на диске": {
     "English": "Data on disk"
@@ -174,34 +192,34 @@
     "English": "Dialogue"
   },
   "Динамик": {
+    "Deutsch": "Lautsprecher",
     "English": "Speaker",
-    "Українська": "Динамік",
     "Español": "Altavoz",
-    "Deutsch": "Lautsprecher"
+    "Українська": "Динамік"
   },
   "Длительность записи": {
+    "Deutsch": "Aufnahmedauer",
     "English": "Recording length",
-    "Українська": "Тривалість запису",
     "Español": "Duración de la grabación",
-    "Deutsch": "Aufnahmedauer"
+    "Українська": "Тривалість запису"
   },
   "Добавить": {
     "English": "Add"
   },
   "Добавить папку…": {
+    "Deutsch": "Ordner hinzufügen…",
     "English": "Add folder…",
-    "Українська": "Додати теку…",
     "Español": "Añadir carpeta…",
-    "Deutsch": "Ordner hinzufügen…"
+    "Українська": "Додати теку…"
   },
   "Добавить фразу": {
     "English": "Add a phrase"
   },
   "Добавить шаг": {
+    "Deutsch": "Schritt hinzufügen",
     "English": "Add step",
-    "Українська": "Додати крок",
     "Español": "Añadir paso",
-    "Deutsch": "Schritt hinzufügen"
+    "Українська": "Додати крок"
   },
   "Добавленные папки": {
     "English": "Added folders"
@@ -240,16 +258,16 @@
     "English": "SCHEDULED · {0}"
   },
   "Забыть": {
+    "Deutsch": "Vergessen",
     "English": "Forget",
-    "Українська": "Забути",
     "Español": "Olvidar",
-    "Deutsch": "Vergessen"
+    "Українська": "Забути"
   },
   "Забыть все": {
+    "Deutsch": "Alle vergessen",
     "English": "Forget all",
-    "Українська": "Забути все",
     "Español": "Olvidar todo",
-    "Deutsch": "Alle vergessen"
+    "Українська": "Забути все"
   },
   "Закрыть": {
     "English": "Close"
@@ -264,10 +282,10 @@
     "English": "Record"
   },
   "Записывать тексты реплик": {
+    "Deutsch": "Nachrichtentexte protokollieren",
     "English": "Log message texts",
-    "Українська": "Записувати тексти реплік",
     "Español": "Registrar el texto de los mensajes",
-    "Deutsch": "Nachrichtentexte protokollieren"
+    "Українська": "Записувати тексти реплік"
   },
   "Записывать тексты реплик в журнал. По умолчанию выключено": {
     "English": "Write reply texts to the log. Off by default"
@@ -288,13 +306,19 @@
     "English": "Audio"
   },
   "Звуковые эффекты": {
+    "Deutsch": "Soundeffekte",
     "English": "Sound effects",
-    "Українська": "Звукові ефекти",
     "Español": "Efectos de sonido",
-    "Deutsch": "Soundeffekte"
+    "Українська": "Звукові ефекти"
   },
   "Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом.": {
     "English": "Everything you ask to be reminded of lands here — from the field above or by voice."
+  },
+  "Здравствуйте": {
+    "English": "Hello"
+  },
+  "Знакомство": {
+    "English": "Getting started"
   },
   "ИЗ ЧЕГО СОБРАНА": {
     "English": "WHAT IT'S MADE OF"
@@ -309,10 +333,10 @@
     "English": "From folder"
   },
   "Импорт": {
+    "Deutsch": "Importieren",
     "English": "Import",
-    "Українська": "Імпорт",
     "Español": "Importar",
-    "Deutsch": "Importieren"
+    "Українська": "Імпорт"
   },
   "Имя модели на этом сервере": {
     "English": "Model name on that server"
@@ -328,6 +352,9 @@
   },
   "Исходники": {
     "English": "Source"
+  },
+  "Как вас звать": {
+    "English": "What to call her"
   },
   "Каким характером модель отвечает": {
     "English": "What character the model answers with"
@@ -351,10 +378,10 @@
     "English": "Command saved."
   },
   "Команды": {
+    "Deutsch": "Befehle",
     "English": "Commands",
-    "Українська": "Команди",
     "Español": "Comandos",
-    "Deutsch": "Befehle"
+    "Українська": "Команди"
   },
   "Команды Рины (*.json)|*.json": {
     "English": "Rina commands (*.json)|*.json"
@@ -390,10 +417,10 @@
     "English": "MY COMMANDS · {0}"
   },
   "Микрофон": {
+    "Deutsch": "Mikrofon",
     "English": "Microphone",
-    "Українська": "Мікрофон",
     "Español": "Micrófono",
-    "Deutsch": "Mikrofon"
+    "Українська": "Мікрофон"
   },
   "Микрофон не отозвался: {0}": {
     "English": "The microphone didn’t respond: {0}"
@@ -419,26 +446,32 @@
   "НОВОЕ НАПОМИНАНИЕ": {
     "English": "NEW REMINDER"
   },
+  "Назад": {
+    "English": "Back"
+  },
   "Название модели": {
     "English": "Model name"
   },
   "Напоминание": {
+    "Deutsch": "Erinnerung",
     "English": "Reminder",
-    "Українська": "Нагадування",
     "Español": "Recordatorio",
-    "Deutsch": "Erinnerung"
+    "Українська": "Нагадування"
   },
   "Напоминания": {
+    "Deutsch": "Erinnerungen",
     "English": "Reminders",
-    "Українська": "Нагадування",
     "Español": "Recordatorios",
-    "Deutsch": "Erinnerungen"
+    "Українська": "Нагадування"
   },
   "Напомнить": {
     "English": "Remind me"
   },
   "Напомню {0}": {
     "English": "I’ll remind you {0}"
+  },
+  "Например: «Рина, поставь таймер на десять минут».": {
+    "English": "For example: “Rina, set a timer for ten minutes”."
   },
   "Насколько громко Рина говорит": {
     "English": "How loudly Rina speaks"
@@ -447,10 +480,10 @@
     "English": "How detailed the log is"
   },
   "Настройки": {
+    "Deutsch": "Einstellungen",
     "English": "Settings",
-    "Українська": "Налаштування",
     "Español": "Ajustes",
-    "Deutsch": "Einstellungen"
+    "Українська": "Налаштування"
   },
   "Настройки сброшены.": {
     "English": "Settings have been reset."
@@ -460,6 +493,9 @@
   },
   "Настройки, история, команды": {
     "English": "Settings, history, commands"
+  },
+  "Начать": {
+    "English": "Start"
   },
   "Начинать свёрнутой": {
     "English": "Start minimised"
@@ -482,11 +518,14 @@
   "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
     "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
   },
+  "Ничего не уходит в сеть без вашего ведома.": {
+    "English": "Nothing leaves for the network without your knowing."
+  },
   "Новая команда": {
+    "Deutsch": "Neuer Befehl",
     "English": "New command",
-    "Українська": "Нова команда",
     "Español": "Nuevo comando",
-    "Deutsch": "Neuer Befehl"
+    "Українська": "Нова команда"
   },
   "Новый шаг": {
     "English": "New step"
@@ -504,10 +543,10 @@
     "English": "You need to say what to do."
   },
   "О программе": {
+    "Deutsch": "Über",
     "English": "About",
-    "Українська": "Про програму",
     "Español": "Acerca de",
-    "Deutsch": "Über"
+    "Українська": "Про програму"
   },
   "О чём напомнить?": {
     "English": "What should I remind you about?"
@@ -516,16 +555,16 @@
     "English": "UPDATES"
   },
   "Обзор…": {
+    "Deutsch": "Durchsuchen…",
     "English": "Browse…",
-    "Українська": "Огляд…",
     "Español": "Examinar…",
-    "Deutsch": "Durchsuchen…"
+    "Українська": "Огляд…"
   },
   "Обновить": {
+    "Deutsch": "Aktualisieren",
     "English": "Refresh",
-    "Українська": "Оновити",
     "Español": "Actualizar",
-    "Deutsch": "Aktualisieren"
+    "Українська": "Оновити"
   },
   "Обновление не подходит к тому, что установлено: {0}.": {
     "English": "This update does not fit what is installed: {0}."
@@ -540,10 +579,10 @@
     "English": "Main shortcut"
   },
   "Отвечать голосом": {
+    "Deutsch": "Mit Stimme antworten",
     "English": "Reply with voice",
-    "Українська": "Відповідати голосом",
     "Español": "Responder con voz",
-    "Deutsch": "Mit Stimme antworten"
+    "Українська": "Відповідати голосом"
   },
   "Отвечать моделью": {
     "English": "Answer with a model"
@@ -561,16 +600,16 @@
     "English": "Where to take commands from"
   },
   "Отмена": {
+    "Deutsch": "Abbrechen",
     "English": "Cancel",
-    "Українська": "Скасувати",
     "Español": "Cancelar",
-    "Deutsch": "Abbrechen"
+    "Українська": "Скасувати"
   },
   "Отменить": {
+    "Deutsch": "Abbrechen",
     "English": "Cancel",
-    "Українська": "Скасувати",
     "Español": "Cancelar",
-    "Deutsch": "Abbrechen"
+    "Українська": "Скасувати"
   },
   "Отправить": {
     "English": "Send"
@@ -594,10 +633,10 @@
     "English": "Rereading…"
   },
   "Плавающая строка команд": {
+    "Deutsch": "Schwebende Befehlszeile",
     "English": "Floating command bar",
-    "Українська": "Плаваючий рядок команд",
     "Español": "Barra de comandos flotante",
-    "Deutsch": "Schwebende Befehlszeile"
+    "Українська": "Плаваючий рядок команд"
   },
   "Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой.": {
     "English": "A plugin gives Rina a new skill: a command, a section, or both. Put the plugin folder next to the program."
@@ -606,28 +645,31 @@
     "English": "No plugins yet"
   },
   "Плагины": {
+    "Deutsch": "Plug-ins",
     "English": "Plugins",
-    "Українська": "Плагіни",
     "Español": "Complementos",
-    "Deutsch": "Plug-ins"
+    "Українська": "Плагіни"
   },
   "Плагины живут в ядре, а связи с ним сейчас нет.": {
     "English": "Plugins live in the core, and there’s no connection to it."
   },
+  "По этому слову Рина понимает, что обращаются к ней.": {
+    "English": "This is the word Rina listens for to know she is being spoken to."
+  },
   "Поведение": {
+    "Deutsch": "Verhalten",
     "English": "Behavior",
-    "Українська": "Поведінка",
     "Español": "Comportamiento",
-    "Deutsch": "Verhalten"
+    "Українська": "Поведінка"
   },
   "Поверх окон; вызывается сочетанием клавиш": {
     "English": "On top of other windows; opened by a shortcut"
   },
   "Подробность журнала": {
+    "Deutsch": "Protokolldetails",
     "English": "Log detail",
-    "Українська": "Докладність журналу",
     "Español": "Detalle del registro",
-    "Deutsch": "Protokolldetails"
+    "Українська": "Докладність журналу"
   },
   "Подтверждение": {
     "English": "Confirmation"
@@ -669,16 +711,16 @@
     "English": "Edit"
   },
   "Приватность": {
+    "Deutsch": "Datenschutz",
     "English": "Privacy",
-    "Українська": "Приватність",
     "Español": "Privacidad",
-    "Deutsch": "Datenschutz"
+    "Українська": "Приватність"
   },
   "Проверить": {
+    "Deutsch": "Testen",
     "English": "Check",
-    "Українська": "Перевірити",
     "Español": "Probar",
-    "Deutsch": "Testen"
+    "Українська": "Перевірити"
   },
   "Проверить голос": {
     "English": "Test voice"
@@ -693,16 +735,16 @@
     "English": "No check has been run yet."
   },
   "Проверять обновления": {
+    "Deutsch": "Nach Updates suchen",
     "English": "Check for updates",
-    "Українська": "Перевіряти оновлення",
     "Español": "Buscar actualizaciones",
-    "Deutsch": "Nach Updates suchen"
+    "Українська": "Перевіряти оновлення"
   },
   "Программы": {
+    "Deutsch": "Programme",
     "English": "Programs",
-    "Українська": "Програми",
     "Español": "Programas",
-    "Deutsch": "Programme"
+    "Українська": "Програми"
   },
   "Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*": {
     "English": "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*"
@@ -734,17 +776,23 @@
   "Распознавание": {
     "English": "Recognition"
   },
+  "Распознавание работает по модели — файлу, который в установщик не помещается.": {
+    "English": "Recognition needs a model — a file too large to put in the installer."
+  },
   "Рина": {
+    "Deutsch": "Rina",
     "English": "Rina",
-    "Українська": "Ріна",
     "Español": "Rina",
-    "Deutsch": "Rina"
+    "Українська": "Ріна"
   },
   "Рина будет запускаться сама при входе в систему": {
     "English": "Rina will start by herself when you sign in"
   },
   "Рина скажет это вместо «Готово»": {
     "English": "Rina will say this instead of “Done”"
+  },
+  "Рина — голосовой помощник на этом компьютере. Несколько вопросов, и всё.": {
+    "English": "Rina is a voice assistant that runs on this computer. A few questions, and that is all."
   },
   "С этих слов начинается обращение к Рине": {
     "English": "Words that start an address to Rina"
@@ -768,10 +816,10 @@
     "English": "No commands of your own yet"
   },
   "Сворачивать в трей": {
+    "Deutsch": "In den Infobereich minimieren",
     "English": "Minimize to tray",
-    "Українська": "Згортати в трей",
     "Español": "Minimizar a la bandeja",
-    "Deutsch": "In den Infobereich minimieren"
+    "Українська": "Згортати в трей"
   },
   "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
     "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
@@ -791,6 +839,15 @@
   "Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик.": {
     "English": "Said “{0}” — {1}s. Can’t hear it? Check the speaker."
   },
+  "Скачаем: ": {
+    "English": "Will download: "
+  },
+  "Скачается само при первом обращении.": {
+    "English": "Downloads itself the first time it is needed."
+  },
+  "Скачивать нечего — распознавание можно включить позже.": {
+    "English": "Nothing to download — recognition can be switched on later."
+  },
   "Сколько ждать ответа, прежде чем сдаться": {
     "English": "How long to wait for an answer before giving up"
   },
@@ -801,19 +858,19 @@
     "English": "How long to wait for the phrase after being addressed"
   },
   "Скорость речи": {
+    "Deutsch": "Sprechgeschwindigkeit",
     "English": "Speech rate",
-    "Українська": "Швидкість мовлення",
     "Español": "Velocidad del habla",
-    "Deutsch": "Sprechgeschwindigkeit"
+    "Українська": "Швидкість мовлення"
   },
   "Скрыть": {
     "English": "Hide"
   },
   "Слова активации": {
+    "Deutsch": "Aktivierungswörter",
     "English": "Wake words",
-    "Українська": "Слова активації",
     "Español": "Palabras de activación",
-    "Deutsch": "Aktivierungswörter"
+    "Українська": "Слова активації"
   },
   "Слушаю": {
     "English": "Listening"
@@ -837,16 +894,16 @@
     "English": "Report a problem"
   },
   "Сохранить": {
+    "Deutsch": "Speichern",
     "English": "Save",
-    "Українська": "Зберегти",
     "Español": "Guardar",
-    "Deutsch": "Speichern"
+    "Українська": "Зберегти"
   },
   "Сохранять историю": {
+    "Deutsch": "Verlauf speichern",
     "English": "Save history",
-    "Українська": "Зберігати історію",
     "Español": "Guardar historial",
-    "Deutsch": "Verlauf speichern"
+    "Українська": "Зберігати історію"
   },
   "Сочетания, назначенные отдельным действиям": {
     "English": "Combinations assigned to individual actions"
@@ -864,10 +921,10 @@
     "English": "Installing…"
   },
   "Таймер": {
+    "Deutsch": "Timer",
     "English": "Timer",
-    "Українська": "Таймер",
     "Español": "Temporizador",
-    "Deutsch": "Timer"
+    "Українська": "Таймер"
   },
   "Точно выполнить?": {
     "English": "Run it — are you sure?"
@@ -885,22 +942,25 @@
     "English": "INSTALLED · {0}"
   },
   "Убрать": {
+    "Deutsch": "Entfernen",
     "English": "Remove",
-    "Українська": "Прибрати",
     "Español": "Quitar",
-    "Deutsch": "Entfernen"
+    "Українська": "Прибрати"
   },
   "Уведомления": {
+    "Deutsch": "Benachrichtigungen",
     "English": "Notifications",
-    "Українська": "Сповіщення",
     "Español": "Notificaciones",
-    "Deutsch": "Benachrichtigungen"
+    "Українська": "Сповіщення"
   },
   "Удалить": {
+    "Deutsch": "Löschen",
     "English": "Delete",
-    "Українська": "Видалити",
     "Español": "Eliminar",
-    "Deutsch": "Löschen"
+    "Українська": "Видалити"
+  },
+  "Уже скачано.": {
+    "English": "Already downloaded."
   },
   "Установить эту пару нельзя.": {
     "English": "This pair cannot be installed."
@@ -918,16 +978,19 @@
     "English": "The .onnx model file"
   },
   "Файл не разобрался как JSON.": {
+    "Deutsch": "Die Datei ließ sich nicht als JSON lesen.",
     "English": "The file did not parse as JSON.",
-    "Українська": "Файл не розібрався як JSON.",
     "Español": "El archivo no se pudo analizar como JSON.",
-    "Deutsch": "Die Datei ließ sich nicht als JSON lesen."
+    "Українська": "Файл не розібрався як JSON."
   },
   "Фразы, по которым сработает": {
     "English": "Phrases that trigger it"
   },
   "Характер": {
     "English": "Persona"
+  },
+  "Ход скачивания виден в настройках, там же его можно остановить.": {
+    "English": "Progress is shown in the settings, and can be stopped there too."
   },
   "Хранить переписку между запусками": {
     "English": "Keep the conversation between runs"
@@ -956,11 +1019,17 @@
   "Что сделать": {
     "English": "What to do"
   },
+  "Что скачать": {
+    "English": "What to download"
+  },
   "Чувствительность активации": {
+    "Deutsch": "Aktivierungsempfindlichkeit",
     "English": "Wake word sensitivity",
-    "Українська": "Чутливість активації",
     "Español": "Sensibilidad de activación",
-    "Deutsch": "Aktivierungsempfindlichkeit"
+    "Українська": "Чутливість активації"
+  },
+  "Шаг {0} из {1}": {
+    "English": "Step {0} of {1}"
   },
   "Шаги по порядку": {
     "English": "Steps in order"
@@ -969,10 +1038,10 @@
     "English": "The step needs something to do."
   },
   "Экспорт": {
+    "Deutsch": "Exportieren",
     "English": "Export",
-    "Українська": "Експорт",
     "Español": "Exportar",
-    "Deutsch": "Exportieren"
+    "Українська": "Експорт"
   },
   "Эта программа не подписана": {
     "English": "This program isn’t signed"
@@ -985,6 +1054,9 @@
   },
   "Ядро не на связи": {
     "English": "Core not connected"
+  },
+  "Ядро не на связи — скачать пока нечего.": {
+    "English": "The core is not connected — there is nothing to download yet."
   },
   "Ядро не объявило возможность «плагины».": {
     "English": "The core didn’t declare the “plugins” capability."
