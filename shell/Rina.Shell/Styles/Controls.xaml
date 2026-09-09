@@ -244,6 +244,22 @@
     <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
   </Style>
 
+  <!--
+    A transport button: back, hold, on (4.0b-A07).
+
+    Quiet on purpose. Three of them stand together in a row, and three
+    ordinary buttons side by side read as a toolbar demanding a choice.
+    These answer a glance, not a decision.
+  -->
+  <Style x:Key="Btn.Quiet" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
   <!-- A section in the column. The active mark is the only accent. -->
   <Style x:Key="Nav.Item" TargetType="RadioButton">
     <Setter Property="Height" Value="{StaticResource Size.Row}" />

@@ -118,6 +118,23 @@ public partial class App : Application
         return Finishes[(at < 0 ? 0 : at + 1) % Finishes.Length];
     }
 
+    /// <summary>
+    /// The remote for whatever is playing (`4.0b-A07`).
+    /// </summary>
+    /// <remarks>
+    /// One for the application. It follows the system's media register, and
+    /// the home page — which is built afresh on every visit — subscribes to
+    /// it rather than owning it.
+    /// </remarks>
+    public static MediaRemote? Remote { get; private set; }
+
+    /// <summary>Start following what the machine is playing.</summary>
+    public static async Task StartRemoteAsync()
+    {
+        Remote = new MediaRemote();
+        await Remote.StartAsync();
+    }
+
     public static void ApplyFinish(string finish)
     {
         // The name of the file, from the name of the finish. A switch over

@@ -53,6 +53,10 @@ public partial class App
         var finish = Value(args, "--finish") ?? "silver";
         ApplyFinish(finish);
 
+        // The media register is asked once, at start: it is the system's,
+        // not ours, and the home page is rebuilt on every visit.
+        _ = StartRemoteAsync();
+
         var window = new MainWindow();
         window.ShowFinish(finish);
 
@@ -171,6 +175,13 @@ public partial class App
         // The wizard on its own, for a screenshot and for the eye. It is
         // shown once per install, so without this the only way to look at
         // it again would be to wipe the settings.
+        if (args.Contains("--check-media"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckMediaAsync(window, Value(args, "--shot"));
+            return;
+        }
+
         if (args.Contains("--check-dialogue"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -752,6 +763,124 @@ public partial class App
 
         watch.Dispose();
         Check("после Dispose не следит", !watch.Watching);
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The remote for whatever is playing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Plan item <c>4.0b-A07</c>. In the "machine" group: it asks Windows
+    /// what is playing on this machine right now, and the answer depends on
+    /// what the person happens to have open.
+    /// </para>
+    /// <para>
+    /// <b>What is asserted does not depend on that.</b> Whether anything is
+    /// playing is the machine's business; what is ours is that reading the
+    /// register does not throw, that nothing playing means no panel rather
+    /// than an empty one, and that something playing fills the panel. The
+    /// state that happens to be there decides which of the last two is
+    /// checked, and the check says which.
+    /// </para>
+    /// </remarks>
+    private async Task CheckMediaAsync(MainWindow window, string? shot)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== Пульт: то, что уже играет ===");
+
+        await StartRemoteAsync();
+        Check("реестр воспроизведения ответил", Remote?.Available == true,
+              Remote?.Available == true ? "" : "| система не пустила");
+
+        // A moment for the properties: the register answers at once, the
+        // track behind it is read asynchronously.
+        await Task.Delay(700);
+
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.Activate();
+        window.ShowSectionFor("home");
+        await Until(() => window.CurrentPage is Pages.HomePage);
+        var home = (Pages.HomePage)window.CurrentPage!;
+
+        var playing = Remote?.Playing;
+        if (playing is null)
+        {
+            Console.WriteLine("      (ничего не играет — проверяем покой)");
+            Check("ничего не играет — пульта нет вовсе",
+                  home.RemoteShows.Length == 0,
+                  $"| показано «{home.RemoteShows}»");
+        }
+        else
+        {
+            Console.WriteLine($"      (играет: {playing.Artist} — "
+                              + $"{playing.Title})");
+            await Until(() => home.RemoteShows.Length > 0, 5);
+            Check("играющее показано", home.RemoteShows.Length > 0,
+                  $"| {home.RemoteShows}");
+            Check("и это то же самое, что говорит система",
+                  home.RemoteShows.Contains(playing.Title,
+                                            StringComparison.Ordinal),
+                  $"| {home.RemoteShows}");
+        }
+
+        // --- and the half that is ours, on a quiet machine too ---
+        //
+        // Whether anything is playing belongs to the person's machine.
+        // Whether the home screen lays it out belongs to us, and it has to
+        // be checked either way — otherwise the interesting half is tested
+        // only when somebody happens to have music on.
+        Remote!.ShowForCheck(new MediaRemote.Sounding(
+            "Проверка", "Тишина в двух актах", Running: true, Cover: null));
+        await Until(() => home.RemoteShows.Length > 0, 5);
+        Check("подставленное играющее показано целиком",
+              home.RemoteShows.Contains("Тишина в двух актах",
+                                        StringComparison.Ordinal)
+              && home.RemoteShows.Contains("Проверка",
+                                           StringComparison.Ordinal),
+              $"| {home.RemoteShows}");
+
+        Remote.ShowForCheck(null);
+        await Until(() => home.RemoteShows.Length == 0, 5);
+        Check("а когда играть перестало — панель уходит",
+              home.RemoteShows.Length == 0, $"| «{home.RemoteShows}»");
+
+        // Pressing must not throw whether or not there is a session: a
+        // remote whose buttons crash when nothing is playing is worse than
+        // one that does nothing.
+        try
+        {
+            await Remote!.PlayPause();
+            await Remote.PlayPause();
+            Check("нажатие не роняет и без сессии", true);
+        }
+        catch (Exception exc)
+        {
+            Check("нажатие не роняет и без сессии", false,
+                  $"| {exc.GetType().Name}");
+        }
+
+        if (shot is not null)
+        {
+            Save(window, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");

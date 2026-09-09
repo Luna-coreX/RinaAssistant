@@ -316,9 +316,30 @@ public sealed class CoreLink : IAsyncDisposable
     /// </remarks>
     public async Task RunSetupAsync()
     {
-        var wizard = new Pages.SetupWindow(this) { Owner = _window };
-        await wizard.LoadAsync();
-        wizard.ShowDialog();
+        var wizard = new Pages.SetupWindow(this);
+
+        // The owner only if there is one to own it. Setting `Owner` to a
+        // window that has not been shown throws, and the throw was not
+        // caught: the application died. Nobody met it, because in ordinary
+        // use the window is up by the time the core connects — but starting
+        // minimised or to the tray is an ordinary way to start, and a first
+        // run in that state would have killed Rina outright.
+        if (_window.IsLoaded && _window.IsVisible) wizard.Owner = _window;
+
+        try
+        {
+            await wizard.LoadAsync();
+            wizard.ShowDialog();
+        }
+        catch (Exception exc)                            // noqa
+        {
+            // A wizard that cannot open is a wizard that did not run. It is
+            // not a reason to take the assistant with it: everything it
+            // offers can be done in the settings afterwards.
+            System.Diagnostics.Debug.WriteLine(
+                $"[setup] wizard would not open: {exc.GetType().Name}");
+            return;
+        }
 
         var wanted = wizard.Chosen;
         if (wanted.Count == 0) return;

@@ -1170,6 +1170,11 @@ public static partial class Loc
                 {
                     ["English"] = "Folders besides those Rina finds by herself",
                 },
+            ["Пауза"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Pause",
+                },
             ["Перечитываю…"] =
                 new Dictionary<string, string>
                 {
@@ -1301,6 +1306,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "EDITING A COMMAND",
+                },
+            ["Предыдущий"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Previous",
                 },
             ["Приватность"] =
                 new Dictionary<string, string>
@@ -1594,6 +1604,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Hide",
+                },
+            ["Следующий"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Next",
                 },
             ["Слова активации"] =
                 new Dictionary<string, string>

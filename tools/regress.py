@@ -132,7 +132,10 @@ FINISHES = _finishes()
 #: an icon in the tray. A regression that does that unasked in the middle
 #: of a working day stops being run — and then it checks nothing.
 TOUCHES_MACHINE = {"--check-voice", "--check-hover", "--check-tray",
-                   "--check-audio", "--check-system"}
+                   "--check-audio", "--check-system",
+                   # Asks Windows what is playing on this machine right now,
+                   # and part of what it checks depends on the answer.
+                   "--check-media"}
 
 
 class Check:

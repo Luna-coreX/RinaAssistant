@@ -13,10 +13,12 @@
 -->
 <UserControl x:Class="Rina.Shell.Pages.HomePage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
@@ -44,7 +46,51 @@
       who reads the screen rather than sees it.
     -->
     <TextBlock x:Name="DoingText" Grid.Row="1"
-               HorizontalAlignment="Center" Margin="0,0,0,48"
+               HorizontalAlignment="Center" Margin="0,0,0,24"
                Style="{StaticResource Text.Legend}" />
+
+    <!--
+      A remote for whatever is already playing (4.0b-A07). Hidden when
+      nothing is: an empty panel with three dead buttons says the thing is
+      broken, and most of the time nothing is playing.
+    -->
+    <Border x:Name="Remote" Grid.Row="2" Visibility="Collapsed"
+            HorizontalAlignment="Center" Margin="0,0,0,40"
+            MaxWidth="420" Style="{StaticResource Card}">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <Border Grid.Column="0" Width="44" Height="44"
+                CornerRadius="{StaticResource Radius.Tight}"
+                Background="{DynamicResource C.FaceLow}">
+          <Image x:Name="Cover" Stretch="UniformToFill" />
+        </Border>
+
+        <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                    Margin="12,0,12,0">
+          <TextBlock x:Name="Track" Style="{StaticResource Text.Body}"
+                     TextTrimming="CharacterEllipsis" />
+          <TextBlock x:Name="Artist" Style="{StaticResource Text.Meta}"
+                     TextTrimming="CharacterEllipsis" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal"
+                    VerticalAlignment="Center">
+          <Button x:Name="Back" Style="{StaticResource Btn.Quiet}"
+                  Content="&#x23EE;" Click="OnPrevious"
+                  ToolTip="{loc:S 'Предыдущий'}" />
+          <Button x:Name="Hold" Style="{StaticResource Btn.Quiet}"
+                  Content="&#x23EF;" Click="OnPlayPause"
+                  ToolTip="{loc:S 'Пауза'}" />
+          <Button x:Name="Ahead" Style="{StaticResource Btn.Quiet}"
+                  Content="&#x23ED;" Click="OnNext"
+                  ToolTip="{loc:S 'Следующий'}" />
+        </StackPanel>
+      </Grid>
+    </Border>
   </Grid>
 </UserControl>

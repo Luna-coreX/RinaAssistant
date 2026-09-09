@@ -626,6 +626,9 @@
   "Папки, кроме тех, что Рина находит сама": {
     "English": "Folders besides those Rina finds by herself"
   },
+  "Пауза": {
+    "English": "Pause"
+  },
   "Перечитываю…": {
     "English": "Rereading…"
   },
@@ -700,6 +703,9 @@
   },
   "Править": {
     "English": "Edit"
+  },
+  "Предыдущий": {
+    "English": "Previous"
   },
   "Приватность": {
     "Deutsch": "Datenschutz",
@@ -874,6 +880,9 @@
   },
   "Скрыть": {
     "English": "Hide"
+  },
+  "Следующий": {
+    "English": "Next"
   },
   "Слова активации": {
     "Deutsch": "Aktivierungswörter",

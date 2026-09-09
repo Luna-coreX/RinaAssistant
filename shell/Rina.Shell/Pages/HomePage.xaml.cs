@@ -54,6 +54,16 @@ public partial class HomePage : UserControl
         }
         App.AccentChanged += OnAccentChanged;
 
+        // The remote is the window's, not the page's: the page is rebuilt on
+        // every visit, and asking Windows for the media register each time
+        // would be a system call for a thing that has not changed.
+        _remote = App.Remote;
+        if (_remote is not null)
+        {
+            _remote.Changed += ShowPlaying;
+            ShowPlaying();
+        }
+
         // The page is built anew on every switch to it, so what it
         // subscribed to has to be let go on the way out. Without this the
         // dead pages went on receiving events and repainting figures that
@@ -213,6 +223,56 @@ public partial class HomePage : UserControl
     }
 
     private void OnAccentChanged() => _figure.Build();
+
+    private readonly MediaRemote? _remote;
+
+    /// <summary>
+    /// Show what is playing — or nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// Hidden when nothing is playing, rather than shown empty. Most of the
+    /// time nothing is, and a panel with three dead buttons and two blank
+    /// lines reads as a fault rather than as a rest.
+    /// </remarks>
+    private void ShowPlaying()
+    {
+        var playing = _remote?.Playing;
+        if (playing is null || playing.Title.Length == 0)
+        {
+            Remote.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        Remote.Visibility = Visibility.Visible;
+        Track.Text = playing.Title;
+        // Not everything says who: a browser tab often gives a title alone,
+        // and an empty line under it would look like something failed to
+        // load rather than like something that was never there.
+        Artist.Text = playing.Artist;
+        Artist.Visibility = playing.Artist.Length > 0
+            ? Visibility.Visible : Visibility.Collapsed;
+        Cover.Source = playing.Cover;
+        Hold.Content = playing.Running ? "\u23F8" : "\u25B6";
+    }
+
+    private async void OnPrevious(object sender, RoutedEventArgs e)
+    {
+        if (_remote is not null) await _remote.Previous();
+    }
+
+    private async void OnPlayPause(object sender, RoutedEventArgs e)
+    {
+        if (_remote is not null) await _remote.PlayPause();
+    }
+
+    private async void OnNext(object sender, RoutedEventArgs e)
+    {
+        if (_remote is not null) await _remote.Next();
+    }
+
+    /// <summary>What the remote is showing — for the check.</summary>
+    public string RemoteShows => Remote.Visibility == Visibility.Visible
+        ? $"{Artist.Text} — {Track.Text}" : "";
 
     private void ShowDoing() => DoingText.Text = _figure.State switch
     {
