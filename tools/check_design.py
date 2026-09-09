@@ -274,6 +274,45 @@ for name, finish in tokens["finishes"].items():
     check(f"[{name}] крупность поля разумна",
           1.0 <= nebula["scale"] <= 8.0, f"| {nebula['scale']}")
 
+# Typography: a role that names a family must have that family applied.
+#
+# Every role has named one since `4.0-R03`, and until `4.0b-A06` nothing
+# read it: every style inherited the single UI face, so `"family":
+# "display"` was a word in a file. The role `value` went further — it was
+# described, emitted, and had no style at all, so nothing in the window
+# could ask for it.
+#
+# Both are the same failure and it is the quiet kind: the tokens look like a
+# decision, the window looks finished, and the two have nothing to do with
+# each other.
+print()
+print("=== роли текста применены, а не только объявлены ===")
+
+STYLES = os.path.join(ROOT, "shell", "Rina.Shell", "Styles", "Text.xaml")
+GENERATED = os.path.join(ROOT, "shell", "Rina.Shell", "Generated",
+                         "Tokens.g.xaml")
+with open(STYLES, encoding="utf-8") as handle:
+    styles = handle.read()
+with open(GENERATED, encoding="utf-8") as handle:
+    generated = handle.read()
+
+for role, spec in tokens["typography"]["role"].items():
+    name = role.capitalize()
+    check(f"роль {role}: семейство отдано в ресурсы",
+          f'x:Key="Type.{name}.Family"' in generated)
+    check(f"роль {role}: у неё есть стиль",
+          f'x:Key="Text.{name}"' in styles)
+    check(f"роль {role}: стиль применяет её семейство",
+          f"Type.{name}.Family" in styles)
+
+# And nothing declares what cannot be carried out. WPF has no letter spacing
+# on a TextBlock; a `tracking` in the tokens would be a number that looks
+# like a decision and is a note.
+for role, spec in tokens["typography"]["role"].items():
+    check(f"роль {role}: не обещает невыполнимого",
+          "tracking" not in spec, "| WPF не умеет межбуквенный интервал")
+
+
 # The finishes are equal (`4.0-R08`), and "equal" is a checkable statement:
 # the same set of roles, and glass that is dark in every one of them.
 #

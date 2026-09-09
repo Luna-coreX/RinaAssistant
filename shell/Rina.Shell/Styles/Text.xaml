@@ -18,48 +18,70 @@
   </Style>
 
   <Style x:Key="Text.Title" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Title.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Title.Size}" />
     <Setter Property="FontWeight" Value="{StaticResource Type.Title.Weight}" />
   </Style>
 
   <Style x:Key="Text.Section" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Section.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Section.Size}" />
     <Setter Property="FontWeight" Value="{StaticResource Type.Section.Weight}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
-    <!-- Tracking in WPF is set through the font's character spacing; 0.10 em
-         at 11 px is 1.1 px, and rounding to a whole is harmless here. -->
+    <!-- Tracking is not here, and not by oversight: WPF has no letter
+         spacing on a TextBlock at all. The tokens used to declare it for
+         three roles and nothing applied it — a number that looks like a
+         decision and is a note. It was removed from the tokens rather than
+         left there looking done. -->
     <Setter Property="Typography.Capitals" Value="Normal" />
   </Style>
 
   <Style x:Key="Text.Nav" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Nav.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Nav.Size}" />
     <Setter Property="FontWeight" Value="{StaticResource Type.Nav.Weight}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
   </Style>
 
   <Style x:Key="Text.Body" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Body.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Body.Size}" />
   </Style>
 
   <Style x:Key="Text.Legend" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Legend.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Legend.Size}" />
     <Setter Property="FontWeight" Value="{StaticResource Type.Legend.Weight}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
   </Style>
 
+  <!--
+    A setting's value. The role has been in the system's §3 since R03 and
+    had no style at all: the tokens described it, the generator emitted it,
+    and nothing in the window could ask for it. A role without an
+    application is a row in a table.
+  -->
+  <Style x:Key="Text.Value" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Value.Family}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Value.Weight}" />
+  </Style>
+
   <Style x:Key="Text.Meta" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Meta.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Meta.Size}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
   </Style>
 
   <!-- Instrument readings: digits must not jump when the value changes. -->
   <Style x:Key="Text.Figure" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
-    <Setter Property="FontFamily" Value="{StaticResource Font.Mono}" />
+    <Setter Property="FontFamily" Value="{StaticResource Type.Figure.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Figure.Size}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
   </Style>
 
   <Style x:Key="Text.Speech" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+    <Setter Property="FontFamily" Value="{StaticResource Type.Speech.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Speech.Size}" />
     <Setter Property="Foreground" Value="{DynamicResource C.GlassText}" />
     <Setter Property="TextWrapping" Value="Wrap" />

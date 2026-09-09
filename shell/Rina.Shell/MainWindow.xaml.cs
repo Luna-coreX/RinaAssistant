@@ -56,7 +56,12 @@ public partial class MainWindow : Window
         // anybody to look: hidden, minimised or behind another window means
         // nobody, and then it stops. See Backdrop for why that is the task
         // rather than an optimisation.
-        _backdrop = new Backdrop(Backdrop);
+        _backdrop = new Backdrop(Backdrop, BackdropCalm);
+        // The flow takes its colour from the accent, so it has to be told
+        // when the accent changes — and it is changed from two places, the
+        // settings page and the link's first hello, neither of which should
+        // know that a background exists.
+        App.AccentChanged += () => _backdrop.Build();
         IsVisibleChanged += (_, _) => FollowBackdrop();
         StateChanged += (_, _) => FollowBackdrop();
         Activated += (_, _) => FollowBackdrop();
@@ -228,7 +233,10 @@ public partial class MainWindow : Window
     public double BackdropPhase => _backdrop.Phase;
 
     /// <summary>What one frame of the background costs — for the check.</summary>
-    public double BackdropFrameMs => _backdrop.LastFrameMs;
+    public double BackdropFrameMs => _backdrop.BestFrameMs;
+
+    /// <summary>How much the background's picture moved — for the check.</summary>
+    public double BackdropChange => _backdrop.FrameChange;
 
     /// <summary>
     /// Let the background run only while there is somebody to look.

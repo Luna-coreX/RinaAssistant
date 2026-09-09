@@ -43,46 +43,47 @@
   <CornerRadius x:Key="Radius.Max">3</CornerRadius>
 
   <!-- Гарнитуры -->
-  <FontFamily x:Key="Font.Ui">Segoe UI Variable, Segoe UI, Segoe UI Variable</FontFamily>
+  <FontFamily x:Key="Font.Display">Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
+  <FontFamily x:Key="Font.Ui">Segoe UI Variable Text, Segoe UI Variable Text, Segoe UI, Arial</FontFamily>
   <FontFamily x:Key="Font.Mono">Cascadia Mono, Cascadia Mono, Consolas</FontFamily>
 
-  <!-- Роли текста (§3): размер, начертание, трекинг -->
-  <sys:Double x:Key="Type.Title.Size">20</sys:Double>
-  <FontWeight x:Key="Type.Title.Weight">600</FontWeight>
-  <sys:Double x:Key="Type.Title.Tracking">-0.01</sys:Double>
+  <!-- Роли текста (§3): семейство, размер, начертание -->
+  <FontFamily x:Key="Type.Title.Family">{StaticResource Font.Display}</FontFamily>
+  <sys:Double x:Key="Type.Title.Size">21</sys:Double>
+  <FontWeight x:Key="Type.Title.Weight">300</FontWeight>
   <sys:Boolean x:Key="Type.Title.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Section.Family">{StaticResource Font.Display}</FontFamily>
   <sys:Double x:Key="Type.Section.Size">11</sys:Double>
-  <FontWeight x:Key="Type.Section.Weight">600</FontWeight>
-  <sys:Double x:Key="Type.Section.Tracking">0.1</sys:Double>
+  <FontWeight x:Key="Type.Section.Weight">500</FontWeight>
   <sys:Boolean x:Key="Type.Section.Upper">true</sys:Boolean>
+  <FontFamily x:Key="Type.Nav.Family">{StaticResource Font.Display}</FontFamily>
   <sys:Double x:Key="Type.Nav.Size">13</sys:Double>
-  <FontWeight x:Key="Type.Nav.Weight">500</FontWeight>
-  <sys:Double x:Key="Type.Nav.Tracking">0</sys:Double>
+  <FontWeight x:Key="Type.Nav.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Nav.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Legend.Family">{StaticResource Font.Ui}</FontFamily>
   <sys:Double x:Key="Type.Legend.Size">12</sys:Double>
   <FontWeight x:Key="Type.Legend.Weight">500</FontWeight>
-  <sys:Double x:Key="Type.Legend.Tracking">0</sys:Double>
   <sys:Boolean x:Key="Type.Legend.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Body.Family">{StaticResource Font.Ui}</FontFamily>
   <sys:Double x:Key="Type.Body.Size">13</sys:Double>
   <FontWeight x:Key="Type.Body.Weight">400</FontWeight>
-  <sys:Double x:Key="Type.Body.Tracking">0</sys:Double>
   <sys:Boolean x:Key="Type.Body.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Value.Family">{StaticResource Font.Ui}</FontFamily>
   <sys:Double x:Key="Type.Value.Size">14</sys:Double>
   <FontWeight x:Key="Type.Value.Weight">400</FontWeight>
-  <sys:Double x:Key="Type.Value.Tracking">0</sys:Double>
   <sys:Boolean x:Key="Type.Value.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Figure.Family">{StaticResource Font.Mono}</FontFamily>
   <sys:Double x:Key="Type.Figure.Size">13</sys:Double>
   <FontWeight x:Key="Type.Figure.Weight">400</FontWeight>
-  <sys:Double x:Key="Type.Figure.Tracking">0</sys:Double>
   <sys:Boolean x:Key="Type.Figure.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Speech.Family">{StaticResource Font.Ui}</FontFamily>
   <sys:Double x:Key="Type.Speech.Size">15</sys:Double>
   <FontWeight x:Key="Type.Speech.Weight">400</FontWeight>
-  <sys:Double x:Key="Type.Speech.Tracking">0</sys:Double>
   <sys:Double x:Key="Type.Speech.Leading">1.6</sys:Double>
   <sys:Boolean x:Key="Type.Speech.Upper">false</sys:Boolean>
+  <FontFamily x:Key="Type.Meta.Family">{StaticResource Font.Ui}</FontFamily>
   <sys:Double x:Key="Type.Meta.Size">11</sys:Double>
   <FontWeight x:Key="Type.Meta.Weight">400</FontWeight>
-  <sys:Double x:Key="Type.Meta.Tracking">0</sys:Double>
   <sys:Boolean x:Key="Type.Meta.Upper">false</sys:Boolean>
 
   <!-- Движение (§7): длительности в миллисекундах -->
@@ -97,19 +98,27 @@
   <CubicEase x:Key="Ease.Out" EasingMode="EaseIn" />
 
   <!-- Глубина (4.0b-A06): три уровня, дальше человек не различает -->
-  <sys:Double x:Key="Lift.Raised.Blur">8</sys:Double>
-  <sys:Double x:Key="Lift.Raised.Y">1</sys:Double>
-  <sys:Double x:Key="Lift.Raised.Opacity">0.2</sys:Double>
-  <sys:Double x:Key="Lift.Floating.Blur">18</sys:Double>
-  <sys:Double x:Key="Lift.Floating.Y">3</sys:Double>
-  <sys:Double x:Key="Lift.Floating.Opacity">0.28</sys:Double>
+  <sys:Double x:Key="Lift.Raised.Blur">12</sys:Double>
+  <sys:Double x:Key="Lift.Raised.Y">2</sys:Double>
+  <sys:Double x:Key="Lift.Raised.Opacity">0.32</sys:Double>
+  <sys:Double x:Key="Lift.Floating.Blur">24</sys:Double>
+  <sys:Double x:Key="Lift.Floating.Y">5</sys:Double>
+  <sys:Double x:Key="Lift.Floating.Opacity">0.4</sys:Double>
   <sys:Double x:Key="Lift.Overlay.Blur">32</sys:Double>
-  <sys:Double x:Key="Lift.Overlay.Y">6</sys:Double>
-  <sys:Double x:Key="Lift.Overlay.Opacity">0.36</sys:Double>
+  <sys:Double x:Key="Lift.Overlay.Y">10</sys:Double>
+  <sys:Double x:Key="Lift.Overlay.Opacity">0.48</sys:Double>
+
+  <!-- Стекло (4.0b-A06): сквозь полосы и органы управления видно течение -->
+  <sys:Double x:Key="Glass.Bar">0.72</sys:Double>
+  <sys:Double x:Key="Glass.Column">0.66</sys:Double>
+  <sys:Double x:Key="Glass.Strip">0.78</sys:Double>
+  <sys:Double x:Key="Glass.Control">0.55</sys:Double>
+  <sys:Double x:Key="Glass.Raised">0.62</sys:Double>
+  <sys:Double x:Key="Glass.Edge">0.14</sys:Double>
 
   <!-- Дыхание фона (4.0b-A06). Когда фон замирает, решает оболочка, а не эти числа -->
-  <sys:Double x:Key="Background.Period">90</sys:Double>
-  <sys:Double x:Key="Background.Fps">20</sys:Double>
+  <sys:Double x:Key="Background.Period">45</sys:Double>
+  <sys:Double x:Key="Background.Fps">15</sys:Double>
 
   <!-- Штриховка опасного (§6): единственный признак необратимого -->
   <sys:Double x:Key="Hatch.Angle">45</sys:Double>

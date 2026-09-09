@@ -45,7 +45,7 @@
 
 
   <Style x:Key="Btn" TargetType="Button">
-    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Control}" />
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
@@ -65,13 +65,35 @@
               application on the first hover.
             -->
             <Border x:Name="Face" Background="{TemplateBinding Background}"
-                    CornerRadius="{StaticResource Radius.Max}" />
+                    CornerRadius="{StaticResource Radius.Max}">
+              <!--
+                What a person presses stands above the flow, and is seen to
+                (4.0b-A06). The shadow is not decoration: on a living
+                background a step of value stops separating anything,
+                because the background itself changes lightness underneath.
+                A shadow is not a colour — it is darker than whatever is
+                under it — so it reads over any of the flow's colours.
+              -->
+              <Border.Effect>
+                <DropShadowEffect BlurRadius="{StaticResource Lift.Raised.Blur}"
+                                  ShadowDepth="{StaticResource Lift.Raised.Y}"
+                                  Opacity="{StaticResource Lift.Raised.Opacity}"
+                                  Direction="270" Color="Black" />
+              </Border.Effect>
+            </Border>
             <Border x:Name="Warm" Opacity="0"
                     Background="{DynamicResource C.FaceHigh}"
                     CornerRadius="{StaticResource Radius.Max}" />
             <Border x:Name="Sunk" Opacity="0"
                     Background="{DynamicResource C.FaceLow}"
                     CornerRadius="{StaticResource Radius.Max}" />
+            <!--
+              And a single line of light along the top edge, saying where
+              the light comes from. A pixel high: enough to read as an edge
+              catching the light, not enough to read as a border.
+            -->
+            <Border x:Name="Edge" Height="1" VerticalAlignment="Top"
+                    Margin="6,0" Background="{DynamicResource C.Edge}" />
             <Border x:Name="Ring" BorderThickness="0"
                     CornerRadius="{StaticResource Radius.Max}"
                     Padding="{TemplateBinding Padding}">
@@ -194,7 +216,14 @@
   </Style>
 
   <!-- Window controls: marks, not words. That is the system's convention. -->
+  <!--
+    The window's own controls are part of the frame and do not float above
+    it. That is the rule that keeps "everything a person presses is raised"
+    from becoming "everything is raised", which is the same as nothing
+    being raised.
+  -->
   <Style x:Key="Btn.Window" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
     <Setter Property="Width" Value="44" />
     <Setter Property="Height" Value="{StaticResource Size.Row}" />
     <Setter Property="Padding" Value="0" />

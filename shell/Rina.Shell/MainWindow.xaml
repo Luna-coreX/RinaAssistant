@@ -13,15 +13,29 @@
     independent; otherwise the window becomes the very god object that
     block B was started to get rid of.
   -->
-  <Grid>
+  <Grid ClipToBounds="True">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
+    <!--
+      The living background, vivid, under the whole window (4.0b-A06).
+
+      Under everything, not only under the working area: the title bar, the
+      column and the level strip are glass over it. That is what makes them
+      one instrument instead of three planes that happen to touch — and it
+      is why this element spans all three rows.
+
+      Empty here: the picture is computed in code from the current finish
+      and accent.
+    -->
+    <Image x:Name="Backdrop" Grid.RowSpan="3" Stretch="Fill"
+           IsHitTestVisible="False" />
+
     <!-- The title bar: our own, because the typography is our own -->
-    <Grid Grid.Row="0" Background="{DynamicResource C.FaceLow}"
+    <Grid Grid.Row="0" Background="{DynamicResource C.Glass.Bar}"
           Height="{StaticResource Size.Row}">
       <TextBlock Text="Rina Assistant" VerticalAlignment="Center"
                  Margin="16,0,0,0" FontSize="12" FontWeight="Medium"
@@ -43,19 +57,17 @@
       </Grid.ColumnDefinitions>
 
       <!--
-        The living background (4.0b-A06): patches of light drifting under
-        the working area. The canvas is empty here — the patches are built
-        in code from the current finish's colours, because a dynamic
-        resource cannot reach inside a gradient stop.
-
-        The clipping is on the containing grid, so a patch never reaches
-        the section column or the level strip.
+        The same flow, calmed and softened, under the part one reads
+        (4.0b-A06). Not a second field: the same one, painted in the calm
+        palette and blurred a little. A person reading settings should have
+        the background stay behind the words, and the vivid layer is for the
+        screen one looks at rather than reads.
       -->
-      <Image x:Name="Backdrop" Grid.ColumnSpan="2" Stretch="Fill"
+      <Image x:Name="BackdropCalm" Grid.ColumnSpan="2" Stretch="Fill"
              IsHitTestVisible="False" />
 
       <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
-      <Grid Grid.Column="0" Background="{DynamicResource C.FaceLow}">
+      <Grid Grid.Column="0" Background="{DynamicResource C.Glass.Column}">
         <Grid.RowDefinitions>
           <RowDefinition Height="*" />
           <RowDefinition Height="Auto" />
@@ -100,7 +112,7 @@
       whole, not to the current screen.
     -->
     <Grid Grid.Row="2" Height="{StaticResource Size.LevelStrip}"
-          Background="{DynamicResource C.FaceSunk}">
+          Background="{DynamicResource C.Glass.Strip}">
       <Rectangle x:Name="Level" HorizontalAlignment="Left" Width="0">
         <Rectangle.Fill>
           <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">

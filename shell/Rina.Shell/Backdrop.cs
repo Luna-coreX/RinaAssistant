@@ -63,19 +63,49 @@ public sealed class Backdrop
     private const int High = 162;
 
     private readonly Image _view;
+    private readonly Image? _calmView;
     private readonly DispatcherTimer _clock = new();
     private readonly WriteableBitmap _film;
+    private readonly WriteableBitmap? _calmFilm;
     private readonly byte[] _pixels = new byte[Wide * High * 4];
+    private readonly byte[] _calm = new byte[Wide * High * 4];
+    private readonly byte[] _before = new byte[Wide * High * 4];
+
+    /// <summary>The field, before it is turned into colour.</summary>
+    /// <remarks>
+    /// Kept as its own array so the two layers are two paintings of one
+    /// field rather than two fields. Were the calm layer computed
+    /// separately it would drift out of step with the vivid one, and the
+    /// window would show the same flow twice at different moments — which
+    /// reads, immediately and unmistakably, as broken.
+    /// </remarks>
+    private readonly float[] _field = new float[Wide * High];
+
+    private (byte R, byte G, byte B)[] _calmRamp = [];
 
     private readonly double _period;
+
+    /// <summary>How far the field has travelled, in periods.</summary>
+    /// <remarks>
+    /// It does not start at zero, and that is not decoration. At a whole
+    /// number every octave of the noise sits exactly on a lattice plane at
+    /// once, and the smoothing curve is flat at a plane — so the flow very
+    /// nearly stops. Since all four octaves are whole together only at zero,
+    /// starting there gave the stillest moment the field has, and it gave it
+    /// at the moment a person first looks. An offset with no round factors
+    /// puts the octaves out of step, where they belong.
+    /// </remarks>
+    private double _elapsed = 13.37;
+
     private double _scale = 2.6;
     private double _warp = 1.1;
     private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
 
-    public Backdrop(Image view)
+    public Backdrop(Image view, Image? calmView = null)
     {
         _view = view;
+        _calmView = calmView;
         _period = Token("Background.Period", 90);
         var fps = Token("Background.Fps", 20);
 
@@ -83,6 +113,15 @@ public sealed class Backdrop
                                     null);
         _view.Source = _film;
         RenderOptions.SetBitmapScalingMode(_view, BitmapScalingMode.Fant);
+
+        if (_calmView is not null)
+        {
+            _calmFilm = new WriteableBitmap(Wide, High, 96, 96,
+                                            PixelFormats.Bgra32, null);
+            _calmView.Source = _calmFilm;
+            RenderOptions.SetBitmapScalingMode(_calmView,
+                                               BitmapScalingMode.Fant);
+        }
 
         _clock.Interval = TimeSpan.FromMilliseconds(1000.0 / Math.Max(1, fps));
         _clock.Tick += (_, _) => Advance();
@@ -111,6 +150,44 @@ public sealed class Backdrop
 
     /// <summary>How many stops the flow's ramp has.</summary>
     public int Steps => _ramp.Length;
+
+    /// <summary>
+    /// How much the picture itself changed since the previous frame, in
+    /// values per channel.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The one number that would have caught the defect a person reported as
+    /// "the background is fast and jerky, as if limited to five frames".
+    /// Until this existed the motion check watched the <b>phase</b>, and the
+    /// phase advanced perfectly while the picture stood still: time was not
+    /// interpolated in the noise, so the field was frozen between the whole
+    /// numbers of the lattice and snapped when it crossed one.
+    /// </para>
+    /// <para>
+    /// A check that measures the clock instead of the picture agrees with
+    /// its author about everything except what the person can see. This
+    /// measures the picture: greater than zero means it moves at all, and
+    /// small means it moves smoothly rather than in jumps.
+    /// </para>
+    /// </remarks>
+    public double FrameChange { get; private set; }
+
+    /// <summary>The cheapest frame so far, in milliseconds.</summary>
+    /// <remarks>
+    /// The number the check holds to a ceiling, and the last one is not.
+    /// The question is whether a frame <b>can</b> be computed inside its
+    /// budget, and a single slice of wall-clock answers a different one:
+    /// whether the scheduler was kind just then. Under the full regression —
+    /// a dozen processes at once — the last frame drifted over the ceiling
+    /// and turned the check red on a machine that was merely busy. A check
+    /// that fails by luck is a check that gets ignored.
+    ///
+    /// The best is still an honest measure of the thing: a frame that
+    /// cannot fit even once does not fit, and a field four times the size
+    /// failed on this number by a factor of three.
+    /// </remarks>
+    public double BestFrameMs { get; private set; }
 
     /// <summary>How long the last frame took to compute, in milliseconds.</summary>
     /// <remarks>
@@ -158,16 +235,44 @@ public sealed class Backdrop
     public void Build()
     {
         var steps = (int)Token("Nebula.Steps", 5);
-        var ramp = new List<(byte, byte, byte)>();
-        for (var at = 0; at < steps; at++)
-            if (Application.Current?.TryFindResource($"Color.Nebula{at}")
-                is Color stop)
-                ramp.Add((stop.R, stop.G, stop.B));
+        var accent = App.CurrentAccent;
 
-        _ramp = [.. ramp];
+        _ramp = Ramp(accent, steps, calm: false);
+        _calmRamp = Ramp(accent, steps, calm: true);
         _scale = Token("Nebula.Scale", 2.6);
         _warp = Token("Nebula.Warp", 1.1);
-        Paint();
+        Repaint();
+    }
+
+    /// <summary>One palette of the flow, by accent.</summary>
+    /// <remarks>
+    /// Read, not computed. Both palettes are worked out by
+    /// <c>tools/nebula.py</c> and written into the finish's resources by the
+    /// generator, and the checks use that same module. A second
+    /// implementation of the same formula parts company with the first at
+    /// its first change, and does it quietly: both sides go on producing
+    /// plausible colours, and only a person sees that the check was
+    /// measuring a palette nobody paints.
+    /// </remarks>
+    private static (byte R, byte G, byte B)[] Ramp(string accent, int steps,
+                                                   bool calm)
+    {
+        // The accent is a lower-case name in the settings and a capitalised
+        // one in the resources, because the generator writes resource keys
+        // the way XAML keys are written. Asking with the settings' spelling
+        // found nothing, `TryFindResource` returned null without complaint,
+        // and the whole background silently vanished — the motion check
+        // caught it, which is the only reason this took minutes.
+        var known = string.IsNullOrEmpty(accent)
+            ? "Amber"
+            : char.ToUpperInvariant(accent[0]) + accent[1..].ToLowerInvariant();
+        var name = calm ? "Calm." : "";
+        var ramp = new List<(byte, byte, byte)>();
+        for (var at = 0; at < steps; at++)
+            if (Application.Current?.TryFindResource(
+                    $"Color.Nebula.{known}.{name}{at}") is Color stop)
+                ramp.Add((stop.R, stop.G, stop.B));
+        return [.. ramp];
     }
 
     /// <summary>Run or stop, to match whether there is anybody to look.</summary>
@@ -214,33 +319,67 @@ public sealed class Backdrop
         // from a count of ticks: a tick that arrived late must move the flow
         // further, or the movement slows down under load instead of keeping
         // its promised period.
-        Phase = (Phase + _clock.Interval.TotalSeconds / _period) % 1.0;
-        Paint();
+        // Two clocks, and they are not the same thing. `_elapsed` is where
+        // the field is and only ever grows; `Phase` is how far round the
+        // period we are, and it wraps. The checks watch the phase because a
+        // number that wraps can be compared with itself.
+        var step = _clock.Interval.TotalSeconds / _period;
+        _elapsed += step;
+        Phase = (Phase + step) % 1.0;
+        Repaint();
     }
 
     /// <summary>Compute one frame of the flow.</summary>
-    private void Paint()
+    /// <summary>Compute the field afresh, then paint both layers from it.</summary>
+    private void Repaint()
     {
-        if (_ramp.Length == 0) return;
+        // The clock starts here and not inside `Paint`. When the work was
+        // split in two, the stopwatch stayed with the cheap half — the
+        // colouring — and the expensive half, the field itself, walked out
+        // from under the measurement. The check went on reporting a frame
+        // eight times cheaper than it was, and stayed green while doing it.
+        // A measurement that keeps its old name after its subject has moved
+        // is worse than none: it is trusted.
         var started = System.Diagnostics.Stopwatch.GetTimestamp();
+        Sample();
+        Paint();
+        var spent = (System.Diagnostics.Stopwatch.GetTimestamp() - started)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        LastFrameMs = spent;
+        BestFrameMs = BestFrameMs is 0 ? spent : Math.Min(BestFrameMs, spent);
+    }
 
-        // Time is the third and fourth coordinate of the noise, and it goes
-        // round a circle rather than along a line: at the end of the period
-        // the field is where it started, so there is no seam — and no drift
-        // into ever-larger numbers, where floating point starts to grain.
-        var angle = Phase * 2 * Math.PI;
-        var zx = (float)(Math.Cos(angle) * 0.8);
-        var zy = (float)(Math.Sin(angle) * 0.8);
+    /// <summary>Work out the field, once, without any colour in it.</summary>
+    /// <remarks>
+    /// Separated from the painting because the two layers are two readings
+    /// of one field, not two fields. Computed separately they would drift
+    /// out of step, and the window would show the same flow twice at
+    /// different moments — which reads, immediately, as broken.
+    /// </remarks>
+    private void Sample()
+    {
+
+        // Time is the third coordinate of the noise, and it goes along a
+        // line. The first edition sent it round a circle so the flow would
+        // return to itself without a seam, and paid for that with a fourth
+        // dimension it then failed to interpolate — the seam was avoided and
+        // the movement was lost.
+        //
+        // A loop was never needed. The coordinate grows by one every
+        // `period` seconds, so a week of running leaves it in the thousands,
+        // where a float still has five digits after the point. Nobody
+        // watches a background long enough to notice that it does not
+        // repeat, and nobody would thank us if it did.
+        var z = (float)_elapsed;
 
         var scale = (float)_scale;
         var warp = (float)_warp;
-        var ramp = _ramp;
-        var pixels = _pixels;
+        var field = _field;
 
         Parallel.For(0, High, y =>
         {
             var v = (float)y / High * scale;
-            var row = y * Wide * 4;
+            var row = y * Wide;
             for (var x = 0; x < Wide; x++)
             {
                 var u = (float)x / Wide * scale * ((float)Wide / High);
@@ -248,29 +387,115 @@ public sealed class Backdrop
                 // Domain warping: the field's own coordinates are bent by
                 // the field, twice. One level gives clouds; two give the
                 // filaments and eddies that read as liquid.
-                var qx = Fbm(u, v, zx, zy);
-                var qy = Fbm(u + 5.2f, v + 1.3f, zx, zy);
+                var qx = Fbm(u, v, z);
+                var qy = Fbm(u + 5.2f, v + 1.3f, z);
 
-                var rx = Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f,
-                             zx, zy);
-                var ry = Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f,
-                             zx, zy);
+                var rx = Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f, z);
+                var ry = Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f, z);
 
-                var f = Fbm(u + warp * rx, v + warp * ry, zx, zy);
+                field[row + x] = Fbm(u + warp * rx, v + warp * ry, z);
+            }
+        });
+    }
 
-                var (red, green, blue) = Shade(ramp, f);
-                var at = row + x * 4;
+    /// <summary>Turn the field into the two pictures.</summary>
+    private void Paint()
+    {
+        if (_ramp.Length == 0) return;
+
+        Ink(_field, _ramp, _pixels);
+        _film.WritePixels(new Int32Rect(0, 0, Wide, High), _pixels, Wide * 4, 0);
+
+        if (_calmFilm is not null && _calmRamp.Length > 0)
+        {
+            // The calm layer is the same field in the calm palette, and then
+            // softened. Both halves matter: the palette alone would give a
+            // grey version of the same sharp picture, and the softening
+            // alone would give a blurred bright one. A person reads on this
+            // layer, and reading wants both.
+            Ink(_field, _calmRamp, _calm);
+            Soften(_calm);
+            _calmFilm.WritePixels(new Int32Rect(0, 0, Wide, High), _calm,
+                                  Wide * 4, 0);
+        }
+
+        // How far the picture moved, before the new frame becomes the old
+        // one. Every fourth pixel and one channel: this is a measure of
+        // movement, not a comparison of images, and it is paid for on every
+        // frame.
+        var moved = 0L;
+        for (var at = 0; at < _pixels.Length; at += 16)
+            moved += Math.Abs(_pixels[at] - _before[at]);
+        FrameChange = moved / (double)(_pixels.Length / 16);
+        Array.Copy(_pixels, _before, _pixels.Length);
+    }
+
+    /// <summary>Colour a field with a palette.</summary>
+    private static void Ink(float[] field, (byte R, byte G, byte B)[] ramp,
+                            byte[] pixels)
+    {
+        Parallel.For(0, High, y =>
+        {
+            var from = y * Wide;
+            var to = y * Wide * 4;
+            for (var x = 0; x < Wide; x++)
+            {
+                var (red, green, blue) = Shade(ramp, field[from + x]);
+                var at = to + x * 4;
                 pixels[at] = blue;
                 pixels[at + 1] = green;
                 pixels[at + 2] = red;
                 pixels[at + 3] = 255;
             }
         });
+    }
 
-        _film.WritePixels(new Int32Rect(0, 0, Wide, High), pixels, Wide * 4, 0);
+    /// <summary>A small blur, for the layer one reads on.</summary>
+    /// <remarks>
+    /// <para>
+    /// A box blur over three points, run once along each axis. Not a
+    /// <c>BlurEffect</c>: that one blurs the element after it has been
+    /// enlarged to the size of the window, which is hundreds of times the
+    /// pixels — the whole reason this field is computed small is not to pay
+    /// that.
+    /// </para>
+    /// <para>
+    /// The design system's ban on blur is untouched. That ban is about
+    /// blurring the <b>interface</b> — a soft edge instead of a real one.
+    /// This softens the background beneath it, which is the opposite move:
+    /// it is what makes the edges above read as edges.
+    /// </para>
+    /// </remarks>
+    private static void Soften(byte[] pixels)
+    {
+        var pass = new byte[pixels.Length];
+        Array.Copy(pixels, pass, pixels.Length);
 
-        LastFrameMs = (System.Diagnostics.Stopwatch.GetTimestamp() - started)
-                      * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        Parallel.For(0, High, y =>
+        {
+            var row = y * Wide * 4;
+            for (var x = 1; x < Wide - 1; x++)
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var at = row + x * 4 + channel;
+                    pixels[at] = (byte)((pass[at - 4] + pass[at]
+                                         + pass[at + 4]) / 3);
+                }
+        });
+
+        Array.Copy(pixels, pass, pixels.Length);
+        Parallel.For(1, High - 1, y =>
+        {
+            var row = y * Wide * 4;
+            var step = Wide * 4;
+            for (var x = 0; x < Wide; x++)
+                for (var channel = 0; channel < 3; channel++)
+                {
+                    var at = row + x * 4 + channel;
+                    pixels[at] = (byte)((pass[at - step] + pass[at]
+                                         + pass[at + step]) / 3);
+                }
+        });
     }
 
     /// <summary>A value of the field -> a colour of the ramp.</summary>
@@ -296,54 +521,79 @@ public sealed class Backdrop
     /// three once the frame was measured and found to cost a fifth of its
     /// budget: detail one can afford is detail worth having.
     /// </remarks>
-    private static float Fbm(float x, float y, float zx, float zy)
+    private static float Fbm(float x, float y, float z)
     {
         var sum = 0f;
         var weight = 0.5f;
         for (var octave = 0; octave < 4; octave++)
         {
-            sum += weight * Noise(x, y, zx, zy);
+            sum += weight * Noise(x, y, z);
             x *= 2.03f;
             y *= 2.03f;
-            zx *= 2.03f;
-            zy *= 2.03f;
+            // Time speeds up with the octaves, but far less than space does.
+            // At the same factor the fine detail would boil while the large
+            // forms barely moved, and the picture would read as static shapes
+            // with static noise crawling over them.
+            z *= 1.27f;
             weight *= 0.5f;
         }
         return sum * 2f - 1f;
     }
 
-    /// <summary>Smooth value noise on a lattice.</summary>
+    /// <summary>Smooth value noise on a three-dimensional lattice.</summary>
     /// <remarks>
-    /// Four coordinates, because time here is a circle: two are the place
-    /// and two are where we are on that circle. Going round rather than
-    /// along is what lets the flow return to itself without a jump.
+    /// <para>
+    /// Two coordinates are the place and the third is time, and all three
+    /// are interpolated. The third one is the whole point of this method's
+    /// second edition.
+    /// </para>
+    /// <para>
+    /// <b>The first edition did not interpolate time at all.</b> It floored
+    /// the time coordinate and fed the whole number straight to the hash, so
+    /// the field stood perfectly still while time stayed inside one cell of
+    /// the lattice and then snapped to an unrelated field when it crossed
+    /// into the next. A person watching it saw a jerk every few seconds and
+    /// nothing in between, and read that as a low frame rate — which it was
+    /// not: every frame was computed, and every frame was identical. The
+    /// frames were never the problem, and no amount of raising their number
+    /// would have helped.
+    /// </para>
     /// </remarks>
-    private static float Noise(float x, float y, float zx, float zy)
+    private static float Noise(float x, float y, float z)
     {
-        int xi = (int)MathF.Floor(x), yi = (int)MathF.Floor(y);
-        int ax = (int)MathF.Floor(zx * 8), ay = (int)MathF.Floor(zy * 8);
-        float xf = x - xi, yf = y - yi;
+        int xi = (int)MathF.Floor(x), yi = (int)MathF.Floor(y),
+            zi = (int)MathF.Floor(z);
+        float xf = x - xi, yf = y - yi, zf = z - zi;
 
-        // Smoothstep on both axes: linear interpolation would leave the
-        // lattice visible as a grid of creases.
-        float u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+        // Smoothstep on all three axes: linear interpolation leaves the
+        // lattice visible as a grid of creases — in space as a mesh, in
+        // time as a pulse.
+        float u = xf * xf * (3 - 2 * xf);
+        float v = yf * yf * (3 - 2 * yf);
+        float w = zf * zf * (3 - 2 * zf);
 
-        float c00 = Hash(xi, yi, ax, ay);
-        float c10 = Hash(xi + 1, yi, ax, ay);
-        float c01 = Hash(xi, yi + 1, ax, ay);
-        float c11 = Hash(xi + 1, yi + 1, ax, ay);
+        float near = Plane(xi, yi, zi, u, v);
+        float far = Plane(xi, yi, zi + 1, u, v);
+        return near * (1 - w) + far * w;
+    }
 
+    /// <summary>One time-slice of the lattice, interpolated in place.</summary>
+    private static float Plane(int xi, int yi, int zi, float u, float v)
+    {
+        float c00 = Hash(xi, yi, zi);
+        float c10 = Hash(xi + 1, yi, zi);
+        float c01 = Hash(xi, yi + 1, zi);
+        float c11 = Hash(xi + 1, yi + 1, zi);
         return (c00 * (1 - u) + c10 * u) * (1 - v)
              + (c01 * (1 - u) + c11 * u) * v;
     }
 
-    /// <summary>A repeatable number in [0, 1) from four whole coordinates.</summary>
-    private static float Hash(int x, int y, int zx, int zy)
+    /// <summary>A repeatable number in [0, 1) from three whole coordinates.</summary>
+    private static float Hash(int x, int y, int z)
     {
         unchecked
         {
-            var n = x * 374761393 + y * 668265263 + zx * 1274126177
-                    + zy * 1103515245;
+            var n = x * 374761393 + y * 668265263 + z * 1274126177;
             n = (n ^ (n >> 13)) * 1274126177;
             return ((n ^ (n >> 16)) & 0x7fffffff) / (float)0x7fffffff;
         }

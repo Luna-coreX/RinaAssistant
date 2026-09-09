@@ -44,7 +44,25 @@ public partial class App : Application
             new System.Windows.Media.SolidColorBrush(tone);
         Current.Resources["C.SignalSunk"] =
             new System.Windows.Media.SolidColorBrush(deep);
+        CurrentAccent = wanted;
+        AccentChanged?.Invoke();
     }
+
+    /// <summary>The accent has changed; the background follows it.</summary>
+    /// <remarks>
+    /// An event and not a call into the window: the accent is applied from
+    /// two places (the settings page and the link's first hello), and
+    /// neither of them should have to know that a background exists.
+    /// </remarks>
+    public static event Action? AccentChanged;
+
+    /// <summary>Which accent is on right now.</summary>
+    /// <remarks>
+    /// Kept as a name rather than read back out of the colours: the living
+    /// background needs the accent to pick its palette, and a palette cannot
+    /// be found by the colour it produced.
+    /// </remarks>
+    public static string CurrentAccent { get; private set; } = "amber";
 
     /// <summary>The default accent — the one that was there before any choice.</summary>
     public static string DefaultAccent =>

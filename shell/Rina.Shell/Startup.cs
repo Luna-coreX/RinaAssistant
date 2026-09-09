@@ -1697,6 +1697,21 @@ public partial class App
             // measured makes that argument on trust. The ceiling is a third
             // of the interval — beyond that the flow starts eating the
             // frame it was supposed to fit inside.
+            // The picture, not the clock. The phase above advances even when
+            // the field is frozen — that is exactly how a jerking background
+            // passed this check while a person was watching it stutter.
+            //
+            // Two bounds, because there are two ways to be wrong. Zero means
+            // the picture is not moving at all. Too large means it is
+            // jumping: at this period a frame should shift things by a
+            // fraction of a value, and a leap of several values per frame is
+            // the snap between two lattice cells that the person saw.
+            var moved = window.BackdropChange;
+            Check("и картинка меняется, а не только часы", moved > 0.002,
+                  $"| {moved:0.000} значения на кадр");
+            Check("и меняется плавно, без скачка", moved < 2.0,
+                  $"| {moved:0.000} значения на кадр, потолок 2.0");
+
             var frame = window.BackdropFrameMs;
             var budget = 1000.0 / (double)Application.Current
                 .FindResource("Background.Fps") / 3;

@@ -34,6 +34,8 @@ import json
 import os
 import sys
 
+import nebula as nebula_mod
+
 from console import use_utf8
 
 use_utf8()
@@ -62,7 +64,7 @@ def key(name: str) -> str:
     return "".join(p.capitalize() for p in name.replace("-", "_").split("_"))
 
 
-def finish_xaml(name: str, finish: dict) -> str:
+def finish_xaml(name: str, finish: dict, glass: dict) -> str:
     lines = [HEADER, f"<!-- Отделка «{finish['title']}» -->", DICT]
     for role, value in finish["color"].items():
         lines.append(f'  <Color x:Key="Color.{key(role)}">{value}</Color>')
@@ -86,17 +88,67 @@ def finish_xaml(name: str, finish: dict) -> str:
     # Every tint is a tint of **this** finish and of nothing else: the
     # category's cliché is a purple-to-blue glow, and the way not to
     # arrive at it is not to have a colour that the panel does not have.
+    # Glass: the bars are the finish's own surface at less than full
+    # strength, so the flow shows through them (`4.0b-A06`). A brush and not
+    # an `Opacity` on the element: opacity applies to everything inside, and
+    # the title, the buttons and the section names would fade with the
+    # surface they stand on.
+    #
+    # The alpha comes first in `#aarrggbb` — a colour written with six
+    # digits is opaque, and this is the one place where forgetting the pair
+    # would silently give back exactly what we are trying to move away from.
+    for part, surface in (("Bar", "FACE_LOW"), ("Column", "FACE_LOW"),
+                          ("Strip", "FACE_SUNK"), ("Control", "FACE_HIGH"),
+                          ("Raised", "FACE_HIGH")):
+        share = glass.get(part.lower())
+        if share is None:
+            continue
+        alpha = f"{round(share * 255):02x}"
+        body = finish["color"][surface].lstrip("#")
+        lines.append(f'  <SolidColorBrush x:Key="C.Glass.{part}" '
+                     f'Color="#{alpha}{body}" />')
+
+    # The light along the top edge of anything raised. One line, a pixel
+    # thick, saying where the light falls from — the cheapest thing in the
+    # system that reads as material rather than as paint.
+    edge = glass.get("edge")
+    if edge is not None:
+        alpha = f"{round(edge * 255):02x}"
+        body = finish["color"]["INK"].lstrip("#")
+        lines.append(f'  <SolidColorBrush x:Key="C.Edge" '
+                     f'Color="#{alpha}{body}" />')
+
+    # The living background's palette, worked out here and handed over
+    # ready (`4.0b-A06`). The shell computes none of it: the arithmetic
+    # lives in `tools/nebula.py`, and the checks use that same module — a
+    # formula implemented twice diverges at the first change to it, and
+    # diverges quietly.
+    #
+    # A palette per accent, and two of each: vivid for the screen one looks
+    # at, calm for the pages one reads on. Thirty per finish, and every one
+    # of them checked against the ink and the legends.
     nebula = finish.get("nebula")
     if nebula:
+        base = nebula["ramp"]
+        face = finish["color"]["FACE"]
         lines.append("")
-        for at, stop in enumerate(nebula["ramp"]):
-            lines.append(f'  <Color x:Key="Color.Nebula{at}">{stop}</Color>')
         lines.append(f'  <sys:Double x:Key="Nebula.Steps">'
-                     f'{len(nebula["ramp"])}</sys:Double>')
+                     f'{len(base)}</sys:Double>')
         lines.append(f'  <sys:Double x:Key="Nebula.Scale">'
                      f'{nebula["scale"]}</sys:Double>')
         lines.append(f'  <sys:Double x:Key="Nebula.Warp">'
                      f'{nebula["warp"]}</sys:Double>')
+        for accent_name, accent in (finish.get("accents") or {}).items():
+            vivid = nebula_mod.tinted(base, accent["signal"],
+                                      nebula.get("accent", 0.0))
+            calm = nebula_mod.dimmed(vivid, face, nebula.get("dim", 0.0))
+            lines.append("")
+            for at, stop in enumerate(vivid):
+                lines.append(f'  <Color x:Key="Color.Nebula.'
+                             f'{key(accent_name)}.{at}">{stop}</Color>')
+            for at, stop in enumerate(calm):
+                lines.append(f'  <Color x:Key="Color.Nebula.'
+                             f'{key(accent_name)}.Calm.{at}">{stop}</Color>')
 
     lines.append("</ResourceDictionary>")
     return "\n".join(lines) + "\n"
@@ -133,22 +185,38 @@ def common_xaml(tokens: dict) -> str:
 
     lines.append("")
     lines.append("  <!-- Гарнитуры -->")
+    #: What to fall back on when the family is missing. Named per family
+    #: rather than "ui or the other one": there are three now, and the old
+    #: two-way split silently gave the display face a monospaced fallback.
+    #:
+    #: The fallbacks are real families, checked on the machine. The tokens
+    #: used to name `Segoe UI Variable`, which Windows does not install
+    #: under that name at all — it installs `... Display`, `... Text` and
+    #: `... Small`. Every heading in the application had been set in the
+    #: fallback, silently, since `4.0-R03`.
+    FALLBACK = {
+        "display": "Segoe UI Variable Display, Segoe UI, Arial",
+        "ui": "Segoe UI Variable Text, Segoe UI, Arial",
+        "mono": "Cascadia Mono, Consolas",
+    }
     for name, value in typo["family"].items():
-        fallback = ("Segoe UI, Segoe UI Variable" if name == "ui"
-                    else "Cascadia Mono, Consolas")
+        fallback = FALLBACK.get(name, "Segoe UI, Arial")
         lines.append(f'  <FontFamily x:Key="Font.{key(name)}">{value}, '
                      f'{fallback}</FontFamily>')
 
     lines.append("")
-    lines.append("  <!-- Роли текста (§3): размер, начертание, трекинг -->")
+    lines.append("  <!-- Роли текста (§3): семейство, размер, начертание -->")
     for role, spec in typo["role"].items():
         r = key(role)
+        # The role's family, resolved here. The roles have named a family
+        # since `4.0-R03`, and until `4.0b-A06` nothing read it: every style
+        # inherited the one UI face, so `"family": "display"` was a word in
+        # a file. A token nobody applies is not a decision but a note.
+        lines.append(f'  <FontFamily x:Key="Type.{r}.Family">'
+                     f'{{StaticResource Font.{key(spec.get("family", "ui"))}}}'
+                     f'</FontFamily>')
         lines.append(f'  <sys:Double x:Key="Type.{r}.Size">{spec["size"]}</sys:Double>')
         lines.append(f'  <FontWeight x:Key="Type.{r}.Weight">{spec["weight"]}</FontWeight>')
-        tracking = spec.get("tracking", 0)
-        # In WPF, tracking is set in em units through Typography/RenderOptions
-        # rather than directly; here we give out the fraction, and a style applies it.
-        lines.append(f'  <sys:Double x:Key="Type.{r}.Tracking">{tracking}</sys:Double>')
         if "leading" in spec:
             lines.append(f'  <sys:Double x:Key="Type.{r}.Leading">'
                          f'{spec["leading"]}</sys:Double>')
@@ -194,6 +262,17 @@ def common_xaml(tokens: dict) -> str:
                          f'{spec["y"]}</sys:Double>')
             lines.append(f'  <sys:Double x:Key="Lift.{k}.Opacity">'
                          f'{spec["opacity"]}</sys:Double>')
+
+    glass = tokens.get("glasswork")
+    if glass:
+        lines.append("")
+        lines.append("  <!-- Стекло (4.0b-A06): сквозь полосы и органы "
+                     "управления видно течение -->")
+        for name, value in glass.items():
+            if name == "note":
+                continue
+            lines.append(f'  <sys:Double x:Key="Glass.{key(name)}">'
+                         f'{value}</sys:Double>')
 
     background = motion.get("background")
     if background:
@@ -262,7 +341,8 @@ def accents_xaml(tokens) -> str:
 def files(tokens: dict) -> dict[str, str]:
     out = {"Tokens.g.xaml": common_xaml(tokens)}
     for name, finish in tokens["finishes"].items():
-        out[f"Finish.{name.capitalize()}.g.xaml"] = finish_xaml(name, finish)
+        out[f"Finish.{name.capitalize()}.g.xaml"] = finish_xaml(
+            name, finish, tokens.get("glasswork") or {})
     if any(f.get("accents") for f in tokens["finishes"].values()):
         out["Accents.g.xaml"] = accents_xaml(tokens)
     return out
