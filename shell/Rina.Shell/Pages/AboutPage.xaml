@@ -65,6 +65,20 @@
            person who came here with a fault is not obliged to know which
            journals we need or where they lie; and we are not obliged to
            ask them to open ten folders. -->
+      <!-- The wizard again. Without this it was unreachable after the
+           first run: somebody who skipped the downloads had no way back to
+           them but editing the settings file. -->
+      <TextBlock Text="{loc:S 'ЗНАКОМСТВО'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+        <Button x:Name="RunSetup" Style="{StaticResource Btn}"
+                Content="{loc:S 'Пройти настройку заново'}"
+                Click="OnRunSetup" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                 Margin="0,0,0,16"
+                 Text="{loc:S 'Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно.'}" />
+
       <TextBlock Text="{loc:S 'ДИАГНОСТИКА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
       <StackPanel Orientation="Horizontal" Margin="0,0,0,8">

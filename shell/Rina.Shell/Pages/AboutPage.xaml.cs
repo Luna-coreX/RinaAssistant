@@ -245,6 +245,14 @@ public partial class AboutPage : UserControl
     /// it is written in its own first line.
     /// </para>
     /// </remarks>
+    private async void OnRunSetup(object sender, RoutedEventArgs e)
+    {
+        if (_link is null) return;
+        RunSetup.IsEnabled = false;
+        try { await _link.RunSetupAsync(); }
+        finally { RunSetup.IsEnabled = true; }
+    }
+
     private async void OnCollectDiagnostics(object sender, RoutedEventArgs e)
     {
         CollectDiagnostics.IsEnabled = false;

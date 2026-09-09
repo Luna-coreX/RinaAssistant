@@ -482,7 +482,12 @@ public partial class App
               $"| «{window.CoreStateTextValue}»");
 
         // The shell does not read the finish from a file, it asks the core.
-        await Task.Delay(1500);
+        // Waited for rather than slept through: a second and a half is a
+        // guess about how long a machine takes to answer, and under the
+        // load of the full regression it was sometimes not enough — this
+        // check went red at random and green on its own.
+        await Until(() => Array.IndexOf(App.Finishes,
+                                        window.FinishValue) >= 0);
         Check("отделка получена от ядра",
               Array.IndexOf(App.Finishes, window.FinishValue) >= 0,
               $"| {window.FinishValue}");
@@ -769,6 +774,13 @@ public partial class App
             await Task.Delay(100);
         Check("ядро на связи",
               link.State == Rina.Protocol.CoreState.Ready, $"| {link.State}");
+
+        // The way back to the wizard. Without it, it was unreachable after
+        // the first run — for anybody, not only for whoever had seen it.
+        var about = new Pages.AboutPage(link);
+        Check("в «о программе» есть кнопка «пройти настройку заново»",
+              about.FindName("RunSetup") is System.Windows.Controls.Button,
+              "| без неё мастер после первого запуска недостижим");
 
         var wizard = new Pages.SetupWindow(link);
         await wizard.LoadAsync();

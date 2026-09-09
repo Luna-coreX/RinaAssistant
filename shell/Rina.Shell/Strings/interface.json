@@ -260,6 +260,9 @@
   "ЗАПЛАНИРОВАНО · {0}": {
     "English": "SCHEDULED · {0}"
   },
+  "ЗНАКОМСТВО": {
+    "English": "GETTING STARTED"
+  },
   "Забыть": {
     "Deutsch": "Vergessen",
     "English": "Forget",
@@ -755,6 +758,9 @@
   "Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*": {
     "English": "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*"
   },
+  "Пройти настройку заново": {
+    "English": "Run setup again"
+  },
   "Протокол": {
     "English": "Protocol"
   },
@@ -949,6 +955,9 @@
     "English": "Timer",
     "Español": "Temporizador",
     "Українська": "Таймер"
+  },
+  "Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно.": {
+    "English": "The same questions as on the first run. Nothing is reset: you need not answer them again."
   },
   "Точно выполнить?": {
     "English": "Run it — are you sure?"

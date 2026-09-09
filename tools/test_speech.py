@@ -189,13 +189,31 @@ while True:
 check("речь ушла оболочкой по каналу данных", chunks,
       f"| кусков {len(chunks)}")
 
+def until(ready, seconds=8.0):
+    """
+    Wait for something to become true, up to a deadline.
+
+    Instead of a fixed pause. A pause is a guess about how long a machine
+    takes, and it is wrong in both directions: too long and every run pays
+    for it, too short and the check reddens because something else was
+    building at the time. This check went red only under the load of the
+    full regression and green on its own — four times before it was worth
+    tracing rather than re-running.
+    """
+    edge = _time.monotonic() + seconds
+    while _time.monotonic() < edge and not ready():
+        _time.sleep(0.02)
+    return ready()
+
+
 engine.say("готово")
-_time.sleep(0.4)
+until(lambda: "готово" in voice.said)
 check("синтез позвали на настоящий ответ", "готово" in voice.said,
       f"| {voice.said}")
 # The round is closed: the recognised phrase reached the command pipeline,
 # and Rina answered it herself — "Засекла 5 с." in the list of what was
 # synthesised.
+until(lambda: any("Засекла" in said for said in voice.said))
 check("распознанное исполнилось, и ответ тоже озвучен",
       any("Засекла" in said for said in voice.said), f"| {voice.said}")
 check("местный динамик при этом молчал", box.spoken == [], f"| {box.spoken}")

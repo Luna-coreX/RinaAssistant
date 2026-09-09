@@ -42,6 +42,14 @@ SESSIONS_DIR = os.path.join(ROOT, "docs", "golden", "sessions")
 # ---------------------------------------------------------------------------
 #: What in an answer depends on the moment of the run rather than on behaviour.
 _VOLATILE = (
+    # The date, when a reminder falls on another day: "10.09 23:55".
+    #
+    # Masked **before** the clock, and it has to be: a session recorded
+    # in the afternoon fired at "ЧЧ:ММ", and the same session run near
+    # midnight fired at "10.09 ЧЧ:ММ" — a reminder a few minutes out had
+    # crossed into tomorrow. Rina was right to say the date; the fixture
+    # was wrong to depend on the hour at which somebody ran it.
+    (re.compile(r"\b\d{2}\.\d{2} (?=\d{1,2}:\d{2}\b)"), ""),
     # The time by the clock: "02:15".
     (re.compile(r"\b\d{1,2}:\d{2}\b"), "ЧЧ:ММ"),
     # A countdown: "9 мин 59 с" — it depends on a fraction of a second.

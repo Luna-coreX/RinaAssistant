@@ -561,6 +561,11 @@ public static partial class Loc
                 {
                     ["English"] = "Hello",
                 },
+            ["ЗНАКОМСТВО"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "GETTING STARTED",
+                },
             ["Знакомство"] =
                 new Dictionary<string, string>
                 {
@@ -1389,6 +1394,11 @@ public static partial class Loc
                 {
                     ["English"] = "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*",
                 },
+            ["Пройти настройку заново"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Run setup again",
+                },
             ["Протокол"] =
                 new Dictionary<string, string>
                 {
@@ -1719,6 +1729,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "that combination won’t work",
+                },
+            ["Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The same questions as on the first run. Nothing is reset: you need not answer them again.",
                 },
             ["Точно выполнить?"] =
                 new Dictionary<string, string>

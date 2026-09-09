@@ -119,6 +119,21 @@ try:
     # go red on a train rather than when the code broke.
 
     print()
+    print("=== флаг меняет только завершение мастера ===")
+    # The button in "About" opens the same wizard, and opening it must not
+    # mark the first run as done: somebody who looked at the wizard out of
+    # curiosity would otherwise never be shown it when it matters. So the
+    # flag is asked here after everything else the shell might call.
+    for method, payload in (("models.catalogue", {}),
+                            ("models.fetch", {"ids": ["whisper-base"]}),
+                            ("settings.get", {"keys": ["volume"]}),
+                            ("setup.state", {})):
+        answer(core, method, payload)
+    still = answer(core, "setup.state")
+    check("после всего прочего он всё ещё первый запуск",
+          still.get("needed") is True, f"| {still}")
+
+    print()
     print("=== мастер закрывается насовсем ===")
     answer(core, "setup.finish")
     again = answer(core, "setup.state")

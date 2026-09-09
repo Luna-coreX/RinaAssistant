@@ -292,18 +292,40 @@ public sealed class CoreLink : IAsyncDisposable
         if (state?["needed"]?.GetValue<bool>() != true) return;
         _setupShown = true;
 
+        await RunSetupAsync();
+        await AskAsync(Methods.SetupFinish);
+    }
+
+    /// <summary>
+    /// Show the wizard and start whatever was chosen in it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Public, because after the first run the wizard was unreachable — not
+    /// only for the person who had already seen it, but for anyone. Somebody
+    /// who skipped the downloads had no way back to them except editing the
+    /// settings file by hand.
+    /// </para>
+    /// <para>
+    /// <b>Asking for it does not touch `first_run`.</b> That flag governs
+    /// whether the wizard appears **by itself**, and a person who opened it
+    /// deliberately has not un-run their first run. Only
+    /// <see cref="OfferSetupAsync"/> marks it done, and only after the
+    /// automatic showing.
+    /// </para>
+    /// </remarks>
+    public async Task RunSetupAsync()
+    {
         var wizard = new Pages.SetupWindow(this) { Owner = _window };
         await wizard.LoadAsync();
         wizard.ShowDialog();
-
-        await AskAsync(Methods.SetupFinish);
 
         var wanted = wizard.Chosen;
         if (wanted.Count == 0) return;
         var ids = new JsonArray();
         foreach (var id in wanted) ids.Add(id);
-        // The reply carries a task id per download; progress arrives as
-        // ordinary `task.progress` (§9), which the shell already shows.
+        // The reply carries a task id per item; progress arrives as ordinary
+        // `task.progress` (§9), which the settings page already shows.
         await AskAsync(Methods.ModelsFetch, new JsonObject { ["ids"] = ids });
     }
 
