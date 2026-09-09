@@ -6,7 +6,27 @@ namespace Rina.Shell.Pages;
 public sealed record Labelled(string Key, string Title, string Hint = "");
 
 /// <summary>A section of the settings screen: a heading and what is in it.</summary>
-public sealed record Section(string Title, Labelled[] Keys);
+public sealed record Section(string Title, Labelled[] Keys,
+                            Sheet[]? Sheets = null);
+
+/// <summary>
+/// A group of settings that opens in a window of its own.
+/// </summary>
+/// <remarks>
+/// <para>
+/// For what is a **list** rather than a switch: the words Rina answers to,
+/// the programs she has learned, the key combinations, the models. Such
+/// things grow — a person adds a word, teaches an alias, downloads a model
+/// — and a growing list on a shared page drowns everything below it. After
+/// a year of use the page would be aliases with a few settings lost among
+/// them.
+/// </para>
+/// <para>
+/// A button on the page, the list in a window. The editors are the same
+/// ones: what changed is where they are shown, not what they are.
+/// </para>
+/// </remarks>
+public sealed record Sheet(string Title, string Note, string[] Keys);
 
 /// <summary>
 /// The layout of the settings screen — entirely the shell's business.
@@ -50,76 +70,70 @@ public static class SettingsLayout
     /// </remarks>
     public static readonly Section[] Sections =
     [
-        new(Word("Голос"),
+        new(Word("Голос и речь"),
         [
             new("tts_engine", Word("Система синтеза"),
                 Word("Чем Рина говорит. Офлайновые работают без интернета")),
-            new("stt_engine", Word("Распознавание"),
-                Word("Чем Рина слышит. Без него команды только с клавиатуры")),
             new("voice", Word("Голос"),
                 Word("Голоса зависят от выбранной системы синтеза")),
-            new("wake_words", Word("Слова активации"),
-                Word("С этих слов начинается обращение к Рине")),
             new("volume", Word("Громкость"),
                 Word("Насколько громко Рина говорит")),
             new("speed", Word("Скорость речи"),
                 Word("Быстрее ста — торопится, медленнее — растягивает")),
-        ]),
-        new(Word("Модели"),
-        [
-            new("whisper_model", Word("Модель Whisper"),
-                Word("Крупнее — точнее и медленнее")),
-            new("vosk_model", Word("Модель Vosk"),
-                Word("Папка с распакованной моделью Vosk")),
-            new("piper_model", Word("Модель Piper"),
-                Word("Файл модели .onnx")),
+            new("stt_engine", Word("Распознавание"),
+                Word("Чем Рина слышит. Без него команды только с клавиатуры")),
             new("wake_sensitivity", Word("Чувствительность активации"),
-                Word("Ниже — откликается чаще, но и на чужое тоже")),
+                Word("Ниже — реже слышит имя, выше — чаще ошибается")),
             new("listen_seconds", Word("Длительность записи"),
-                Word("Сколько ждать фразу после обращения")),
+                Word("Сколько секунд слушать после активации")),
+        ],
+        [
+            new(Word("Слова активации"),
+                Word("С этих слов начинается обращение к Рине"),
+                ["wake_words"]),
+            new(Word("Модели"),
+                Word("Что скачано и где лежит"),
+                ["whisper_model", "vosk_model", "piper_model"]),
         ]),
         new(Word("Звук"),
         [
             new("input_device", Word("Микрофон"),
-                Word("Какой микрофон слушать")),
+                Word("Устройство, с которого Рина слышит")),
             new("output_device", Word("Динамик"),
-                Word("Куда говорить")),
+                Word("Устройство, в которое Рина говорит")),
             new("sound_effects", Word("Звуковые эффекты"),
-                Word("Короткий сигнал, когда Рина услышала и когда ответила")),
+                Word("Короткие сигналы: услышала, ошиблась")),
         ]),
         new(Word("Программы"),
         [
-            new("program_folders", Word("Добавленные папки"),
-                Word("Portable-программы ищутся здесь")),
-            new("app_aliases", Word("Выученные соответствия"),
-                Word("Что Рина запомнила: какое слово какую программу означает")),
             new("watch_apps", Word("Замечать, какие программы открыты"),
-                Word("Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает")),
+                Word("Нужно для напоминаний «когда открою…». Выключено по умолчанию")),
+        ],
+        [
+            new(Word("Где искать программы"),
+                Word("Папки, кроме тех, что Рина находит сама"),
+                ["program_folders"]),
+            new(Word("Выученные соответствия"),
+                Word("Каким словом Рина зовёт какую программу"),
+                ["app_aliases"]),
         ]),
         new(Word("Поведение"),
         [
             new("autostart", Word("Запускать при входе в систему"),
-                Word("Рина будет запускаться сама при входе в систему")),
+                Word("Рина будет готова сразу после входа")),
             new("minimize_to_tray", Word("Сворачивать в трей"),
-                Word("Крестик прячет окно, а не выходит из программы")),
+                Word("Окно уходит в трей, а не на панель задач")),
             new("start_minimized", Word("Начинать свёрнутой"),
-                Word("Запускаться сразу в трее, без окна")),
+                Word("Запускаться без окна")),
             new("floating_command_bar", Word("Плавающая строка команд"),
-                Word("Поверх окон; вызывается сочетанием клавиш")),
+                Word("Строка поверх экрана по горячей клавише")),
             new("notifications", Word("Уведомления"),
-                Word("Показывать ответы, когда окно скрыто")),
-            new("hotkey", Word("Основная комбинация"),
-                Word("Показать окно и начать слушать")),
-            new("action_hotkeys", Word("Комбинации действий"),
-                Word("Сочетания, назначенные отдельным действиям")),
-        ]),
-        new(Word("Обновления"),
+                Word("Показывать всплывающие сообщения")),
+        ],
         [
-            // The setting is there, and updates are not yet: the hint
-            // says so outright. A toggle without a hint would promise
-            // behaviour that will not exist until block U.
-            new("check_updates", Word("Проверять обновления"),
-                Word("Появится вместе с обновлениями")),
+            new(Word("Комбинации клавиш"),
+                Word("Чем вызывать Рину и её действия"),
+                ["hotkey", "action_hotkeys"]),
         ]),
         new(Word("ИИ"),
         [
@@ -132,45 +146,40 @@ public static class SettingsLayout
             new("llm_persona", Word("Характер"),
                 Word("Каким характером модель отвечает")),
             new("llm_timeout", Word("Сколько ждать ответа, секунд"),
-                Word("Сколько ждать ответа, прежде чем сдаться")),
+                Word("Дольше — терпеливее, но и молчание дольше")),
         ]),
         new(Word("Поиск"),
         [
             new("search_engine", Word("Поисковая система"),
-                Word("Где искать, когда Рина не поняла команду")),
+                Word("Где искать по просьбе")),
             new("web_search_fallback", Word("Искать нераспознанное"),
-                Word("Непонятое уходит в поиск, а не остаётся без ответа")),
+                Word("Непонятую фразу отправлять в поиск")),
         ]),
         new(Word("Внешний вид"),
         [
             new("finish", Word("Отделка"),
-                Word("Вся поверхность целиком: цвета проверены парами")),
+                Word("Серебро, чёрный или графит — равноправные")),
             new("accent", Word("Акцент"),
-                Word("Цвет, которым Рина выделяет важное")),
+                Word("Цвет, которым Рина обращает на себя внимание")),
             new("ui_language", Word("Язык интерфейса"),
-                Word("Язык подписей в окне")),
+                Word("Язык окна и реплик Рины")),
         ]),
         new(Word("Приватность"),
         [
             new("save_history", Word("Сохранять историю"),
-                Word("Хранить переписку между запусками")),
+                Word("Хранить, о чём был разговор")),
             new("log_texts", Word("Записывать тексты реплик"),
                 Word("Записывать тексты реплик в журнал. По умолчанию выключено")),
             new("log_level", Word("Подробность журнала"),
                 Word("Насколько подробен журнал")),
         ]),
+        new(Word("Обновления"),
+        [
+            new("check_updates", Word("Проверять обновления"),
+                Word("Появится вместе с обновлениями")),
+        ]),
     ];
 
-    /// <summary>
-    /// Settings the shell shows somewhere other than here.
-    /// </summary>
-    /// <remarks>
-    /// "Answer by voice" and "always listen" stand by the input line
-    /// (<c>4.0-R04</c>): these are not settings but the instrument's mode
-    /// of work, and they are switched in the middle of a conversation. They
-    /// are not "unknown" — they are known and shown elsewhere, and the rule
-    /// about unfamiliar keys does not apply to them.
-    /// </remarks>
     public static readonly HashSet<string> Elsewhere =
     [
         "voice_reply",

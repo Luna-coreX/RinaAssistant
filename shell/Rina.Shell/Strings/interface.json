@@ -8,9 +8,6 @@
   "Enter — отправить, Esc — скрыть": {
     "English": "Enter — send, Esc — hide"
   },
-  "Portable-программы ищутся здесь": {
-    "English": "Portable apps are looked for here"
-  },
   "[слишком глубокая вложенность]": {
     "English": "[nesting too deep]"
   },
@@ -107,9 +104,6 @@
   "Всегда слушаю": {
     "English": "Always listening"
   },
-  "Вся поверхность целиком: цвета проверены парами": {
-    "English": "The whole surface: colours verified in pairs"
-  },
   "Всё это потом можно поменять в настройках.": {
     "English": "All of this can be changed later in the settings."
   },
@@ -140,8 +134,11 @@
   "ГДЕ ЧТО ЛЕЖИТ": {
     "English": "WHERE THINGS ARE"
   },
-  "Где искать, когда Рина не поняла команду": {
-    "English": "Where to search when Rina didn’t understand"
+  "Где искать по просьбе": {
+    "English": "Where to search when asked"
+  },
+  "Где искать программы": {
+    "English": "Where to look for programs"
   },
   "Где лежит модель": {
     "English": "Where the model lives"
@@ -163,6 +160,9 @@
   },
   "Голос и распознавание — на вашем компьютере.": {
     "English": "Speech and recognition happen on your computer."
+  },
+  "Голос и речь": {
+    "English": "Voice and speech"
   },
   "Голоса зависят от выбранной системы синтеза": {
     "English": "Voices depend on the chosen synthesis engine"
@@ -224,11 +224,11 @@
     "Español": "Añadir paso",
     "Українська": "Додати крок"
   },
-  "Добавленные папки": {
-    "English": "Added folders"
-  },
   "Добавлено {0}, пропущено как уже известные {1}.": {
     "English": "Added {0}, skipped {1} already known."
+  },
+  "Дольше — терпеливее, но и молчание дольше": {
+    "English": "Longer is more patient, and the silence is longer too"
   },
   "Думаю": {
     "English": "Thinking"
@@ -302,8 +302,8 @@
   "Запускать при входе в систему": {
     "English": "Start when you sign in"
   },
-  "Запускаться сразу в трее, без окна": {
-    "English": "Start in the tray, without a window"
+  "Запускаться без окна": {
+    "English": "Start with no window"
   },
   "Запустить один раз": {
     "English": "Run once"
@@ -362,6 +362,9 @@
   "Как вас звать": {
     "English": "What to call her"
   },
+  "Каким словом Рина зовёт какую программу": {
+    "English": "Which word Rina uses for which program"
+  },
   "Каким характером модель отвечает": {
     "English": "What character the model answers with"
   },
@@ -370,9 +373,6 @@
   },
   "Какой адрес открыть": {
     "English": "Which address to open"
-  },
-  "Какой микрофон слушать": {
-    "English": "Which microphone to listen to"
   },
   "Какую папку открыть": {
     "English": "Which folder to open"
@@ -398,20 +398,11 @@
   "Команды, история и плагины останутся на месте.": {
     "English": "Commands, history and plugins stay where they are."
   },
-  "Комбинации действий": {
-    "English": "Action shortcuts"
+  "Комбинации клавиш": {
+    "English": "Key combinations"
   },
-  "Короткий сигнал, когда Рина услышала и когда ответила": {
-    "English": "A short sound when Rina hears you and when she answers"
-  },
-  "Крестик прячет окно, а не выходит из программы": {
-    "English": "The close button hides the window instead of quitting"
-  },
-  "Крупнее — точнее и медленнее": {
-    "English": "Larger is more accurate and slower"
-  },
-  "Куда говорить": {
-    "English": "Where to speak"
+  "Короткие сигналы: услышала, ошиблась": {
+    "English": "Short signals: heard you, went wrong"
   },
   "Куда сохранить диагностический пакет": {
     "English": "Where to save the diagnostic package"
@@ -436,15 +427,6 @@
   },
   "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*": {
     "English": "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*"
-  },
-  "Модель Piper": {
-    "English": "Piper model"
-  },
-  "Модель Vosk": {
-    "English": "Vosk model"
-  },
-  "Модель Whisper": {
-    "English": "Whisper model"
   },
   "НОВАЯ КОМАНДА": {
     "English": "NEW COMMAND"
@@ -491,6 +473,9 @@
     "Español": "Ajustes",
     "Українська": "Налаштування"
   },
+  "Настройки не пришли: ядро не описало их.": {
+    "English": "The settings did not arrive: the core described none."
+  },
   "Настройки сброшены.": {
     "English": "Settings have been reset."
   },
@@ -515,11 +500,11 @@
   "Не прочиталось: {0}": {
     "English": "Couldn’t read it: {0}"
   },
-  "Непонятое уходит в поиск, а не остаётся без ответа": {
-    "English": "What isn’t understood goes to search instead of nowhere"
+  "Непонятую фразу отправлять в поиск": {
+    "English": "Send a phrase that was not understood to a search"
   },
-  "Ниже — откликается чаще, но и на чужое тоже": {
-    "English": "Lower means she responds more often — to other things too"
+  "Ниже — реже слышит имя, выше — чаще ошибается": {
+    "English": "Lower hears the name less often, higher mistakes it more often"
   },
   "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
     "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
@@ -542,8 +527,8 @@
   "Нужна хотя бы одна фраза.": {
     "English": "At least one phrase is needed."
   },
-  "Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает": {
-    "English": "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once"
+  "Нужно для напоминаний «когда открою…». Выключено по умолчанию": {
+    "English": "Needed for the «when I open…» reminders. Off by default"
   },
   "Нужно указать, что делать.": {
     "English": "You need to say what to do."
@@ -581,8 +566,8 @@
   "Оболочка": {
     "English": "Shell"
   },
-  "Основная комбинация": {
-    "English": "Main shortcut"
+  "Окно уходит в трей, а не на панель задач": {
+    "English": "The window goes to the tray rather than the taskbar"
   },
   "Остановить": {
     "English": "Stop"
@@ -635,8 +620,8 @@
   "Папка с плагином": {
     "English": "Plugin folder"
   },
-  "Папка с распакованной моделью Vosk": {
-    "English": "Folder with the unpacked Vosk model"
+  "Папки, кроме тех, что Рина находит сама": {
+    "English": "Folders besides those Rina finds by herself"
   },
   "Перечитываю…": {
     "English": "Rereading…"
@@ -671,9 +656,6 @@
     "Español": "Comportamiento",
     "Українська": "Поведінка"
   },
-  "Поверх окон; вызывается сочетанием клавиш": {
-    "English": "On top of other windows; opened by a shortcut"
-  },
   "Подробность журнала": {
     "Deutsch": "Protokolldetails",
     "English": "Log detail",
@@ -698,11 +680,8 @@
   "Показать": {
     "English": "Show"
   },
-  "Показать окно и начать слушать": {
-    "English": "Show the window and start listening"
-  },
-  "Показывать ответы, когда окно скрыто": {
-    "English": "Show answers when the window is hidden"
+  "Показывать всплывающие сообщения": {
+    "English": "Show pop-up messages"
   },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
@@ -800,8 +779,8 @@
     "Español": "Rina",
     "Українська": "Ріна"
   },
-  "Рина будет запускаться сама при входе в систему": {
-    "English": "Rina will start by herself when you sign in"
+  "Рина будет готова сразу после входа": {
+    "English": "Rina will be ready right after you sign in"
   },
   "Рина скажет это вместо «Готово»": {
     "English": "Rina will say this instead of “Done”"
@@ -842,6 +821,9 @@
   "Серебро, чёрное или графит": {
     "English": "Silver, black or graphite"
   },
+  "Серебро, чёрный или графит — равноправные": {
+    "English": "Silver, black or graphite — equals"
+  },
   "Система синтеза": {
     "English": "Synthesis engine"
   },
@@ -878,14 +860,11 @@
   "Скачивать нечего — распознавание можно включить позже.": {
     "English": "Nothing to download — recognition can be switched on later."
   },
-  "Сколько ждать ответа, прежде чем сдаться": {
-    "English": "How long to wait for an answer before giving up"
-  },
   "Сколько ждать ответа, секунд": {
     "English": "How long to wait for an answer, seconds"
   },
-  "Сколько ждать фразу после обращения": {
-    "English": "How long to wait for the phrase after being addressed"
+  "Сколько секунд слушать после активации": {
+    "English": "How many seconds to listen after being called"
   },
   "Скорость речи": {
     "Deutsch": "Sprechgeschwindigkeit",
@@ -935,9 +914,6 @@
     "Español": "Guardar historial",
     "Українська": "Зберігати історію"
   },
-  "Сочетания, назначенные отдельным действиям": {
-    "English": "Combinations assigned to individual actions"
-  },
   "Список напоминаний живёт в ядре, а связи с ним сейчас нет.": {
     "English": "The reminder list lives in the core, and there’s no connection to it."
   },
@@ -949,6 +925,9 @@
   },
   "Ставлю…": {
     "English": "Installing…"
+  },
+  "Строка поверх экрана по горячей клавише": {
+    "English": "A line over the screen, on a hotkey"
   },
   "Таймер": {
     "Deutsch": "Timer",
@@ -1013,8 +992,11 @@
   "Устройство по умолчанию": {
     "English": "Default device"
   },
-  "Файл модели .onnx": {
-    "English": "The .onnx model file"
+  "Устройство, в которое Рина говорит": {
+    "English": "The device Rina speaks into"
+  },
+  "Устройство, с которого Рина слышит": {
+    "English": "The device Rina hears from"
   },
   "Файл не разобрался как JSON.": {
     "Deutsch": "Die Datei ließ sich nicht als JSON lesen.",
@@ -1031,11 +1013,11 @@
   "Ход скачивания виден в настройках, там же его можно остановить.": {
     "English": "Progress is shown in the settings, and can be stopped there too."
   },
-  "Хранить переписку между запусками": {
-    "English": "Keep the conversation between runs"
+  "Хранить, о чём был разговор": {
+    "English": "Keep what the conversation was about"
   },
-  "Цвет, которым Рина выделяет важное": {
-    "English": "The colour Rina highlights with"
+  "Цвет, которым Рина обращает на себя внимание": {
+    "English": "The colour Rina draws attention with"
   },
   "Чем Рина говорит. Офлайновые работают без интернета": {
     "English": "How Rina speaks. Offline engines work without the internet"
@@ -1043,8 +1025,8 @@
   "Чем Рина слышит. Без него команды только с клавиатуры": {
     "English": "How Rina hears. Without it, commands are typed only"
   },
-  "Что Рина запомнила: какое слово какую программу означает": {
-    "English": "What Rina learned: which word means which program"
+  "Чем вызывать Рину и её действия": {
+    "English": "What calls Rina and her actions"
   },
   "Что доустановить": {
     "English": "What else is needed"
@@ -1060,6 +1042,9 @@
   },
   "Что сделать": {
     "English": "What to do"
+  },
+  "Что скачано и где лежит": {
+    "English": "What is downloaded and where it lies"
   },
   "Чувствительность активации": {
     "Deutsch": "Aktivierungsempfindlichkeit",
@@ -1097,14 +1082,17 @@
   "Ядро не на связи — скачать пока нечего.": {
     "English": "The core is not connected — there is nothing to download yet."
   },
+  "Ядро не на связи.": {
+    "English": "The core is not connected."
+  },
   "Ядро не объявило возможность «плагины».": {
     "English": "The core didn’t declare the “plugins” capability."
   },
   "Язык интерфейса": {
     "English": "Interface language"
   },
-  "Язык подписей в окне": {
-    "English": "Language of the labels in the window"
+  "Язык окна и реплик Рины": {
+    "English": "The language of the window and of Rina's words"
   },
   "без имени": {
     "English": "unnamed"

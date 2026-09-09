@@ -171,6 +171,13 @@ public partial class App
         // The wizard on its own, for a screenshot and for the eye. It is
         // shown once per install, so without this the only way to look at
         // it again would be to wipe the settings.
+        if (args.Contains("--check-settings"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckSettingsAsync(window, Value(args, "--shot"));
+            return;
+        }
+
         if (args.Contains("--check-setup"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -739,6 +746,117 @@ public partial class App
         watch.Dispose();
         Check("после Dispose не следит", !watch.Watching);
 
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The settings page: nothing that grows is left lying on it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Plan item <c>4.0b-A14</c>'s neighbour, <c>4.0b-A10</c>. A list on a
+    /// shared page drowns everything below it: after a year of use the
+    /// settings would be learned aliases with a few switches lost among
+    /// them. So the lists live behind buttons, and this is what says they
+    /// still do.
+    /// </para>
+    /// <para>
+    /// Checked against the layout and the built page together. The layout
+    /// alone would say what was intended; the page alone would not say
+    /// which of its rows is a list. Both, and they have to agree.
+    /// </para>
+    /// </remarks>
+    private async Task CheckSettingsAsync(MainWindow window, string? shot)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== Настройки: списки за кнопкой ===");
+        var link = new CoreLink(window, CoreLink.FindCore());
+        // Handed to the window, and that is not a formality: the settings
+        // page asks **the window's** link, not whichever one a check
+        // happens to be holding. Without this line the page found no core,
+        // built nothing, and the check called an empty page tidy.
+        window.Link = link;
+        await link.StartAsync();
+        await Until(() => link.State == Rina.Protocol.CoreState.Ready, 12);
+        Check("ядро на связи",
+              link.State == Rina.Protocol.CoreState.Ready, $"| {link.State}");
+
+        // What grows with use. Named here rather than guessed from the
+        // editor's kind: whether a thing grows is a judgement about the
+        // world — a person adds words, teaches aliases, downloads models —
+        // and a rule derived from the widget would go green the day
+        // somebody drew a list with a different control.
+        string[] growing =
+        [
+            "wake_words", "app_aliases", "program_folders", "action_hotkeys",
+            "whisper_model", "vosk_model", "piper_model",
+        ];
+
+        var onPage = Pages.SettingsLayout.Sections
+            .SelectMany(s => s.Keys.Select(k => k.Key)).ToHashSet();
+        var behind = Pages.SettingsLayout.Sections
+            .SelectMany(s => s.Sheets ?? [])
+            .SelectMany(s => s.Keys).ToHashSet();
+
+        foreach (var key in growing)
+        {
+            Check($"{key} не лежит на странице", !onPage.Contains(key));
+            Check($"{key} открывается своим окном", behind.Contains(key));
+        }
+
+        // Nothing is in two places at once: a setting edited from two rows
+        // is a setting whose two rows disagree the moment one is changed.
+        var twice = onPage.Intersect(behind).ToArray();
+        Check("ни один ключ не показан дважды", twice.Length == 0,
+              $"| {string.Join(", ", twice)}");
+
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.Activate();
+        window.ShowSectionFor("settings");
+        await Until(() => window.CurrentPage is Pages.SettingsPage);
+        // **Asked of the window every time, never held.** The window
+        // rebuilds the section whenever the link is set again — and it is,
+        // as soon as the core answers — so a page captured a moment ago has
+        // been thrown away and replaced. Measuring the one in hand reported
+        // an empty page while a full one was on the screen.
+        Pages.SettingsPage Shown() => (Pages.SettingsPage)window.CurrentPage!;
+
+        await Until(() => Shown().SectionsShown > 0, 15);
+        var built = Shown().SectionsShown > 0;
+        Check("страница собралась", built,
+              $"| секций {Shown().SectionsShown}, ключей {Shown().SchemaKeys}"
+              + (Shown().Trouble.Length > 0 ? $", {Shown().Trouble}" : ""));
+        // The rule with teeth from ADR 0006 still holds: an unfamiliar key
+        // is shown rather than hidden. "Other" being empty means every key
+        // the core sent has a place — not that unknown ones are dropped.
+        // `built &&`, because an empty page has no "Other" section either,
+        // and the first version of this line called that tidy. A check that
+        // agrees with nothing having happened will agree with anything.
+        Check("секция «Прочее» пуста", built && !Shown().HasOtherSection,
+              built ? "" : "| страница пуста — сказать нечего");
+
+        if (shot is not null)
+        {
+            Save(window, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
+
+        await link.DisposeAsync();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

@@ -141,7 +141,17 @@ public partial class SettingsPage : UserControl
     private async Task LoadAsync()
     {
         var described = await Ask(Methods.SettingsDescribe);
-        if (described?["schema"] is not JsonObject schema) return;
+        if (described?["schema"] is not JsonObject schema)
+        {
+            // Said out loud rather than returned from in silence. An empty
+            // settings page looks like a page with no settings, and that is
+            // indistinguishable from a page that could not ask. Whoever
+            // meets it — a person or a check — is owed the difference.
+            if (Note.Text.Length == 0)
+                Note.Text = S("Настройки не пришли: ядро не описало их.");
+            Ready?.Invoke();
+            return;
+        }
 
         // Two marks are skipped, and they mean different things.
         // `obsolete` is "replaced" (3.1.0's five palettes gave way to two
@@ -267,10 +277,20 @@ public partial class SettingsPage : UserControl
         {
             var keys = section.Keys.Where(k => _schema.ContainsKey(k.Key))
                                    .ToArray();
-            if (keys.Length == 0) continue;
+            var sheets = (section.Sheets ?? [])
+                .Where(s => s.Keys.Any(_schema.ContainsKey))
+                .ToArray();
+            if (keys.Length == 0 && sheets.Length == 0) continue;
+
             Body.Children.Add(BuildSection(section.Title,
-                                           keys.Select(k => k.Key)));
+                                           keys.Select(k => k.Key), sheets));
             foreach (var k in keys) placed.Add(k.Key);
+            // A key behind a button is placed. Counting it a stranger would
+            // print it twice — once in its window and once in "Other" —
+            // and the second copy would edit the same setting from a place
+            // nobody meant it to be edited from.
+            foreach (var sheet in sheets)
+                foreach (var key in sheet.Keys) placed.Add(key);
         }
 
         // The rule with teeth from ADR 0006: an unfamiliar key is shown,
@@ -282,10 +302,11 @@ public partial class SettingsPage : UserControl
                         && !SettingsLayout.Elsewhere.Contains(k))
             .OrderBy(k => k, StringComparer.Ordinal)
             .ToArray();
+        HasOtherSection = strangers.Length > 0;
         if (strangers.Length > 0)
             Body.Children.Add(BuildSection(SettingsLayout.Other, strangers));
+        SectionsShown = Body.Children.Count;
 
-        if (_models.Count > 0) Body.Children.Add(BuildDownloads());
     }
 
     //: What can be downloaded, and what is happening to it. Filled from
@@ -534,7 +555,26 @@ public partial class SettingsPage : UserControl
             ? S("{0} ГБ", (bytes / (1024.0 * 1024 * 1024)).ToString("0.0"))
             : S("{0} МБ", bytes / (1024 * 1024));
 
-    private UIElement BuildSection(string title, IEnumerable<string> keys)
+    /// <summary>How many keys the schema brought — for the check.</summary>
+    public int SchemaKeys => _schema.Count;
+
+    /// <summary>What went wrong while loading, if anything — for the check.</summary>
+    public string Trouble => Note.Text;
+
+    /// <summary>How many sections were drawn — for the check.</summary>
+    public int SectionsShown { get; private set; }
+
+    /// <summary>Is there an "Other" section — for the check.</summary>
+    /// <remarks>
+    /// It holds the keys the core sent and the layout has no place for
+    /// (ADR 0006). Empty is the goal; **hiding** them would not be — a key
+    /// with nowhere to go must be visible somewhere, or it becomes
+    /// unreachable and nobody notices.
+    /// </remarks>
+    public bool HasOtherSection { get; private set; }
+
+    private UIElement BuildSection(string title, IEnumerable<string> keys,
+                                   Sheet[]? sheets = null)
     {
         var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
         stack.Children.Add(new TextBlock
@@ -545,7 +585,77 @@ public partial class SettingsPage : UserControl
             Margin = new Thickness(0, 0, 0, 12),
         });
         foreach (var key in keys) stack.Children.Add(BuildRow(key));
+        foreach (var sheet in sheets ?? []) stack.Children.Add(BuildOpener(sheet));
         return stack;
+    }
+
+    /// <summary>A row that opens a list in a window of its own.</summary>
+    /// <remarks>
+    /// It looks like every other row — a name, an explanation, and a control
+    /// in the same column — because it is one. What is behind it is a list
+    /// rather than a switch, and that is the only difference a person needs
+    /// to see.
+    /// </remarks>
+    private UIElement BuildOpener(Sheet sheet)
+    {
+        var row = new Grid { Margin = new Thickness(0, 0, 0, 16) };
+        row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(ControlColumn),
+        });
+
+        var left = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
+        left.Children.Add(new TextBlock
+        {
+            Text = S(sheet.Title),
+            Style = (Style)FindResource("Text.Body"),
+        });
+        left.Children.Add(new TextBlock
+        {
+            Text = S(sheet.Note),
+            Style = (Style)FindResource("Text.Meta"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, 0, 0),
+        });
+        row.Children.Add(left);
+
+        var open = new Button
+        {
+            Style = (Style)FindResource("Btn"),
+            Content = S("Открыть"),
+            Width = ControlWidth,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            VerticalAlignment = VerticalAlignment.Top,
+        };
+        open.Click += (_, _) => ShowSheet(sheet);
+        Grid.SetColumn(open, 1);
+        row.Children.Add(open);
+        return row;
+    }
+
+    /// <summary>Open one list in its window.</summary>
+    private void ShowSheet(Sheet sheet)
+    {
+        // The editors are built here, by the same code that would have put
+        // them on the page. The window holds them and knows nothing about
+        // settings: a window that could also build one would be a second
+        // place where that is decided.
+        var rows = sheet.Keys.Where(_schema.ContainsKey)
+                             .Select(BuildRow)
+                             .ToList();
+
+        // The models are a list too, and they live behind the same kind of
+        // button rather than at the bottom of the page where they landed
+        // when they were new.
+        if (sheet.Keys.Contains("whisper_model") && _models.Count > 0)
+            rows.Add(BuildDownloads());
+
+        var window = new SheetWindow(S(sheet.Title), S(sheet.Note), rows)
+        {
+            Owner = Window.GetWindow(this),
+        };
+        window.ShowDialog();
     }
 
     /// <summary>
@@ -1524,7 +1634,11 @@ public partial class SettingsPage : UserControl
 
     private async Task<JsonObject?> Ask(string method, JsonObject? payload = null)
     {
-        if (_link?.Connection is not { Ready: true } connection) return null;
+        if (_link?.Connection is not { Ready: true } connection)
+        {
+            Note.Text = S("Ядро не на связи.");
+            return null;
+        }
         try
         {
             var answer = await connection.CallAsync(method, payload,
