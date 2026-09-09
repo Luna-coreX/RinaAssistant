@@ -840,6 +840,15 @@ public partial class App
                   $"| {home.RemoteShows}");
         }
 
+        // The picture is taken here, while something is showing. After the
+        // seam below the remote is deliberately emptied, and a photograph
+        // of that proves only that an empty panel is empty.
+        if (shot is not null)
+        {
+            Save(window, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
+
         // --- and the half that is ours, on a quiet machine too ---
         //
         // Whether anything is playing belongs to the person's machine.
@@ -874,12 +883,6 @@ public partial class App
         {
             Check("нажатие не роняет и без сессии", false,
                   $"| {exc.GetType().Name}");
-        }
-
-        if (shot is not null)
-        {
-            Save(window, shot);
-            Console.WriteLine($"снимок: {shot}");
         }
 
         Console.WriteLine();
