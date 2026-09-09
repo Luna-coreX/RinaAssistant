@@ -345,6 +345,9 @@ public partial class MainWindow : Window
     /// <summary>How much the background's picture moved — for the check.</summary>
     public double BackdropChange => _backdrop.FrameChange;
 
+    /// <summary>How much the background moved over a second — for the check.</summary>
+    public double BackdropDrift => _backdrop.DriftPerSecond;
+
     /// <summary>
     /// Let the background run only while there is somebody to look.
     /// </summary>

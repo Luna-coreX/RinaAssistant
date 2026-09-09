@@ -62,6 +62,9 @@ public sealed class AudioLink : IDisposable
     /// <summary>How much of what was received is not yet played.</summary>
     public int Pending => _speaker.Pending;
 
+    /// <summary>How loud Rina's own voice is at this instant, 0 to 1.</summary>
+    public double Speech => _speaker.Speech;
+
     /// <summary>The microphone level, 0..1 — for the instrument strip.</summary>
     public event Action<float>? Level;
 

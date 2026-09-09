@@ -194,6 +194,9 @@ public sealed class CoreLink : IAsyncDisposable
     /// </remarks>
     public bool Speaking => _voice is { Pending: > 0 };
 
+    /// <summary>How loud Rina's own voice is at this instant, 0 to 1.</summary>
+    public double Speech => _voice?.Speech ?? 0;
+
     public Task StartAsync() => _boss.StartAsync();
 
     /// <summary>Ask the core for the interface language and apply it.</summary>

@@ -45,7 +45,7 @@ public partial class HomePage : UserControl
         InitializeComponent();
         _link = link;
         _figure = new Figure(Face);
-        _figure.Build(App.CurrentAccent, Steps);
+        _figure.Build();
 
         if (_link is not null)
         {
@@ -73,11 +73,6 @@ public partial class HomePage : UserControl
     }
 
     private Backdrop? _backdrop;
-
-    /// <summary>How many stops the flow's palette has, from the tokens.</summary>
-    private static int Steps =>
-        Application.Current?.TryFindResource("Nebula.Steps") is double count
-            ? (int)count : 5;
 
     /// <summary>Move at the background's pace — see <see cref="Figure"/>.</summary>
     public void FollowClock(Backdrop backdrop)
@@ -119,20 +114,79 @@ public partial class HomePage : UserControl
     //: argue with them. Never set in the running application.
     private bool _held;
 
+    /// <summary>Feed a microphone and a level, without a microphone.</summary>
+    /// <remarks>
+    /// For the check, and through the real path: this sets exactly what the
+    /// events set and then asks <see cref="Settle"/>, so what is checked is
+    /// the rule, not a shortcut past it. Whether an open microphone alone
+    /// makes her "listening" is the question that was got wrong once, and
+    /// it cannot be settled by speaking into a real one.
+    /// </remarks>
+    public void HearFor(bool open, float level)
+    {
+        _mic = open;
+        if (!open) _heard = 0;
+        OnLevel(level);
+        Settle();
+        ShowDoing();
+    }
+
     private void OnTick(double elapsed, double step)
     {
+        if (!_held) Settle();
         _figure.Advance(elapsed, step);
-        // Talking is not an event: it is the state of the audio, and the
-        // audio does not announce itself. Asked once a frame, where the
-        // answer is already needed.
-        if (!_held && _figure.State is not (Doing.Listening or Doing.Thinking))
-            Retune(_link?.Speaking == true ? Doing.Talking : Doing.Idle);
     }
+
+    /// <summary>Work out what she is doing, from what is actually true.</summary>
+    /// <remarks>
+    /// <para>
+    /// Thinking wins, because it is the only one of the four the core
+    /// declares outright. Then talking, read from the sound being played —
+    /// not from `assistant.response`, which arrives when the text is ready
+    /// and would light the figure for the length of a message rather than
+    /// of a sentence said aloud.
+    /// </para>
+    /// <para>
+    /// <b>And listening is a voice, not an open microphone.</b> That was
+    /// wrong in the first edition: the microphone opens when "always
+    /// listening" is switched on or a hotkey is pressed, and it then stays
+    /// open for hours. The figure sat in `listening` the whole time and
+    /// said nothing about anybody speaking. What it shows now is that
+    /// somebody <i>is speaking</i> — the level is above the floor — which
+    /// is what a person meant when they asked to see it react when they
+    /// start to talk.
+    /// </para>
+    /// </remarks>
+    private void Settle()
+    {
+        if (_thinking) { Retune(Doing.Thinking); return; }
+
+        var speech = _link?.Speech ?? 0;
+        if (_link?.Speaking == true && speech > 0)
+        {
+            Retune(Doing.Talking, speech);
+            return;
+        }
+
+        // A floor, and a fall that lags the rise. Speech is not a steady
+        // sound — there are gaps between words — and without the lag the
+        // figure would drop back to waiting inside every pause.
+        _heard *= 0.90;
+        if (_mic && _heard > Floor) Retune(Doing.Listening, _heard);
+        else Retune(Doing.Idle);
+    }
+
+    //: Below this a level is a room, not a voice. Anything lower and the
+    //: figure answers the fridge.
+    private const double Floor = 0.06;
+
+    private bool _mic;
+    private bool _thinking;
+    private double _heard;
 
     private void OnLevel(float level)
     {
-        if (_figure.State is Doing.Listening)
-            _figure.Show(Doing.Listening, level);
+        if (level > _heard) _heard = level;
     }
 
     private void OnCoreEvent(Envelope message)
@@ -140,25 +194,25 @@ public partial class HomePage : UserControl
         switch (message.Method)
         {
             case "listening.capturing":
-                Retune(message.Payload["active"]?.GetValue<bool>() == true
-                       ? Doing.Listening : Doing.Idle);
+                // Only whether the microphone is open. Whether anybody is
+                // speaking into it is a different question, answered above.
+                _mic = message.Payload["active"]?.GetValue<bool>() == true;
+                if (!_mic) _heard = 0;
                 break;
             case "assistant.thinking":
-                Retune(message.Payload["active"]?.GetValue<bool>() == true
-                       ? Doing.Thinking : Doing.Idle);
+                _thinking = message.Payload["active"]?.GetValue<bool>() == true;
                 break;
         }
     }
 
-    private void Retune(Doing doing)
+    private void Retune(Doing doing, double loud = 0)
     {
-        if (_figure.State == doing) return;
-        _figure.Show(doing);
-        ShowDoing();
+        var changed = _figure.State != doing;
+        _figure.Show(doing, loud);
+        if (changed) ShowDoing();
     }
 
-    private void OnAccentChanged() =>
-        _figure.Build(App.CurrentAccent, Steps);
+    private void OnAccentChanged() => _figure.Build();
 
     private void ShowDoing() => DoingText.Text = _figure.State switch
     {

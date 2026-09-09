@@ -67,13 +67,74 @@ public sealed class Speaker : IDisposable
     public void Enqueue(ReadOnlySpan<byte> pcm)
     {
         if (pcm.Length == 0) return;
+        var loud = Loudness(pcm);
         lock (_lock)
         {
             Ensure();
             _buffer!.AddSamples(pcm.ToArray(), 0, pcm.Length);
+            _written += pcm.Length;
+            _said.Enqueue((_written, loud));
             if (_device!.PlaybackState != PlaybackState.Playing) _device.Play();
         }
         SetSpeaking(true);
+    }
+
+    /// <summary>How loud what is being played **right now** is, from 0 to 1.</summary>
+    /// <remarks>
+    /// <para>
+    /// Lined up with playback rather than with arrival. The level of a
+    /// chunk is worked out when it is handed over, but it is answered for
+    /// only when the ear reaches it: the position being played is what has
+    /// been written less what is still waiting, and the chunk covering that
+    /// position is the one that is sounding.
+    /// </para>
+    /// <para>
+    /// Without lining up, the figure would pulse to a sentence the core had
+    /// finished synthesising and not yet finished saying — ahead of the
+    /// voice by the depth of the buffer, which is however long the last
+    /// sentence was. A mouth that moves before the sound is worse than one
+    /// that does not move at all.
+    /// </para>
+    /// </remarks>
+    public double Speech
+    {
+        get
+        {
+            lock (_lock)
+            {
+                if (_buffer is null) return 0;
+                var at = _written - _buffer.BufferedBytes;
+                while (_said.Count > 1 && _said.Peek().End <= at)
+                    _said.Dequeue();
+                return _said.Count > 0 && IsSpeaking ? _said.Peek().Loud : 0;
+            }
+        }
+    }
+
+    //: Where each chunk ends, and how loud it was. Trimmed as the ear
+    //: passes each one, so it never grows beyond what is still to play.
+    private readonly Queue<(long End, double Loud)> _said = new();
+    private long _written;
+
+    /// <summary>The loudness of a chunk of 16-bit sound.</summary>
+    private static double Loudness(ReadOnlySpan<byte> pcm)
+    {
+        if (pcm.Length < 2) return 0;
+        double sum = 0;
+        var count = 0;
+        // Every eighth sample. This runs on the audio path, and the answer
+        // is a bar on a screen: an eighth of the samples gives the same
+        // answer to within far less than a person can see.
+        for (var at = 0; at + 1 < pcm.Length; at += 16)
+        {
+            var sample = (short)(pcm[at] | (pcm[at + 1] << 8)) / 32768.0;
+            sum += sample * sample;
+            count++;
+        }
+        // Root mean square, then opened out: speech spends most of its time
+        // quiet, and a linear scale would leave the figure nearly still
+        // through an entire sentence.
+        return count == 0 ? 0 : Math.Clamp(Math.Sqrt(sum / count) * 3.2, 0, 1);
     }
 
     /// <summary>

@@ -1682,6 +1682,25 @@ public partial class App
                 Check($"{seen[at].State} отличается от покоя",
                       Math.Abs(seen[at].Swell - seen[0].Swell) > 0.01,
                       $"| {seen[0].Swell:0.000} против {seen[at].Swell:0.000}");
+
+            // The correction a person had to make: an open microphone is
+            // not somebody speaking. "Always listening" opens it and leaves
+            // it open for hours, and the figure used to sit in `listening`
+            // that whole time — reporting the setting instead of the room.
+            home.HearFor(true, 0f);
+            await Task.Delay(120);
+            Check("открытый микрофон сам по себе — ещё не «слушаю»",
+                  home.Doing != Doing.Listening, $"| {home.Doing}");
+
+            home.HearFor(true, 0.5f);
+            await Task.Delay(120);
+            Check("а заговоривший человек — да",
+                  home.Doing == Doing.Listening, $"| {home.Doing}");
+
+            home.HearFor(false, 0f);
+            await Task.Delay(120);
+            Check("микрофон закрыли — снова ждёт",
+                  home.Doing == Doing.Idle, $"| {home.Doing}");
         }
 
         Console.WriteLine();
@@ -1817,6 +1836,14 @@ public partial class App
                   $"| {moved:0.000} значения на кадр");
             Check("и меняется плавно, без скачка", moved < 2.0,
                   $"| {moved:0.000} значения на кадр, потолок 2.0");
+
+            // And how far it travels in a second, which is the interval a
+            // person judges by. Below a value or so it is a photograph that
+            // technically updates.
+            await Task.Delay(1400);
+            var drift = window.BackdropDrift;
+            Check("и за секунду сдвигается заметно", drift >= 1.0,
+                  $"| {drift:0.00} значения за секунду");
 
             var frame = window.BackdropFrameMs;
             var budget = 1000.0 / (double)Application.Current

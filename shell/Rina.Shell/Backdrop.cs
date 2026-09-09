@@ -70,6 +70,8 @@ public sealed class Backdrop
     private readonly byte[] _pixels = new byte[Wide * High * 4];
     private readonly byte[] _calm = new byte[Wide * High * 4];
     private readonly byte[] _before = new byte[Wide * High * 4];
+    private readonly byte[] _mark = new byte[Wide * High * 4];
+    private double _sinceMark;
 
     /// <summary>The field, before it is turned into colour.</summary>
     /// <remarks>
@@ -99,6 +101,7 @@ public sealed class Backdrop
 
     private double _scale = 2.6;
     private double _warp = 1.1;
+    private double _drift = 0.55;
     private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
 
@@ -189,6 +192,26 @@ public sealed class Backdrop
     /// </remarks>
     public double BestFrameMs { get; private set; }
 
+    /// <summary>
+    /// How much the picture has moved over the last second, in values.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The number that answers the question a person actually asks, which
+    /// is "is this moving" — and they ask it by looking for a second or
+    /// two, not by comparing consecutive frames.
+    /// </para>
+    /// <para>
+    /// <see cref="FrameChange"/> was not wrong, it was answering something
+    /// else. It caught a frozen field, which is what it was written for.
+    /// It could not catch a field that moves by a hundredth of a value per
+    /// frame — arithmetically alive, visually a photograph — and that is
+    /// exactly what a person reported: "the animations are static". A
+    /// measurement can be honest and still be about the wrong quantity.
+    /// </para>
+    /// </remarks>
+    public double DriftPerSecond { get; private set; }
+
     /// <summary>How long the last frame took to compute, in milliseconds.</summary>
     /// <remarks>
     /// Measured and asserted, not assumed. The whole argument for stopping
@@ -243,6 +266,7 @@ public sealed class Backdrop
         _ramp = Ramp(accent, steps, calm: false);
         _calmRamp = Ramp(accent, steps, calm: true);
         _scale = Token("Nebula.Scale", 2.6);
+        _drift = Token("Background.Drift", 0.55);
         _warp = Token("Nebula.Warp", 1.1);
         Repaint();
     }
@@ -386,13 +410,25 @@ public sealed class Backdrop
         var warp = (float)_warp;
         var field = _field;
 
+        // The field travels sideways as well as morphing in place, and the
+        // sideways part is what makes it read as moving at all. Morphing
+        // alone changes the picture just as much by any measure, and the
+        // eye does not see it: it tracks features going somewhere, and a
+        // feature that stays put while changing shape is a still picture
+        // being redrawn. Without this the background measured 0.24 values
+        // of change per second and a person called it static — both were
+        // true at once.
+        var slide = (float)(_elapsed * _drift);
+        var slideY = slide * 0.62f;
+
         Parallel.For(0, High, y =>
         {
-            var v = (float)y / High * scale;
+            var v = (float)y / High * scale + slideY;
             var row = y * Wide;
             for (var x = 0; x < Wide; x++)
             {
-                var u = (float)x / Wide * scale * ((float)Wide / High);
+                var u = (float)x / Wide * scale * ((float)Wide / High)
+                        + slide;
 
                 // Domain warping: the field's own coordinates are bent by
                 // the field, twice. One level gives clouds; two give the
@@ -438,6 +474,21 @@ public sealed class Backdrop
             moved += Math.Abs(_pixels[at] - _before[at]);
         FrameChange = moved / (double)(_pixels.Length / 16);
         Array.Copy(_pixels, _before, _pixels.Length);
+
+        // And against a frame from a second ago. A second is roughly how
+        // long a person looks at a background before deciding whether it is
+        // alive, so it is the interval the question is actually about.
+        _sinceMark += _clock.Interval.TotalSeconds;
+        if (_sinceMark >= 1.0)
+        {
+            var drifted = 0L;
+            for (var at = 0; at < _pixels.Length; at += 16)
+                drifted += Math.Abs(_pixels[at] - _mark[at]);
+            DriftPerSecond = drifted / (double)(_pixels.Length / 16)
+                             / _sinceMark;
+            Array.Copy(_pixels, _mark, _pixels.Length);
+            _sinceMark = 0;
+        }
     }
 
     /// <summary>Colour a field with a palette.</summary>

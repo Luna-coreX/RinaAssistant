@@ -30,14 +30,12 @@
              IsHitTestVisible="False" />
 
       <!--
-        A ring around it: one line, in the accent. What says "this is an
-        instrument and not a picture" — an aperture has an edge, and the
-        edge is machined.
+        There was a machined ring here, and it had to go. A drawn circle
+        around a sphere that has its own soft, uneven edge reads as a sphere
+        someone has traced round: two edges in the same place, one of them
+        perfect, and the perfect one wins the eye. The figure's own rim is
+        the edge.
       -->
-      <Ellipse x:Name="Ring" Width="248" Height="248"
-               StrokeThickness="1"
-               Stroke="{DynamicResource C.Signal}"
-               Opacity="0.5" IsHitTestVisible="False" />
     </Grid>
 
     <!--
