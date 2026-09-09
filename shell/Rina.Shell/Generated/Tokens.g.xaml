@@ -119,8 +119,8 @@
 
   <!-- Дыхание фона (4.0b-A06). Когда фон замирает, решает оболочка, а не эти числа -->
   <sys:Double x:Key="Background.Period">9</sys:Double>
-  <sys:Double x:Key="Background.Fps">15</sys:Double>
-  <sys:Double x:Key="Background.Drift">3.0</sys:Double>
+  <sys:Double x:Key="Background.Fps">60</sys:Double>
+  <sys:Double x:Key="Background.Drift">4.0</sys:Double>
 
   <!-- Штриховка опасного (§6): единственный признак необратимого -->
   <sys:Double x:Key="Hatch.Angle">45</sys:Double>

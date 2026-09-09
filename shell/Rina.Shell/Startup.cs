@@ -756,6 +756,34 @@ public partial class App
               speaking.Count >= 2 && speaking[^1] is false,
               "| " + string.Join(" -> ", speaking));
 
+        // --- the tail of an utterance is not thrown away ---
+        //
+        // The core closes the stream when it has finished **sending**, and
+        // a second of sound is still sitting unplayed. That close used to
+        // call `Interrupt`, so the end of every single utterance was
+        // dropped — which a person heard as speech that breaks off, and no
+        // check said a word, because every check here interrupted on
+        // purpose and got exactly what it asked for.
+        var tail = new Audio.Speaker();
+        var ended = new List<bool>();
+        tail.Speaking += value => ended.Add(value);
+        tail.Enqueue(Tone(seconds: 1.0));
+        await Task.Delay(120);
+
+        var before = tail.Pending;
+        tail.Drain();
+        Check("закрытие потока не выбрасывает недоигранное",
+              tail.Pending > before / 2,
+              $"| было {before} Б, осталось {tail.Pending} Б");
+        Check("и речь ещё считается идущей", tail.IsSpeaking);
+
+        // And it does end — by itself, when there is nothing left.
+        for (var waited = 0; waited < 40 && tail.IsSpeaking; waited++)
+            await Task.Delay(100);
+        Check("а доиграв — заканчивается сама", !tail.IsSpeaking,
+              $"| осталось {tail.Pending} Б");
+        tail.Dispose();
+
         // --- "do not listen to oneself": muting, not stopping the device ---
         var microphone = new Audio.Microphone();
         speaker.Speaking += value => microphone.Muted = value;
@@ -812,6 +840,29 @@ public partial class App
                   got == sent && got == audio.Sent,
                   $"| ядро {got} Б, оболочка {sent} Б, учтено {audio.Sent} Б");
         }
+
+        // --- and somebody in the running application starts the microphone ---
+        //
+        // The defect this catches was found by a person, not by a check:
+        // "she cannot hear me, and the check says the microphone works".
+        // Both were true. The device worked, the stream worked, the core
+        // recognised — and `StartCaptureAsync` had no caller outside the
+        // checks, so nothing was ever captured in the running application.
+        //
+        // **Driven through a real core.** The first version of this check
+        // called the shell's handler itself and passed while the
+        // subscription that reaches it was deleted: it measured that the
+        // method works, which was never in doubt. What is in question is
+        // whether the shell hears the core say it is listening, and the
+        // only way to ask that is to make the core say it.
+        Check("до объявления ядра микрофон молчит", !link.Capturing);
+
+        await link.ListenOnceAsync();
+        for (var waited = 0; waited < 20 && !link.Capturing; waited++)
+            await Task.Delay(100);
+        Check("ядро объявило, что слушает — оболочка включила микрофон",
+              link.Capturing && link.CaptureStarts > 0,
+              $"| запусков {link.CaptureStarts}");
 
         await link.DisposeAsync();
         Console.WriteLine();
@@ -1840,7 +1891,7 @@ public partial class App
             // And how far it travels in a second, which is the interval a
             // person judges by. Below a value or so it is a photograph that
             // technically updates.
-            await Task.Delay(1400);
+            await Task.Delay(2400);
             var drift = window.BackdropDrift;
             Check("и за секунду сдвигается заметно", drift >= 1.0,
                   $"| {drift:0.00} значения за секунду");

@@ -43,11 +43,11 @@ public static class Flow
     /// three once the frame was measured and found to cost a fifth of its
     /// budget: detail one can afford is detail worth having.
     /// </remarks>
-    public static float Fbm(float x, float y, float z)
+    public static float Fbm(float x, float y, float z, int octaves = 4)
     {
         var sum = 0f;
         var weight = 0.5f;
-        for (var octave = 0; octave < 4; octave++)
+        for (var octave = 0; octave < octaves; octave++)
         {
             sum += weight * Noise(x, y, z);
             x *= 2.03f;

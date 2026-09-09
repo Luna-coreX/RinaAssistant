@@ -59,8 +59,14 @@ public sealed class Backdrop
     /// the picture actually has; anything above it would be spent computing
     /// the same value twice.
     /// </remarks>
-    private const int Wide = 288;
-    private const int High = 162;
+    /// <remarks>
+    /// Cut down when the frame rate went up. The background is soft,
+    /// drifting and behind everything; its finest detail was already below
+    /// what the blur and the enlargement can show. The figure keeps the
+    /// full count — it is the thing being looked at.
+    /// </remarks>
+    private const int Wide = 208;
+    private const int High = 117;
 
     private readonly Image _view;
     private readonly Image? _calmView;
@@ -72,6 +78,7 @@ public sealed class Backdrop
     private readonly byte[] _before = new byte[Wide * High * 4];
     private readonly byte[] _mark = new byte[Wide * High * 4];
     private double _sinceMark;
+    private bool _marked;
 
     /// <summary>The field, before it is turned into colour.</summary>
     /// <remarks>
@@ -102,6 +109,13 @@ public sealed class Backdrop
     private double _scale = 2.6;
     private double _warp = 1.1;
     private double _drift = 0.55;
+
+    //: Where the field has wandered to, and how far it moved last frame.
+    //: Kept rather than worked out from the elapsed time, because a
+    //: wandering path is an integral and has no closed form.
+    private double _wanderX;
+    private double _wanderY;
+    private double _step;
     private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
 
@@ -351,6 +365,7 @@ public sealed class Backdrop
         // period we are, and it wraps. The checks watch the phase because a
         // number that wraps can be compared with itself.
         var step = _clock.Interval.TotalSeconds / _period;
+        _step = step;
         _elapsed += step;
         Phase = (Phase + step) % 1.0;
         Repaint();
@@ -410,16 +425,25 @@ public sealed class Backdrop
         var warp = (float)_warp;
         var field = _field;
 
-        // The field travels sideways as well as morphing in place, and the
-        // sideways part is what makes it read as moving at all. Morphing
-        // alone changes the picture just as much by any measure, and the
-        // eye does not see it: it tracks features going somewhere, and a
-        // feature that stays put while changing shape is a still picture
-        // being redrawn. Without this the background measured 0.24 values
-        // of change per second and a person called it static — both were
-        // true at once.
-        var slide = (float)(_elapsed * _drift);
-        var slideY = slide * 0.62f;
+        // The field travels as well as morphing in place, and the travelling
+        // is what makes it read as moving at all. Morphing alone changes the
+        // picture just as much by any measure, and the eye does not see it:
+        // it tracks features going somewhere, and a feature that stays put
+        // while changing shape is a still picture being redrawn. Without
+        // this the background measured 0.24 values of change per second and
+        // a person called it static — both were true at once.
+        //
+        // **And it wanders rather than travelling one way.** A constant
+        // direction turns the background into a conveyor belt: everything
+        // enters at one edge and leaves at the other, and after a minute the
+        // eye knows where the next thing comes from. The heading turns on
+        // two circles whose periods do not divide into one another, so the
+        // path never closes and never repeats.
+        var heading = _elapsed * 0.37 + Math.Sin(_elapsed * 0.61) * 1.7;
+        _wanderX += _step * _drift * Math.Cos(heading);
+        _wanderY += _step * _drift * Math.Sin(heading) * 0.8;
+        var slide = (float)_wanderX;
+        var slideY = (float)_wanderY;
 
         Parallel.For(0, High, y =>
         {
@@ -433,13 +457,19 @@ public sealed class Backdrop
                 // Domain warping: the field's own coordinates are bent by
                 // the field, twice. One level gives clouds; two give the
                 // filaments and eddies that read as liquid.
-                var qx = Flow.Fbm(u, v, z);
-                var qy = Flow.Fbm(u + 5.2f, v + 1.3f, z);
+                // Three octaves here, four in the figure. The fourth adds
+                // detail finer than a blurred, enlarged background can
+                // show, and it is a whole extra pass over every point —
+                // paid for on every frame and seen on none.
+                var qx = Flow.Fbm(u, v, z, 3);
+                var qy = Flow.Fbm(u + 5.2f, v + 1.3f, z, 3);
 
-                var rx = Flow.Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f, z);
-                var ry = Flow.Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f, z);
+                var rx = Flow.Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f,
+                                  z, 3);
+                var ry = Flow.Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f,
+                                  z, 3);
 
-                field[row + x] = Flow.Fbm(u + warp * rx, v + warp * ry, z);
+                field[row + x] = Flow.Fbm(u + warp * rx, v + warp * ry, z, 3);
             }
         });
     }
@@ -452,7 +482,12 @@ public sealed class Backdrop
         Ink(_field, _ramp, _pixels);
         _film.WritePixels(new Int32Rect(0, 0, Wide, High), _pixels, Wide * 4, 0);
 
-        if (_calmFilm is not null && _calmRamp.Length > 0)
+        // Not painted while it is not on screen. The home screen folds the
+        // calm layer away, and until this line the window went on computing
+        // and blurring a picture nobody could see — a third of the frame,
+        // spent on the one screen where the frame is tightest.
+        if (_calmFilm is not null && _calmRamp.Length > 0
+            && _calmView?.Visibility == Visibility.Visible)
         {
             // The calm layer is the same field in the calm palette, and then
             // softened. Both halves matter: the palette alone would give a
@@ -478,6 +513,20 @@ public sealed class Backdrop
         // And against a frame from a second ago. A second is roughly how
         // long a person looks at a background before deciding whether it is
         // alive, so it is the interval the question is actually about.
+        if (!_marked)
+        {
+            // The first frame is what the next second is measured against,
+            // not something to measure. Left as it was, the mark started as
+            // an empty image and the first reading came out two hundred
+            // values a second — a frozen background would have passed this
+            // check for its first second of life, which is exactly the
+            // second a check looks at.
+            Array.Copy(_pixels, _mark, _pixels.Length);
+            _marked = true;
+            _sinceMark = 0;
+            return;
+        }
+
         _sinceMark += _clock.Interval.TotalSeconds;
         if (_sinceMark >= 1.0)
         {

@@ -71,10 +71,11 @@ public sealed class Speaker : IDisposable
         lock (_lock)
         {
             Ensure();
+            _draining = false;
             _buffer!.AddSamples(pcm.ToArray(), 0, pcm.Length);
             _written += pcm.Length;
             _said.Enqueue((_written, loud));
-            if (_device!.PlaybackState != PlaybackState.Playing) _device.Play();
+            Wake();
         }
         SetSpeaking(true);
     }
@@ -186,6 +187,66 @@ public sealed class Speaker : IDisposable
     }
 
     /// <summary>
+    /// No more sound is coming. What is already here still has to be heard.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The core closes the stream when it has finished <b>sending</b>, and
+    /// up to a second and a half of it is still sitting unplayed. Until
+    /// this existed the close called <see cref="Interrupt"/>, which stops
+    /// the device and empties the buffer — so the tail of every single
+    /// utterance was thrown away. That is what a person heard as speech
+    /// that breaks off.
+    /// </para>
+    /// <para>
+    /// Draining is also when a short phrase finally starts: shorter than
+    /// the pre-roll, it would otherwise sit in the buffer waiting for a
+    /// fullness that is never coming.
+    /// </para>
+    /// </remarks>
+    public void Drain()
+    {
+        lock (_lock)
+        {
+            if (_buffer is null) { SetSpeaking(false); return; }
+            _draining = true;
+            Wake();
+        }
+
+        // Polled rather than awaited: NAudio says nothing when a buffered
+        // provider runs out — there is no "finished" to subscribe to, only
+        // a count that reaches zero.
+        _ = Task.Run(async () =>
+        {
+            while (Pending > 0) await Task.Delay(40);
+            lock (_lock) _device?.Stop();
+            SetSpeaking(false);
+        });
+    }
+
+    //: Sound has stopped arriving; what is here is being played out.
+    private bool _draining;
+
+    /// <summary>Start the device once there is enough to play without gaps.</summary>
+    /// <remarks>
+    /// <b>Not on the first chunk.</b> Speech arrives as it is synthesised,
+    /// which is near enough to real time that a device started on the first
+    /// chunk runs the buffer dry between chunks — and a buffered provider
+    /// pads what it lacks with silence, so the gaps are heard rather than
+    /// reported. A fifth of a second in hand costs a fifth of a second of
+    /// delay and removes the whole class.
+    /// </remarks>
+    private void Wake()
+    {
+        if (_device is null || _buffer is null) return;
+        if (_device.PlaybackState == PlaybackState.Playing) return;
+
+        var preRoll = _format.AverageBytesPerSecond / 5;
+        if (!_draining && _buffer.BufferedBytes < preRoll) return;
+        _device.Play();
+    }
+
+    /// <summary>
     /// Cut the speech off right now.
     /// </summary>
     /// <remarks>
@@ -197,8 +258,10 @@ public sealed class Speaker : IDisposable
     {
         lock (_lock)
         {
+            _draining = false;
             _device?.Stop();
             _buffer?.ClearBuffer();
+            _said.Clear();
         }
         SetSpeaking(false);
     }

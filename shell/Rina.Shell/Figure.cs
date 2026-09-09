@@ -77,6 +77,17 @@ public sealed class Figure
 
     private double _turn;
     private double _breath;
+
+    //: What is followed towards its target rather than switched to it.
+    //: `_churned` is the flow's own clock, kept separately because its
+    //: **pace** is what a state changes: multiplying the shared elapsed
+    //: time by a changing rate would jerk the field back and forth as the
+    //: rate moved.
+    private double _spin = 0.35;
+    private double _twist = 0.9;
+    private double _churn = 0.8;
+    private double _burst;
+    private double _churned;
     private double _hue;
     private double _loud;
     private double _shown;
@@ -139,30 +150,41 @@ public sealed class Figure
         //               what it has to show is effort;
         //   talking   — pulses with her own voice, which is the only thing
         //               here that has a rhythm of its own.
-        var (spin, swell, twist, churn) = State switch
+        var (spin, swell, twist, churn, burst) = State switch
         {
-            Doing.Listening => (0.5, 0.10 + _loud * 0.22, 1.1, 1.3),
-            Doing.Thinking => (2.1, 0.04, 2.6, 2.2),
-            Doing.Talking => (0.9, 0.06 + _loud * 0.26, 1.4, 1.6),
-            _ => (0.35, 0.0, 0.9, 0.8),
+            Doing.Listening => (0.5, 0.09 + _loud * 0.20, 1.1, 1.3,
+                                _loud * 0.30),
+            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16),
+            Doing.Talking => (0.9, 0.05 + _loud * 0.16, 1.4, 1.6,
+                              0.10 + _loud * 0.55),
+            _ => (0.35, 0.0, 0.9, 0.8, 0.0),
         };
 
-        // The swell is followed rather than assigned: a voice arrives in
-        // jumps, and a sphere that jumped with it would twitch. Rising
-        // faster than it falls, for the same reason as the level strip —
-        // what is happening now must not be late, what has passed has
-        // nowhere to hurry.
-        var pace = swell > _shown ? 0.35 : 0.08;
-        _shown += (swell - _shown) * pace;
+        // **Everything is followed, not assigned.** The first edition eased
+        // only the swell and switched the rest — the spin, the twist, the
+        // pace of the flow — the instant the state changed, and a person
+        // saw the sphere's insides jump while its outside grew smoothly.
+        // Half a transition looks worse than none: the smooth part makes
+        // the jump conspicuous.
+        _shown = Follow(_shown, swell, swell > _shown ? 0.16 : 0.05);
+        _spin = Follow(_spin, spin, 0.06);
+        _twist = Follow(_twist, twist, 0.06);
+        _churn = Follow(_churn, churn, 0.06);
+        _burst = Follow(_burst, burst, burst > _burst ? 0.22 : 0.06);
 
-        _turn += step * spin;
+        _turn += step * _spin;
         _breath += step * (State is Doing.Idle ? 0.5 : 1.2);
+        _churned += step * _churn;
 
         Swell = _shown + Math.Sin(_breath * 2 * Math.PI) * 0.028;
-        Paint((float)(elapsed * churn), (float)_turn, (float)twist);
+        Paint((float)_churned, (float)_turn, (float)_twist, (float)_burst);
     }
 
-    private void Paint(float z, float turn, float twist)
+    /// <summary>One value moving towards another. Nothing here jumps.</summary>
+    private static double Follow(double have, double want, double pace) =>
+        have + (want - have) * pace;
+
+    private void Paint(float z, float turn, float twist, float burst)
     {
         var pixels = _pixels;
         var half = Side / 2f;
@@ -176,8 +198,21 @@ public sealed class Figure
             for (var x = 0; x < Side; x++)
             {
                 var dx = x - half;
-                var far = MathF.Sqrt(dx * dx + dy * dy) / radius;
+                var reachOut = MathF.Sqrt(dx * dx + dy * dy);
                 var at = row + x * 4;
+
+                // **The rim is thrown outward unevenly.** Growing and
+                // shrinking is a balloon; what was asked for is the thing
+                // scattering — parts of it flung further than others and
+                // coming back at their own pace. So the radius is not one
+                // number: it is a number per direction, pushed out by the
+                // flow itself at the angle being looked at. Loud enough and
+                // the sphere frays; quiet and it closes back into a circle.
+                var about = MathF.Atan2(dy, dx);
+                var scatter = burst <= 0.001f ? 0f
+                    : Flow.Fbm(MathF.Cos(about) * 1.7f,
+                               MathF.Sin(about) * 1.7f, z * 1.6f) * burst;
+                var far = reachOut / (radius * (1f + scatter));
 
                 if (far >= 1.06f)
                 {

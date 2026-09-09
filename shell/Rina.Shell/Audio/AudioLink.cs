@@ -264,10 +264,17 @@ public sealed class AudioLink : IDisposable
     private int _outputStream;
 
     /// <summary>The speech stream was closed by the core.</summary>
+    /// <remarks>
+    /// Drained, not interrupted. "The core has finished sending" and "the
+    /// person has finished hearing" are a second apart, and cutting at the
+    /// first of them threw away the end of every utterance. Interrupting is
+    /// what "stop" does, and stopping is a different thing a person asks
+    /// for out loud.
+    /// </remarks>
     public void StopPlayback()
     {
         _outputStream = 0;
-        _speaker.Interrupt();
+        _speaker.Drain();
     }
 
     /// <summary>Cut the speech off: "stop" is obliged to be instant.</summary>

@@ -60,6 +60,7 @@ public sealed class CoreLink : IAsyncDisposable
         _boss.EventReceived += message => OnUi(() =>
         {
             _window.OnCoreEvent(message);
+            FollowListening(message);
             CoreEvent?.Invoke(message);
         });
 
@@ -500,6 +501,67 @@ public sealed class CoreLink : IAsyncDisposable
             return !answer.IsError;
         }
         catch { return false; }
+    }
+
+    /// <summary>How many times capture has been started — for the check.</summary>
+    public int CaptureStarts { get; private set; }
+
+    /// <summary>Is the microphone streaming to the core right now.</summary>
+    public bool Capturing { get; private set; }
+
+    /// <summary>
+    /// The core says it is listening — so open the microphone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nobody did this, and that is why she could not hear.</b> The
+    /// whole declared path — the shell captures, the data channel carries,
+    /// the core cuts phrases and recognises — existed, was checked end to
+    /// end in <c>--check-audio</c>, and was started by nobody but that
+    /// check. In the running application <c>StartCaptureAsync</c> had not a
+    /// single caller.
+    /// </para>
+    /// <para>
+    /// The same failure is already written down one layer below, about the
+    /// sound link itself: "it existed, was checked, and was created by
+    /// nobody but the check". A path that only a check walks is a path that
+    /// works only for the check, and both times the check was green while a
+    /// person was talking to a program that was not listening.
+    /// </para>
+    /// <para>
+    /// The microphone follows what the core declares rather than a button:
+    /// there are three ways listening starts — a hotkey, the wake word, and
+    /// "always listening" — and the core is where all three already meet.
+    /// Wiring the shell to each of them separately would be three places to
+    /// keep in step.
+    /// </para>
+    /// </remarks>
+    private void FollowListening(Envelope message)
+    {
+        var wanted = message.Method switch
+        {
+            "listening.started" => true,
+            "listening.stopped" => false,
+            "listening.always" =>
+                message.Payload["enabled"]?.GetValue<bool>() == true,
+            _ => (bool?)null,
+        };
+        if (wanted is null || wanted == Capturing) return;
+
+        // "Always listening" being switched off must not shut the
+        // microphone if a single listen is going on at that moment, and the
+        // other way round. The core sends both, and the last one wins —
+        // which is what a person means by whichever they did last.
+        Capturing = wanted.Value;
+        if (wanted.Value)
+        {
+            CaptureStarts++;
+            _ = _voice?.StartCaptureAsync();
+        }
+        else
+        {
+            _ = _voice?.StopCaptureAsync();
+        }
     }
 
     /// <summary>Listen once — on a hotkey.</summary>
