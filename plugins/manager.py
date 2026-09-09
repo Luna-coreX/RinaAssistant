@@ -23,6 +23,13 @@ from core.settings_store import settings
 
 log = get_logger("plugins")
 
+#: How many elements a home tile may have.
+#:
+#: A tile that grows becomes a page, and a page has its own place. The
+#: number lives here rather than in the shell because it is a decision about
+#: the home screen, not about drawing.
+HOME_TILE_LIMIT = 4
+
 
 def plugins_dir() -> str:
     """The plugins' directory (next to the project)."""
@@ -533,6 +540,42 @@ class PluginManager:
             self.log(plugin_id,
                      tr("Ошибка page:\n") + traceback.format_exc(limit=2))
             return []
+
+    def home_tiles(self):
+        """
+        The tiles switched-on plugins want on the home screen (`4.0b-A07`).
+
+        Asked of everything that is on, in one call: the home screen draws
+        them together, and asking one at a time would make the screen appear
+        in pieces.
+
+        A plugin that throws here loses its tile and nothing else. The home
+        screen is the first thing a person sees, and a plugin is somebody
+        else's code (`T-04`): it may not take the screen down with it.
+        """
+        tiles = []
+        for plugin_id, lp in self.plugins.items():
+            if not lp.enabled or lp.instance is None:
+                continue
+            try:
+                elements = lp.instance.home() or []
+            except Exception:
+                self.log(plugin_id, tr("Ошибка home:")
+                         + "\n" + traceback.format_exc(limit=2))
+                continue
+            if not elements:
+                continue
+            tiles.append({
+                "id": plugin_id,
+                "title": getattr(lp.manifest, "name", plugin_id),
+                # Trimmed here rather than by whoever draws: how much fits on
+                # the home screen is a decision about the home screen, and
+                # asking every plugin to behave would be asking politely.
+                "elements": [e.to_dict() if hasattr(e, "to_dict") else e
+                             for e in elements[:HOME_TILE_LIMIT]],
+                "trimmed": len(elements) > HOME_TILE_LIMIT,
+            })
+        return tiles
 
     def dispatch_action(self, plugin_id, action, value=None):
         """A button on the plugin's tab was pressed."""

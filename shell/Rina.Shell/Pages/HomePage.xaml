@@ -20,6 +20,7 @@
       <RowDefinition Height="*" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <!--
@@ -50,11 +51,30 @@
                Style="{StaticResource Text.Legend}" />
 
     <!--
+      What plugins asked to show here (4.0b-A07). By ADR 0010 a plugin
+      **declares** rather than draws: these are the same elements as on its
+      own tab, laid out by us.
+
+      Above the remote and below the figure: the figure is what the screen
+      is for, the remote belongs to something that is already happening, and
+      a plugin's tile is something to glance at.
+    -->
+    <ItemsControl x:Name="Tiles" Grid.Row="2"
+                  HorizontalAlignment="Center" Margin="0,0,0,16"
+                  MaxWidth="440">
+      <ItemsControl.ItemsPanel>
+        <ItemsPanelTemplate>
+          <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+        </ItemsPanelTemplate>
+      </ItemsControl.ItemsPanel>
+    </ItemsControl>
+
+    <!--
       A remote for whatever is already playing (4.0b-A07). Hidden when
       nothing is: an empty panel with three dead buttons says the thing is
       broken, and most of the time nothing is playing.
     -->
-    <Border x:Name="Remote" Grid.Row="2" Visibility="Collapsed"
+    <Border x:Name="Remote" Grid.Row="3" Visibility="Collapsed"
             HorizontalAlignment="Center" Margin="0,0,0,40"
             MaxWidth="420" Style="{StaticResource Card}">
       <Grid>

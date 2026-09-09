@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using Rina.Protocol;
@@ -57,6 +58,11 @@ public partial class HomePage : UserControl
         // The remote is the window's, not the page's: the page is rebuilt on
         // every visit, and asking Windows for the media register each time
         // would be a system call for a thing that has not changed.
+        // Asked once, when the page appears: a tile is a glance, not a
+        // stream, and a plugin that wants to change it says so by the
+        // ordinary means — the page is rebuilt on every visit anyway.
+        Loaded += async (_, _) => await ShowTilesAsync();
+
         _remote = App.Remote;
         if (_remote is not null)
         {
@@ -225,6 +231,69 @@ public partial class HomePage : UserControl
     private void OnAccentChanged() => _figure.Build();
 
     private readonly MediaRemote? _remote;
+
+    /// <summary>
+    /// Draw what plugins asked to show here.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The same elements as a plugin's own tab, drawn by the same view: a
+    /// plugin declares and does not draw (ADR 0010), and having two
+    /// renderers would mean two ideas of what a card is.
+    /// </para>
+    /// <para>
+    /// <b>Nothing is shown while there is nothing.</b> Most people have no
+    /// plugin that wants a tile, and an empty frame reserved for one is a
+    /// hole in the screen.
+    /// </para>
+    /// </remarks>
+    private async Task ShowTilesAsync()
+    {
+        if (_link is null) return;
+        var told = await _link.AskAsync(Methods.PluginsHome);
+        Tiles.Items.Clear();
+
+        foreach (var tile in told?["tiles"]?.AsArray() ?? [])
+        {
+            if (tile is not JsonObject one) continue;
+            var id = one["id"]?.GetValue<string>() ?? "";
+            if (one["elements"] is not JsonArray elements
+                || elements.Count == 0) continue;
+
+            var view = new PluginView(_link, id);
+            view.Draw(elements);
+            view.Margin = new Thickness(0, 0, 12, 12);
+            view.MaxWidth = 208;
+            Tiles.Items.Add(view);
+        }
+    }
+
+    /// <summary>How many tiles are showing — for the check.</summary>
+    public int TilesShown => Tiles.Items.Count;
+
+    /// <summary>Draw these tiles, as if the core had offered them.</summary>
+    /// <remarks>
+    /// The two halves belong to different people, as with the remote.
+    /// Whether any plugin wants a tile depends on what is installed and
+    /// switched on; drawing what is offered is ours, and it has to be
+    /// checkable on a machine with no such plugin. Without this the
+    /// assertion read "the core offered none and none were drawn" — true,
+    /// and about nothing.
+    /// </remarks>
+    public void ShowTilesForCheck(JsonArray tiles)
+    {
+        Tiles.Items.Clear();
+        foreach (var tile in tiles)
+        {
+            if (tile is not JsonObject one) continue;
+            if (one["elements"] is not JsonArray elements
+                || elements.Count == 0) continue;
+            var view = new PluginView(_link, one["id"]?.GetValue<string>() ?? "");
+            view.Draw(elements);
+            view.MaxWidth = 208;
+            Tiles.Items.Add(view);
+        }
+    }
 
     /// <summary>
     /// Show what is playing — or nothing at all.

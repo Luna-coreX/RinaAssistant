@@ -310,6 +310,7 @@ class ProtocolServer:
             "plugins.list": self._plugins_list,
             "plugins.set_enabled": self._plugins_set_enabled,
             "plugins.page": self._plugins_page,
+            "plugins.home": self._plugins_home,
             "plugins.action": self._plugins_action,
             "plugins.install": self._plugins_install,
             "settings.reset": self._settings_reset,
@@ -1013,6 +1014,19 @@ class ProtocolServer:
         manager.toggle(plugin_id, bool(message.payload.get("enabled", False)))
         loaded = manager.plugins[plugin_id]
         return {"plugin": self._plugin_state(plugin_id, loaded)}
+
+    def _plugins_home(self, message: Envelope) -> dict:
+        """
+        What switched-on plugins want to show on the home screen.
+
+        Everything at once rather than plugin by plugin: the home screen
+        draws them together, and asking one at a time would make it appear
+        in pieces.
+        """
+        manager = self._plugin_manager()
+        if manager is None:
+            return {"tiles": []}
+        return {"tiles": manager.home_tiles()}
 
     def _plugins_page(self, message: Envelope) -> dict:
         """

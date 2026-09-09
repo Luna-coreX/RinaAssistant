@@ -68,6 +68,7 @@
     "plugins": {
       "methods": [
         "plugins.action",
+        "plugins.home",
         "plugins.install",
         "plugins.list",
         "plugins.page",
@@ -459,6 +460,7 @@
     "permission.request": "permissions",
     "ping": null,
     "plugins.action": "plugins",
+    "plugins.home": "plugins",
     "plugins.install": "plugins",
     "plugins.list": "plugins",
     "plugins.page": "plugins",

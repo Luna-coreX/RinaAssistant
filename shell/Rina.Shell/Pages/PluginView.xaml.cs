@@ -57,6 +57,24 @@ public partial class PluginView : UserControl
 
     private bool _drawn;
 
+    /// <summary>
+    /// Draw elements handed over ready — for the home screen's tiles.
+    /// </summary>
+    /// <remarks>
+    /// The home screen asks for every plugin's tile in one call
+    /// (`plugins.home`) and hands each view its own share. Letting each
+    /// view fetch its own would be a round trip per tile, and a home screen
+    /// that appears in pieces.
+    /// </remarks>
+    public void Draw(JsonArray elements)
+    {
+        _drawn = true;
+        Body.Children.Clear();
+        DrawnElements = 0;
+        foreach (var element in elements.OfType<JsonObject>())
+            Body.Children.Add(BuildElement(element, depth: 0));
+    }
+
     private void Draw(JsonObject? page)
     {
         _drawn = true;

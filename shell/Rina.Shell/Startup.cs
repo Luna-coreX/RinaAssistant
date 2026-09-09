@@ -2261,6 +2261,7 @@ public partial class App
         window.Activate();
         await Until(() => window.CurrentPage is Pages.HomePage);
 
+
         // **The clock has to be running before anything about the figure is
         // measured.** The figure moves on the background's tick, and that
         // ticks only while the window is active — a window shown off-screen
@@ -2340,6 +2341,57 @@ public partial class App
             Check("микрофон закрыли — снова ждёт",
                   home.Doing == Doing.Idle, $"| {home.Doing}");
         }
+
+        // --- and what plugins asked to show here ---
+        //
+        // The core is raised **here**, at the end, and not at the start:
+        // starting it takes the focus off our window, and everything above
+        // measures a figure that only moves while the window is active.
+        // Raised first, it turned three green assertions red and said
+        // nothing about why.
+        var link = new CoreLink(window, CoreLink.FindCore());
+        window.Link = link;
+        await link.StartAsync();
+        await Until(() => link.State == Rina.Protocol.CoreState.Ready, 12);
+        window.Activate();
+        await Until(() => window.CurrentPage is Pages.HomePage);
+        //
+        // Whether any plugin wants a tile depends on what is installed and
+        // switched on, so what is asserted is the agreement between the two
+        // sides: as many tiles as the core offers, drawn. Zero on both sides
+        // is a lawful answer and the commonest one.
+        var offered = await link.AskAsync(Rina.Protocol.Methods.PluginsHome);
+        var wanted = offered?["tiles"]?.AsArray()?.Count ?? 0;
+        var shown = (Pages.HomePage)window.CurrentPage!;
+        await Until(() => shown.TilesShown == wanted, 8);
+        Check("плиток нарисовано столько, сколько предложило ядро",
+              shown.TilesShown == wanted,
+              $"| ядро дало {wanted}, нарисовано {shown.TilesShown}");
+
+        // And the drawing itself, which must work on a machine where no
+        // plugin wants a tile — otherwise the assertion above says "none
+        // offered, none drawn" and means nothing.
+        shown.ShowTilesForCheck(new JsonArray(
+            new JsonObject
+            {
+                ["id"] = "проба",
+                ["elements"] = new JsonArray(
+                    new JsonObject
+                    {
+                        ["kind"] = "note",
+                        ["text"] = "Плитка от плагина",
+                    }),
+            }));
+        await Until(() => shown.TilesShown == 1, 5);
+        Check("объявленная плитка рисуется", shown.TilesShown == 1,
+              $"| {shown.TilesShown}");
+
+        shown.ShowTilesForCheck([]);
+        await Until(() => shown.TilesShown == 0, 5);
+        Check("а без плиток на главной их нет", shown.TilesShown == 0,
+              $"| {shown.TilesShown}");
+
+        await link.DisposeAsync();
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");

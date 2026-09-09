@@ -213,6 +213,26 @@ class Plugin:
         """
         return None
 
+    def home(self):
+        """
+        Describe a tile for the home screen (API v5, `4.0b-A07`).
+
+        The same elements as `page`, and the same rule: you say what, the
+        application decides how. `[]` or `None` means no tile — and that is
+        the right answer for most plugins. The home screen is one screen for
+        everybody, and a plugin that puts itself there is taking room from
+        whatever else is on it.
+
+        **It has to be short.** A tile that grows becomes a page, and there
+        is already a place for a page. The application keeps only the first
+        few elements and says so rather than scrolling a home screen.
+
+        **It is drawn often** — the home screen is where a person lands —
+        so build it from what you already know rather than going to the
+        network here. Fetch on your own schedule and answer from memory.
+        """
+        return None
+
     def on_action(self, action: str, value=None):
         """
         A button with this action on the plugin's tab was pressed.

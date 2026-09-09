@@ -130,6 +130,10 @@ _CAPABILITY_LIST = (
                "напоминания по открытию программ (4.0b-A03, T-19)"),
     Capability("plugins", Side.CORE,
                ("plugins.list", "plugins.set_enabled", "plugins.page",
+                # Tiles for the home screen (`4.0b-A07`). Inside the plugins
+                # capability rather than a base method: a shell without
+                # plugins has no tiles to ask for.
+                "plugins.home",
                 "plugins.action", "plugins.install"),
                "плагины"),
     # User commands and history. Introduced in 4.0-F04: the surface

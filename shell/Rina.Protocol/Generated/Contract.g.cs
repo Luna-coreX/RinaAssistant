@@ -81,6 +81,8 @@ public static class Methods
     /// <summary>Возможность: plugins.</summary>
     public const string PluginsAction = "plugins.action";
     /// <summary>Возможность: plugins.</summary>
+    public const string PluginsHome = "plugins.home";
+    /// <summary>Возможность: plugins.</summary>
     public const string PluginsInstall = "plugins.install";
     /// <summary>Возможность: plugins.</summary>
     public const string PluginsList = "plugins.list";
@@ -168,6 +170,7 @@ public static class Methods
             ["permission.request"] = "permissions",
             ["ping"] = null,
             ["plugins.action"] = "plugins",
+            ["plugins.home"] = "plugins",
             ["plugins.install"] = "plugins",
             ["plugins.list"] = "plugins",
             ["plugins.page"] = "plugins",

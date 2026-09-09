@@ -140,7 +140,7 @@
 | `stt` | ядро | `speech.listen_once`, `speech.set_always_listen` |
 | `tts` | ядро | `speech.say` |
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
-| `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.action`, `plugins.install` |
+| `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `history` | ядро | `history.list`, `history.clear`, `history.export` |
 | `llm` | ядро | — |
@@ -262,6 +262,7 @@
 | `plugins.list` | — | список с состоянием |
 | `plugins.set_enabled` | `plugin_id`, `enabled` | состояние |
 | `plugins.page` | `plugin_id` | декларативное описание страницы |
+| `plugins.home` | — | плитки включённых плагинов для главного экрана (`4.0b-A07`); всё сразу, потому что главная рисует их вместе |
 | `plugins.action` | `plugin_id`, `action`, `values` | новое описание страницы |
 | `plugins.install` | `source` | установленный плагин |
 | `commands.list` | — | список своих команд |

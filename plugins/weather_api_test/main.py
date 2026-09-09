@@ -4,8 +4,10 @@ Uses Open-Meteo's geocoding and forecast APIs. No API key is required.
 """
 
 from plugins.api import Plugin, PluginTool
+from plugins.page_spec import Card, Note, Title
 from core.tools import Param
 import json
+import time
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
@@ -23,6 +25,54 @@ class WeatherApiDemo(Plugin):
                 confirm_required=False,
             )
         ]
+
+    #: What was last fetched, and when. The home screen is drawn every
+    #: time a person lands on it, and going to the network from `home`
+    #: would mean a request per glance — and a home screen that waits for
+    #: somebody else's server before it appears.
+    _said = ""
+    _asked_at = 0.0
+
+    #: How long an answer is worth showing. Weather does not change in a
+    #: minute, and a person who wants it now can ask out loud.
+    FRESH_FOR = 900.0
+
+    def home(self):
+        """
+        A tile for the home screen (`4.0b-A07`).
+
+        Answers from memory. If nothing has been fetched yet the tile says
+        so rather than being absent: "ask me and I will know" is a state
+        worth showing, and a plugin that appears only after its first
+        success looks broken until then.
+        """
+        city = self.ctx.get_setting("city", "") if self.ctx else ""
+        if not city:
+            return None
+
+        if self._said and time.time() - self._asked_at < self.FRESH_FOR:
+            return [Card([Title(city), Note(self._said)], title="Погода")]
+
+        # Fetching happens off the drawing path: the tile shows what it has
+        # and asks for more in the background.
+        self._refresh(city)
+        return [Card([Title(city),
+                      Note(self._said or "Смотрю…")], title="Погода")]
+
+    def _refresh(self, city):
+        import threading
+
+        def work():
+            try:
+                said = self._weather(city)
+            except Exception as exc:                     # noqa: BLE001
+                self.log(f"Weather API error: {exc}")
+                return
+            self._said = said
+            self._asked_at = time.time()
+
+        threading.Thread(target=work, daemon=True,
+                         name="weather-tile").start()
 
     def on_command(self, text: str) -> bool:
         # Keep command handling deliberately simple: the tool path is the
