@@ -131,6 +131,12 @@
   "Где лежит модель": {
     "English": "Where the model lives"
   },
+  "Главная": {
+    "English": "Home"
+  },
+  "Говорю": {
+    "English": "Speaking"
+  },
   "Говорю…": {
     "English": "Speaking…"
   },
@@ -203,6 +209,9 @@
   "Добавлено {0}, пропущено как уже известные {1}.": {
     "English": "Added {0}, skipped {1} already known."
   },
+  "Думаю": {
+    "English": "Thinking"
+  },
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
@@ -247,6 +256,9 @@
   },
   "Заменён: {0}. Он выключен — включите, если доверяете.": {
     "English": "Replaced: {0}. It is off — turn it on if you trust it."
+  },
+  "Замечать, какие программы открыты": {
+    "English": "Notice which programs are open"
   },
   "Записать": {
     "English": "Record"
@@ -485,6 +497,9 @@
   "Нужна хотя бы одна фраза.": {
     "English": "At least one phrase is needed."
   },
+  "Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает": {
+    "English": "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once"
+  },
   "Нужно указать, что делать.": {
     "English": "You need to say what to do."
   },
@@ -713,6 +728,9 @@
   "Раздел появится в 4.0-F04.": {
     "English": "This section arrives in 4.0-F04."
   },
+  "Разделы": {
+    "English": "Sections"
+  },
   "Распознавание": {
     "English": "Recognition"
   },
@@ -758,6 +776,9 @@
   "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
     "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
   },
+  "Серебро, чёрное или графит": {
+    "English": "Silver, black or graphite"
+  },
   "Система синтеза": {
     "English": "Synthesis engine"
   },
@@ -793,6 +814,9 @@
     "Українська": "Слова активації",
     "Español": "Palabras de activación",
     "Deutsch": "Aktivierungswörter"
+  },
+  "Слушаю": {
+    "English": "Listening"
   },
   "Слушаю две секунды — скажите что-нибудь…": {
     "English": "Listening for two seconds — say something…"
@@ -892,6 +916,12 @@
   },
   "Файл модели .onnx": {
     "English": "The .onnx model file"
+  },
+  "Файл не разобрался как JSON.": {
+    "English": "The file did not parse as JSON.",
+    "Українська": "Файл не розібрався як JSON.",
+    "Español": "El archivo no se pudo analizar como JSON.",
+    "Deutsch": "Die Datei ließ sich nicht als JSON lesen."
   },
   "Фразы, по которым сработает": {
     "English": "Phrases that trigger it"
@@ -1135,20 +1165,5 @@
   },
   "ядро не отвечает": {
     "English": "the core isn’t responding"
-  },
-  "Файл не разобрался как JSON.": {
-    "English": "The file did not parse as JSON.",
-    "Українська": "Файл не розібрався як JSON.",
-    "Español": "El archivo no se pudo analizar como JSON.",
-    "Deutsch": "Die Datei ließ sich nicht als JSON lesen."
-  },
-  "Замечать, какие программы открыты": {
-    "English": "Notice which programs are open"
-  },
-  "Нужно для напоминаний «когда открою редактор». Рина замечает переключение и тут же забывает": {
-    "English": "Needed for reminders like “when I open the editor”. Rina notices the switch and forgets it at once"
-  },
-  "Серебро, чёрное или графит": {
-    "English": "Silver, black or graphite"
   }
 }

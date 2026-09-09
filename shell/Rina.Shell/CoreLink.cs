@@ -146,7 +146,11 @@ public sealed class CoreLink : IAsyncDisposable
 
         // The strip shows a real level rather than one and the same
         // number: an instrument whose needle knows two positions is a lamp.
-        _voice.Level += level => OnUi(() => _window.ShowLevel(level));
+        _voice.Level += level => OnUi(() =>
+        {
+            _window.ShowLevel(level);
+            Level?.Invoke(level);
+        });
         _ = ApplyAudioSettingsAsync();
     }
 
@@ -169,6 +173,26 @@ public sealed class CoreLink : IAsyncDisposable
 
     /// <summary>Core events for the pages. Already in the window's thread.</summary>
     public event Action<Envelope>? CoreEvent;
+
+    /// <summary>How loud the microphone is right now.</summary>
+    /// <remarks>
+    /// Passed on rather than reached for. The sound link is created and
+    /// destroyed with the connection, and a page that held on to it would
+    /// be holding an object that had already gone.
+    /// </remarks>
+    public event Action<float>? Level;
+
+    /// <summary>Is Rina speaking out loud at this moment.</summary>
+    /// <remarks>
+    /// Not an event and not a message: this is the state of the audio
+    /// queue, and the audio does not announce itself. The core sends the
+    /// text of an answer and then the sound of it; the moment she really
+    /// stops is the moment the last frame has played, and only this side
+    /// knows it. Taking `assistant.response` for "talking" would light the
+    /// figure up for the length of a message rather than for the length of
+    /// a sentence said aloud.
+    /// </remarks>
+    public bool Speaking => _voice is { Pending: > 0 };
 
     public Task StartAsync() => _boss.StartAsync();
 

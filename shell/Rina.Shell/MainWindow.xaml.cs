@@ -29,6 +29,7 @@ public partial class MainWindow : Window
     /// <summary>The sections in the order they stand in the column.</summary>
     private static readonly (string Name, string Title)[] SectionList =
     [
+        ("home", Word("Главная")),
         ("dialog", Word("Диалог")),
         ("commands", Word("Команды")),
         ("reminders", Word("Напоминания")),
@@ -73,6 +74,15 @@ public partial class MainWindow : Window
         // the god object that block B was started to get rid of.
         _pages = new Dictionary<string, Func<UIElement>>
         {
+            ["home"] = () =>
+            {
+                // The figure moves at the background's pace, and is given
+                // that pace here rather than taking one of its own: every
+                // reason the background stops is a reason the figure stops.
+                var page = new Pages.HomePage(Link);
+                page.FollowClock(_backdrop);
+                return page;
+            },
             ["dialog"] = () => new Pages.DialoguePage(Link),
             ["commands"] = () => new Pages.CommandsPage(Link),
             ["reminders"] = () => new Pages.RemindersPage(Link),
@@ -82,7 +92,7 @@ public partial class MainWindow : Window
         };
 
         BuildSections();
-        ShowSection("dialog");
+        ShowSection("home");
 
         Strings.Loc.Changed += OnLanguageChanged;
         Closed += (_, _) => Strings.Loc.Changed -= OnLanguageChanged;
@@ -134,13 +144,110 @@ public partial class MainWindow : Window
     public object? CurrentPage => Pane.Content;
 
     /// <summary>Open a section from outside — for screenshots and checks.</summary>
-    public void ShowSectionFor(string section) => ShowSection(section);
+    /// <remarks>
+    /// The menu is opened along with it, and that is not a convenience for
+    /// the checks: a section is chosen **from** the menu, so a person who
+    /// is looking at a section they just picked has had the menu open a
+    /// moment ago. A screenshot taken with it shut would be a picture of a
+    /// state nobody arrives at by choosing.
+    /// </remarks>
+    public void ShowSectionFor(string section)
+    {
+        ShowMenu(true);
+        ShowSection(section);
+    }
+
+    /// <summary>Is the section menu open.</summary>
+    public bool MenuOpen { get; private set; }
+
+    /// <summary>How wide the menu is right now — for the check.</summary>
+    /// <remarks>
+    /// "It is closed" cannot be seen in a screenshot taken at the wrong
+    /// moment: the column takes 220 ms to fold away, and a picture caught
+    /// halfway shows a half-open menu that is neither state. This is the
+    /// number, and it is read after the movement is over.
+    /// </remarks>
+    public double MenuWidth => MenuColumn.Width.Value;
+
+    private void OnMenu(object sender, RoutedEventArgs e) =>
+        ShowMenu(!MenuOpen);
+
+    /// <summary>Fold the section menu out or away.</summary>
+    /// <remarks>
+    /// The width is animated rather than switched, and the same 220 ms as a
+    /// section change (SYSTEM §7): the menu is part of the instrument, and
+    /// a part of an instrument that appears instantly reads as a part that
+    /// was hidden rather than as one that was folded away.
+    /// </remarks>
+    public void ShowMenu(bool open)
+    {
+        if (MenuOpen == open) return;
+        MenuOpen = open;
+
+        var wide = (GridLength)FindResource("Col.LegendColumn");
+        var from = MenuColumn.Width.Value;
+        var to = open ? wide.Value : 0;
+        var span = (Duration)FindResource("Motion.Panel");
+        var ease = (System.Windows.Media.Animation.IEasingFunction)
+            FindResource("Ease.In");
+
+        // A GridLength cannot be animated by WPF's own animations — there is
+        // no GridLengthAnimation in the framework, and writing one would be
+        // a class for one property. A clock that assigns the width is the
+        // ordinary way round it, and here it is the cheaper one too.
+        var clock = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = span,
+            EasingFunction = ease,
+        };
+        var carrier = new System.Windows.Controls.Border();
+        carrier.SetValue(System.Windows.FrameworkElement.WidthProperty, from);
+        carrier.SizeChanged += (_, _) =>
+            MenuColumn.Width = new GridLength(carrier.Width);
+        carrier.BeginAnimation(System.Windows.FrameworkElement.WidthProperty,
+                               clock);
+
+        // The carrier is not in the tree, so it raises no SizeChanged. The
+        // width is followed by the rendering clock instead — one line, and
+        // no invisible element pretending to be part of the window.
+        System.Windows.Media.CompositionTarget.Rendering -= FollowMenu;
+        _menuCarrier = carrier;
+        System.Windows.Media.CompositionTarget.Rendering += FollowMenu;
+    }
+
+    private System.Windows.Controls.Border? _menuCarrier;
+
+    private void FollowMenu(object? sender, EventArgs e)
+    {
+        if (_menuCarrier is null) return;
+        var width = _menuCarrier.Width;
+        MenuColumn.Width = new GridLength(double.IsNaN(width) ? 0 : width);
+        var wanted = MenuOpen
+            ? ((GridLength)FindResource("Col.LegendColumn")).Value : 0;
+        if (Math.Abs(width - wanted) < 0.5)
+        {
+            MenuColumn.Width = new GridLength(wanted);
+            System.Windows.Media.CompositionTarget.Rendering -= FollowMenu;
+            _menuCarrier = null;
+        }
+    }
 
     private void ShowSection(string section)
     {
         if (!_pages.TryGetValue(section, out var build)) return;
         _section = section;
         Pane.Content = build();
+
+        // The home screen shows the flow as it is; every other section
+        // shows it calmed and softened (4.0b-A06, 4.0b-A07). This is the
+        // place that decision finally lands: until there was a screen one
+        // *looks* at, the vivid layer had nowhere to be but under the
+        // window's own bars, where it read as a stripe rather than as a
+        // difference between screens.
+        BackdropCalm.Visibility = section is "home"
+            ? Visibility.Collapsed : Visibility.Visible;
 
         // A transition between sections is 220 ms (SYSTEM §7). An
         // appearance, not a "slide-in": movement is obliged to answer the

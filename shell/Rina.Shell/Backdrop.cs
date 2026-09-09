@@ -224,6 +224,9 @@ public sealed class Backdrop
     /// <summary>Somebody changed <see cref="Stillness"/>.</summary>
     private static event Action? Asked;
 
+    /// <summary>A frame has passed: how far the field is, and by how much.</summary>
+    public event Action<double, double>? Ticked;
+
     /// <summary>
     /// Take the ramp of the finish that is on now, and repaint.
     /// </summary>
@@ -327,6 +330,13 @@ public sealed class Backdrop
         _elapsed += step;
         Phase = (Phase + step) % 1.0;
         Repaint();
+
+        // Anything else that moves at the flow's pace hangs off this, and
+        // not off a clock of its own. Every reason this one stops — the
+        // window hidden, the system asked for stillness — is a reason they
+        // stop too, and a second clock would be a second place to remember
+        // that, which is a second place to forget it.
+        Ticked?.Invoke(_elapsed, step);
     }
 
     /// <summary>Compute one frame of the flow.</summary>
@@ -387,13 +397,13 @@ public sealed class Backdrop
                 // Domain warping: the field's own coordinates are bent by
                 // the field, twice. One level gives clouds; two give the
                 // filaments and eddies that read as liquid.
-                var qx = Fbm(u, v, z);
-                var qy = Fbm(u + 5.2f, v + 1.3f, z);
+                var qx = Flow.Fbm(u, v, z);
+                var qy = Flow.Fbm(u + 5.2f, v + 1.3f, z);
 
-                var rx = Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f, z);
-                var ry = Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f, z);
+                var rx = Flow.Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f, z);
+                var ry = Flow.Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f, z);
 
-                field[row + x] = Fbm(u + warp * rx, v + warp * ry, z);
+                field[row + x] = Flow.Fbm(u + warp * rx, v + warp * ry, z);
             }
         });
     }
@@ -440,7 +450,7 @@ public sealed class Backdrop
             var to = y * Wide * 4;
             for (var x = 0; x < Wide; x++)
             {
-                var (red, green, blue) = Shade(ramp, field[from + x]);
+                var (red, green, blue) = Flow.Shade(ramp, field[from + x]);
                 var at = to + x * 4;
                 pixels[at] = blue;
                 pixels[at + 1] = green;
@@ -496,107 +506,6 @@ public sealed class Backdrop
                                          + pass[at + step]) / 3);
                 }
         });
-    }
-
-    /// <summary>A value of the field -> a colour of the ramp.</summary>
-    private static (byte R, byte G, byte B) Shade(
-        (byte R, byte G, byte B)[] ramp, float value)
-    {
-        value = Math.Clamp(value * 0.5f + 0.5f, 0f, 0.999f);
-        var place = value * (ramp.Length - 1);
-        var low = (int)place;
-        var mix = place - low;
-        var a = ramp[low];
-        var b = ramp[Math.Min(low + 1, ramp.Length - 1)];
-        return ((byte)(a.R + (b.R - a.R) * mix),
-                (byte)(a.G + (b.G - a.G) * mix),
-                (byte)(a.B + (b.B - a.B) * mix));
-    }
-
-    /// <summary>Fractal noise: four octaves, each finer and quieter.</summary>
-    /// <remarks>
-    /// Four and not seven. Every further octave is another pass over every
-    /// pixel, and past this its features fall below what the enlargement can
-    /// show — it would be paid for and not seen. The number was raised from
-    /// three once the frame was measured and found to cost a fifth of its
-    /// budget: detail one can afford is detail worth having.
-    /// </remarks>
-    private static float Fbm(float x, float y, float z)
-    {
-        var sum = 0f;
-        var weight = 0.5f;
-        for (var octave = 0; octave < 4; octave++)
-        {
-            sum += weight * Noise(x, y, z);
-            x *= 2.03f;
-            y *= 2.03f;
-            // Time speeds up with the octaves, but far less than space does.
-            // At the same factor the fine detail would boil while the large
-            // forms barely moved, and the picture would read as static shapes
-            // with static noise crawling over them.
-            z *= 1.27f;
-            weight *= 0.5f;
-        }
-        return sum * 2f - 1f;
-    }
-
-    /// <summary>Smooth value noise on a three-dimensional lattice.</summary>
-    /// <remarks>
-    /// <para>
-    /// Two coordinates are the place and the third is time, and all three
-    /// are interpolated. The third one is the whole point of this method's
-    /// second edition.
-    /// </para>
-    /// <para>
-    /// <b>The first edition did not interpolate time at all.</b> It floored
-    /// the time coordinate and fed the whole number straight to the hash, so
-    /// the field stood perfectly still while time stayed inside one cell of
-    /// the lattice and then snapped to an unrelated field when it crossed
-    /// into the next. A person watching it saw a jerk every few seconds and
-    /// nothing in between, and read that as a low frame rate — which it was
-    /// not: every frame was computed, and every frame was identical. The
-    /// frames were never the problem, and no amount of raising their number
-    /// would have helped.
-    /// </para>
-    /// </remarks>
-    private static float Noise(float x, float y, float z)
-    {
-        int xi = (int)MathF.Floor(x), yi = (int)MathF.Floor(y),
-            zi = (int)MathF.Floor(z);
-        float xf = x - xi, yf = y - yi, zf = z - zi;
-
-        // Smoothstep on all three axes: linear interpolation leaves the
-        // lattice visible as a grid of creases — in space as a mesh, in
-        // time as a pulse.
-        float u = xf * xf * (3 - 2 * xf);
-        float v = yf * yf * (3 - 2 * yf);
-        float w = zf * zf * (3 - 2 * zf);
-
-        float near = Plane(xi, yi, zi, u, v);
-        float far = Plane(xi, yi, zi + 1, u, v);
-        return near * (1 - w) + far * w;
-    }
-
-    /// <summary>One time-slice of the lattice, interpolated in place.</summary>
-    private static float Plane(int xi, int yi, int zi, float u, float v)
-    {
-        float c00 = Hash(xi, yi, zi);
-        float c10 = Hash(xi + 1, yi, zi);
-        float c01 = Hash(xi, yi + 1, zi);
-        float c11 = Hash(xi + 1, yi + 1, zi);
-        return (c00 * (1 - u) + c10 * u) * (1 - v)
-             + (c01 * (1 - u) + c11 * u) * v;
-    }
-
-    /// <summary>A repeatable number in [0, 1) from three whole coordinates.</summary>
-    private static float Hash(int x, int y, int z)
-    {
-        unchecked
-        {
-            var n = x * 374761393 + y * 668265263 + z * 1274126177;
-            n = (n ^ (n >> 13)) * 1274126177;
-            return ((n ^ (n >> 16)) & 0x7fffffff) / (float)0x7fffffff;
-        }
     }
 
     private static double Token(string key, double fallback) =>

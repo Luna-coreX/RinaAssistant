@@ -1,0 +1,52 @@
+<!--
+  The home screen (4.0b-A07).
+
+  Deliberately almost empty. This is the screen a person looks at rather
+  than reads, and everything that arrives here later — the remote for
+  whatever is playing, the places plugins put their own things — arrives
+  around the figure, not instead of it.
+
+  There is no title here, and that is not an omission. Every other section
+  says its name because a person got there by choosing it from a list; this
+  one is where they end up without choosing, and a window that announces
+  itself on opening is a window that thinks it is a document.
+-->
+<UserControl x:Class="Rina.Shell.Pages.HomePage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!--
+      The figure. A fixed size rather than a stretched one: it is an
+      instrument's aperture, and an aperture that changes size with the
+      window is a puddle.
+    -->
+    <Grid Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+      <Image x:Name="Face" Width="264" Height="264"
+             IsHitTestVisible="False" />
+
+      <!--
+        A ring around it: one line, in the accent. What says "this is an
+        instrument and not a picture" — an aperture has an edge, and the
+        edge is machined.
+      -->
+      <Ellipse x:Name="Ring" Width="248" Height="248"
+               StrokeThickness="1"
+               Stroke="{DynamicResource C.Signal}"
+               Opacity="0.5" IsHitTestVisible="False" />
+    </Grid>
+
+    <!--
+      What she is doing, in words. The figure says it without words for
+      anyone watching; this says it for anyone who is not, and for anyone
+      who reads the screen rather than sees it.
+    -->
+    <TextBlock x:Name="DoingText" Grid.Row="1"
+               HorizontalAlignment="Center" Margin="0,0,0,48"
+               Style="{StaticResource Text.Legend}" />
+  </Grid>
+</UserControl>

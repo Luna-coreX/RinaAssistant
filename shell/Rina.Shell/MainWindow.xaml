@@ -37,9 +37,32 @@
     <!-- The title bar: our own, because the typography is our own -->
     <Grid Grid.Row="0" Background="{DynamicResource C.Glass.Bar}"
           Height="{StaticResource Size.Row}">
-      <TextBlock Text="Rina Assistant" VerticalAlignment="Center"
-                 Margin="16,0,0,0" FontSize="12" FontWeight="Medium"
-                 Foreground="{DynamicResource C.InkSoft}" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+        <!--
+          Three lines (4.0b-A07). The sections used to stand in a column
+          that was always there; now they are behind this, and the window
+          gives its whole width to what a person came for.
+
+          Drawn rather than set as a character: the glyphs that look like
+          this are not in every font, and a title bar that shows a box
+          instead of a button is a title bar with a hole in it.
+        -->
+        <Button x:Name="BtnMenu" Style="{StaticResource Btn.Window}"
+                Click="OnMenu" ToolTip="{loc:S 'Разделы'}"
+                Width="{StaticResource Size.Row}">
+          <StackPanel VerticalAlignment="Center">
+            <Rectangle Width="14" Height="1" Margin="0,2"
+                       Fill="{DynamicResource C.InkSoft}" />
+            <Rectangle Width="14" Height="1" Margin="0,2"
+                       Fill="{DynamicResource C.InkSoft}" />
+            <Rectangle Width="14" Height="1" Margin="0,2"
+                       Fill="{DynamicResource C.InkSoft}" />
+          </StackPanel>
+        </Button>
+        <TextBlock Text="Rina Assistant" VerticalAlignment="Center"
+                   Margin="4,0,0,0" FontSize="12" FontWeight="Medium"
+                   Foreground="{DynamicResource C.InkSoft}" />
+      </StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
         <Button x:Name="BtnMinimise" Style="{StaticResource Btn.Window}"
                 Content="&#x2013;" Click="OnMinimise" ToolTip="{loc:S 'Свернуть'}" />
@@ -52,7 +75,7 @@
 
     <Grid Grid.Row="1" ClipToBounds="True">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="{StaticResource Col.LegendColumn}" />
+        <ColumnDefinition x:Name="MenuColumn" Width="0" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
 

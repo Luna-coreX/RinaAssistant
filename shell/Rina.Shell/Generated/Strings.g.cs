@@ -256,6 +256,16 @@ public static partial class Loc
                 {
                     ["English"] = "WHERE THINGS ARE",
                 },
+            ["Главная"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Home",
+                },
+            ["Говорю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Speaking",
+                },
             ["Говорю…"] =
                 new Dictionary<string, string>
                 {
@@ -363,6 +373,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Added {0}, skipped {1} already known.",
+                },
+            ["Думаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Thinking",
                 },
             ["Если не ответить, действие не выполнится."] =
                 new Dictionary<string, string>
@@ -1334,6 +1349,11 @@ public static partial class Loc
                 {
                     ["English"] = "This section arrives in 4.0-F04.",
                 },
+            ["Разделы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sections",
+                },
             ["Распознавание"] =
                 new Dictionary<string, string>
                 {
@@ -1470,6 +1490,11 @@ public static partial class Loc
                     ["English"] = "Wake words",
                     ["Español"] = "Palabras de activación",
                     ["Українська"] = "Слова активації",
+                },
+            ["Слушаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening",
                 },
             ["Слушаю две секунды — скажите что-нибудь…"] =
                 new Dictionary<string, string>

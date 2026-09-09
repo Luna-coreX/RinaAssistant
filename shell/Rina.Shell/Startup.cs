@@ -56,6 +56,15 @@ public partial class App
         var window = new MainWindow();
         window.ShowFinish(finish);
 
+        // A screenshot is taken of a section, and with the menu out
+        // (4.0b-A07). The pixel comparison is about the panel and its
+        // areas — the column, the seam, the accent mark — and none of them
+        // is on the home screen, where the menu is folded away and the
+        // figure has the window to itself. Without this the plain `--shot`
+        // photographed a screen the check was never written about.
+        if (Value(args, "--shot") is not null)
+            window.ShowSectionFor(Value(args, "--section") ?? "settings");
+
         // The end-to-end self-check: raise a real core, wait for the link,
         // say what came of it, and exit. The screenshot shows what the
         // window looks like; this shows that it is alive.
@@ -120,6 +129,13 @@ public partial class App
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _ = CheckMotionAsync(window);
+            return;
+        }
+
+        if (args.Contains("--check-home"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckHomeAsync(window);
             return;
         }
 
@@ -1582,6 +1598,96 @@ public partial class App
         var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
         for (var i = 0; i < count; i++)
             yield return System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+    }
+
+    /// <summary>
+    /// A07: the home screen — the menu, and the figure's four states.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Two things a screenshot cannot settle. <b>Whether the menu is shut
+    /// by default</b> is a question about the moment a person first sees
+    /// the window, and every other check opens it deliberately in order to
+    /// measure the column. <b>Whether the four states differ</b> is a
+    /// question about four pictures, and nobody looks at four screenshots
+    /// side by side and calls it a check.
+    /// </para>
+    /// <para>
+    /// The states are set directly rather than by making the core listen
+    /// and think: what is being checked here is that the figure renders
+    /// them differently, not that the events arrive — the events have their
+    /// own path and their own check. Waiting for a microphone would make
+    /// this a check of the microphone.
+    /// </para>
+    /// </remarks>
+    private async Task CheckHomeAsync(MainWindow window)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== главная: меню и фигура ===");
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        await Task.Delay(600);
+
+        Check("окно открывается на главной",
+              window.CurrentPage is Pages.HomePage,
+              $"| {window.CurrentPage?.GetType().Name}");
+        Check("разделы спрятаны за меню", !window.MenuOpen);
+        Check("и колонка свёрнута", window.MenuWidth < 1,
+              $"| ширина {window.MenuWidth:0.0}");
+
+        window.ShowMenu(true);
+        await Task.Delay(400);
+        Check("три полоски открывают разделы", window.MenuWidth > 100,
+              $"| ширина {window.MenuWidth:0.0}");
+
+        window.ShowMenu(false);
+        await Task.Delay(400);
+        Check("и закрывают обратно", window.MenuWidth < 1,
+              $"| ширина {window.MenuWidth:0.0}");
+
+        // The figure. Four states, and the picture has to differ between
+        // them — otherwise there are four names and one behaviour.
+        if (window.CurrentPage is not Pages.HomePage home)
+        {
+            Console.WriteLine("  FAIL  фигуры нет — дальше нечего проверять");
+            fails++;
+        }
+        else
+        {
+            var seen = new List<(Doing State, double Swell)>();
+            foreach (var doing in new[] { Doing.Idle, Doing.Listening,
+                                          Doing.Thinking, Doing.Talking })
+            {
+                home.ShowDoingFor(doing, doing is Doing.Listening ? 0.8 : 0);
+                Check($"состояние {doing} принято", home.Doing == doing);
+                // Measured after a frame has passed: the swell is worked
+                // out while painting, and asking before the first frame
+                // would read the value of the state before.
+                await Task.Delay(220);
+                seen.Add((doing, home.Swell));
+            }
+
+            for (var at = 1; at < seen.Count; at++)
+                Check($"{seen[at].State} отличается от покоя",
+                      Math.Abs(seen[at].Swell - seen[0].Swell) > 0.01,
+                      $"| {seen[0].Swell:0.000} против {seen[at].Swell:0.000}");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
     }
 
     /// <summary>
