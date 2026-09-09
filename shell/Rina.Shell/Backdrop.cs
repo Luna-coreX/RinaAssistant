@@ -115,6 +115,12 @@ public sealed class Backdrop
     //: wandering path is an integral and has no closed form.
     private double _wanderX;
     private double _wanderY;
+
+    //: A second wander, carried into the warp rather than the sample point.
+    //: It moves what the field is bent **by**, so the fine structure travels
+    //: against the coarse instead of with it.
+    private double _churnX;
+    private double _churnY;
     private double _step;
     private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
@@ -433,17 +439,26 @@ public sealed class Backdrop
         // this the background measured 0.24 values of change per second and
         // a person called it static — both were true at once.
         //
-        // **And it wanders rather than travelling one way.** A constant
-        // direction turns the background into a conveyor belt: everything
-        // enters at one edge and leaves at the other, and after a minute the
-        // eye knows where the next thing comes from. The heading turns on
-        // two circles whose periods do not divide into one another, so the
-        // path never closes and never repeats.
-        var heading = _elapsed * 0.37 + Math.Sin(_elapsed * 0.61) * 1.7;
-        _wanderX += _step * _drift * Math.Cos(heading);
-        _wanderY += _step * _drift * Math.Sin(heading) * 0.8;
+        // **And every part goes its own way.** One heading for the whole
+        // field, however it turns, still carries everything together: a
+        // person sees the picture drift into a corner and come round, which
+        // is a procession, not a flow. Two headings on periods that do not
+        // divide into one another, applied at **different depths** of the
+        // warp, is what makes the parts disagree: the coarse forms go one
+        // way while the fine ones go another, and nothing in the picture
+        // shares a direction with the rest for long.
+        var oneWay = _elapsed * 0.37 + Math.Sin(_elapsed * 0.61) * 1.7;
+        var other = _elapsed * -0.23 + Math.Sin(_elapsed * 0.41 + 2.1) * 2.3;
+
+        _wanderX += _step * _drift * Math.Cos(oneWay);
+        _wanderY += _step * _drift * Math.Sin(oneWay) * 0.8;
+        _churnX += _step * _drift * Math.Cos(other) * 1.4;
+        _churnY += _step * _drift * Math.Sin(other) * 1.4;
+
         var slide = (float)_wanderX;
         var slideY = (float)_wanderY;
+        var churnX = (float)_churnX;
+        var churnY = (float)_churnY;
 
         Parallel.For(0, High, y =>
         {
@@ -464,10 +479,10 @@ public sealed class Backdrop
                 var qx = Flow.Fbm(u, v, z, 3);
                 var qy = Flow.Fbm(u + 5.2f, v + 1.3f, z, 3);
 
-                var rx = Flow.Fbm(u + warp * qx + 1.7f, v + warp * qy + 9.2f,
-                                  z, 3);
-                var ry = Flow.Fbm(u + warp * qx + 8.3f, v + warp * qy + 2.8f,
-                                  z, 3);
+                var rx = Flow.Fbm(u + warp * qx + 1.7f + churnX,
+                                  v + warp * qy + 9.2f + churnY, z, 3);
+                var ry = Flow.Fbm(u + warp * qx + 8.3f + churnX,
+                                  v + warp * qy + 2.8f + churnY, z, 3);
 
                 field[row + x] = Flow.Fbm(u + warp * rx, v + warp * ry, z, 3);
             }

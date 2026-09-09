@@ -74,6 +74,20 @@ class RinaEngine:
         #: Who touches the machine instead of the core itself (4.0-G01,
         #: ADR 0009). Until it is set, the core acts itself, as in 3.1.0.
         self.system_out = None
+        #: Who listens to the microphone instead of the core (`4.0-G`).
+        #:
+        #: The microphone belongs to the shell for exactly the reason
+        #: launching programs and system actions do: whoever parses speech
+        #: must not hold the device. Until this is set the core listens for
+        #: itself — that is how 3.1.0 works, where there is no shell at all.
+        #:
+        #: It exists because the declared 4.0 path had never once run. The
+        #: shell sent sound, the core piled it into the segmenter — and both
+        #: a single listen and "always listening" opened **their own**
+        #: microphone and never looked at that sound. Two sets of ears, and
+        #: the one working was the one the architecture says must not.
+        self.ears_outside = False
+
         #: Where to get the program index from. In 4.0 that is the shell
         #: (4.0-G06): the registry and the Start menu are Windows data, and
         #: reading them from a process that is obliged to work without
@@ -291,6 +305,22 @@ class RinaEngine:
 
         sounds.play_activation(self._settings)
         self._emit(Events.LISTENING_STARTED)
+
+        # With a shell the core does not touch the microphone: it has
+        # announced that it is listening, and the sound will arrive over the
+        # data channel. `_hear` cuts it into phrases and starts recognition
+        # itself — what is left here is to hold the window open and say when
+        # it closed.
+        if self.ears_outside:
+            self._emit(Events.CAPTURING, active=True)
+            try:
+                time.sleep(self.listen_seconds())
+            finally:
+                self._emit(Events.CAPTURING, active=False)
+                self._emit(Events.LISTENING_STOPPED)
+                self._busy = False
+            return
+
         result = None
         try:
             engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
@@ -345,6 +375,22 @@ class RinaEngine:
 
     def _always_worker(self, stop_flag=None):
         stop_flag = stop_flag or self._stop_always
+
+        # With a shell the listening window stays open while the mode is
+        # on: the sound arrives by itself, `_hear` cuts it into phrases, and
+        # the wake word is required — checked in the same place as it is for
+        # typed text.
+        if self.ears_outside:
+            self._emit(Events.LISTENING_STARTED)
+            self._emit(Events.CAPTURING, active=True)
+            try:
+                while not stop_flag.wait(0.2):
+                    pass
+            finally:
+                self._emit(Events.CAPTURING, active=False)
+                self._emit(Events.LISTENING_STOPPED)
+            return
+
         engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
         if engine.id == "disabled":
             self._emit(Events.ERROR, text=tr(

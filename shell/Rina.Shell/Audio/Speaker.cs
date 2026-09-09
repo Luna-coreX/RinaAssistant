@@ -43,6 +43,17 @@ public sealed class Speaker : IDisposable
         get { lock (_lock) return _buffer?.BufferedBytes ?? 0; }
     }
 
+    /// <summary>How many bytes the queue can hold in all.</summary>
+    /// <remarks>
+    /// Public so that "nothing was discarded" can be asserted rather than
+    /// believed: without knowing the ceiling, a check cannot tell a queue
+    /// that refused from one that swallowed.
+    /// </remarks>
+    public int Room
+    {
+        get { lock (_lock) { Ensure(); return _buffer!.BufferLength; } }
+    }
+
     /// <summary>Where to output. Applies to the next device.</summary>
     public int Device { get; set; }
 
@@ -166,10 +177,23 @@ public sealed class Speaker : IDisposable
         if (_device is not null) return;
         _buffer = new BufferedWaveProvider(_format)
         {
-            // A second and a half of audio. More means longer to drain on
-            // an interruption; less risks clicks on a slow machine.
-            BufferDuration = TimeSpan.FromSeconds(1.5),
-            DiscardOnBufferOverflow = true,
+            // Five seconds, and **nothing is discarded**.
+            //
+            // It was a second and a half with discarding on, and that is
+            // what a person heard as "fragments of words all through her
+            // speech". The core sends a whole utterance as fast as its
+            // credit allows; everything past the second and a half was
+            // dropped on the floor without a word, so what played was the
+            // beginning, then a hole, then whatever fitted next.
+            //
+            // Discarding is the wrong answer to a full queue in any case:
+            // the queue is full because the sender was allowed to send too
+            // much, and the place to say so is the credit, not the bin. Now
+            // credit is only returned as the queue drains (`RoomAsync`), so
+            // it cannot fill in the first place — and if it ever does, we
+            // would rather hear about it than lose a sentence quietly.
+            BufferDuration = TimeSpan.FromSeconds(5),
+            DiscardOnBufferOverflow = false,
         };
         _device = new WaveOutEvent
         {
@@ -178,6 +202,22 @@ public sealed class Speaker : IDisposable
                 ? Math.Clamp(Device, 0, WaveOut.DeviceCount - 1) : 0,
         };
         _device.Init(_buffer);
+    }
+
+    /// <summary>
+    /// Wait until the queue has room again — that is what credit means.
+    /// </summary>
+    /// <remarks>
+    /// The receiver announces how much it is ready to take, and it is ready
+    /// to take what it has room for. Returning credit the moment sound
+    /// arrives says "I took it" when what happened is "I put it somewhere",
+    /// and the somewhere has a bottom.
+    /// </remarks>
+    public async Task RoomAsync(int wanted, CancellationToken token)
+    {
+        var ceiling = Math.Max(wanted, _format.AverageBytesPerSecond);
+        while (!token.IsCancellationRequested && Pending > ceiling)
+            await Task.Delay(30, token).ConfigureAwait(false);
     }
 
     /// <summary>Speech ended by itself: the queue is empty.</summary>

@@ -211,9 +211,19 @@ public sealed class AudioLink : IDisposable
                 var frame = await _data.ReceiveAsync(token).ConfigureAwait(false);
                 Received += frame.Payload.Length;
                 _speaker.Enqueue(frame.Payload);
+
                 // Credit is returned as playback proceeds, not as data is
-                // received: otherwise the core will pack our queue a minute
+                // received: otherwise the core packs our queue a minute
                 // ahead, and "stop" stops being instant.
+                //
+                // The rule was written here from the start; the code
+                // underneath it granted credit the moment the sound
+                // arrived, which is the opposite. A comment describing what
+                // the code does not do is worse than no comment: it is read
+                // as a guarantee, and the queue overflowed behind it for
+                // every utterance a person ever heard.
+                await _speaker.RoomAsync(frame.Payload.Length, token)
+                              .ConfigureAwait(false);
                 await _connection.CallAsync(Methods.StreamCredit, new JsonObject
                 {
                     ["stream_id"] = frame.StreamId,

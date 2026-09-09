@@ -316,7 +316,18 @@ class ProtocolServer:
 
             self.session.data_version = int(
                 store.get("config_version", CONFIG_VERSION) or CONFIG_VERSION)
-        return self.session.handle_hello(message.payload)
+        answer = self.session.handle_hello(message.payload)
+
+        # Ears outside is a property of the handshake, not of an open
+        # stream. The shell opens the microphone stream **in answer to** the
+        # core announcing that it listens, so at the first announcement
+        # there is none: learning it from the stream would send the first
+        # listen to the core's own microphone — the very path being removed
+        # here.
+        self.engine.ears_outside = (
+            "audio.input" in self.session.peer_capabilities)
+
+        return answer
 
     def _shutdown(self, message: Envelope) -> dict:
         self.stop("оболочка попросила завершиться")
@@ -1304,9 +1315,16 @@ class ProtocolServer:
                 id=self.ids.next()))
             # The shell will issue credit, but waiting for it in silence is
             # dishonest as regards time: the first chunk of speech must go
-            # out at once. We give ourselves credit for one reply and after
-            # that live by what is issued.
-            self.data.grant(self._speech_stream, 512 * 1024)
+            # out at once. So we give ourselves enough to start speaking and
+            # after that live by what is issued.
+            #
+            # Enough to **start**, not enough to finish. Half a megabyte was
+            # ten seconds of sound, which the shell could not hold and
+            # silently threw away: the person heard fragments of words all
+            # through the reply. A self-issued credit larger than the
+            # receiver's queue is not a head start, it is the backpressure
+            # switched off.
+            self.data.grant(self._speech_stream, 32 * 1024)
 
         chunk = 8192
         for offset in range(0, len(pcm), chunk):

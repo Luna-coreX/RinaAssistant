@@ -768,6 +768,40 @@ public partial class App
               speaking.Count >= 2 && speaking[^1] is false,
               "| " + string.Join(" -> ", speaking));
 
+        // --- a long utterance is not thrown away in the middle ---
+        //
+        // What a person heard as "fragments of words all through her
+        // speech". The core sends a whole reply as fast as its credit
+        // allows; the queue held a second and a half and discarded the rest
+        // without a word. Nothing said so — not a log line, not a counter —
+        // because discarding was configured as the normal answer to a full
+        // queue.
+        //
+        // What is asserted is that overflow **refuses**. A queue that
+        // refuses can be waited on, and the credit does exactly that; a
+        // queue that swallows leaves the sender believing it was heard.
+        // Comparing what went in against what is left would measure
+        // playback instead: the device starts as soon as it has enough, and
+        // is meant to.
+        var flood = new Audio.Speaker();
+        try
+        {
+            Check("очередь держит больше полутора секунд",
+                  flood.Room > 22050 * 2 * 2,
+                  $"| место на {flood.Room / (22050.0 * 2):0.0} с");
+
+            var refused = false;
+            var piece = new byte[8192];
+            for (var at = 0; at < 200 && !refused; at++)
+            {
+                try { flood.Enqueue(piece); }
+                catch (InvalidOperationException) { refused = true; }
+            }
+            Check("переполнение отказывает, а не глотает", refused,
+                  refused ? "" : "| приняла всё и часть выбросила");
+        }
+        finally { flood.Dispose(); }
+
         // --- the tail of an utterance is not thrown away ---
         //
         // The core closes the stream when it has finished **sending**, and
