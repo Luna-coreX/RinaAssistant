@@ -23,6 +23,9 @@
   "{0} МБ": {
     "English": "{0} MB"
   },
+  "{0} из {1}": {
+    "English": "{0} of {1}"
+  },
   "{0} — сейчас недоступно": {
     "English": "{0} — unavailable right now"
   },
@@ -578,6 +581,9 @@
   "Основная комбинация": {
     "English": "Main shortcut"
   },
+  "Остановить": {
+    "English": "Stop"
+  },
   "Отвечать голосом": {
     "Deutsch": "Mit Stimme antworten",
     "English": "Reply with voice",
@@ -773,6 +779,9 @@
   "Разделы": {
     "English": "Sections"
   },
+  "Распаковываю…": {
+    "English": "Unpacking…"
+  },
   "Распознавание": {
     "English": "Recognition"
   },
@@ -842,8 +851,23 @@
   "Скачаем: ": {
     "English": "Will download: "
   },
+  "Скачается само": {
+    "English": "Fetches itself"
+  },
   "Скачается само при первом обращении.": {
     "English": "Downloads itself the first time it is needed."
+  },
+  "Скачано": {
+    "English": "Downloaded"
+  },
+  "Скачано.": {
+    "English": "Downloaded."
+  },
+  "Скачать": {
+    "English": "Download"
+  },
+  "Скачивание моделей": {
+    "English": "Downloading models"
   },
   "Скачивать нечего — распознавание можно включить позже.": {
     "English": "Nothing to download — recognition can be switched on later."

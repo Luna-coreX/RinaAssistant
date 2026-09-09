@@ -48,6 +48,7 @@ from core.wire.handshake import CORE_CAPABILITIES, Session, Side
 from core.wire.liveness import Liveness, VolatileState
 from core.wire.permissions import PermissionChannel
 from core.wire.tasks import Registry
+from core.i18n import t as tr
 from core.trace import trace_scope
 from core.wire.transport import Channels, TransportClosed
 
@@ -400,7 +401,8 @@ class ProtocolServer:
     def _models_catalogue(self, message: Envelope) -> dict:
         from core import models
 
-        return {"items": models.catalogue(self._settings())}
+        return {"items": models.catalogue(self._settings(),
+                                          running=self._fetching)}
 
     def _models_fetch(self, message: Envelope) -> dict:
         """
@@ -478,6 +480,11 @@ class ProtocolServer:
 
         fetch = models.Fetch(model, on_progress=told,
                              settings=self._settings())
+        # The task's number is remembered on the download itself, so that a
+        # window opened later can be told which task to cancel. Without it
+        # the only way to stop a download would be to have been watching
+        # when it started.
+        fetch.task_id = task.id
         self._fetching[model.id] = fetch
         fetch.start()
         return {"id": model.id, "task_id": task.id}

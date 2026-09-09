@@ -168,6 +168,41 @@ check("недокачанное не осталось лежать",
 check("и настройка на него не указывает", not store2.get("vosk_model", ""))
 
 print()
+print("=== каталог рассказывает про идущее ===")
+# What a window opened **during** a download is told. Without this the
+# settings showed a model halfway through fetching as simply "not
+# installed", and offered to fetch it a second time.
+clean("probe")
+probe = fetch_of(f"{BASE}/model.zip")
+quiet = models.catalogue()
+check("пока ничего не идёт — состояния нет",
+      all("state" not in m for m in quiet))
+
+seen4 = []
+fetch4 = models.Fetch(probe, on_progress=seen4.append,
+                      settings=MemorySettings({})).start()
+fetch4.task_id = "task-0007"
+for _ in range(100):
+    if seen4 and seen4[-1]["done"] > 0:
+        break
+    time.sleep(0.02)
+
+during = models.catalogue(running={m["id"]: fetch4 for m in models.catalogue()})
+check("идущее видно на каждой записи",
+      all(m.get("state") for m in during),
+      f"| {[m.get('state') for m in during]}")
+check("и номер задачи, чтобы было что останавливать",
+      all(m.get("task_id") == "task-0007" for m in during))
+check("с байтами, а не с процентами",
+      all(m.get("total", 0) > 0 for m in during))
+fetch4.cancel()
+for _ in range(100):
+    if seen4 and seen4[-1]["state"] == "cancelled":
+        break
+    time.sleep(0.05)
+clean("probe")
+
+print()
 print("=== неудача ===")
 clean("probe")
 seen3 = []

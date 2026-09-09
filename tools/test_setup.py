@@ -15,6 +15,7 @@ import os
 import sys
 import shutil
 import tempfile
+import time
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 sys.path.insert(0, os.path.join(
@@ -94,6 +95,21 @@ try:
           bool(listed) and all("ours" in m for m in listed))
     check("и у всего есть размер",
           bool(listed) and all(m.get("size", 0) > 0 for m in listed))
+
+    print()
+    print("=== движковое скачивание за наше не выдаётся ===")
+    # Whisper fetches its own model; `models.fetch` must not claim to have
+    # started it. Saying "started" would leave a window waiting for progress
+    # that is never coming, with a stop button that stops nothing.
+    started = answer(core, "models.fetch",
+                     {"ids": ["whisper-base"]}).get("tasks", [])
+    check("движковое не объявлено начатым", started == [], f"| {started}")
+
+    # The rest of the download's behaviour — progress while it runs, the
+    # catalogue reporting it, cancelling — is checked in `test_models.py`
+    # against a local server. Doing it here would pull forty-six megabytes
+    # off somebody else's machine on every run of the regression, and would
+    # go red on a train rather than when the code broke.
 
     print()
     print("=== мастер закрывается насовсем ===")

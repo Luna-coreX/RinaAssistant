@@ -106,6 +106,16 @@ public partial class SettingsPage : UserControl
         InitializeComponent();
         _link = link;
 
+        // A download reports itself as an ordinary long task (§9), and this
+        // page is where it is watched. Unsubscribed on unload: the page is
+        // built afresh on every visit to the section, and a handler left
+        // behind would keep a dead page updating its own controls.
+        if (_link is not null)
+        {
+            _link.CoreEvent += OnTaskEvent;
+            Unloaded += (_, _) => _link.CoreEvent -= OnTaskEvent;
+        }
+
         // The gap is taken from a token rather than typed as a number:
         // "twice the usual" is `Sp.Danger`, and a second place with 64
         // written in it would part company with the first one day.
@@ -195,6 +205,17 @@ public partial class SettingsPage : UserControl
             _options[key] = listed;
         }
 
+        var catalogue = await Ask(Methods.ModelsCatalogue);
+        _models.Clear();
+        foreach (var item in catalogue?["items"]?.AsArray() ?? [])
+            if (item is JsonObject model)
+            {
+                _models.Add(model);
+                var task = model["task_id"]?.GetValue<string>() ?? "";
+                if (task.Length > 0)
+                    _byTask[task] = model["id"]?.GetValue<string>() ?? "";
+            }
+
         // What a hotkey can be assigned to belongs to the core: it is what
         // performs the actions, and it has the list. Without this the
         // dictionary fell through to the general editor and showed
@@ -263,7 +284,251 @@ public partial class SettingsPage : UserControl
             .ToArray();
         if (strangers.Length > 0)
             Body.Children.Add(BuildSection(SettingsLayout.Other, strangers));
+
+        if (_models.Count > 0) Body.Children.Add(BuildDownloads());
     }
+
+    //: What can be downloaded, and what is happening to it. Filled from
+    //: `models.catalogue`, kept fresh by `task.progress`.
+    private readonly List<JsonObject> _models = [];
+
+    //: Which model each running task belongs to. The catalogue says so when
+    //: the page opens; the events afterwards carry only a task id.
+    private readonly Dictionary<string, string> _byTask = [];
+
+    private readonly Dictionary<string, ProgressBar> _bars = [];
+    private readonly Dictionary<string, TextBlock> _states = [];
+    private readonly Dictionary<string, Button> _buttons = [];
+
+    /// <summary>
+    /// The models: what is downloaded, what is downloading, and the stop.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Its own block rather than a setting, because it is not one: a model
+    /// is a file that is there or is not, and the thing a person wants to
+    /// do about it is start or stop a transfer. Dressing that as a setting
+    /// would give it a value to save and nothing to save it as.
+    /// </para>
+    /// <para>
+    /// <b>Opened during a download, it shows the download.</b> The state
+    /// comes with the catalogue rather than only from the events that
+    /// follow: a page that learned about transfers only by watching them
+    /// start would show a model as "not installed" halfway through fetching
+    /// it, and offer to fetch it again.
+    /// </para>
+    /// </remarks>
+    private UIElement BuildDownloads()
+    {
+        _bars.Clear();
+        _states.Clear();
+        _buttons.Clear();
+
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
+        stack.Children.Add(new TextBlock
+        {
+            Text = S("Скачивание моделей").ToUpperInvariant(),
+            Style = (Style)FindResource("Text.Section"),
+            Margin = new Thickness(0, 0, 0, 12),
+        });
+
+        foreach (var model in _models)
+        {
+            var id = model["id"]?.GetValue<string>() ?? "";
+            var ours = model["ours"]?.GetValue<bool>() ?? false;
+            var row = new Grid { Margin = new Thickness(0, 0, 0, 16) };
+            row.ColumnDefinitions.Add(new ColumnDefinition());
+            row.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+            });
+
+            var left = new StackPanel();
+            left.Children.Add(new TextBlock
+            {
+                Text = $"{model["title"]?.GetValue<string>()} · "
+                       + Weighed(model["size"]?.GetValue<long>() ?? 0),
+                Style = (Style)FindResource("Text.Body"),
+            });
+
+            var said = new TextBlock
+            {
+                Style = (Style)FindResource("Text.Meta"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 16, 0),
+            };
+            left.Children.Add(said);
+            _states[id] = said;
+
+            var bar = new ProgressBar
+            {
+                Height = 3,
+                Minimum = 0,
+                Maximum = 1,
+                Margin = new Thickness(0, 8, 16, 0),
+                Visibility = Visibility.Collapsed,
+                Foreground = (System.Windows.Media.Brush)
+                    FindResource("C.Signal"),
+                Background = (System.Windows.Media.Brush)
+                    FindResource("C.FaceLow"),
+                BorderThickness = new Thickness(0),
+            };
+            left.Children.Add(bar);
+            _bars[id] = bar;
+
+            row.Children.Add(left);
+
+            var button = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Tag = id,
+                MinWidth = 132,
+                VerticalAlignment = VerticalAlignment.Top,
+            };
+            button.Click += OnModelButton;
+            Grid.SetColumn(button, 1);
+            row.Children.Add(button);
+            _buttons[id] = button;
+
+            stack.Children.Add(row);
+            ShowModel(model, id, ours);
+        }
+        return stack;
+    }
+
+    /// <summary>Put one model's row into the state the catalogue reports.</summary>
+    private void ShowModel(JsonObject model, string id, bool ours)
+    {
+        var installed = model["installed"]?.GetValue<bool>() ?? false;
+        var state = model["state"]?.GetValue<string>() ?? "";
+        var button = _buttons[id];
+        var said = _states[id];
+        var bar = _bars[id];
+
+        if (state is "downloading" or "unpacking")
+        {
+            var done = model["done"]?.GetValue<long>() ?? 0;
+            var total = model["total"]?.GetValue<long>() ?? 0;
+            ShowRunning(id, state, done, total);
+            _byTask[model["task_id"]?.GetValue<string>() ?? ""] = id;
+            return;
+        }
+
+        bar.Visibility = Visibility.Collapsed;
+        if (installed)
+        {
+            said.Text = S("Скачано.");
+            button.Content = S("Скачано");
+            button.IsEnabled = false;
+        }
+        else if (!ours)
+        {
+            said.Text = S("Скачается само при первом обращении.");
+            button.Content = S("Скачается само");
+            button.IsEnabled = false;
+        }
+        else
+        {
+            said.Text = model["note"]?.GetValue<string>() ?? "";
+            button.Content = S("Скачать");
+            button.IsEnabled = true;
+        }
+    }
+
+    private void ShowRunning(string id, string state, long done, long total)
+    {
+        if (!_bars.TryGetValue(id, out var bar)) return;
+        bar.Visibility = Visibility.Visible;
+        // A share of one, not a percentage: the number is drawn here, and
+        // whoever draws it decides how many digits fit.
+        bar.Value = total > 0 ? Math.Clamp(done / (double)total, 0, 1) : 0;
+        bar.IsIndeterminate = total <= 0;
+
+        _states[id].Text = state == "unpacking"
+            ? S("Распаковываю…")
+            : S("{0} из {1}", Weighed(done), Weighed(total));
+        _buttons[id].Content = S("Остановить");
+        _buttons[id].IsEnabled = true;
+    }
+
+    private async void OnModelButton(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.Tag is not string id) return;
+
+        var task = _byTask.FirstOrDefault(pair => pair.Value == id).Key;
+        if (task is { Length: > 0 })
+        {
+            // Stopping goes through the ordinary task cancellation (§9):
+            // a download is a long task, and it was deliberately not given
+            // machinery of its own.
+            await Ask(Methods.TaskCancel,
+                      new JsonObject { ["task_id"] = task });
+            return;
+        }
+
+        button.IsEnabled = false;
+        var told = await Ask(Methods.ModelsFetch, new JsonObject
+        {
+            ["ids"] = new JsonArray(id),
+        });
+        foreach (var started in told?["tasks"]?.AsArray() ?? [])
+            if (started is JsonObject one)
+                _byTask[one["task_id"]?.GetValue<string>() ?? ""] =
+                    one["id"]?.GetValue<string>() ?? "";
+        ShowRunning(id, "downloading", 0, 0);
+    }
+
+    /// <summary>An event from the core: a download moved.</summary>
+    private void OnTaskEvent(Envelope message)
+    {
+        var task = message.Payload["task_id"]?.GetValue<string>() ?? "";
+        if (!_byTask.TryGetValue(task, out var id)) return;
+
+        if (message.Method == "task.progress")
+        {
+            // The share comes ready-made; the bytes are in the note, which
+            // the core wrote for a person to read.
+            var share = message.Payload["fraction"]?.GetValue<double>() ?? -1;
+            if (_bars.TryGetValue(id, out var bar))
+            {
+                bar.Visibility = Visibility.Visible;
+                bar.IsIndeterminate = share < 0;
+                if (share >= 0) bar.Value = Math.Clamp(share, 0, 1);
+            }
+            if (_states.TryGetValue(id, out var said))
+                said.Text = message.Payload["note"]?.GetValue<string>() ?? "";
+            if (_buttons.TryGetValue(id, out var stop))
+                stop.Content = S("Остановить");
+            return;
+        }
+
+        // Anything final: ask the catalogue again rather than working out
+        // the new state here. Whether a model counts as installed is the
+        // core's answer — it knows where the folder went — and guessing it
+        // from "the task finished" would be right until the first failure
+        // that still left a folder behind.
+        if (message.Method is "task.done" or "task.failed" or "task.cancelled")
+        {
+            _byTask.Remove(task);
+            _ = RefreshModelsAsync();
+        }
+    }
+
+    private async Task RefreshModelsAsync()
+    {
+        var told = await Ask(Methods.ModelsCatalogue);
+        if (told?["items"] is not JsonArray items) return;
+        _models.Clear();
+        foreach (var item in items)
+            if (item is JsonObject model) _models.Add(model);
+        Build();
+    }
+
+    /// <summary>Bytes as a person reads them.</summary>
+    private static string Weighed(long bytes) =>
+        bytes >= 1024L * 1024 * 1024
+            ? S("{0} ГБ", (bytes / (1024.0 * 1024 * 1024)).ToString("0.0"))
+            : S("{0} МБ", bytes / (1024 * 1024));
 
     private UIElement BuildSection(string title, IEnumerable<string> keys)
     {

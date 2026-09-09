@@ -107,10 +107,20 @@ def installed(model: Model) -> str:
     return where if os.path.isdir(where) else ""
 
 
-def catalogue(settings=None) -> list[dict]:
-    """The catalogue as the shell sees it."""
-    return [
-        {
+def catalogue(settings=None, running=None) -> list[dict]:
+    """
+    The catalogue as the shell sees it, including what is happening now.
+
+    `running` maps a model's id to the download in flight for it. It is
+    passed in rather than kept here: who is downloading what is the
+    session's business, and a module-level register of it would be shared
+    between two cores in one process — the very hidden global that `4.0-B05`
+    was about.
+    """
+    running = running or {}
+    out = []
+    for m in CATALOGUE:
+        item = {
             "id": m.id,
             "title": m.title,
             "engine": m.engine,
@@ -120,8 +130,14 @@ def catalogue(settings=None) -> list[dict]:
             "wanted": m.wanted,
             "installed": bool(installed(m)) if m.ours else False,
         }
-        for m in CATALOGUE
-    ]
+        live = running.get(m.id)
+        if live is not None:
+            item["state"] = live.state
+            item["done"] = live.done
+            item["total"] = live.total
+            item["task_id"] = getattr(live, "task_id", "")
+        out.append(item)
+    return out
 
 
 def find(model_id: str):
@@ -152,6 +168,13 @@ class Fetch:
         self.done = 0
         self.total = model.size
         self.error = ""
+        #: What was last said about this download.
+        #:
+        #: Kept, so that a window opened **during** one can be told where it
+        #: is. Without this, the settings page opened halfway through a
+        #: download showed the model as simply "not installed" — and offered
+        #: to start a second one.
+        self.state = "waiting"
         self._stop = threading.Event()
         self._thread = None
 
@@ -169,15 +192,29 @@ class Fetch:
         return self._stop.is_set()
 
     def _say(self, state: str) -> None:
+        """
+        Tell whoever is listening where we are.
+
+        **A listener that throws is not a failed download.** This is called
+        from inside the transfer's own `try`, so a mistake in the code that
+        *reports* progress came back to the person as "the model could not
+        be downloaded" — which is what happened the first time: a missing
+        import in the server turned every download into a failure, and the
+        error named the download rather than the bug.
+        """
+        self.state = state
         if self.on_progress is None:
             return
-        self.on_progress({
-            "id": self.model.id,
-            "state": state,
-            "done": self.done,
-            "total": self.total,
-            "error": self.error,
-        })
+        try:
+            self.on_progress({
+                "id": self.model.id,
+                "state": state,
+                "done": self.done,
+                "total": self.total,
+                "error": self.error,
+            })
+        except Exception:                               # noqa: BLE001
+            log.exception("Слушатель прогресса %s упал", self.model.id)
 
     def _run(self) -> None:
         archive = os.path.join(models_dir(), self.model.id + ".part")

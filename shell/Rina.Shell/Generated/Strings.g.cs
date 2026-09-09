@@ -49,6 +49,11 @@ public static partial class Loc
                 {
                     ["English"] = "{0} GB",
                 },
+            ["{0} из {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} of {1}",
+                },
             ["{0} МБ"] =
                 new Dictionary<string, string>
                 {
@@ -1091,6 +1096,11 @@ public static partial class Loc
                 {
                     ["English"] = "Main shortcut",
                 },
+            ["Остановить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Stop",
+                },
             ["ответ не объект"] =
                 new Dictionary<string, string>
                 {
@@ -1424,6 +1434,11 @@ public static partial class Loc
                 {
                     ["English"] = "Sections",
                 },
+            ["Распаковываю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Unpacking…",
+                },
             ["Распознавание"] =
                 new Dictionary<string, string>
                 {
@@ -1540,10 +1555,35 @@ public static partial class Loc
                 {
                     ["English"] = "Will download: ",
                 },
+            ["Скачается само"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Fetches itself",
+                },
             ["Скачается само при первом обращении."] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "Downloads itself the first time it is needed.",
+                },
+            ["Скачано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloaded",
+                },
+            ["Скачано."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloaded.",
+                },
+            ["Скачать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Download",
+                },
+            ["Скачивание моделей"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloading models",
                 },
             ["Скачивать нечего — распознавание можно включить позже."] =
                 new Dictionary<string, string>
