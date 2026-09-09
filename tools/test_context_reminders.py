@@ -48,6 +48,10 @@ class Session:
             "reminders": [], "history": [],
         })
         self.engine = RinaEngine(settings=self.settings)
+        # Nothing is opened on anybody's machine: see `test_learning.py`.
+        self.opened = []
+        self.engine.browser_out = lambda url: (self.opened.append(url),
+                                               (True, ""))[1]
         self.engine.apps_source = lambda: [a.to_dict() for a in APPS]
         self.said = []
         self.engine.voice_out = lambda text, **kw: self.said.append(text)

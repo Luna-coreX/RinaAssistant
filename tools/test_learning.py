@@ -61,8 +61,20 @@ class Session:
         self.engine.apps_source = lambda: [a.to_dict() for a in APPS]
         self.launched = []
         self.engine.launch_out = self._launch
+        # Nothing is opened on anybody's machine. An unrecognised phrase
+        # falls through to the web search, and this check feeds in phrases
+        # that are meant not to be recognised — so without this it opened
+        # the person's browser on every run. Recorded rather than
+        # suppressed: what would have been opened is worth being able to
+        # assert about.
+        self.opened = []
+        self.engine.browser_out = self._open
         self.said = []
         self.engine.voice_out = lambda text, **kw: self.said.append(text)
+
+    def _open(self, url):
+        self.opened.append(url)
+        return True, ""
 
     def _launch(self, path, kind):
         self.launched.append(path)
@@ -136,6 +148,21 @@ answer = s.say("когда я говорю браузер, это хром")
 check("спорное спрашивает, а не решает",
       "Google Chrome" in answer and "Chromium" in answer, f"| {answer}")
 check("спорное не записано молча", not s.learned, f"| {s.learned}")
+
+print()
+print("=== проверка не лезет в чужую машину ===")
+# The phrases above are meant not to be recognised, and an unrecognised
+# phrase falls through to the web search. Before the seam existed this
+# opened the person's browser on every run of the regression — found by the
+# person, who watched «я имел в виду Google Chrome» arrive in their search
+# bar. A check that acts on the machine it runs on is not a check.
+s = Session()
+s.say("нет, я имел в виду Google Chrome")
+check("нераспознанное ушло бы в поиск", len(s.opened) == 1,
+      f"| открыто: {s.opened}")
+check("и это адрес поиска, а не что попало",
+      bool(s.opened) and s.opened[0].startswith("https://"),
+      f"| {s.opened[:1]}")
 
 print()
 print("=== два ядра не делят выученное ===")

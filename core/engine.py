@@ -94,6 +94,11 @@ class RinaEngine:
         #: Windows means settling half of win32 inside the core.
         self.apps_source = None
         self._apps_cache = None
+        #: Who opens a page in a browser. The same place as the rest of what
+        #: touches the machine; until it is set, the core opens it itself,
+        #: as in 3.1.0.
+        self.browser_out = None
+
         #: Who creates the process. The shell too (4.0-G05).
         self.launch_out = None
         #: Who to tell about a question that was asked (4.0-F11). Set by the
@@ -156,6 +161,9 @@ class RinaEngine:
                 system_out=lambda action: (self.system_out(action)
                                            if self.system_out else
                                            (False, NO_SHELL)),
+                open_url=lambda url: (self.browser_out(url)
+                                     if self.browser_out else
+                                     (False, NO_SHELL)),
                 launch_app=lambda launch, kind: (
                     self.launch_out(launch, kind) if self.launch_out
                     else (False, NO_SHELL)),

@@ -65,6 +65,24 @@ class ToolContext:
     #: creation of a process, and that somebody is not whoever listens to the
     #: microphone.
     launch_app: Callable = None
+    #: Who opens a page in a browser.
+    #:
+    #: The last side effect without a seam. Launching a program goes through
+    #: the shell (`4.0-G05`), a system action goes through the shell
+    #: (ADR 0009) — and opening a browser went straight from the core to the
+    #: machine. It is the same kind of act as launching: somebody else's
+    #: process is started, and the one who parsed the phrase should not be
+    #: the one who starts it.
+    #:
+    #: It was found the way such things are found: a check that builds a real
+    #: engine opened the person's browser, because a phrase it fed in was not
+    #: recognised and the fallback search is on by default. The check could
+    #: have switched a setting off; the setting was not the problem.
+    #:
+    #: Until it is set, the core opens the browser itself — the 3.1.0 path,
+    #: exactly as with launching.
+    open_url: Callable = None
+
     #: Where to get the program index from.
     #:
     #: It appeared because without it the tools searched a **different** list
@@ -399,6 +417,21 @@ def _web_search(ctx, args):
     engine = args.get("engine") or ctx.settings.get(
         "search_engine", websearch.DEFAULT_ENGINE)
     query = args["query"]
+
+    # Through whoever opens pages, and only ourselves if nobody does. The
+    # same shape as `_launch_app`: `NO_SHELL` means "there was nobody to
+    # ask", which is different from "we asked and were refused".
+    opener = getattr(ctx, "open_url", None)
+    if opener is not None:
+        opened, why = opener(websearch.search_url(query, engine))
+        if why != NO_SHELL:
+            if opened:
+                return ToolResult.done(
+                    tr("Ищу «{query}» в {engine}.", query=query,
+                       engine=websearch.engine_label(engine)))
+            return ToolResult.failed(
+                tr("Не удалось открыть браузер для поиска."), "internal")
+
     if websearch.open_search(query, engine):
         return ToolResult.done(
             tr("Ищу «{query}» в {engine}.", query=query,
