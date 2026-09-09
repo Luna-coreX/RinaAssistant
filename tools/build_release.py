@@ -72,6 +72,15 @@ GET_PIP = "https://bootstrap.pypa.io/get-pip.py"
 CORE_REQUIREMENTS = [
     "numpy>=1.24",
     "soundfile>=0.12",
+    # Recognition, and it has to be in the build: until it was, every copy
+    # of Rina that anybody assembled was deaf to speech — not only on the
+    # developer's machine. Nothing said so, because nothing checked that a
+    # built runtime can recognise anything (`check_release.py` does now).
+    #
+    # `faster-whisper` and not `openai-whisper`: the latter weighs a
+    # megabyte and pulls in torch, whose wheel is over five hundred and
+    # bundles CUDA. Same models, no torch, and quicker on a processor.
+    "faster-whisper>=1.0",
 ]
 
 #: What travels from the project tree into the release.

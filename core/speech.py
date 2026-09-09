@@ -37,6 +37,7 @@ depends on the model.
 
 import array
 import math
+import os
 import struct
 from typing import Protocol
 
@@ -205,11 +206,36 @@ class VoskRecogniser:
         self._error = ""
 
     def available(self) -> bool:
+        """
+        Is this engine usable — asked without loading anything.
+
+        **Availability is not readiness, and asking must be cheap.** This
+        list is drawn every time a person opens the settings, and the first
+        edition loaded the model to answer: opening a page would have sat
+        for seconds on Vosk and started a download on Whisper. Nobody would
+        have connected the two.
+
+        So the question here is "is the engine installed and pointed at
+        something", and the model is opened on the first phrase, where
+        waiting is expected and a failure has somewhere to be reported.
+        """
         if self._model is not None:
             return True
         if not self.model_path:
             self._error = "модель Vosk не выбрана"
             return False
+        if not os.path.isdir(self.model_path):
+            self._error = "папки с моделью Vosk нет"
+            return False
+        if not installed("vosk"):
+            self._error = "пакет vosk не установлен"
+            return False
+        return True
+
+    def _load(self) -> bool:
+        """Open the model. Seconds, so not before the first phrase."""
+        if self._model is not None:
+            return True
         try:
             import vosk
 
@@ -221,7 +247,7 @@ class VoskRecogniser:
             return False
 
     def recognise(self, pcm: bytes, language: str = "ru") -> Heard:
-        if not self.available():
+        if not self.available() or not self._load():
             return Heard(ok=False, error=self._error or "stt.unavailable")
         try:
             import json
@@ -259,12 +285,18 @@ class WhisperRecogniser:
     def available(self) -> bool:
         if self._model is not None:
             return True
-        try:
-            import whisper
-        except ImportError:
+        if not installed("whisper"):
             self._error = "пакет openai-whisper не установлен"
             return False
+        return True
+
+    def _load(self) -> bool:
+        """Load the model — and download it if this is the first time."""
+        if self._model is not None:
+            return True
         try:
+            import whisper
+
             self._model = whisper.load_model(self.size)
             return True
         except Exception as exc:                        # noqa: BLE001
@@ -272,7 +304,7 @@ class WhisperRecogniser:
             return False
 
     def recognise(self, pcm: bytes, language: str = "ru") -> Heard:
-        if not self.available():
+        if not self.available() or not self._load():
             return Heard(ok=False, error=self._error or "stt.unavailable")
         try:
             import array
@@ -295,6 +327,119 @@ class WhisperRecogniser:
             return Heard(ok=False, error=str(exc))
 
 
+def installed(package: str) -> bool:
+    """
+    Is a package there — asked without running it.
+
+    `import` would answer the same question and cost what the package costs
+    to start: `import whisper` pulls in torch, and two and a half seconds
+    went on drawing a list of engine names. `find_spec` looks the module up
+    and stops there.
+    """
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(package) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def wave_from(pcm: bytes):
+    """PCM bytes -> the floats every Whisper wants, at this module's rate."""
+    import array
+
+    import numpy
+
+    samples = array.array("h")
+    samples.frombytes(pcm[:len(pcm) - len(pcm) % SAMPLE_BYTES])
+    return numpy.frombuffer(samples.tobytes(),
+                            dtype=numpy.int16).astype(numpy.float32) / 32768.0
+
+
+class FasterWhisperRecogniser:
+    """
+    The same Whisper models, without torch.
+
+    **This is the one that ships.** `openai-whisper` weighs a megabyte and
+    pulls in torch, whose wheel is over five hundred and bundles CUDA; an
+    installer built around it would be gigabytes for one engine. This runs
+    the same models on CTranslate2 — forty megabytes, no torch, and faster
+    on a processor besides.
+
+    It carries the same name as the other one on purpose. Which library
+    turns the sound into words is our business; a person picks "Whisper",
+    and `whisper_for` gives them whichever of the two is installed,
+    preferring this.
+    """
+
+    name = "whisper"
+
+    def __init__(self, size: str = "base"):
+        self.size = size or "base"
+        self._model = None
+        self._error = ""
+
+    def available(self) -> bool:
+        if self._model is not None:
+            return True
+        if not installed("faster_whisper"):
+            self._error = "пакет faster-whisper не установлен"
+            return False
+        return True
+
+    def _load(self) -> bool:
+        if self._model is not None:
+            return True
+        try:
+            from faster_whisper import WhisperModel
+
+            # `int8` on the processor: the models are quantised on load and
+            # take about a quarter of the memory at a difference in wording
+            # a person does not meet. There is no video card in the promise
+            # this program makes.
+            self._model = WhisperModel(self.size, device="cpu",
+                                       compute_type="int8")
+            return True
+        except Exception as exc:                        # noqa: BLE001
+            self._error = str(exc)
+            return False
+
+    def recognise(self, pcm: bytes, language: str = "ru") -> Heard:
+        if not self.available() or not self._load():
+            return Heard(ok=False, error=self._error or "stt.unavailable")
+        try:
+            pieces, _ = self._model.transcribe(
+                wave_from(pcm), language=language or None)
+            return Heard(text="".join(p.text for p in pieces).strip())
+        except Exception as exc:                        # noqa: BLE001
+            return Heard(ok=False, error=str(exc))
+
+
+def whisper_for(settings) -> Recogniser:
+    """
+    Whichever Whisper is installed, the light one first.
+
+    One name, two libraries. A person choosing recognition is choosing
+    Whisper, not a backend, and offering both under separate names would ask
+    them a question whose answer they have no way of having.
+    """
+    size = str(settings.get("whisper_model", "base") or "base")
+    fast = FasterWhisperRecogniser(size)
+    return fast if fast.available() else WhisperRecogniser(size)
+
+
+#: What each engine is called to a person.
+#:
+#: Written here rather than fetched from the 3.1.0 engine list. That list is
+#: assembled by building every engine and asking each whether it can work,
+#: which probes the sound devices — two and a half seconds, spent on the one
+#: thing we wanted from it, which was the words.
+STT_TITLES = {
+    "vosk": "Vosk (офлайн, микрофон)",
+    "whisper": "Whisper (офлайн, точный)",
+    "disabled": "Выключено (нет распознавания)",
+}
+
 #: Recognisers the streaming path can actually build (`4.0-E05`).
 #:
 #: A person picked `whisper` in the settings and heard "recognition is
@@ -309,8 +454,7 @@ class WhisperRecogniser:
 RECOGNISERS = {
     "vosk": lambda settings: VoskRecogniser(
         str(settings.get("vosk_model", "") or "")),
-    "whisper": lambda settings: WhisperRecogniser(
-        str(settings.get("whisper_model", "base") or "base")),
+    "whisper": whisper_for,
     "disabled": lambda settings: DisabledRecogniser(),
 }
 

@@ -153,6 +153,26 @@ for name in sorted(buildable):
     check(f"«{name}» строится и отвечает про свою доступность",
           hasattr(built, "available") and isinstance(built.available(), bool))
 
+# And asking must be cheap. This list is drawn every time a person opens the
+# settings, and the first edition answered by importing: `import whisper`
+# pulls in torch, so naming three engines took two and a half seconds. The
+# edition before that loaded the model to answer, which on a fresh machine
+# would have started a download from a settings page.
+import time
+
+started = time.time()
+options_for("stt_engine", MemorySettings({}))
+spent = time.time() - started
+check("список движков рисуется мгновенно", spent < 0.5,
+      f"| {spent:.2f} с")
+
+# "Off" is the choice of having no recognition, and it can never be
+# unavailable. Asking a recogniser gets "no" — which is what it means, and
+# which greyed out the one option that cannot fail.
+choices = {o["value"]: o for o in options_for("stt_engine", MemorySettings({}))}
+check("«выключено» всегда можно выбрать",
+      choices.get("disabled", {}).get("available") is True)
+
 print()
 print("ИТОГО ошибок:", fails)
 

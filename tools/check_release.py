@@ -127,6 +127,33 @@ check("это наш рантайм, а не системный",
       f"| {own.stdout.strip()}")
 
 print()
+print("=== собранная Рина слышит речь ===")
+
+# The check whose absence hid everything else. Recognition was implemented,
+# checked in the core, and installed into the runtime by nobody: for as long
+# as this was not asked, every copy of Rina anyone assembled was deaf to
+# speech — and not on one machine but on all of them. A person meets that as
+# silence, which is the hardest thing to trace back to a build step.
+#
+# Asked of the **shipped** runtime, in its own words: whether recognition is
+# available is a property of that interpreter and the packages in it, and
+# the developer's own Python answers a different question.
+heard = subprocess.run(
+    [python, "-c",
+     "import sys; sys.path.insert(0, r'" + where + "');"
+     "from core.speech import RECOGNISERS;"
+     "from core.settings_api import MemorySettings;"
+     "s = MemorySettings({});"
+     "ready = [n for n in RECOGNISERS if n != 'disabled'"
+     " and RECOGNISERS[n](s).available()];"
+     "print(','.join(ready))"],
+    capture_output=True, text=True, encoding="utf-8", errors="replace",
+    env=child_env())
+ready = heard.stdout.strip()
+check("распознавание в сборке доступно", bool(ready),
+      f"| {ready or heard.stderr.strip()[:120] or 'ни одного движка'}")
+
+print()
 print("=== в рантайм можно доставить пакет ===")
 
 # The promise of ADR 0011. Without it the choice of an embedded

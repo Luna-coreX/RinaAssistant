@@ -244,15 +244,22 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         # those to a person whose sound arrives from the shell means
         # promising recognition that will answer "unavailable" — which is
         # exactly what happened with `whisper`.
-        from core.speech import RECOGNISERS
+        from core.speech import RECOGNISERS, STT_TITLES
 
-        titles = {i: t for i, t, _ in stt.engine_choices()}
         out = []
         for name in RECOGNISERS:
-            probe = RECOGNISERS[name](settings)
+            # "Off" is always choosable. It is the choice of having no
+            # recognition, and asking a recogniser whether it is available
+            # gets the answer "no" — which is what it means, and which would
+            # have greyed out the one option that can never fail.
+            if name == "disabled":
+                out.append({"value": name,
+                            "title": named(STT_TITLES[name]),
+                            "available": True})
+                continue
             out.append({"value": name,
-                        "title": named(titles.get(name, name)),
-                        "available": probe.available()})
+                        "title": named(STT_TITLES.get(name, name)),
+                        "available": RECOGNISERS[name](settings).available()})
         return out
     if key == "voice":
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
