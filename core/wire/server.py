@@ -35,6 +35,7 @@ import time
 from typing import Any, Callable
 
 from core import settings_schema, speech
+from core.logging_setup import get_logger, safe
 from core.confirmations import ConfirmationLedger
 from core.protocol import ALL_EVENTS
 from core.wire.data import (DataFrameDecoder, DataReceiver, DataSender,
@@ -49,6 +50,9 @@ from core.wire.permissions import PermissionChannel
 from core.wire.tasks import Registry
 from core.trace import trace_scope
 from core.wire.transport import Channels, TransportClosed
+
+
+log = get_logger("wire")
 
 
 class ProtocolServer:
@@ -1206,6 +1210,22 @@ class ProtocolServer:
 
     # -- speech (4.0-E03, E04) --------------------------------------------------------
 
+    #: What the ear has actually seen, stage by stage (`4.0-G`).
+    #:
+    #: Kept because three separate defects in this chain all looked the same
+    #: from outside — "she cannot hear me" — while each broke at a different
+    #: joint, and nothing anywhere said which. A chain of four links with no
+    #: counters is debugged by guessing, and I guessed wrong twice.
+    #:
+    #: Counted, not logged per frame: sound arrives fifty times a second,
+    #: and a line each would bury the journal it was meant to help.
+    heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+             "recognitions": 0, "texts": 0}
+
+    def hearing(self) -> dict:
+        """Where the sound got to. For the diagnostics and the checks."""
+        return dict(self.heard)
+
     def _hear(self, pcm: bytes) -> None:
         """
         Accumulate sound and recognise a finished phrase.
@@ -1218,7 +1238,33 @@ class ProtocolServer:
         hundreds of milliseconds, and the data channel is read on this same
         thread — the delay would turn into missed sound.
         """
+        if self.heard["frames"] == 0:
+            # Said once, and it is the line worth having. "Sound is
+            # arriving" and "sound is not arriving" were indistinguishable
+            # from outside, and telling them apart splits this chain in two
+            # at the joint where it actually broke twice.
+            log.info("Звук от оболочки пошёл: слушаю")
+
+        self.heard["bytes"] += len(pcm)
+        self.heard["frames"] += 1
+        # The loudness the segmenter itself judges by, counted here so that
+        # "the microphone is sending silence" can be told from "the
+        # threshold is too high" — the two look identical from outside and
+        # want opposite fixes.
+        if speech.Segmenter.level(pcm) >= self.segmenter.threshold:
+            self.heard["loud_frames"] += 1
+
+        # Every few seconds while nothing is being cut out — quietly, at
+        # debug. A stream that arrives and yields no phrase means the
+        # loudness never crossed the threshold, and that is a different
+        # complaint from silence with a different cure.
+        if self.heard["frames"] % 200 == 0 and self.heard["phrases"] == 0:
+            log.debug("Звук идёт (%d кадров), громких %d, фраз пока нет",
+                      self.heard["frames"], self.heard["loud_frames"])
+
         for phrase in self.segmenter.feed(pcm):
+            self.heard["phrases"] += 1
+            log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
             threading.Thread(target=self._recognise, args=(phrase,),
                              name="rina-stt", daemon=True).start()
 
@@ -1231,15 +1277,34 @@ class ProtocolServer:
                     "assistant.error",
                     text="Распознавание недоступно: выберите модель в настройках.")
                 return
-            heard = self.recogniser.recognise(phrase)
-            if not heard.ok:
-                self.engine.bus.emit("assistant.error",
-                                     text=f"Не удалось распознать: {heard.error}")
+            self.heard["recognitions"] += 1
+            outcome = self.recogniser.recognise(phrase)
+            if not outcome.ok:
+                log.warning("Распознавание не сложилось: %s", outcome.error)
+                self.engine.bus.emit(
+                    "assistant.error",
+                    text=f"Не удалось распознать: {outcome.error}")
                 return
-            if not heard.text:
+            if not outcome.text:
+                log.info("Фраза распозналась пустой — тишина или шум")
                 return          # silence is neither an error nor worth reporting
-            self.engine.bus.emit("speech.recognized", text=heard.text)
-            self.engine.handle_command_async(heard.text, source="voice")
+
+            self.heard["texts"] += 1
+            log.info("Распознано: %s", safe(outcome.text))
+
+            # The recognised words are announced before anything is decided
+            # about them, and that is deliberate: a person must see what was
+            # heard even when it is not acted on. Otherwise "she ignored me"
+            # and "she misheard me" are the same silence.
+            self.engine.bus.emit("speech.recognized", text=outcome.text)
+
+            # The wake word is demanded while "always listening" is on, and
+            # only then. Without this the streamed path acted on every
+            # phrase in the room: the old path asked for the wake word in
+            # `_always_worker`, which the shell's audio does not go through.
+            self.engine.handle_command_async(
+                outcome.text, source="voice",
+                require_wake=self.engine.is_always_listen())
 
     def _voice_follows_settings(self) -> None:
         """

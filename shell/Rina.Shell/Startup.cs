@@ -830,6 +830,34 @@ public partial class App
               $"| осталось {tail.Pending} Б");
         tail.Dispose();
 
+        // --- speech ends by itself, and the microphone comes back ---
+        //
+        // The defect a person met as "she still does not react". The end of
+        // speech was announced from one place only — the core closing the
+        // speech stream — and the core opens that stream once and closes it
+        // only when the sample rate changes, so in an ordinary session the
+        // close never arrives. `IsSpeaking` latched true at the first
+        // reply, the microphone stayed muted because that is what the flag
+        // is for, and she never heard anything again.
+        //
+        // Nothing was needed for this check that was not here already: a
+        // speaker, a tone, and waiting. What was missing was asking.
+        var alone = new Audio.Speaker();
+        var ear = new Audio.Microphone();
+        alone.Speaking += value => ear.Muted = value;
+        try
+        {
+            alone.Enqueue(Tone(seconds: 0.4));
+            Check("пока говорит — микрофон заглушен", alone.IsSpeaking && ear.Muted);
+
+            for (var waited = 0; waited < 60 && alone.IsSpeaking; waited++)
+                await Task.Delay(100);
+            Check("договорив, речь кончается сама, без закрытия потока",
+                  !alone.IsSpeaking, $"| в очереди {alone.Pending} Б");
+            Check("и микрофон снова слышит", !ear.Muted);
+        }
+        finally { alone.Dispose(); ear.Dispose(); }
+
         // --- "do not listen to oneself": muting, not stopping the device ---
         var microphone = new Audio.Microphone();
         speaker.Speaking += value => microphone.Muted = value;

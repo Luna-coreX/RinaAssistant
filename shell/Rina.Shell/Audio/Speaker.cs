@@ -89,6 +89,7 @@ public sealed class Speaker : IDisposable
             Wake();
         }
         SetSpeaking(true);
+        WatchForSilence();
     }
 
     /// <summary>How loud what is being played **right now** is, from 0 to 1.</summary>
@@ -225,6 +226,57 @@ public sealed class Speaker : IDisposable
     {
         if (Pending == 0) SetSpeaking(false);
     }
+
+    /// <summary>
+    /// Notice, unaided, that there is nothing left to play.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is why she stopped hearing after her first reply.</b> The
+    /// end of speech was announced from one place only — the core closing
+    /// the speech stream — and the core opens that stream once and closes
+    /// it only if the sample rate changes. In an ordinary session the close
+    /// never comes. So <c>IsSpeaking</c> latched true at the first
+    /// utterance and stayed true, and with it the microphone stayed muted,
+    /// because muting is what "Rina is speaking" is for: she must not hear
+    /// herself. She never heard anything again either.
+    /// </para>
+    /// <para>
+    /// A speaker knows it has finished when its queue has been empty for a
+    /// moment. The grace matters: between chunks the queue empties briefly
+    /// while an utterance is still going on, and declaring the end there
+    /// would unmute the microphone into the middle of her own sentence.
+    /// </para>
+    /// <para>
+    /// The core closing the stream still means the end — see
+    /// <see cref="Drain"/>. This is not instead of that but underneath it:
+    /// a promise kept only when somebody remembers to say so is kept by
+    /// accident.
+    /// </para>
+    /// </remarks>
+    private void WatchForSilence()
+    {
+        if (Interlocked.Exchange(ref _watching, 1) == 1) return;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var quiet = 0;
+                while (IsSpeaking)
+                {
+                    await Task.Delay(50).ConfigureAwait(false);
+                    quiet = Pending == 0 ? quiet + 1 : 0;
+                    if (quiet < 5) continue;      // a quarter of a second
+                    lock (_lock) _device?.Stop();
+                    SetSpeaking(false);
+                    break;
+                }
+            }
+            finally { Interlocked.Exchange(ref _watching, 0); }
+        });
+    }
+
+    private int _watching;
 
     /// <summary>
     /// No more sound is coming. What is already here still has to be heard.
