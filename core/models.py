@@ -24,6 +24,7 @@ There is no Qt here: the module lies in the core.
 """
 
 import os
+import sys
 import threading
 import urllib.request
 import zipfile
@@ -92,6 +93,66 @@ CATALOGUE = (
 )
 
 
+class Package:
+    """A package the assistant can install for itself."""
+
+    __slots__ = ("id", "title", "pip", "module", "engine", "size", "note",
+                 "wanted")
+
+    def __init__(self, id, title, pip, module, engine, size, note="",
+                 wanted=False):
+        self.id = id
+        self.title = title
+        #: What to hand to `pip`. **Taken from here and nowhere else.**
+        self.pip = pip
+        #: What to import to find out whether it is already there.
+        self.module = module
+        self.engine = engine
+        self.size = size
+        self.note = note
+        self.wanted = wanted
+
+
+#: What may be installed. Closed, and in the code (`T-20`).
+#:
+#: **The name of a package is never taken from a message.** The shell names
+#: an identifier; the name handed to `pip` is looked up here. Otherwise
+#: "install this for me" would be "run this on my machine", and a typo in a
+#: popular package's name is an ordinary way of spreading malicious code —
+#: one a person cannot defend themselves against by choosing carefully,
+#: because they do not know how it is spelled.
+#:
+#: The same rule as the tool registry and the closed list of reminder
+#: occasions: everything that changes the world is named in advance.
+PACKAGES = (
+    Package("pkg-vosk", "Пакет Vosk", "vosk", "vosk", "vosk",
+            size=14 * 1024 * 1024,
+            wanted=True,
+            note="Нужен, чтобы модель Vosk заработала."),
+    Package("pkg-whisper", "Пакет Whisper", "faster-whisper",
+            "faster_whisper", "whisper",
+            size=60 * 1024 * 1024,
+            note="Лёгкая сборка Whisper: те же модели, без torch."),
+)
+
+
+def have_package(package: Package) -> bool:
+    """Is it already importable."""
+    import importlib.util
+
+    try:
+        return importlib.util.find_spec(package.module) is not None
+    except Exception:                                   # noqa: BLE001
+        return False
+
+
+def find_package(package_id: str):
+    for package in PACKAGES:
+        if package.id == package_id:
+            return package
+    return None
+
+
 def models_dir() -> str:
     """Where unpacked models live."""
     path = os.path.join(config_dir(), "models")
@@ -119,9 +180,30 @@ def catalogue(settings=None, running=None) -> list[dict]:
     """
     running = running or {}
     out = []
+    for p in PACKAGES:
+        item = {
+            "id": p.id,
+            "kind": "package",
+            "title": p.title,
+            "engine": p.engine,
+            "size": p.size,
+            "note": p.note,
+            "ours": True,
+            "wanted": p.wanted,
+            "installed": have_package(p),
+        }
+        live = running.get(p.id)
+        if live is not None:
+            item["state"] = live.state
+            item["done"] = live.done
+            item["total"] = live.total
+            item["task_id"] = getattr(live, "task_id", "")
+        out.append(item)
+
     for m in CATALOGUE:
         item = {
             "id": m.id,
+            "kind": "model",
             "title": m.title,
             "engine": m.engine,
             "size": m.size,
@@ -145,6 +227,121 @@ def find(model_id: str):
         if model.id == model_id:
             return model
     return None
+
+
+class Install:
+    """
+    One package installation, in its own thread, that can be stopped.
+
+    Reports like a download and is watched like one, so the window shows
+    both the same way — but the numbers are different in kind. `pip` says
+    what it is doing in lines, not in bytes, so there is no share to draw:
+    `total` stays zero and the bar is left indeterminate. Inventing a
+    percentage from the number of lines would be a bar that means nothing
+    and moves convincingly.
+    """
+
+    def __init__(self, package: Package, on_progress=None, settings=None):
+        self.package = package
+        self.on_progress = on_progress
+        self.settings = settings
+        self.done = 0
+        self.total = 0
+        self.error = ""
+        self.state = "waiting"
+        self._stop = threading.Event()
+        self._process = None
+        self._thread = None
+
+    def start(self) -> "Install":
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name=f"rina-pip-{self.package.id}")
+        self._thread.start()
+        return self
+
+    def cancel(self) -> None:
+        self._stop.set()
+        process = self._process
+        if process is not None and process.poll() is None:
+            # Killed rather than asked: `pip` has no polite way to stop, and
+            # a half-installed package is what an unclean stop leaves. The
+            # importable check afterwards is what decides whether it counts
+            # as installed, so a torn-off install reads as absent.
+            try:
+                process.kill()
+            except Exception:                           # noqa: BLE001
+                pass
+
+    def _say(self, state: str, note: str = "") -> None:
+        self.state = state
+        if self.on_progress is None:
+            return
+        try:
+            self.on_progress({
+                "id": self.package.id,
+                "state": state,
+                "done": self.done,
+                "total": self.total,
+                "note": note,
+                "error": self.error,
+            })
+        except Exception:                               # noqa: BLE001
+            log.exception("Слушатель установки %s упал", self.package.id)
+
+    def _run(self) -> None:
+        import subprocess
+
+        try:
+            self._say("downloading", f"Ставлю {self.package.title}")
+            # Into **our own** interpreter: `sys.executable` is the runtime
+            # we shipped, not whatever Python the machine happens to have.
+            # Somebody else's installation is not our place to change.
+            #
+            # The name comes from `PACKAGES`, never from the caller — see
+            # `T-20`. This line is the one that would turn a message into
+            # code execution if the name came from outside.
+            self._process = subprocess.Popen(
+                [sys.executable, "-m", "pip", "install",
+                 "--disable-pip-version-check", "--no-input",
+                 self.package.pip],
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace")
+
+            tail = []
+            for line in self._process.stdout:
+                if self._stop.is_set():
+                    break
+                said = line.strip()
+                if not said:
+                    continue
+                tail.append(said)
+                del tail[:-6]
+                self._say("downloading", said[:120])
+
+            code = self._process.wait()
+            if self._stop.is_set():
+                self._say("cancelled")
+                return
+
+            # Whether it worked is decided by asking Python, not by the exit
+            # code: `pip` returns zero for "already satisfied" and for
+            # installs that leave nothing importable on this interpreter.
+            # The question is "can the core import it now", and that is the
+            # only question the person cares about.
+            import importlib
+
+            importlib.invalidate_caches()
+            if have_package(self.package):
+                log.info("Пакет %s поставлен", self.package.pip)
+                self._say("ready")
+                return
+
+            self.error = "\n".join(tail[-3:]) or f"pip завершился с {code}"
+            self._say("failed")
+        except Exception as exc:                        # noqa: BLE001
+            self.error = str(exc)
+            log.warning("Пакет %s не поставился: %s", self.package.pip, exc)
+            self._say("failed")
 
 
 class Fetch:

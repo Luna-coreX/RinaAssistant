@@ -783,7 +783,12 @@ public partial class App
         // opened. Asked before it, this counted the greeting's boxes —
         // there are none — and called that "nothing is ticked by default".
         wizard.ShowFor(2);
-        Check("по умолчанию отмечено ровно одно", wizard.TickedNow == 1,
+        // Two now: the small model and the package it is useless without.
+        // What matters is that nothing heavy is ticked, and `test_setup.py`
+        // holds that by weight; here it is enough that something sensible
+        // is offered ready-ticked at all.
+        Check("что-то отмечено по умолчанию, и немного",
+              wizard.TickedNow is > 0 and <= 3,
               $"| отмечено {wizard.TickedNow}");
         wizard.ShowFor(at);
 

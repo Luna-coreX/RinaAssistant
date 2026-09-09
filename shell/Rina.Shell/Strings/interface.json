@@ -785,8 +785,8 @@
   "Распознавание": {
     "English": "Recognition"
   },
-  "Распознавание работает по модели — файлу, который в установщик не помещается.": {
-    "English": "Recognition needs a model — a file too large to put in the installer."
+  "Распознавание работает по пакету и модели — их размер в установщик не помещается.": {
+    "English": "Recognition needs a package and a model — too large to put in the installer."
   },
   "Рина": {
     "Deutsch": "Rina",
@@ -986,6 +986,12 @@
   "Уже скачано.": {
     "English": "Already downloaded."
   },
+  "Уже установлено.": {
+    "English": "Already installed."
+  },
+  "Установить": {
+    "English": "Install"
+  },
   "Установить эту пару нельзя.": {
     "English": "This pair cannot be installed."
   },
@@ -1031,6 +1037,9 @@
   "Что Рина запомнила: какое слово какую программу означает": {
     "English": "What Rina learned: which word means which program"
   },
+  "Что доустановить": {
+    "English": "What else is needed"
+  },
   "Что ответить (необязательно)": {
     "English": "What to answer (optional)"
   },
@@ -1042,9 +1051,6 @@
   },
   "Что сделать": {
     "English": "What to do"
-  },
-  "Что скачать": {
-    "English": "What to download"
   },
   "Чувствительность активации": {
     "Deutsch": "Aktivierungsempfindlichkeit",

@@ -63,6 +63,20 @@ ALLOWED = "toolrunner.py"
 #: shell.
 LAUNCHER_ONLY = "plugin_host.py"
 
+#: The third — and with a proviso of its own, checked below.
+#:
+#: `models.py` installs the recognition packages (`4.0b-A15`). It is a side
+#: effect and a large one: `pip` runs somebody else's build code and the
+#: core imports the result into its own process. It is not, however, one of
+#: **Rina's skills** — the invariant guards that a phrase cannot reach the
+#: world past the registry, and nothing here is reachable from a phrase.
+#: What reaches it is a person pressing "install" in the setup window.
+#:
+#: The concession is narrowed here and checked in `tools/test_packages.py`:
+#: our own interpreter, `pip install`, and a name out of the closed list
+#: (`T-20`).
+PIP_ONLY = "models.py"
+
 
 def calls_in(path):
     """Every call of the form `module.function` in a file."""
@@ -86,7 +100,7 @@ core_files = sorted(
 
 offenders = []
 for path in core_files:
-    if os.path.basename(path) in (ALLOWED, LAUNCHER_ONLY):
+    if os.path.basename(path) in (ALLOWED, LAUNCHER_ONLY, PIP_ONLY):
         continue
     for (owner, attr), line in calls_in(path):
         if (owner, attr) in FORBIDDEN_CALLS or (owner, None) in FORBIDDEN_CALLS:
@@ -95,7 +109,28 @@ for path in core_files:
 check("ядро не делает побочных эффектов мимо реестра", not offenders,
       f"| {offenders}")
 print(f"     проверено файлов ядра: {len(core_files)}, "
-      f"разрешён только {ALLOWED}")
+      f"разрешены {ALLOWED}, {LAUNCHER_ONLY} и {PIP_ONLY} — каждый со своей "
+      f"оговоркой")
+
+# The proviso about models.py: one process, and it is `pip` on our own
+# interpreter. Anything else forbidden appearing in that file would be a
+# second concession riding in on the first one's ticket.
+pip_source = io.open(os.path.join("core", PIP_ONLY), encoding="utf-8").read()
+pip_tree = ast.parse(pip_source)
+pip_spawns = [node for node in ast.walk(pip_tree)
+              if isinstance(node, ast.Call)
+              and isinstance(node.func, ast.Attribute)
+              and node.func.attr in ("Popen", "run", "call", "check_output",
+                                     "startfile", "system")]
+check("пакет ставится ровно в одном месте", len(pip_spawns) == 1,
+      f"| найдено {len(pip_spawns)}")
+
+pip_args = ast.dump(pip_spawns[0]) if pip_spawns else ""
+check("своим интерпретатором и именно pip",
+      "attr='executable'" in pip_args and "'pip'" in pip_args,
+      "| ни системного python, ни другой команды")
+check("и без оболочки системы", "shell=True" not in pip_source,
+      "| shell=True превратил бы имя пакета в команду")
 
 # The proviso about plugin_host: only our own launcher is started.
 host_source = io.open(os.path.join("core", LAUNCHER_ONLY),

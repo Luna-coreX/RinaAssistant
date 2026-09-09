@@ -430,7 +430,11 @@ public partial class SettingsPage : UserControl
         else
         {
             said.Text = model["note"]?.GetValue<string>() ?? "";
-            button.Content = S("Скачать");
+            // A package is installed, a model is downloaded. The same
+            // button does both, and calling both "download" would leave a
+            // person wondering where the thing they downloaded went.
+            button.Content = model["kind"]?.GetValue<string>() == "package"
+                ? S("Установить") : S("Скачать");
             button.IsEnabled = true;
         }
     }

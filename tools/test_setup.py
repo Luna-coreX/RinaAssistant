@@ -75,14 +75,21 @@ try:
     check("каталог приехал", len(listed) > 0, f"| записей {len(listed)}")
 
     ticked = [m for m in listed if m.get("wanted")]
-    check("по умолчанию отмечено ровно одно", len(ticked) == 1,
-          "| " + ", ".join(m["id"] for m in ticked))
-    if ticked:
-        # The rule in one line: what is ticked for somebody has to be small
-        # enough that nobody minds having agreed to it without reading.
-        check("и это малая модель, а не двухгигабайтная",
-              ticked[0]["size"] < 200 * 1024 * 1024,
-              f"| {ticked[0]['id']}, {ticked[0]['size'] // (1024 * 1024)} МБ")
+    # **By what it costs, not by how many.** The rule was always about size:
+    # what is ticked for somebody is a box they do not read, so it has to be
+    # small enough that nobody minds having agreed to it. The first version
+    # of this check counted to one, which was only ever a rough stand-in —
+    # and it went red the moment a package joined the model it is useless
+    # without, where two ticks are the right answer.
+    weight = sum(m["size"] for m in ticked)
+    check("отмеченное по умолчанию весит немного",
+          0 < weight < 200 * 1024 * 1024,
+          f"| {weight // (1024 * 1024)} МБ: "
+          + ", ".join(m["id"] for m in ticked))
+    check("ничего крупного среди отмеченного нет",
+          all(m["size"] < 200 * 1024 * 1024 for m in ticked),
+          "| " + ", ".join(f"{m['id']} {m['size'] // (1024 * 1024)} МБ"
+                           for m in ticked))
 
     heavy = [m for m in listed if m["size"] > 1024 * 1024 * 1024]
     check("тяжёлое есть в списке и не отмечено",

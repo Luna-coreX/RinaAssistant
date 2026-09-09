@@ -101,8 +101,23 @@ check("наше и чужое различимо",
       any(m["ours"] for m in listed) and any(not m["ours"] for m in listed),
       "| " + ", ".join(f"{m['id']}:{'наше' if m['ours'] else 'движка'}"
                        for m in listed))
+models_only = [m for m in listed if m["kind"] == "model"]
+packages_only = [m for m in listed if m["kind"] == "package"]
+check("в каталоге есть и модели, и пакеты",
+      bool(models_only) and bool(packages_only),
+      f"| моделей {len(models_only)}, пакетов {len(packages_only)}")
 check("модель находится по имени",
-      models.find(listed[0]["id"]) is not None and models.find("нет") is None)
+      models.find(models_only[0]["id"]) is not None
+      and models.find("нет") is None)
+# The two lists stay apart. A package id that resolved to a model — or the
+# other way round — would mean one identifier naming two different things,
+# and the thing actually started would depend on the order of the lookup.
+check("пакет находится своим поиском",
+      models.find_package(packages_only[0]["id"]) is not None
+      and models.find_package("нет") is None)
+check("и списки не перепутаны",
+      models.find(packages_only[0]["id"]) is None
+      and models.find_package(models_only[0]["id"]) is None)
 
 print()
 print("=== скачивание ===")

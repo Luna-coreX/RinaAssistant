@@ -51,8 +51,8 @@ public partial class SetupWindow : Window
             S("По этому слову Рина понимает, что обращаются к ней."),
             BuildWake, KeepWake));
         _steps.Add(new Step(
-            S("Что скачать"),
-            S("Распознавание работает по модели — файлу, который в установщик не помещается."),
+            S("Что доустановить"),
+            S("Распознавание работает по пакету и модели — их размер в установщик не помещается."),
             BuildModels));
         _steps.Add(new Step(
             S("Готово"),
@@ -165,7 +165,10 @@ public partial class SetupWindow : Window
             stack.Children.Add(box);
 
             var note = model["note"]?.GetValue<string>() ?? "";
-            if (have) note = S("Уже скачано.");
+            var kind = model["kind"]?.GetValue<string>() ?? "model";
+            if (have)
+                note = kind == "package" ? S("Уже установлено.")
+                                         : S("Уже скачано.");
             else if (!ours) note = S("Скачается само при первом обращении.");
             if (note.Length > 0)
                 stack.Children.Add(new TextBlock

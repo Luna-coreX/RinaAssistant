@@ -425,69 +425,87 @@ class ProtocolServer:
 
         wanted = [str(i) for i in (message.payload.get("ids") or [])]
         started = []
-        for model_id in wanted:
-            model = models.find(model_id)
+        for wanted_id in wanted:
+            if wanted_id in self._fetching:
+                continue
+
+            # A package, and its **name comes from `PACKAGES`**, never from
+            # this message (`T-20`). The shell names an identifier; an
+            # unknown one is skipped in silence. Were the pip name taken
+            # from the payload, "install this for me" would be "run this on
+            # my machine" for anyone who can send us a message.
+            package = models.find_package(wanted_id)
+            if package is not None:
+                started.append(self._work_as_task(
+                    wanted_id, package.title,
+                    models.Install(package,
+                                   settings=self._settings())))
+                continue
+
+            model = models.find(wanted_id)
             # What the engine fetches for itself is skipped rather than
             # reported as started: we do not drive that transfer, and saying
             # we did would leave the shell waiting for progress that is
             # never coming, with a cancel button that cancels nothing.
             if model is None or not model.ours:
                 continue
-            if model_id in self._fetching:
-                continue
-            started.append(self._fetch_as_task(model))
+            started.append(self._work_as_task(
+                wanted_id, model.title,
+                models.Fetch(model, settings=self._settings())))
         return {"tasks": started}
 
-    def _fetch_as_task(self, model) -> dict:
-        """One download, wrapped in the task lifecycle."""
-        from core import models
+    def _work_as_task(self, what_id: str, title: str, work) -> dict:
+        """
+        One download or installation, wrapped in the task lifecycle.
 
+        One method for both, because from outside they are the same thing: a
+        long piece of work that reports where it is and can be stopped. They
+        differ only in whether there is a share to draw, and that difference
+        is carried by the numbers rather than by a second code path.
+        """
         task = self.tasks.create()
         task.start()
 
         def told(state: dict) -> None:
             # Cancellation is noticed rather than pushed, because that is
             # the contract `Task` states: "it is obliged to stop itself, on
-            # noticing the flag". Progress arrives every quarter-megabyte,
-            # which is often enough for "stop" to feel immediate — and the
-            # alternative was inventing a callback field on `Task` for one
-            # caller's convenience.
+            # noticing the flag".
             if task.cancel_requested:
-                fetch.cancel()
+                work.cancel()
 
             name = state.get("state")
             if name == "downloading":
                 total = state.get("total") or 0
                 done = state.get("done") or 0
+                # A share only where there is one. `pip` speaks in lines,
+                # not bytes; a bar invented from a line count would mean
+                # nothing and move convincingly.
                 self.send(task.progress(
-                    tr("Скачиваю {name}: {done} из {total} МБ",
-                       name=model.title,
-                       done=done // (1024 * 1024),
-                       total=total // (1024 * 1024)),
+                    state.get("note") or tr(
+                        "Скачиваю {name}: {done} из {total} МБ",
+                        name=title,
+                        done=done // (1024 * 1024),
+                        total=total // (1024 * 1024)),
                     fraction=(done / total) if total else None))
             elif name == "unpacking":
                 self.send(task.progress(tr("Распаковываю {name}",
-                                           name=model.title)))
-            elif name == "ready":
-                self._fetching.pop(model.id, None)
-                self.send(task.done({"id": model.id}))
-            elif name == "cancelled":
-                self._fetching.pop(model.id, None)
-                self.send(task.cancelled())
-            elif name == "failed":
-                self._fetching.pop(model.id, None)
-                self.send(task.failed(state.get("error", "")))
+                                           name=title)))
+            elif name in ("ready", "cancelled", "failed"):
+                self._fetching.pop(what_id, None)
+                if name == "ready":
+                    self.send(task.done({"id": what_id}))
+                elif name == "cancelled":
+                    self.send(task.cancelled())
+                else:
+                    self.send(task.failed(state.get("error", "")))
 
-        fetch = models.Fetch(model, on_progress=told,
-                             settings=self._settings())
-        # The task's number is remembered on the download itself, so that a
-        # window opened later can be told which task to cancel. Without it
-        # the only way to stop a download would be to have been watching
-        # when it started.
-        fetch.task_id = task.id
-        self._fetching[model.id] = fetch
-        fetch.start()
-        return {"id": model.id, "task_id": task.id}
+        work.on_progress = told
+        # The task's number is remembered on the work itself, so that a
+        # window opened later can be told which task to cancel.
+        work.task_id = task.id
+        self._fetching[what_id] = work
+        work.start()
+        return {"id": what_id, "task_id": task.id}
 
     def _listen_once(self, message: Envelope) -> dict:
         # The context is copied so that listening events land in the same

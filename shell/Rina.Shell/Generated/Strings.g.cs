@@ -1444,10 +1444,10 @@ public static partial class Loc
                 {
                     ["English"] = "Recognition",
                 },
-            ["Распознавание работает по модели — файлу, который в установщик не помещается."] =
+            ["Распознавание работает по пакету и модели — их размер в установщик не помещается."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Recognition needs a model — a file too large to put in the installer.",
+                    ["English"] = "Recognition needs a package and a model — too large to put in the installer.",
                 },
             ["Рина"] =
                 new Dictionary<string, string>
@@ -1754,6 +1754,11 @@ public static partial class Loc
                 {
                     ["English"] = "Already downloaded.",
                 },
+            ["Уже установлено."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Already installed.",
+                },
             ["УМЕЕТ СРАЗУ"] =
                 new Dictionary<string, string>
                 {
@@ -1763,6 +1768,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "WORKS OUT OF THE BOX · programs found: {0}",
+                },
+            ["Установить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Install",
                 },
             ["Установить эту пару нельзя."] =
                 new Dictionary<string, string>
@@ -1882,6 +1892,11 @@ public static partial class Loc
                 {
                     ["English"] = "in an hour",
                 },
+            ["Что доустановить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What else is needed",
+                },
             ["Что ответить (необязательно)"] =
                 new Dictionary<string, string>
                 {
@@ -1916,11 +1931,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What to do",
-                },
-            ["Что скачать"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "What to download",
                 },
             ["Чувствительность активации"] =
                 new Dictionary<string, string>
