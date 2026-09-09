@@ -257,9 +257,18 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
                             "title": named(STT_TITLES[name]),
                             "available": True})
                 continue
+            # And **why** it cannot be chosen. Availability alone left a
+            # person looking at a greyed-out Vosk with a model downloaded
+            # and a path set, and no way to learn that what was missing was
+            # the package. The core works the reason out already — it just
+            # kept it to itself.
+            probe = RECOGNISERS[name](settings)
+            ready = probe.available()
             out.append({"value": name,
                         "title": named(STT_TITLES.get(name, name)),
-                        "available": RECOGNISERS[name](settings).available()})
+                        "available": ready,
+                        "reason": "" if ready else tr(getattr(
+                            probe, "_error", "") or "движок недоступен")})
         return out
     if key == "voice":
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))

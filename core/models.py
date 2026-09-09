@@ -1,150 +1,227 @@
 # -*- coding: utf-8 -*-
 """
-Fetching a recognition model, visibly and interruptibly.
+Downloadable models: the catalogue, and fetching them with progress.
 
-Plan item `4.0-E05`. A Whisper model is a hundred and forty megabytes and a
-Vosk one about forty-five: on a slow line that is minutes, and minutes with
-nothing on the screen are indistinguishable from a program that has hung.
+Plan item `4.0b-A14`. Recognition and speech need files that cannot go into
+an installer — the small Russian Vosk model is forty-six megabytes and the
+full one is nearly two gigabytes. In 3.1.0 a person met this at the setup
+wizard; the port lost the wizard, and with it the only place where anybody
+was ever told that a model was needed at all.
 
-**Three promises, and each is here because its absence has a name.**
+**The catalogue is here rather than in the shell.** Which model an engine
+needs is knowledge about engines, and engines are the core's (ADR 0006).
+The shell shows a list and a progress bar; it does not know what Vosk is.
 
-`1.` **It says how far it has got.** Not because a bar is pretty, but
-because "downloading, 12 of 140 MB" and silence are different answers to
-"is it working". The library would download this by itself on first use —
-silently, inside the call that was supposed to recognise a phrase.
+**Two kinds of entry, and the difference is stated rather than hidden.**
+Some models we fetch ourselves — a plain archive at a known address, so the
+progress is real bytes and cancelling actually stops a transfer. Others the
+engine fetches on first use, and for those the honest thing to show is
+"about this much, on first use", not a progress bar we would have to invent.
+Pretending we control a transfer we do not is how a cancel button comes to
+do nothing.
 
-`2.` **It can be stopped.** A person who started a download on a metered
-connection must be able to change their mind, and a cancel that only stops
-the display is a lie. What is written to disk is thrown away with it: a
-half a model left lying about is worse than none, because next time it will
-be found and used.
-
-`3.` **It is never started behind one's back.** Fetching is asked for, and
-the asking is a separate step from choosing an engine. Picking "Whisper" in
-a list is not consent to spend a hundred and forty megabytes of somebody
-else's traffic.
-
-There is no Qt here and no protocol: this module reports through a callback
-and is told to stop through an event, so it can be checked without raising
-either half of the application.
+There is no Qt here: the module lies in the core.
 """
 
 import os
-import shutil
 import threading
 import urllib.request
+import zipfile
 
 from core.logging_setup import get_logger
+from core.settings_store import config_dir
 
 
 log = get_logger("models")
 
-#: How much is read at a time. Small enough that cancelling feels instant,
-#: large enough that the callback is not the expensive part.
-CHUNK = 256 * 1024
 
+class Model:
+    """One downloadable thing and what it is for."""
 
-class Cancelled(Exception):
-    """The person changed their mind. Not a failure."""
+    __slots__ = ("id", "title", "url", "size", "engine", "setting", "note")
 
-
-class Progress:
-    """How far a download has got. Plain data — it travels to the shell."""
-
-    __slots__ = ("done", "total", "name")
-
-    def __init__(self, name: str, done: int = 0, total: int = 0):
-        self.name = name
-        self.done = done
-        self.total = total
+    def __init__(self, id, title, engine, size, url="", setting="", note=""):
+        self.id = id
+        self.title = title
+        #: Which engine setting this model belongs to (`stt_engine` value).
+        self.engine = engine
+        #: Bytes. Real, and checked against the server when we fetch.
+        self.size = size
+        #: Empty means the engine fetches it itself on first use.
+        self.url = url
+        #: The settings key that must point at the unpacked model, if any.
+        self.setting = setting
+        self.note = note
 
     @property
-    def share(self) -> float:
-        """From zero to one; zero when the size is not known in advance."""
-        return self.done / self.total if self.total > 0 else 0.0
-
-    def to_dict(self) -> dict:
-        return {"name": self.name, "done": self.done, "total": self.total,
-                "share": round(self.share, 4)}
+    def ours(self) -> bool:
+        """Do we fetch this one, or does the engine."""
+        return bool(self.url)
 
 
-def fetch(url: str, into: str, name: str = "", on_progress=None,
-          stop: threading.Event | None = None) -> str:
+#: What can be had, and what it costs.
+#:
+#: Sizes are the ones the servers report, checked rather than remembered:
+#: a number in a wizard is a promise about somebody's traffic.
+CATALOGUE = (
+    Model("vosk-ru-small", "Vosk: русский, малый", "vosk",
+          size=46 * 1024 * 1024,
+          url="https://alphacephei.com/vosk/models/"
+              "vosk-model-small-ru-0.22.zip",
+          setting="vosk_model",
+          note="Быстрый и нетребовательный. Хватает для команд."),
+    Model("vosk-ru-full", "Vosk: русский, полный", "vosk",
+          size=1938 * 1024 * 1024,
+          url="https://alphacephei.com/vosk/models/vosk-model-ru-0.42.zip",
+          setting="vosk_model",
+          note="Точнее, но почти два гигабайта и заметно больше памяти."),
+    Model("whisper-base", "Whisper: base", "whisper",
+          size=145 * 1024 * 1024,
+          note="Скачается сам при первом распознавании."),
+)
+
+
+def models_dir() -> str:
+    """Where unpacked models live."""
+    path = os.path.join(config_dir(), "models")
+    os.makedirs(path, exist_ok=True)
+    return path
+
+
+def installed(model: Model) -> str:
+    """The path to this model on disk, or an empty string."""
+    if not model.ours:
+        return ""
+    where = os.path.join(models_dir(), model.id)
+    return where if os.path.isdir(where) else ""
+
+
+def catalogue(settings=None) -> list[dict]:
+    """The catalogue as the shell sees it."""
+    return [
+        {
+            "id": m.id,
+            "title": m.title,
+            "engine": m.engine,
+            "size": m.size,
+            "note": m.note,
+            "ours": m.ours,
+            "installed": bool(installed(m)) if m.ours else False,
+        }
+        for m in CATALOGUE
+    ]
+
+
+def find(model_id: str):
+    for model in CATALOGUE:
+        if model.id == model_id:
+            return model
+    return None
+
+
+class Fetch:
     """
-    Download a file, telling how it goes and stopping when told.
+    One download, running in its own thread, that can be stopped.
 
-    Returns the path it was written to. Raises `Cancelled` if it was
-    stopped, and whatever the network raised otherwise — both leave nothing
-    behind.
+    Cancelling is checked between blocks rather than by killing the thread:
+    a half-written file left behind by a killed thread looks exactly like a
+    finished one, and the next start would load it and fail somewhere far
+    away from here.
     """
-    name = name or os.path.basename(url)
-    os.makedirs(os.path.dirname(into) or ".", exist_ok=True)
 
-    # Written beside the real name and moved into place at the end. A file
-    # that appears only when it is whole cannot be found half-finished by
-    # the next run — and being found half-finished is the one failure that
-    # does not look like a failure.
-    partial = into + ".part"
-    progress = Progress(name)
+    #: Big enough not to spend the whole time in Python, small enough that
+    #: "stop" is answered within a moment.
+    BLOCK = 256 * 1024
 
-    try:
-        with urllib.request.urlopen(url, timeout=30) as answer:
-            progress.total = int(answer.headers.get("Content-Length") or 0)
-            if on_progress:
-                on_progress(progress)
+    def __init__(self, model: Model, on_progress=None, settings=None):
+        self.model = model
+        self.on_progress = on_progress
+        self.settings = settings
+        self.done = 0
+        self.total = model.size
+        self.error = ""
+        self._stop = threading.Event()
+        self._thread = None
 
-            with open(partial, "wb") as file:
-                while True:
-                    if stop is not None and stop.is_set():
-                        raise Cancelled(name)
-                    piece = answer.read(CHUNK)
-                    if not piece:
-                        break
-                    file.write(piece)
-                    progress.done += len(piece)
-                    if on_progress:
-                        on_progress(progress)
-    except BaseException:
-        # Including `Cancelled`, and deliberately: what was interrupted is
-        # removed by whoever was writing it. Leaving that to the caller
-        # means leaving it undone.
-        if os.path.exists(partial):
-            try:
-                os.remove(partial)
-            except OSError:
-                log.warning("Не убрала недокачанное: %s", partial)
-        raise
+    def start(self) -> "Fetch":
+        self._thread = threading.Thread(target=self._run, daemon=True,
+                                        name=f"rina-fetch-{self.model.id}")
+        self._thread.start()
+        return self
 
-    os.replace(partial, into)
-    log.info("Модель скачана: %s (%d Б)", name, progress.done)
-    return into
+    def cancel(self) -> None:
+        self._stop.set()
 
+    @property
+    def cancelled(self) -> bool:
+        return self._stop.is_set()
 
-def unpack(archive: str, into: str, stop: threading.Event | None = None) -> str:
-    """
-    Unpack a model archive next to itself, then throw the archive away.
+    def _say(self, state: str) -> None:
+        if self.on_progress is None:
+            return
+        self.on_progress({
+            "id": self.model.id,
+            "state": state,
+            "done": self.done,
+            "total": self.total,
+            "error": self.error,
+        })
 
-    Vosk ships a zip; Whisper does not ship an archive at all. Unpacking is
-    separate from fetching for that reason — an engine uses what it needs.
-    """
-    import zipfile
+    def _run(self) -> None:
+        archive = os.path.join(models_dir(), self.model.id + ".part")
+        target = os.path.join(models_dir(), self.model.id)
+        try:
+            self._say("downloading")
+            with urllib.request.urlopen(self.model.url, timeout=60) as answer:
+                told = int(answer.headers.get("Content-Length") or 0)
+                if told:
+                    # What the server says beats what the catalogue
+                    # remembers: a model gets rebuilt, and a progress bar
+                    # that runs past its end is worse than none.
+                    self.total = told
+                with open(archive, "wb") as file:
+                    while not self._stop.is_set():
+                        block = answer.read(self.BLOCK)
+                        if not block:
+                            break
+                        file.write(block)
+                        self.done += len(block)
+                        self._say("downloading")
 
-    os.makedirs(into, exist_ok=True)
-    with zipfile.ZipFile(archive) as bundle:
-        for entry in bundle.namelist():
-            if stop is not None and stop.is_set():
-                raise Cancelled(os.path.basename(archive))
-            bundle.extract(entry, into)
-    os.remove(archive)
-    return into
+            if self._stop.is_set():
+                self._tidy(archive)
+                self._say("cancelled")
+                return
 
+            self._say("unpacking")
+            with zipfile.ZipFile(archive) as zipped:
+                zipped.extractall(target)
+            self._tidy(archive)
 
-def remove(path: str) -> bool:
-    """Throw a model away. What was downloaded can be undownloaded."""
-    if not os.path.exists(path):
-        return False
-    if os.path.isdir(path):
-        shutil.rmtree(path, ignore_errors=True)
-    else:
-        os.remove(path)
-    return True
+            # The archives carry one folder inside; the engine wants that
+            # folder, not its parent.
+            inner = [os.path.join(target, name) for name in os.listdir(target)]
+            if len(inner) == 1 and os.path.isdir(inner[0]):
+                where = inner[0]
+            else:
+                where = target
+
+            if self.model.setting and self.settings is not None:
+                self.settings.set(self.model.setting, where)
+                self.settings.save()
+
+            log.info("Модель %s готова: %s", self.model.id, where)
+            self._say("ready")
+        except Exception as exc:                        # noqa: BLE001
+            self.error = str(exc)
+            self._tidy(archive)
+            log.warning("Модель %s не скачалась: %s", self.model.id, exc)
+            self._say("failed")
+
+    @staticmethod
+    def _tidy(path: str) -> None:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError:
+            pass

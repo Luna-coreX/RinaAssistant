@@ -1762,7 +1762,21 @@ public partial class App
         window.Left = -4000;
         window.Top = -4000;
         window.Show();
-        await Task.Delay(600);
+        window.Activate();
+        await Until(() => window.CurrentPage is Pages.HomePage);
+
+        // **The clock has to be running before anything about the figure is
+        // measured.** The figure moves on the background's tick, and that
+        // ticks only while the window is active — a window shown off-screen
+        // gets focus or does not, depending on what else the machine is
+        // doing. When it did not, every state reported the same swell and
+        // the check called that "the states do not differ": true, and about
+        // nothing. Three runs in a row went red under the load of the full
+        // regression and green on their own, which is exactly how a race
+        // looks from outside.
+        var ticking = await Until(() => window.BackdropRunning);
+        Check("часы идут — иначе фигуру мерить нечем", ticking,
+              ticking ? "" : "| окно не получило фокус, движения нет");
 
         Check("окно открывается на главной",
               window.CurrentPage is Pages.HomePage,
@@ -1772,12 +1786,12 @@ public partial class App
               $"| ширина {window.MenuWidth:0.0}");
 
         window.ShowMenu(true);
-        await Task.Delay(400);
+        await Until(() => window.MenuWidth > 100);
         Check("три полоски открывают разделы", window.MenuWidth > 100,
               $"| ширина {window.MenuWidth:0.0}");
 
         window.ShowMenu(false);
-        await Task.Delay(400);
+        await Until(() => window.MenuWidth < 1);
         Check("и закрывают обратно", window.MenuWidth < 1,
               $"| ширина {window.MenuWidth:0.0}");
 
@@ -1796,10 +1810,13 @@ public partial class App
             {
                 home.ShowDoingFor(doing, doing is Doing.Listening ? 0.8 : 0);
                 Check($"состояние {doing} принято", home.Doing == doing);
-                // Measured after a frame has passed: the swell is worked
-                // out while painting, and asking before the first frame
-                // would read the value of the state before.
-                await Task.Delay(220);
+                // Measured after the figure has actually settled, not
+                // after a guessed pause: the swell is worked out while
+                // painting, and it travels towards its target over several
+                // frames. Waiting for it to stop moving is the same
+                // question the pause was asking, answered rather than
+                // estimated.
+                await Settled(() => home.Swell);
                 seen.Add((doing, home.Swell));
             }
 
@@ -1813,17 +1830,17 @@ public partial class App
             // it open for hours, and the figure used to sit in `listening`
             // that whole time — reporting the setting instead of the room.
             home.HearFor(true, 0f);
-            await Task.Delay(120);
+            await Until(() => home.Doing != Doing.Talking);
             Check("открытый микрофон сам по себе — ещё не «слушаю»",
                   home.Doing != Doing.Listening, $"| {home.Doing}");
 
             home.HearFor(true, 0.5f);
-            await Task.Delay(120);
+            await Until(() => home.Doing == Doing.Listening);
             Check("а заговоривший человек — да",
                   home.Doing == Doing.Listening, $"| {home.Doing}");
 
             home.HearFor(false, 0f);
-            await Task.Delay(120);
+            await Until(() => home.Doing == Doing.Idle);
             Check("микрофон закрыли — снова ждёт",
                   home.Doing == Doing.Idle, $"| {home.Doing}");
         }
@@ -2817,6 +2834,71 @@ public partial class App
         _tray?.Dispose();
         _link?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(6));
         base.OnExit(e);
+    }
+
+    /// <summary>
+    /// Wait for something to become true, up to a deadline.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Replaces the fixed pauses the checks were written with. A pause is a
+    /// guess about how long a machine takes, and it is wrong in both
+    /// directions: too long, and every run pays for it; too short, and the
+    /// check goes red because something else was building at the time.
+    /// </para>
+    /// <para>
+    /// Three checks in this suite went red only under the load of the full
+    /// regression and green on their own — `test_speech`, `--check-core`,
+    /// `--check-home`. That is not flakiness to be re-run away: a suite
+    /// that reddens at random teaches the person reading it to disbelieve
+    /// it, which costs more than the checks were worth.
+    /// </para>
+    /// <para>
+    /// The deadline is generous because it is only ever paid when something
+    /// is genuinely wrong; when things work, this returns as soon as they
+    /// do.
+    /// </para>
+    /// </remarks>
+    /// <summary>Wait until a moving value stops moving.</summary>
+    /// <remarks>
+    /// For what eases towards a target rather than switching to it. "Has it
+    /// arrived" cannot be asked of a number without knowing where it was
+    /// going; "has it stopped changing" can, and that is the same question
+    /// for anything that settles.
+    /// </remarks>
+    private static async Task Settled(Func<double> value, double seconds = 4.0)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        var before = value();
+
+        // Wait for it to **start** before waiting for it to stop. A value
+        // that never moves is "settled" from the first look, and that is
+        // how this helper first read a frozen figure as a finished one.
+        while (DateTime.UtcNow < deadline
+               && Math.Abs(value() - before) < 0.0005)
+            await Task.Delay(20);
+
+        var still = 0;
+        before = value();
+        while (DateTime.UtcNow < deadline && still < 3)
+        {
+            await Task.Delay(40);
+            var now = value();
+            still = Math.Abs(now - before) < 0.0005 ? still + 1 : 0;
+            before = now;
+        }
+    }
+
+    private static async Task<bool> Until(Func<bool> ready,
+                                          double seconds = 6.0)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(seconds);
+        while (DateTime.UtcNow < deadline)
+        {
+            if (ready()) return true;
+            await Task.Delay(25);
+        }
+        return ready();
     }
 
     private static string? Value(string[] args, string name)

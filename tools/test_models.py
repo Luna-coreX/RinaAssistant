@@ -1,27 +1,30 @@
 # -*- coding: utf-8 -*-
 """
-4.0-E05: fetching a model says how it goes and stops when told.
+4.0b-A14: downloadable models — the catalogue, the transfer, and stopping it.
 
-Checked against a server of our own rather than a real model. A hundred and
-forty megabytes over somebody's line is not a check, it is a wait — and a
-check that needs the network gives a different answer depending on the room
-it is run in.
+Checked against a **local** server rather than the real one. A check that
+downloads forty-six megabytes from the internet is a check that fails on a
+train and passes at a desk, and it would be measuring somebody else's
+uptime rather than our code.
 
-What matters is not the bytes but the three promises: progress is reported,
-cancelling stops it, and nothing half-finished is left behind. All three are
-about what happens **while** it downloads, which a finished download cannot
-show.
+What is genuinely ours and worth checking: that progress is reported as
+bytes arrive, that cancelling stops the transfer and leaves nothing
+half-written behind, that a failure is reported rather than swallowed, and
+that a finished model points the setting at the folder the engine wants.
 """
 import http.server
+import io
 import os
 import shutil
 import sys
-import tempfile
 import threading
+import time
+import zipfile
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 
 from core import models
+from core.settings_api import MemorySettings
 
 fails = 0
 
@@ -33,100 +36,154 @@ def check(label, cond, detail=""):
     print(("OK   " if cond else "FAIL "), label, detail)
 
 
-BODY = b"x" * (900 * 1024)
+# --- a model archive and a server to serve it slowly ----------------------
+# Two megabytes: the downloader reads in blocks of a quarter, and a
+# fixture smaller than a few blocks cannot show whether progress is
+# reported along the way or only at the end.
+def make_archive(inner_name="the-model", padding=2_000_000):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as zipped:
+        zipped.writestr(f"{inner_name}/README", "a model, honestly")
+        zipped.writestr(f"{inner_name}/weights.bin", b"\0" * padding)
+    return buffer.getvalue()
 
 
-class Slow(http.server.BaseHTTPRequestHandler):
-    """Serves a megabyte slowly enough to be caught in the middle."""
+ARCHIVE = make_archive()
+
+
+class Slowly(http.server.BaseHTTPRequestHandler):
+    """Serves the archive in dribs, so a cancel has something to stop."""
 
     def do_GET(self):
+        if self.path == "/missing.zip":
+            self.send_error(404)
+            return
         self.send_response(200)
-        self.send_header("Content-Length", str(len(BODY)))
+        self.send_header("Content-Length", str(len(ARCHIVE)))
         self.end_headers()
-        for at in range(0, len(BODY), 64 * 1024):
+        for at in range(0, len(ARCHIVE), 16 * 1024):
             try:
-                self.wfile.write(BODY[at:at + 64 * 1024])
+                self.wfile.write(ARCHIVE[at:at + 16 * 1024])
                 self.wfile.flush()
-            except (BrokenPipeError, ConnectionAbortedError):
-                return              # cancelled — that is the point
-            import time
+            except Exception:                           # noqa: BLE001
+                return                                  # the other side left
             time.sleep(0.02)
 
-    def log_message(self, *args):
+    def log_message(self, *_args):
         pass
 
 
-server = http.server.HTTPServer(("127.0.0.1", 0), Slow)
+server = http.server.HTTPServer(("127.0.0.1", 0), Slowly)
 threading.Thread(target=server.serve_forever, daemon=True).start()
-URL = f"http://127.0.0.1:{server.server_address[1]}/model.bin"
+BASE = f"http://127.0.0.1:{server.server_address[1]}"
 
-room = tempfile.mkdtemp(prefix="rina-models-")
-try:
-    print("=== скачивание отчитывается о ходе ===")
-    seen = []
-    early = []
-    target = os.path.join(room, "model.bin")
 
-    def note(p):
-        seen.append((p.done, p.total))
-        # Whether the final name exists **while** it is still downloading.
-        # Asked here and nowhere else: after the fact both a careful
-        # download and a careless one look the same, and the promise is
-        # about the middle — a half-written file under the real name is
-        # found by the next run and used as though it were whole.
-        if 0 < p.done < p.total:
-            early.append(os.path.exists(target))
+def fetch_of(url, model_id="probe", setting="vosk_model"):
+    model = models.Model(model_id, "Проба", "vosk", size=len(ARCHIVE),
+                         url=url, setting=setting)
+    return model
 
-    models.fetch(URL, target, name="проверочная", on_progress=note)
 
-    check("файл на месте", os.path.isfile(target),
-          f"| {os.path.getsize(target) if os.path.isfile(target) else 0} Б")
-    check("размер сказан заранее", seen and seen[0][1] == len(BODY),
-          f"| {seen[0] if seen else '—'}")
-    check("о ходе сообщили не один раз", len(seen) > 3, f"| {len(seen)} раз")
-    check("и дошли до конца", seen[-1][0] == len(BODY), f"| {seen[-1]}")
-    check("доля растёт, а не скачет",
-          all(a[0] <= b[0] for a, b in zip(seen, seen[1:])))
-    check("под настоящим именем ничего не лежит, пока не дописано",
-          early and not any(early), f"| замеров {len(early)}")
+def clean(model_id):
+    where = os.path.join(models.models_dir(), model_id)
+    if os.path.isdir(where):
+        shutil.rmtree(where, ignore_errors=True)
+    part = where + ".part"
+    if os.path.exists(part):
+        os.remove(part)
 
-    print()
-    print("=== отмена останавливает и не оставляет следов ===")
-    os.remove(target)
-    stop = threading.Event()
-    # Stopped part-way: after the first pieces, while there is plainly more
-    # to come. Cancelling a download that has already finished proves
-    # nothing.
-    def halt(p):
-        if p.done > 128 * 1024:
-            stop.set()
 
-    stopped = False
-    try:
-        models.fetch(URL, target, on_progress=halt, stop=stop)
-    except models.Cancelled:
-        stopped = True
+print("=== каталог ===")
+listed = models.catalogue()
+check("каталог не пуст", len(listed) > 0, f"| записей {len(listed)}")
+check("у всего есть размер", all(m["size"] > 0 for m in listed))
+check("наше и чужое различимо",
+      any(m["ours"] for m in listed) and any(not m["ours"] for m in listed),
+      "| " + ", ".join(f"{m['id']}:{'наше' if m['ours'] else 'движка'}"
+                       for m in listed))
+check("модель находится по имени",
+      models.find(listed[0]["id"]) is not None and models.find("нет") is None)
 
-    check("отмена сработала", stopped)
-    check("готового файла не появилось", not os.path.exists(target))
-    check("и недокачанного тоже", not os.path.exists(target + ".part"),
-          f"| {os.listdir(room)}")
+print()
+print("=== скачивание ===")
+clean("probe")
+store = MemorySettings({})
+seen = []
+fetch = models.Fetch(fetch_of(f"{BASE}/model.zip"), on_progress=seen.append,
+                     settings=store).start()
+for _ in range(300):
+    if seen and seen[-1]["state"] in ("ready", "failed"):
+        break
+    time.sleep(0.05)
 
-    print()
-    print("=== сорванная связь тоже ничего не оставляет ===")
-    broken = os.path.join(room, "nowhere.bin")
-    fell = False
-    try:
-        models.fetch("http://127.0.0.1:1/nothing", broken)
-    except models.Cancelled:
-        fell = False
-    except Exception:
-        fell = True
-    check("ошибка сети доходит до вызвавшего", fell)
-    check("и мусора не осталось", not os.path.exists(broken + ".part"))
-finally:
-    server.shutdown()
-    shutil.rmtree(room, ignore_errors=True)
+check("скачалось", seen and seen[-1]["state"] == "ready",
+      f"| {seen[-1] if seen else 'ни одного сообщения'}")
+# Progress must be reported *while* it goes, not once at the end: a bar
+# that jumps from nothing to done is a bar that was never watched.
+middle = [s for s in seen if s["state"] == "downloading" and 0 < s["done"]
+          < len(ARCHIVE)]
+check("прогресс шёл по дороге, а не одним прыжком", len(middle) >= 2,
+      f"| промежуточных сообщений {len(middle)}")
+check("байты не превысили обещанного",
+      all(s["done"] <= s["total"] for s in seen))
+check("настройка указывает на распакованное",
+      os.path.isdir(str(store.get("vosk_model", ""))),
+      f"| {store.get('vosk_model', '')!r}")
+check("внутренняя папка развёрнута, а не её обёртка",
+      os.path.isfile(os.path.join(str(store.get("vosk_model", "")), "README")))
+check("временный файл убран",
+      not os.path.exists(os.path.join(models.models_dir(), "probe.part")))
+check("каталог видит установленное",
+      models.installed(fetch.model) != "")
+
+print()
+print("=== отмена ===")
+clean("probe")
+store2 = MemorySettings({})
+seen2 = []
+fetch2 = models.Fetch(fetch_of(f"{BASE}/model.zip"), on_progress=seen2.append,
+                      settings=store2).start()
+for _ in range(100):
+    if seen2 and seen2[-1]["done"] > 0:
+        break
+    time.sleep(0.02)
+fetch2.cancel()
+for _ in range(200):
+    if seen2 and seen2[-1]["state"] in ("cancelled", "ready", "failed"):
+        break
+    time.sleep(0.05)
+
+# By bytes, not by the word "cancelled". The first version of this check
+# asserted the state, and it stayed green when the stop flag was taken out
+# of the reading loop entirely: the whole file came down and *then* the
+# transfer announced itself as cancelled. A check on an announcement passes
+# for anything that announces.
+check("отмена останавливает, а не доводит до конца",
+      seen2 and seen2[-1]["state"] == "cancelled"
+      and fetch2.done < len(ARCHIVE),
+      f"| состояние {seen2[-1]['state'] if seen2 else '—'}, "
+      f"взято {fetch2.done} из {len(ARCHIVE)} Б")
+check("недокачанное не осталось лежать",
+      not os.path.exists(os.path.join(models.models_dir(), "probe.part")))
+check("и настройка на него не указывает", not store2.get("vosk_model", ""))
+
+print()
+print("=== неудача ===")
+clean("probe")
+seen3 = []
+models.Fetch(fetch_of(f"{BASE}/missing.zip"), on_progress=seen3.append,
+             settings=MemorySettings({})).start()
+for _ in range(200):
+    if seen3 and seen3[-1]["state"] in ("failed", "ready"):
+        break
+    time.sleep(0.05)
+check("о неудаче сообщено, а не проглочено",
+      seen3 and seen3[-1]["state"] == "failed",
+      f"| {seen3[-1].get('error', '')[:50] if seen3 else '—'}")
+check("и причина названа", seen3 and seen3[-1]["error"] != "")
+
+clean("probe")
+server.shutdown()
 
 print()
 print("ИТОГО ошибок:", fails)

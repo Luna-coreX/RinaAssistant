@@ -180,18 +180,18 @@ public partial class SettingsPage : UserControl
                 var finish = _values.GetValueOrDefault("finish")
                                  ?.GetValue<string>() ?? "black";
                 _options[key] = App.Accents(finish)
-                    .Select(a => (a.Value, a.Title, true)).ToList();
+                    .Select(a => (a.Value, a.Title, true, "")).ToList();
                 continue;
             }
 
             var devices = key == "input_device"
                 ? Audio.Microphone.Devices()
                 : Audio.Speaker.Devices();
-            var listed = new List<(string, string, bool)>
+            var listed = new List<(string, string, bool, string)>
             {
-                ("default", S("Устройство по умолчанию"), true),
+                ("default", S("Устройство по умолчанию"), true, ""),
             };
-            listed.AddRange(devices.Select(d => (d.Name, d.Name, true)));
+            listed.AddRange(devices.Select(d => (d.Name, d.Name, true, "")));
             _options[key] = listed;
         }
 
@@ -206,7 +206,7 @@ public partial class SettingsPage : UserControl
                            ?? [])
                 .Select(a => (a["value"]?.GetValue<string>() ?? "",
                               a["title"]?.GetValue<string>() ?? "",
-                              true))
+                              true, ""))
                 .Where(a => a.Item1.Length > 0)
                 .ToList();
             if (actions.Count > 0) _options["action_hotkeys"] = actions;
@@ -228,12 +228,14 @@ public partial class SettingsPage : UserControl
             _options[key] = items.Select(item => (
                 item?["value"]?.GetValue<string>() ?? "",
                 item?["title"]?.GetValue<string>() ?? "",
-                item?["available"]?.GetValue<bool>() ?? true)).ToList();
+                item?["available"]?.GetValue<bool>() ?? true,
+                item?["reason"]?.GetValue<string>() ?? "")).ToList();
         }
     }
 
     private readonly Dictionary<string, List<(string Value, string Title,
-                                              bool Available)>> _options = [];
+                                              bool Available,
+                                              string Reason)>> _options = [];
 
     private void Build()
     {
@@ -631,19 +633,27 @@ public partial class SettingsPage : UserControl
     /// have it installed".
     /// </remarks>
     private FrameworkElement BuildChoice(string key,
-        List<(string Value, string Title, bool Available)> known, string current)
+        List<(string Value, string Title, bool Available, string Reason)> known,
+        string current)
     {
         var box = new ComboBox
         {
             Style = (Style)FindResource("Choice"),
             Width = ControlWidth,
         };
-        foreach (var (value, title, available) in known)
+        foreach (var (value, title, available, reason) in known)
             box.Items.Add(new ComboBoxItem
             {
-                Content = title.Length > 0 ? title : value,
+                // Dimmed **and** told why. "Vosk is unavailable" in front of
+                // a person who has downloaded the model and set the path
+                // says nothing they can act on; the core knew all along that
+                // what was missing was the package, and simply kept it.
+                Content = available || reason.Length == 0
+                    ? (title.Length > 0 ? title : value)
+                    : $"{(title.Length > 0 ? title : value)} — {reason}",
                 Tag = value,
                 IsEnabled = available,
+                ToolTip = reason.Length > 0 ? reason : null,
             });
 
         box.SelectedItem = box.Items.OfType<ComboBoxItem>()
@@ -965,18 +975,18 @@ public partial class SettingsPage : UserControl
     /// the same events the window receives anyway.
     /// </remarks>
     private FrameworkElement BuildAssignments(string key,
-        List<(string Value, string Title, bool Available)> actions,
+        List<(string Value, string Title, bool Available, string Reason)> actions,
         JsonObject? current)
     {
         var stack = new StackPanel();
         var assigned = new JsonObject();
-        foreach (var (name, _t, _a) in actions)
+        foreach (var (name, _t, _a, _r) in actions)
         {
             var combination = current?[name]?.GetValue<string>() ?? "";
             if (combination.Length > 0) assigned[name] = combination;
         }
 
-        foreach (var (name, title, _) in actions)
+        foreach (var (name, title, _, _) in actions)
         {
             var row = new StackPanel
             {
