@@ -99,7 +99,7 @@ def finish_xaml(name: str, finish: dict, glass: dict) -> str:
     # would silently give back exactly what we are trying to move away from.
     for part, surface in (("Bar", "FACE_LOW"), ("Column", "FACE_LOW"),
                           ("Strip", "FACE_SUNK"), ("Control", "FACE_HIGH"),
-                          ("Raised", "FACE_HIGH")):
+                          ("Raised", "FACE_HIGH"), ("Popup", "FACE_HIGH")):
         share = glass.get(part.lower())
         if share is None:
             continue
@@ -195,7 +195,11 @@ def common_xaml(tokens: dict) -> str:
     #: `... Small`. Every heading in the application had been set in the
     #: fallback, silently, since `4.0-R03`.
     FALLBACK = {
-        "display": "Segoe UI Variable Display, Segoe UI, Arial",
+        # Bahnschrift is second on purpose: Century Gothic is not on every
+        # Windows install, and falling straight through to a neutral
+        # grotesque would lose the whole character of the setting exactly
+        # where it is missing.
+        "display": "Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial",
         "ui": "Segoe UI Variable Text, Segoe UI, Arial",
         "mono": "Cascadia Mono, Consolas",
     }

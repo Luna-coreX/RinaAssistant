@@ -42,11 +42,12 @@
   <SolidColorBrush x:Key="C.Hatch" Color="#dedace" />
 
   <Color x:Key="Color.Shadow">#000000</Color>
-  <SolidColorBrush x:Key="C.Glass.Bar" Color="#b8141412" />
-  <SolidColorBrush x:Key="C.Glass.Column" Color="#a8141412" />
-  <SolidColorBrush x:Key="C.Glass.Strip" Color="#c70f0f0e" />
+  <SolidColorBrush x:Key="C.Glass.Bar" Color="#00141412" />
+  <SolidColorBrush x:Key="C.Glass.Column" Color="#00141412" />
+  <SolidColorBrush x:Key="C.Glass.Strip" Color="#9e0f0f0e" />
   <SolidColorBrush x:Key="C.Glass.Control" Color="#8c272621" />
-  <SolidColorBrush x:Key="C.Glass.Raised" Color="#9e272621" />
+  <SolidColorBrush x:Key="C.Glass.Raised" Color="#80272621" />
+  <SolidColorBrush x:Key="C.Glass.Popup" Color="#e6272621" />
   <SolidColorBrush x:Key="C.Edge" Color="#24dedace" />
 
   <sys:Double x:Key="Nebula.Steps">5</sys:Double>

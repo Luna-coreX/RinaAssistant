@@ -309,16 +309,30 @@ def main(argv) -> int:
           f"| {tuple(round(v) for v in pane)}, расходится на {off:.0f} "
           f"(не больше 10)")
 
-    # And the areas are still separated. The system's means is a step of
-    # value plus a hairline seam; under a flow the direction of the step is
-    # no longer fixed — the flow can be darker or lighter than the column at
-    # any moment — but the **discontinuity** at the boundary stays, and that
-    # is what "separated" actually means.
+    # What separates the column from the panel depends on what the design
+    # says the column is, so the assertion is taken from the tokens rather
+    # than from what happens to be on screen.
+    #
+    # While the column had a surface of its own, separation was a step of
+    # value and the check demanded one. Since `4.0b-A06` it is fully
+    # transparent — the flow runs edge to edge, and what marks the open
+    # section is the accent stroke, checked below. Demanding a step now
+    # would be demanding the design of the version before last.
+    #
+    # So with a transparent column the assertion turns round: there must be
+    # **no** step. That is not a weaker statement, it is the opposite one,
+    # and it catches the thing worth catching — a scrim left on a surface
+    # declared to have none.
     column_pixel = average(image, inside, height * 0.55)
     gap = abs(brightness(pane) - brightness(column_pixel))
-    check("колонка и панель разделены — разрыв на границе", gap >= 4,
-          f"| панель {brightness(pane):.0f}, колонка "
-          f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
+    if glass.get("column", 1.0) <= 0.001:
+        check("колонка прозрачна насквозь — течение идёт без шва", gap <= 3,
+              f"| панель {brightness(pane):.0f}, колонка "
+              f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
+    else:
+        check("колонка и панель разделены — разрыв на границе", gap >= 4,
+              f"| панель {brightness(pane):.0f}, колонка "
+              f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
     # The title bar lies over the vivid layer: the calm one covers only the
     # working area, and the bar is above it.
     bar_glass = glass_over(colors["FACE_LOW"], glass.get("bar", 1.0),
@@ -356,21 +370,29 @@ def main(argv) -> int:
         check("акцент шириной ровно 2 точки",
               not near(at(4, middle), colors["SIGNAL"], 6),
               f"| точка 4: {at(4, middle)}")
-        # The open section is flush with the panel and the others stay
-        # sunk. Under glass both are composites, so what is asserted is the
-        # relation that carries the meaning: the open one is lighter than
-        # its neighbours. That relation is what a person reads, and unlike
-        # an exact colour it does not depend on where the flow happens to
-        # be at the moment of the shot.
+        # The open section has no fill of its own, and neither do the
+        # others: both show the flow as it is. The assertion used to be
+        # "the open one is lighter", and it could not hold — in `black` the
+        # flow's brighter stops are lighter than the surface the fill was
+        # made of, so the same fill read lighter in one place and darker in
+        # another. What marks the open section is the accent stroke above
+        # and the ink going to full; the fill was removed rather than
+        # measured with a rule loose enough to accept it.
+        # Compared with the flow's own palette, not with each other. Two
+        # rows lie forty points apart, and the flow is not uniform over
+        # forty points: an earlier version of this assertion compared them
+        # to one another and failed on `black` for a difference of four
+        # values that was simply the background doing its job. What is
+        # independent of where the rows happen to be is whether either of
+        # them shows a colour the flow cannot produce — which is exactly
+        # what a plate would be.
         other = middle + row if bottom + row < height * 0.7 else middle - row
-        check("активный раздел заподлицо с панелью",
-              brightness(at(inside, middle)) > brightness(at(inside, other)),
-              f"| открытый {brightness(at(inside, middle)):.0f}, "
-              f"соседний {brightness(at(inside, other)):.0f}")
-
-        check("неактивный раздел остаётся утопленным",
-              off_ramp(at(inside, other), column_glass) <= 10,
-              f"| {at(inside, other)}")
+        for label, y in (("открытый", middle), ("соседний", other)):
+            point = at(inside, y)
+            check(f"{label} раздел без своей заливки — цвет из течения",
+                  off_ramp(point, column_glass) <= 10,
+                  f"| {point}, расходится на "
+                  f"{off_ramp(point, column_glass):.0f}")
 
     # The level strip along the bottom edge of the whole window: the
     # microphone belongs to the instrument as a whole, not to the current
