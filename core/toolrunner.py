@@ -387,6 +387,42 @@ def _run_user_command(ctx, args):
             else ToolResult.failed(response, "internal"))
 
 
+def _try_user_command(ctx, args):
+    """
+    Run a command that is still being assembled.
+
+    What keeps this a call of declared tools rather than an arbitrary
+    action is `execute` below: it knows a fixed set of kinds and does
+    nothing with one it does not know. The sanitising the card goes
+    through first is the import path's, and on this path it buys the caps
+    — fifty steps, a thousand characters of target — not the refusals.
+
+    Nothing is written down. A trial does not go into the command store,
+    does not bump the run counter, and leaves no command behind if the
+    person closes the editor: they were trying it out, not keeping it.
+    """
+    import threading
+
+    from core.data_transfer import sanitize_command
+    from voice.user_commands import execute
+
+    card = args["command"]
+    if not isinstance(card, dict):
+        return ToolResult.failed(tr("Нечего пробовать."), "internal")
+    command = sanitize_command(card)
+
+    if command.get("type") == "sequence":
+        def worker():
+            execute(command, ctx.host, ctx.emit)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return ToolResult.done(tr("Пробую последовательность."))
+
+    ok, response = execute(command, ctx.host, ctx.emit)
+    return (ToolResult.done(response) if ok
+            else ToolResult.failed(response, "internal"))
+
+
 def _dispatch_plugin_command(ctx, args):
     if ctx.plugins is None:
         return ToolResult.done(value=False)
@@ -526,6 +562,7 @@ IMPLEMENTATIONS = {
     "list_reminders": _list_reminders,
     "cancel_reminder": _cancel_reminder,
     "run_user_command": _run_user_command,
+    "try_user_command": _try_user_command,
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
     "add_todo": _add_todo,

@@ -143,7 +143,7 @@ _CAPABILITY_LIST = (
     # six would have been lost.
     Capability("commands", Side.CORE,
                ("commands.list", "commands.kinds", "commands.builtin",
-                "commands.save", "commands.delete",
+                "commands.save", "commands.try", "commands.delete",
                 "commands.set_enabled", "commands.export",
                 "commands.import"),
                "свои команды пользователя"),

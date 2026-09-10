@@ -1300,5 +1300,44 @@
   },
   "или в": {
     "English": "or at"
+  },
+  " или ": {
+    "English": " or "
+  },
+  ", затем ": {
+    "English": ", then "
+  },
+  "{0} → {1}. Ответит: {2}.": {
+    "English": "{0} → {1}. Answers: {2}."
+  },
+  "«Готово»": {
+    "English": "“Done”"
+  },
+  "Бета-возможность: поведение может измениться в следующих версиях.": {
+    "English": "A beta capability: its behaviour may change in later versions."
+  },
+  "ЧТО ПОЛУЧИТСЯ": {
+    "English": "WHAT YOU GET"
+  },
+  "Скажите фразу…": {
+    "English": "Say a phrase…"
+  },
+  "ничего — шагов пока нет": {
+    "English": "nothing — there are no steps yet"
+  },
+  "ничего — не указано, что делать": {
+    "English": "nothing — what to do is not set"
+  },
+  "Нечего пробовать: шагов пока нет.": {
+    "English": "Nothing to try: there are no steps yet."
+  },
+  "Нечего пробовать: не указано, что делать.": {
+    "English": "Nothing to try: what to do is not set."
+  },
+  "Пробую…": {
+    "English": "Trying…"
+  },
+  "бета": {
+    "English": "beta"
   }
 }

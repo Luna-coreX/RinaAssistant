@@ -684,6 +684,20 @@ class RinaEngine:
                     name="rina-run-command", daemon=True).start()
                 return
 
+    def try_command(self, card):
+        """
+        Try a command being assembled, without saving it (`4.0b-A09`).
+
+        In the background for the same reason as `run_command_by_id`: a
+        sequence with pauses takes seconds, and the press comes from the
+        interface thread.
+        """
+        self._ensure_command_worker()
+        ctx = contextvars.copy_context()
+        threading.Thread(
+            target=ctx.run, args=(self._executor.try_user_command, card),
+            name="rina-try-command", daemon=True).start()
+
     # ------------------------------------------------------------------
     # the command queue
     # ------------------------------------------------------------------

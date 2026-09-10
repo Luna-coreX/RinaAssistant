@@ -14,10 +14,20 @@ public static partial class Loc
         IReadOnlyDictionary<string, string>> Table =
         new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
+            [" или "] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = " or ",
+                },
             [" — необратимо"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = " — irreversible",
+                },
+            [", затем "] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = ", then ",
                 },
             ["19:30"] =
                 new Dictionary<string, string>
@@ -59,6 +69,11 @@ public static partial class Loc
                 {
                     ["English"] = "{0} — unavailable right now",
                 },
+            ["{0} → {1}. Ответит: {2}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} → {1}. Answers: {2}.",
+                },
             ["«{0}» включён."] =
                 new Dictionary<string, string>
                 {
@@ -88,6 +103,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "“{0}”: didn’t understand the value.",
+                },
+            ["«Готово»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“Done”",
                 },
             ["«который час» · «запусти браузер» · «посчитай 15 * 12»"] =
                 new Dictionary<string, string>
@@ -133,6 +153,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "unnamed",
+                },
+            ["бета"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "beta",
+                },
+            ["Бета-возможность: поведение может измениться в следующих версиях."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A beta capability: its behaviour may change in later versions.",
                 },
             ["Будильник"] =
                 new Dictionary<string, string>
@@ -959,6 +989,16 @@ public static partial class Loc
                 {
                     ["English"] = "no connection",
                 },
+            ["Нечего пробовать: не указано, что делать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing to try: what to do is not set.",
+                },
+            ["Нечего пробовать: шагов пока нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing to try: there are no steps yet.",
+                },
             ["Ниже — реже слышит имя, выше — чаще ошибается"] =
                 new Dictionary<string, string>
                 {
@@ -978,6 +1018,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Nothing leaves for the network without your knowing.",
+                },
+            ["ничего — не указано, что делать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing — what to do is not set",
+                },
+            ["ничего — шагов пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing — there are no steps yet",
                 },
             ["НОВАЯ КОМАНДА"] =
                 new Dictionary<string, string>
@@ -1360,6 +1410,11 @@ public static partial class Loc
                 {
                     ["English"] = "applies after a restart",
                 },
+            ["Пробую…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Trying…",
+                },
             ["Проверить"] =
                 new Dictionary<string, string>
                 {
@@ -1576,6 +1631,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Say or type: “open the browser”",
+                },
+            ["Скажите фразу…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say a phrase…",
                 },
             ["Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик."] =
                 new Dictionary<string, string>
@@ -1963,6 +2023,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "what to open or say",
+                },
+            ["ЧТО ПОЛУЧИТСЯ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WHAT YOU GET",
                 },
             ["Что произнести"] =
                 new Dictionary<string, string>

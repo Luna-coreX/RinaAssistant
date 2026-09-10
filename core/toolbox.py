@@ -225,6 +225,38 @@ RUN_USER_COMMAND = Tool(
     errors=("internal",),
 )
 
+TRY_USER_COMMAND = Tool(
+    name="try_user_command",
+    summary="Выполнить команду, ещё не сохранённую, — проба из конструктора.",
+    params=(
+        Param("command", "object", "Карточка команды целиком."),
+    ),
+    # The same permissions as running a saved one, and for the same reason:
+    # what a command may do is not knowable from its card.
+    #
+    # **Why a card and not an identifier.** Every other tool here takes a
+    # reference to something the core already keeps; this one takes the
+    # thing itself, which is a wider door and worth saying out loud.
+    #
+    # What keeps it narrow is `voice.user_commands.execute`: it knows a
+    # fixed set of kinds and does nothing at all with one it does not
+    # know, and a system action outside its own table is likewise ignored.
+    # So a card can only ever name what the core already performs. The four
+    # gates are unchanged on top of that — an irreversible action still
+    # asks, and the call is written in the journal with `shell` as the
+    # initiator.
+    #
+    # The card is also put through the import path's sanitising, which on
+    # this path buys the caps rather than the refusals: fifty steps and a
+    # thousand characters of target. Said exactly, because the first
+    # version of this comment credited the sanitising with the refusals
+    # too, and the test written from it passed with the sanitising removed.
+    permissions={"process.launch", "network.external"},
+    idempotent=False,
+    returns="Ответ команды, либо подтверждение по умолчанию.",
+    errors=("internal",),
+)
+
 DISPATCH_PLUGIN_COMMAND = Tool(
     name="dispatch_plugin_command",
     summary="Передать фразу плагинам.",
@@ -334,7 +366,7 @@ ALL_TOOLS = (
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     ADD_TODO, LIST_TODO, CLOSE_TODO,
-    RUN_USER_COMMAND, DISPATCH_PLUGIN_COMMAND,
+    RUN_USER_COMMAND, TRY_USER_COMMAND, DISPATCH_PLUGIN_COMMAND,
     CALCULATE, WEB_SEARCH, ASK_MODEL,
 )
 

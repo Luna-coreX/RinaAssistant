@@ -865,6 +865,29 @@
   </Style>
 
   <!-- A card: raised by a step in value, without a border and without a shadow. -->
+  <!--
+    A beta mark: a capability that may still change under a person.
+
+    Beside the control itself, not in a release note. The promise is not
+    the disclaimer but the warning — this may behave differently in a
+    month, so do not build your work on it yet — and a person reads that
+    where they press, or not at all.
+
+    It is deliberately quiet: hatching is spoken for (it means irreversible
+    and nothing else, DIRECTION §5), and a loud mark on a capability that
+    works perfectly well would read as a fault. An outline, small type, and
+    the word.
+  -->
+  <Style x:Key="Chip.Beta" TargetType="Border">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+  </Style>
+
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.Glass.Raised}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />

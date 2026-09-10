@@ -652,6 +652,16 @@ public partial class App
                 await shown.OpenFirstPageAsync(keepOpen: true);
                 await Task.Delay(300);
             }
+            // The editor, likewise, has to be opened to be seen: a
+            // screenshot of the commands page shows the list and the
+            // button that opens the editor, and nothing of the editor —
+            // which is the part being looked at when it is asked for.
+            if (_shotSection == "commands"
+                && window.CurrentPage is Pages.CommandsPage editing)
+            {
+                await editing.OpenEditorAsync(null);
+                await Task.Delay(400);
+            }
             if (_shotScroll > 0 && window.CurrentPage is Pages.SettingsPage page)
             {
                 page.ScrollTo(_shotScroll);
@@ -3009,6 +3019,52 @@ public partial class App
             var before = commands.CommandCount;
             var opened = await commands.OpenEditorAsync(null);
             Check("конструктор открылся", opened && commands.EditorOpen);
+
+            // --- the command read back as one thing (`4.0b-A09`) ---
+            //
+            // Everything in the editor is the command in pieces: a phrase
+            // in one place, a kind in another, a path in a third. What a
+            // person decides is whether the whole does what they meant,
+            // and until this line there was nowhere on the screen that
+            // said so. Asserted by what it says, not by whether the block
+            // exists: an empty summary is a block that exists.
+            var editor = commands.OpenEditor;
+            if (editor is null) Check("конструктор доступен проверке", false);
+            else
+            {
+                // Waited for, not slept through. The editor is put on the
+                // page and measured on the next layout pass; read before
+                // that, every element reports itself invisible and a check
+                // about where the mark sits answers about nothing.
+                var laid = await Until(() => editor.IsVisible, 5);
+                Check("конструктор на экране", laid);
+                editor.FillForCheck("открой блокнот", "app",
+                                    @"C:\Windows\System32\notepad.exe");
+                var read = editor.SummarySaid;
+                Check("сводка называет фразу", read.Contains("открой блокнот"),
+                      $"| «{read}»");
+                Check("сводка называет, что произойдёт",
+                      read.Contains("notepad.exe"), $"| «{read}»");
+                Check("и чем она ответит", read.Contains("Готово"),
+                      $"| «{read}»");
+
+                // The new capability says it is new, beside itself.
+                var (seen, x, y, width) = editor.BetaWhere();
+                Check("проба помечена бетой", editor.BetaMarkedWell,
+                      seen ? $"| метка на {x:0}×{y:0} от кнопки шириной {width:0}"
+                           : "| кнопки или метки нет на экране");
+
+                // And trying does not save. The whole reason the method
+                // exists: a person trying a phrase four times would
+                // otherwise have four commands to delete.
+                var had = commands.CommandCount;
+                editor.TryForCheck();
+                await Task.Delay(900);
+                await commands.ReloadForCheckAsync();
+                Check("проба ничего не завела в списке",
+                      commands.CommandCount == had,
+                      $"| было {had}, стало {commands.CommandCount}");
+            }
 
             var saved = await commands.CreateForCheckAsync(
                 "открой блокнот", "app", @"C:\Windows\System32\notepad.exe");

@@ -247,6 +247,17 @@ class Executor:
         return self._run("run_user_command",
                          {"command_id": command.get("id")}, source=source)
 
+    def try_user_command(self, command, source="shell"):
+        """
+        Try a command that has not been saved (`4.0b-A09`).
+
+        Whole rather than by identifier: there is no identifier yet. The
+        card is narrowed inside the tool, by the same function the import
+        path uses.
+        """
+        return self._run("try_user_command", {"command": command},
+                         source=source)
+
     # ---------- answers ----------
     def _do_calc(self, intent, source):
         return self._ok(tr("Получается {result}.",

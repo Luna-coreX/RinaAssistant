@@ -128,7 +128,7 @@ def commands_from_data(data, source="файл"):
             f"Слишком много команд в файле (больше {MAX_COMMANDS})",
             "transfer.unreadable")
 
-    clean = [_sanitize_command(c) for c in commands
+    clean = [sanitize_command(c) for c in commands
              if isinstance(c, dict) and c.get("triggers")]
     from core.logging_setup import security_log
     security_log().info(
@@ -162,8 +162,16 @@ MAX_TRIGGER_LEN = 200
 MIN_TRIGGER_LEN = 2
 
 
-def _sanitize_command(raw):
-    """Keeps only the known fields and brings them to the expected types."""
+def sanitize_command(raw):
+    """
+    Keeps only the known fields and brings them to the expected types.
+
+    Public because importing a file is no longer the only way a
+    command card arrives from outside: the editor's "try it" sends
+    one too (`4.0b-A09`). One narrowing for both, so a card that
+    cannot come in through the door cannot come in through the
+    window either.
+    """
     from voice.user_commands import COMMAND_TYPES, SYSTEM_ACTIONS
 
     known_types = {t for t, _label, *_ in COMMAND_TYPES} | {"pause"}
@@ -185,7 +193,7 @@ def _sanitize_command(raw):
             cmd_type, target = "speak", ""
 
     steps = raw.get("steps") or []
-    steps = [_sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
+    steps = [sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
 
     return {
         "id": str(raw.get("id", "")),

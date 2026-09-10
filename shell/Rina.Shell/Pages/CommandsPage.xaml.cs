@@ -188,6 +188,9 @@ public partial class CommandsPage : UserControl
     /// <summary>How many commands are in the list — for the end-to-end check.</summary>
     public int CommandCount => _items.Count;
 
+    /// <summary>Re-read the list — for the check.</summary>
+    public Task ReloadForCheckAsync() => ReloadAsync();
+
     /// <summary>
     /// Built-in skills, and how many programs were found.
     /// </summary>
@@ -275,7 +278,11 @@ public partial class CommandsPage : UserControl
         if (kinds is null) return false;
 
         var editor = new CommandEditor(kinds, existing);
-        editor.Cancelled += () => EditorBox.Content = null;
+        editor.Cancelled += () =>
+        {
+            EditorBox.Content = null;
+            _editor = null;
+        };
         editor.Saved += async command =>
         {
             var saved = await Ask(Methods.CommandsSave, new JsonObject
@@ -287,9 +294,25 @@ public partial class CommandsPage : UserControl
             Note.Text = S("Команда сохранена.");
             await ReloadAsync();
         };
+        // A trial does not close the editor and does not touch the list:
+        // the person is still assembling, and the point of trying is to go
+        // on changing it afterwards.
+        editor.Tried += async command =>
+            await Ask(Methods.CommandsTry, new JsonObject
+            {
+                ["command"] = command,
+            });
+
         EditorBox.Content = editor;
+        _editor = editor;
         return true;
     }
+
+    //: The open editor — so a check can reach it.
+    private CommandEditor? _editor;
+
+    /// <summary>The editor now open, if any — for the check.</summary>
+    public CommandEditor? OpenEditor => _editor;
 
     private async void OnToggle(object sender, RoutedEventArgs e)
     {

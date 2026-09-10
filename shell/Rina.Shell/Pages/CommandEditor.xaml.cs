@@ -101,6 +101,7 @@ public partial class CommandEditor : UserControl
                              ?? [])
             _steps.Add((JsonObject)step.DeepClone());
         DrawSteps();
+        ShowSummary();
     }
 
     private string SelectedKind =>
@@ -151,13 +152,77 @@ public partial class CommandEditor : UserControl
 
         StepsBox.Visibility = kind == "sequence" ? Visibility.Visible
                                                  : Visibility.Collapsed;
+        StepsLabel.Visibility = StepsBox.Visibility;
+        TargetLabel.Visibility = TargetRow.Visibility;
         if (kind == "sequence" && StepKind.Items.Count == 0) FillStepKinds();
         Note.Text = "";
         ShowWarning();
+        ShowSummary();
     }
+
+    /// <summary>The whole command in one sentence.</summary>
+    /// <remarks>
+    /// <para>
+    /// Assembled from the same pieces <see cref="OnSave"/> sends, and in
+    /// the order a person would say them: what is said, what happens, what
+    /// she answers. Everything above this line is the command **in
+    /// pieces** — a phrase in one place, a kind in another, a path in a
+    /// third — and what is actually being decided is whether the whole does
+    /// what was meant.
+    /// </para>
+    /// <para>
+    /// The names of the kinds and of the system actions come from the core,
+    /// through the same lists that fill the dropdowns: a summary that
+    /// translated `app` into "Программа" on its own would be a second place
+    /// where that is decided, and the two would part company in silence.
+    /// </para>
+    /// </remarks>
+    private void ShowSummary()
+    {
+        var kind = SelectedKind;
+        var said = _triggers.Count == 0
+            ? S("Скажите фразу…")
+            : string.Join(S(" или "), _triggers.Select(p => $"«{p}»"));
+
+        string happens;
+        if (kind == "sequence")
+            happens = _steps.Count == 0
+                ? S("ничего — шагов пока нет")
+                : string.Join(S(", затем "),
+                              _steps.Select(step => DescribeStep(step)
+                                  .Replace(" · ", " ")));
+        else
+        {
+            var target = kind == "system"
+                ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
+                : Target.Text.Trim();
+            happens = target.Length == 0
+                ? S("ничего — не указано, что делать")
+                : DescribeStep(new JsonObject
+                {
+                    ["type"] = kind,
+                    ["target"] = target,
+                }).Replace(" · ", " ");
+        }
+
+        var answer = Response.Text.Trim();
+        Summary.Text = S("{0} → {1}. Ответит: {2}.", said, happens,
+                         answer.Length > 0 ? $"«{answer}»" : S("«Готово»"));
+    }
+
+    /// <summary>Enter adds the phrase — the hands are already there.</summary>
+    private void OnTriggerKey(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.Enter)
+            OnAddTrigger(sender, new RoutedEventArgs());
+    }
+
+    private void OnAnythingChanged(object sender, TextChangedEventArgs e) =>
+        ShowSummary();
 
     private void ShowWarning()
     {
+        ShowSummary();
         var chosen = (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
         var destructive = SelectedKind == "system"
                           && _actions.Any(a => a.Value == chosen
@@ -175,6 +240,7 @@ public partial class CommandEditor : UserControl
         _triggers.Add(phrase);
         NewTrigger.Clear();
         DrawTriggers();
+        ShowSummary();
     }
 
     private void DrawTriggers()
@@ -199,7 +265,12 @@ public partial class CommandEditor : UserControl
                 Style = (Style)FindResource("Btn"),
                 Content = S("Убрать"),
             };
-            drop.Click += (_, _) => { _triggers.Remove(phrase); DrawTriggers(); };
+            drop.Click += (_, _) =>
+            {
+                _triggers.Remove(phrase);
+                DrawTriggers();
+                ShowSummary();
+            };
             row.Children.Add(drop);
             Phrases.Children.Add(row);
         }
@@ -292,6 +363,7 @@ public partial class CommandEditor : UserControl
         StepTarget.Clear();
         Note.Text = "";
         DrawSteps();
+        ShowSummary();
     }
 
     /// <summary>Show the steps with their order and buttons.</summary>
@@ -367,7 +439,12 @@ public partial class CommandEditor : UserControl
                 Style = (Style)FindResource("Btn"),
                 Content = S("Убрать"),
             };
-            drop.Click += (_, _) => { _steps.RemoveAt(index); DrawSteps(); };
+            drop.Click += (_, _) =>
+            {
+                _steps.RemoveAt(index);
+                DrawSteps();
+                ShowSummary();
+            };
             Grid.SetColumn(drop, 4);
             row.Children.Add(drop);
 
@@ -381,6 +458,7 @@ public partial class CommandEditor : UserControl
         if (to < 0 || to >= _steps.Count) return;
         (_steps[index], _steps[to]) = (_steps[to], _steps[index]);
         DrawSteps();
+        ShowSummary();
     }
 
     /// <summary>A step in human words: the kind and what exactly.</summary>
@@ -440,24 +518,75 @@ public partial class CommandEditor : UserControl
             return;
         }
 
-        var command = new JsonObject
-        {
-            ["enabled"] = true,
-            ["type"] = kind,
-            ["triggers"] = new JsonArray(
-                _triggers.Select(t => (JsonNode)t!).ToArray()),
-            ["match"] = "contains",
-            ["target"] = target,
-            ["response"] = Response.Text.Trim(),
-            ["steps"] = new JsonArray(
-                _steps.Select(step => step.DeepClone()).ToArray()),
-        };
+        var command = Card(kind, target);
         // The number is assigned by the core; we send our own only when
         // editing one that already exists — otherwise editing would turn
         // into creating a twin.
         if (_id.Length > 0) command["id"] = _id;
 
         Saved?.Invoke(command);
+    }
+
+    /// <summary>The card as the core expects it.</summary>
+    /// <remarks>
+    /// One place, used by both saving and trying. Two builders would part
+    /// company the first time a field was added, and the trial would then
+    /// be a trial of something slightly different from what gets saved —
+    /// which is the one thing a trial must not be.
+    /// </remarks>
+    private JsonObject Card(string kind, string target) => new()
+    {
+        ["enabled"] = true,
+        ["type"] = kind,
+        ["triggers"] = new JsonArray(
+            _triggers.Select(t => (JsonNode)t!).ToArray()),
+        ["match"] = "contains",
+        ["target"] = target,
+        ["response"] = Response.Text.Trim(),
+        ["steps"] = new JsonArray(
+            _steps.Select(step => step.DeepClone()).ToArray()),
+    };
+
+    /// <summary>The person wants to see it happen (`4.0b-A09`).</summary>
+    public event Action<JsonObject>? Tried;
+
+    /// <summary>
+    /// Try it without saving.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Assembling a command and finding out whether it does what was meant
+    /// were two separate acts: save, close the editor, find the row, press
+    /// «Выполнить» — and if it was wrong, open it again. Trying it four
+    /// times left four commands to delete.
+    /// </para>
+    /// <para>
+    /// <b>Phrases are not needed for this.</b> A phrase is how the command
+    /// is found when spoken; a trial is pressed, not said, so demanding one
+    /// would be demanding a thing that has no part in what is about to
+    /// happen. What to do is still needed — that is the thing being tried.
+    /// </para>
+    /// </remarks>
+    private void OnTry(object sender, RoutedEventArgs e)
+    {
+        var kind = SelectedKind;
+        var target = kind == "system"
+            ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
+            : Target.Text.Trim();
+
+        if (kind == "sequence" && _steps.Count == 0)
+        {
+            Note.Text = S("Нечего пробовать: шагов пока нет.");
+            return;
+        }
+        if (kind != "sequence" && target.Length == 0)
+        {
+            Note.Text = S("Нечего пробовать: не указано, что делать.");
+            return;
+        }
+
+        Note.Text = S("Пробую…");
+        Tried?.Invoke(Card(kind, target));
     }
 
     private void OnCancel(object sender, RoutedEventArgs e) => Cancelled?.Invoke();
@@ -512,4 +641,59 @@ public partial class CommandEditor : UserControl
 
     /// <summary>How many steps were assembled — for the check.</summary>
     public int StepCount => _steps.Count;
+
+    /// <summary>The command read back as one sentence — for the check.</summary>
+    public string SummarySaid => Summary.Text;
+
+    /// <summary>
+    /// Is the new capability marked as one — for the check.
+    /// </summary>
+    /// <remarks>
+    /// Both halves: the mark is beside <c>Try</c> and both are on screen.
+    /// A mark that is present but hidden, or present beside something else,
+    /// is not a warning anybody reads — and either would satisfy a check
+    /// that only asked whether the element existed.
+    /// </remarks>
+    /// <summary>
+    /// Where the mark sits, in numbers — for the check.
+    /// </summary>
+    /// <remarks>
+    /// Numbers, and the check makes the sentence. The first version
+    /// composed its own report here, in Russian, inside a page — and
+    /// `check_strings.py` was right to object: a line a person never sees
+    /// has no business among the ones that get translated, and a page has
+    /// no business writing a check's prose.
+    /// </remarks>
+    public (bool Seen, double X, double Y, double Width) BetaWhere()
+    {
+        if (!Try.IsVisible || !TryBeta.IsVisible) return (false, 0, 0, 0);
+        var at = TryBeta.TranslatePoint(new Point(0, 0), Try);
+        return (true, at.X, at.Y, Try.ActualWidth);
+    }
+
+    /// <summary>Is the mark beside the button it belongs to.</summary>
+    public bool BetaMarkedWell
+    {
+        get
+        {
+            var (seen, x, y, width) = BetaWhere();
+            return seen && x >= width && x < width + 40
+                   && Math.Abs(y) < Try.ActualHeight;
+        }
+    }
+
+    /// <summary>Fill in a simple command — for the check.</summary>
+    public void FillForCheck(string phrase, string kind, string target)
+    {
+        _triggers.Clear();
+        _triggers.Add(phrase);
+        DrawTriggers();
+        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string?)item.Tag == kind);
+        Target.Text = target;
+        ShowSummary();
+    }
+
+    /// <summary>Press «Проверить» — for the check.</summary>
+    public void TryForCheck() => OnTry(this, new RoutedEventArgs());
 }

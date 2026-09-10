@@ -141,7 +141,7 @@
 | `tts` | ядро | `speech.say` |
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
 | `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
-| `commands` | ядро | `commands.list`, `commands.save`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
+| `commands` | ядро | `commands.list`, `commands.save`, `commands.try`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
 | `history` | ядро | `history.list`, `history.clear`, `history.export` |
 | `llm` | ядро | — |
@@ -279,6 +279,7 @@
 | `models.catalogue` | — | какие модели можно скачать, чего они стоят |
 | `models.fetch` | `ids` | начать скачивание; ход — обычными `task.*` |
 | `commands.save` | `command` | сохранённая команда; создание и правка — один метод |
+| `commands.try` | `command` — карточка целиком | `accepted`. Выполнить несохранённое — проба из конструктора (`4.0b-A09`). Ничего не сохраняет: ни команды, ни номера, ни счётчика. Единственный метод, принимающий карточку, а не ссылку на неё, — почему это безопасно, разобрано в `T-21` |
 | `commands.delete` | `id` | удалено ли |
 | `commands.set_enabled` | `id`, `enabled` | список после изменения |
 | `commands.export` | — | содержимое файла целиком: `kind`, `format`, `app_version`, `exported_at`, `payload.commands`, `payload.stats`. Файл пишет оболочка |

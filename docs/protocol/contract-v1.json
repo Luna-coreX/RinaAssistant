@@ -43,7 +43,8 @@
         "commands.kinds",
         "commands.list",
         "commands.save",
-        "commands.set_enabled"
+        "commands.set_enabled",
+        "commands.try"
       ],
       "side": "core"
     },
@@ -458,6 +459,7 @@
     "commands.list": "commands",
     "commands.save": "commands",
     "commands.set_enabled": "commands",
+    "commands.try": "commands",
     "core.shutdown": null,
     "hello": null,
     "history.clear": "history",

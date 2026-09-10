@@ -58,6 +58,8 @@ public static class Methods
     public const string CommandsSave = "commands.save";
     /// <summary>Возможность: commands.</summary>
     public const string CommandsSetEnabled = "commands.set_enabled";
+    /// <summary>Возможность: commands.</summary>
+    public const string CommandsTry = "commands.try";
     /// <summary>Базовый метод.</summary>
     public const string CoreShutdown = "core.shutdown";
     /// <summary>Базовый метод.</summary>
@@ -167,6 +169,7 @@ public static class Methods
             ["commands.list"] = "commands",
             ["commands.save"] = "commands",
             ["commands.set_enabled"] = "commands",
+            ["commands.try"] = "commands",
             ["core.shutdown"] = null,
             ["hello"] = null,
             ["history.clear"] = "history",

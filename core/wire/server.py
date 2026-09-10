@@ -303,6 +303,7 @@ class ProtocolServer:
             "models.fetch": self._models_fetch,
             "speech.test": self._speech_test,
             "commands.save": self._commands_save,
+            "commands.try": self._commands_try,
             "commands.delete": self._commands_delete,
             "commands.set_enabled": self._commands_set_enabled,
             "commands.export": self._commands_export,
@@ -884,6 +885,26 @@ class ProtocolServer:
             command["id"] = "cmd_" + secrets.token_hex(3)
             store.add(command)
         return {"command": dict(command)}
+
+    def _commands_try(self, message: Envelope) -> dict:
+        """
+        Try a card that has not been saved (`4.0b-A09`).
+
+        The editor could assemble a command and could save it, and until it
+        was saved there was no way to find out whether it did what was
+        meant. Saving in order to find out leaves a command behind on every
+        attempt, and a person trying a phrase four times ends up with four
+        commands to delete.
+
+        Nothing is stored: no identifier is issued, the run counter is not
+        bumped, and the card goes straight to the tool — which narrows it
+        through the same function the import path uses.
+        """
+        card = message.payload.get("command")
+        if not isinstance(card, dict):
+            return {"accepted": False}
+        self.engine.try_command(dict(card))
+        return {"accepted": True}
 
     def _commands_delete(self, message: Envelope) -> dict:
         # The store does not say whether it deleted anything, so we count
