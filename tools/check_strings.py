@@ -56,7 +56,7 @@ RUS = re.compile(r"[А-Яа-яЁё]")
 #: elsewhere — both forms are equally lawful and both give a key.
 CALL = re.compile(r'\b(?:S|Word)\(\s*@?"([^"]*)"')
 #: `S("часть" + "часть")` — a phrase assembled from two translations.
-GLUE = re.compile(r'(?:S|Word)\(\s*@?"[^"]*"\s*\+')
+GLUE = re.compile(r'\b(?:S|Word)\(\s*@?"[^"]*"\s*\+')
 XAML_CALL = re.compile(r"\{loc:S '([^']*)'\}")
 CS_LITERAL = re.compile(r'"([^"\n]*[А-Яа-яЁё][^"\n]*)"')
 XAML_ATTR = re.compile(r'\b(?:Text|Content|ToolTip|Title)="([^"{}]*[А-Яа-яЁё][^"{}]*)"')

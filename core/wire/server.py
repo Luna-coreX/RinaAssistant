@@ -858,8 +858,17 @@ class ProtocolServer:
         # the core since 3.1.0, nobody simply asked for them, and under an
         # English interface the editor said "Программа".
         return {
-            "kinds": [{"value": kind, "title": tr(title), "icon": icon}
+            # `step_only` says which kinds are steps of a sequence rather
+            # than commands in their own right (`4.0b-A09`). That is a
+            # statement about meaning, so it comes from here; where to put
+            # such a kind in the window is the shell's business.
+            "kinds": [{"value": kind, "title": tr(title), "icon": icon,
+                       "step_only": kind in user_commands.STEP_ONLY}
                       for kind, title, icon in user_commands.COMMAND_TYPES],
+            "conditions": [{"value": name, "title": tr(title)}
+                           for name, title in user_commands.CONDITIONS],
+            "limits": {"repeat": user_commands.MAX_REPEAT,
+                       "depth": user_commands.MAX_DEPTH},
             "actions": [{"value": action, "title": tr(title),
                          "destructive": action
                          in user_commands.DESTRUCTIVE_ACTIONS}

@@ -188,6 +188,10 @@ public partial class CommandsPage : UserControl
     /// <summary>How many commands are in the list — for the end-to-end check.</summary>
     public int CommandCount => _items.Count;
 
+    /// <summary>Scroll the page — so a screenshot can reach the chain.</summary>
+    public void ScrollTo(double offset) =>
+        Scroll.ScrollToVerticalOffset(offset);
+
     /// <summary>Re-read the list — for the check.</summary>
     public Task ReloadForCheckAsync() => ReloadAsync();
 

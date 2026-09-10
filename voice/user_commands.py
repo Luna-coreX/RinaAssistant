@@ -27,6 +27,11 @@ import shutil
 import subprocess
 import webbrowser
 
+from core.logging_setup import get_logger
+
+
+log = get_logger("commands")
+
 
 COMMAND_TYPES = [
     ("app",      "Программа",        "🖥️"),
@@ -35,7 +40,58 @@ COMMAND_TYPES = [
     ("speak",    "Озвучить текст",   "🔊"),
     ("system",   "Системное действие", "⚙️"),
     ("sequence", "Последовательность", "🔗"),
+    # --- what a sequence is built out of (`4.0b-A09`) ------------------
+    #
+    # `pause` has been executable since 2.0.0 and was **never offered**:
+    # the editor filled its list of kinds from the table above, and the
+    # table did not have it. A capability nobody can reach is not a
+    # capability; found by asking why a person could not put a wait
+    # between "launch" and "maximise".
+    ("pause",    "Подождать",        "⏳"),
+    # Repetition and choice. These are control flow over **calls of
+    # declared tools**, not a way to run something arbitrary: a step
+    # inside them is an ordinary step and goes the same path with the
+    # same gates. That is the line the plan draws, and it is not crossed
+    # by letting a person say "three times" or "only in the evening".
+    ("repeat",   "Повторить",        "🔁"),
+    ("if",       "Если",             "🔀"),
 ]
+
+#: What a condition can ask about.
+#:
+#: Deliberately short, and every one of them answerable **locally and
+#: instantly**. A condition that has to go and look at something takes as
+#: long as the thing it looks at, and a command that hangs on an unreachable
+#: network share is worse than one that cannot ask about it at all.
+CONDITIONS = [
+    ("after",   "Сейчас позже, чем"),
+    ("before",  "Сейчас раньше, чем"),
+    ("weekday", "Сегодня будний день"),
+    ("weekend", "Сегодня выходной"),
+    ("exists",  "Файл или папка есть"),
+    ("missing", "Файла или папки нет"),
+]
+
+#: Kinds that are steps of a sequence and not commands in their own right.
+#:
+#: A command of type "wait" would be a command that does nothing on purpose;
+#: a command that is only a repeat or only a condition says nothing about
+#: what it repeats or chooses between. All three are meaningful **inside** a
+#: sequence and empty outside one.
+#:
+#: The core says this rather than the shell, because it is a statement about
+#: what these things mean, not about how to show them (ADR 0006). A shell
+#: deciding it for itself would be a second place where it is decided.
+STEP_ONLY = frozenset({"pause", "repeat", "if"})
+
+#: How many times a repeat may run, and how deep control flow may nest.
+#:
+#: Both are limits against a slip rather than against an attacker: "repeat
+#: 1000 times" is almost always a typo, and a person who meant it can say
+#: so twice. The nesting limit is what stops a card from being able to
+#: describe an unbounded amount of work.
+MAX_REPEAT = 50
+MAX_DEPTH = 5
 
 # Actions on Rina's own window are performed by the main window (host);
 # actions with the sys_ prefix by voice/system_control (volume, media, PC).
@@ -277,7 +333,65 @@ def _open_path(path):
         return False
 
 
-def execute(command, host=None, emit=None):
+def _run_steps(steps, host, emit, depth):
+    """
+    Perform a list of steps in order, one level deeper.
+
+    The depth is carried rather than counted globally: two sequences side by
+    side are not nesting, and a limit that thought they were would refuse
+    perfectly ordinary commands. Past the limit the steps are simply not
+    run — a card that describes an unbounded amount of work does not get to
+    do an unbounded amount of work.
+    """
+    if depth >= MAX_DEPTH:
+        log.warning("Слишком глубокая вложенность шагов, дальше не идём")
+        return False
+    ok = True
+    for step in steps or []:
+        step_ok, _ = execute(step, host, emit, depth + 1)
+        ok = ok and step_ok
+    return ok
+
+
+def _condition_holds(kind, value):
+    """
+    Whether a condition is met, answered here and now.
+
+    Everything here is answerable locally and instantly. A condition that
+    has to go and look at something takes as long as the thing it looks at,
+    and a command hanging on an unreachable network share is worse than one
+    that cannot ask about it.
+    """
+    import datetime
+
+    now = datetime.datetime.now()
+    if kind in ("after", "before"):
+        try:
+            hour, _, minute = str(value).partition(":")
+            when = now.replace(hour=int(hour), minute=int(minute or 0),
+                               second=0, microsecond=0)
+        except (TypeError, ValueError):
+            # An unreadable time is not a reason to guess. "Later than
+            # nonsense" is false, and the branch simply does not run.
+            return False
+        return now >= when if kind == "after" else now < when
+    if kind == "weekday":
+        return now.weekday() < 5
+    if kind == "weekend":
+        return now.weekday() >= 5
+    if kind in ("exists", "missing"):
+        there = bool(str(value)) and os.path.exists(str(value))
+        return there if kind == "exists" else not there
+    # An unknown condition — from a newer version's file, or a typo — is
+    # false. Said exactly, because "false" is not the same as "nothing
+    # happens": the "otherwise" branch is what a person wrote for the case
+    # when the condition does not hold, and running it is the least
+    # surprising reading. What must not happen is the *then* branch running
+    # on a condition nobody could evaluate.
+    return False
+
+
+def execute(command, host=None, emit=None, depth=0):
     """
     Performs a command. host is an object with methods for system actions
     (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
@@ -330,10 +444,30 @@ def execute(command, host=None, emit=None):
         time.sleep(seconds)
         ok = True
     elif ctype == "sequence":
+        ok = _run_steps(command.get("steps", []), host, emit, depth)
+    elif ctype == "repeat":
+        # "Three times" rather than three copies of the same step. The count
+        # is capped: "repeat 1000 times" is almost always a slip, and a
+        # person who meant it can say it twice.
+        try:
+            times = int(command.get("count", 1) or 1)
+        except (TypeError, ValueError):
+            times = 1
+        times = max(0, min(times, MAX_REPEAT))
         ok = True
-        for step in command.get("steps", []):
-            step_ok, _ = execute(step, host, emit)
-            ok = ok and step_ok
+        for _ in range(times):
+            if not _run_steps(command.get("steps", []), host, emit, depth):
+                # A repeat stops at the first failure rather than trying
+                # again four more times. Whatever went wrong is unlikely to
+                # go right on its own, and repeating a failing action is the
+                # one thing nobody wants a computer to be enthusiastic about.
+                ok = False
+                break
+    elif ctype == "if":
+        met = _condition_holds(command.get("condition", ""),
+                               command.get("value", ""))
+        branch = "steps" if met else "otherwise"
+        ok = _run_steps(command.get(branch) or [], host, emit, depth)
     else:
         ok = False
 

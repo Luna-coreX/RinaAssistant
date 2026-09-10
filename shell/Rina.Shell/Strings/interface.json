@@ -227,12 +227,6 @@
   "Добавить фразу": {
     "English": "Add a phrase"
   },
-  "Добавить шаг": {
-    "Deutsch": "Schritt hinzufügen",
-    "English": "Add step",
-    "Español": "Añadir paso",
-    "Українська": "Додати крок"
-  },
   "Добавлено {0}, пропущено как уже известные {1}.": {
     "English": "Added {0}, skipped {1} already known."
   },
@@ -538,9 +532,6 @@
     "English": "New command",
     "Español": "Nuevo comando",
     "Українська": "Нова команда"
-  },
-  "Новый шаг": {
-    "English": "New step"
   },
   "Нужен хотя бы один шаг.": {
     "English": "At least one step is needed."
@@ -1094,9 +1085,6 @@
   "Шаги по порядку": {
     "English": "Steps in order"
   },
-  "Шагу нужно указать, что делать.": {
-    "English": "The step needs something to do."
-  },
   "Экспорт": {
     "Deutsch": "Exportieren",
     "English": "Export",
@@ -1273,9 +1261,6 @@
   },
   "через час": {
     "English": "in an hour"
-  },
-  "что открыть или произнести": {
-    "English": "what to open or say"
   },
   "что произнести": {
     "English": "what to say"
@@ -1465,5 +1450,35 @@
   },
   "  — пусто": {
     "English": "  — empty"
+  },
+  "Вставить шаг сюда": {
+    "English": "Insert a step here"
+  },
+  "Выше": {
+    "English": "Up"
+  },
+  "Ниже": {
+    "English": "Down"
+  },
+  "Убрать шаг": {
+    "English": "Remove this step"
+  },
+  "тогда": {
+    "English": "then"
+  },
+  "иначе": {
+    "English": "otherwise"
+  },
+  "секунд": {
+    "English": "seconds"
+  },
+  "с": {
+    "English": "s"
+  },
+  "раз": {
+    "English": "times"
+  },
+  "путь": {
+    "English": "path"
   }
 }

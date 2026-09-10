@@ -661,10 +661,35 @@ public partial class App
             {
                 await editing.OpenEditorAsync(null);
                 await Task.Delay(400);
+                // A sequence, because the chain of steps is the thing the
+                // screenshot is being taken of. An empty editor shows the
+                // form and none of it.
+                if (editing.OpenEditor is { } built)
+                {
+                    built.ShowSequenceForCheck();
+                    built.InsertStepForCheck(0, "app",
+                        @"C:\Windows\System32\notepad.exe");
+                    built.InsertStepForCheck(1, "pause", "2");
+                    built.InsertStepForCheck(2, "repeat");
+                    built.NestStepForCheck(2, "steps", "system");
+                    built.InsertStepForCheck(3, "if");
+                    built.NestStepForCheck(3, "steps", "speak", "добрый вечер");
+                    built.NestStepForCheck(3, "otherwise", "speak", "доброе утро");
+                    await Task.Delay(500);
+                }
             }
             if (_shotScroll > 0 && window.CurrentPage is Pages.SettingsPage page)
             {
                 page.ScrollTo(_shotScroll);
+                await Task.Delay(200);
+            }
+            // The commands page scrolls too: the chain of steps is taller
+            // than the window, and a screenshot of its first three rows
+            // shows a list rather than the thing the item is about.
+            if (_shotScroll > 0
+                && window.CurrentPage is Pages.CommandsPage rolled)
+            {
+                rolled.ScrollTo(_shotScroll);
                 await Task.Delay(200);
             }
             Save(window, shot);
@@ -3065,6 +3090,55 @@ public partial class App
                       commands.CommandCount == had,
                       $"| было {had}, стало {commands.CommandCount}");
             }
+
+            // --- the chain of steps (`4.0b-A09`) ---
+            //
+            // What the plan asked for and what the first attempt did not
+            // do: a step goes in **between** two others, what happens
+            // inside a repeat is drawn inside it, and the window offers
+            // exactly the kinds the core will run.
+            editor!.ShowSequenceForCheck();
+            editor!.InsertStepForCheck(0, "app", "первый");
+            editor!.InsertStepForCheck(1, "speak", "третий");
+            editor!.InsertStepForCheck(1, "pause", "1");
+            var order = editor!.ChainForCheck.OfType<JsonObject>()
+                .Select(s => s["type"]?.GetValue<string>() ?? "").ToArray();
+            Check("шаг вставляется между двумя другими, а не в конец",
+                  order.SequenceEqual(["app", "pause", "speak"]),
+                  $"| [{string.Join(", ", order)}]");
+
+            // Nesting, which is the point of a repeat and a condition:
+            // a chain that could not hold one would be the old flat list
+            // with two more kinds in it.
+            editor!.InsertStepForCheck(3, "repeat");
+            var nested = editor!.NestStepForCheck(3, "steps", "speak", "внутри");
+            var inner = (editor!.ChainForCheck[3]?["steps"] as JsonArray)?.Count
+                        ?? 0;
+            Check("шаг ложится внутрь повтора", nested && inner == 1,
+                  $"| внутри {inner}");
+
+            editor!.InsertStepForCheck(4, "if");
+            editor!.NestStepForCheck(4, "steps", "speak", "тогда");
+            editor!.NestStepForCheck(4, "otherwise", "speak", "иначе");
+            var then = (editor!.ChainForCheck[4]?["steps"] as JsonArray)?.Count
+                       ?? 0;
+            var els = (editor!.ChainForCheck[4]?["otherwise"] as JsonArray)
+                      ?.Count ?? 0;
+            Check("у условия две ветви, и обе наполняются",
+                  then == 1 && els == 1, $"| тогда {then}, иначе {els}");
+
+            // The window offers what the core runs — no more, no less.
+            // Offering more would lie while a person works; offering less
+            // would hide a capability with nothing to notice it by. It was
+            // the second of those that hid `pause` since 2.0.0.
+            var asSteps = editor!.StepKindsOffered;
+            var asCommands = editor!.CommandKindsOffered;
+            Check("ожидание, повтор и условие предлагаются как шаги",
+                  new[] { "pause", "repeat", "if" }.All(asSteps.Contains),
+                  $"| [{string.Join(", ", asSteps)}]");
+            Check("и не предлагаются как целая команда",
+                  !new[] { "pause", "repeat", "if" }.Any(asCommands.Contains),
+                  $"| [{string.Join(", ", asCommands)}]");
 
             var saved = await commands.CreateForCheckAsync(
                 "открой блокнот", "app", @"C:\Windows\System32\notepad.exe");

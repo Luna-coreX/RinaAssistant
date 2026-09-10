@@ -107,28 +107,16 @@
                    TextWrapping="Wrap" Margin="0,0,0,8" />
         <StackPanel x:Name="Steps" Margin="0,0,0,8" />
 
-        <Border Style="{StaticResource Card}">
-          <StackPanel>
-            <TextBlock Text="{loc:S 'Новый шаг'}"
-                       Style="{StaticResource Text.Section}"
-                       Margin="0,0,0,8" />
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-              <ComboBox x:Name="StepKind" Style="{StaticResource Choice}"
-                        Width="200" SelectionChanged="OnStepKindChanged" />
-              <TextBox x:Name="StepTarget" Style="{StaticResource Field}"
-                       Width="220" Margin="8,0,0,0"
-                       ui:Ui.Hint="{loc:S 'что открыть или произнести'}" />
-              <ComboBox x:Name="StepAction" Style="{StaticResource Choice}"
-                        Width="220" Margin="8,0,0,0"
-                        Visibility="Collapsed" />
-              <Button x:Name="StepBrowse" Style="{StaticResource Btn}"
-                      Content="{loc:S 'Обзор…'}" Margin="8,0,0,0"
-                      Click="OnStepBrowse" />
-            </StackPanel>
-            <Button Style="{StaticResource Btn}" HorizontalAlignment="Left"
-                    Content="{loc:S 'Добавить шаг'}" Click="OnAddStep" />
-          </StackPanel>
-        </Border>
+        <!--
+          There is no "new step" form any more.
+
+          It stood above the list: pick a kind, type a target, press
+          "add" — and the step appeared at the end. Changing one was
+          impossible, so a person deleted it and typed it again; and the
+          thing being edited was never beside the things it would stand
+          between. Steps are now edited where they stand, and a new one
+          goes in at the "+" between two others.
+        -->
       </StackPanel>
 
       <TextBlock Grid.Row="5" Grid.Column="0"

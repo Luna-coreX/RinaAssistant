@@ -20,7 +20,7 @@
                       Visibility="Collapsed" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="2" x:Name="Scroll" VerticalScrollBarVisibility="Auto">
       <StackPanel>
       <ContentControl x:Name="EditorBox" />
       <!-- The same frame the built-in list has. Without it a person's own

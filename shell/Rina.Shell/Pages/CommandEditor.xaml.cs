@@ -35,7 +35,21 @@ public partial class CommandEditor : UserControl
     //: Steps of the sequence, in order. The order is the meaning: "open
     //: the browser, then the folder" and the reverse are different
     //: commands.
-    private readonly List<JsonObject> _steps = [];
+    //: The steps, at every level. A `JsonArray` rather than a list of
+    //: objects, because a branch inside a step is a `JsonArray` too: one
+    //: shape for all levels is what lets one function draw them all.
+    private readonly JsonArray _chain = [];
+
+    //: Kinds a step may be, what a condition may ask, and the limits — all
+    //: from the core (`commands.kinds`). The window offers exactly what the
+    //: core will run: a window offering more would be lying while a person
+    //: works, and one offering less would hide a capability with nothing to
+    //: notice it by.
+    private readonly List<(string Value, string Title, string Icon)>
+        _stepKinds = [];
+    private readonly List<(string Value, string Title)> _conditions = [];
+    private int _maxRepeat = 50;
+    private int _maxDepth = 5;
     private readonly List<(string Value, string Title, bool Destructive)>
         _actions = [];
     private string _id = "";
@@ -52,12 +66,44 @@ public partial class CommandEditor : UserControl
 
         foreach (var kind in kinds["kinds"]?.AsArray()
                              .OfType<JsonObject>() ?? [])
+        {
+            // What is only ever a step does not appear here. A command of
+            // kind "wait" would do nothing on purpose; one that is only a
+            // repeat says nothing about what it repeats. The core says which
+            // those are — it is a statement about meaning, not presentation.
+            if (kind["step_only"]?.GetValue<bool>() == true) continue;
             Kind.Items.Add(new ComboBoxItem
             {
                 Content = $"{kind["icon"]?.GetValue<string>()} "
                           + kind["title"]?.GetValue<string>(),
                 Tag = kind["value"]?.GetValue<string>(),
             });
+        }
+
+        foreach (var kind in kinds["kinds"]?.AsArray()
+                             .OfType<JsonObject>() ?? [])
+        {
+            // Steps are every kind minus the sequence itself. A sequence
+            // inside a sequence is not forbidden by the core, but a plain
+            // chain turning into a tree is not what somebody assembling
+            // "open the browser and minimise the window" had in mind — and
+            // repeating and choosing now cover what nesting was reached for.
+            if (kind["value"]?.GetValue<string>() == "sequence") continue;
+            _stepKinds.Add((kind["value"]?.GetValue<string>() ?? "",
+                            kind["title"]?.GetValue<string>() ?? "",
+                            kind["icon"]?.GetValue<string>() ?? "•"));
+        }
+
+        foreach (var one in kinds["conditions"]?.AsArray()
+                            .OfType<JsonObject>() ?? [])
+            _conditions.Add((one["value"]?.GetValue<string>() ?? "",
+                             one["title"]?.GetValue<string>() ?? ""));
+
+        if (kinds["limits"] is JsonObject limits)
+        {
+            _maxRepeat = (int)Number(limits["repeat"]);
+            _maxDepth = (int)Number(limits["depth"]);
+        }
 
         foreach (var action in kinds["actions"]?.AsArray()
                                .OfType<JsonObject>() ?? [])
@@ -99,7 +145,7 @@ public partial class CommandEditor : UserControl
 
         foreach (var step in command["steps"]?.AsArray().OfType<JsonObject>()
                              ?? [])
-            _steps.Add((JsonObject)step.DeepClone());
+            _chain.Add(step.DeepClone());
         DrawSteps();
         ShowSummary();
     }
@@ -153,8 +199,8 @@ public partial class CommandEditor : UserControl
         StepsBox.Visibility = kind == "sequence" ? Visibility.Visible
                                                  : Visibility.Collapsed;
         StepsLabel.Visibility = StepsBox.Visibility;
+        if (kind == "sequence") DrawSteps();
         TargetLabel.Visibility = TargetRow.Visibility;
-        if (kind == "sequence" && StepKind.Items.Count == 0) FillStepKinds();
         Note.Text = "";
         ShowWarning();
         ShowSummary();
@@ -186,11 +232,12 @@ public partial class CommandEditor : UserControl
 
         string happens;
         if (kind == "sequence")
-            happens = _steps.Count == 0
+            happens = _chain.Count == 0
                 ? S("ничего — шагов пока нет")
                 : string.Join(S(", затем "),
-                              _steps.Select(step => DescribeStep(step)
-                                  .Replace(" · ", " ")));
+                              _chain.OfType<JsonObject>()
+                                  .Select(step => DescribeStep(step)
+                                      .Replace(" · ", " ")));
         else
         {
             var target = kind == "system"
@@ -276,187 +323,415 @@ public partial class CommandEditor : UserControl
         }
     }
 
+    // -- the chain of steps (4.0b-A09) --------------------------------------
+
     /// <summary>
-    /// Step kinds — the same as a command's, minus the sequence itself.
+    /// The steps, drawn as the chain they are.
     /// </summary>
     /// <remarks>
-    /// A sequence inside a sequence is not forbidden by the core, but it is
-    /// absent from the editor: "a step that is itself a list of steps"
-    /// turns a plain chain into a tree, and a person assembling "open the
-    /// browser and minimise the window" did not have a tree in mind.
+    /// <para>
+    /// This is what the plan asked for and what the previous attempt did not
+    /// do. There was a list of rows with arrows beside them, which is a
+    /// <b>description</b> of a sequence; a person still had to hold its shape
+    /// in their head. Here the shape is the picture: steps stand in a column,
+    /// what happens inside a repeat or a branch is drawn inside it, and a new
+    /// step goes in <b>between</b> two others rather than only at the end.
+    /// </para>
+    /// <para>
+    /// Drawn recursively because the thing is recursive. A repeat contains
+    /// steps; so does each branch of a condition; and each of those is an
+    /// ordinary step. One function that draws a list of steps and calls
+    /// itself is the whole of it — any other arrangement would have a second
+    /// place where "what a step looks like" is decided.
+    /// </para>
     /// </remarks>
-    private void FillStepKinds()
+    private void DrawSteps()
     {
-        foreach (var item in Kind.Items.OfType<ComboBoxItem>())
+        Steps.Children.Clear();
+        Steps.Children.Add(Chain(_chain, 0));
+        StepsEmpty.Visibility = _chain.Count == 0 ? Visibility.Visible
+                                                  : Visibility.Collapsed;
+    }
+
+    private UIElement Chain(JsonArray steps, int depth)
+    {
+        var column = new StackPanel();
+        column.Children.Add(Between(steps, 0, depth));
+        for (var at = 0; at < steps.Count; at++)
         {
-            if ((string?)item.Tag == "sequence") continue;
-            StepKind.Items.Add(new ComboBoxItem
-            {
-                Content = item.Content,
-                Tag = item.Tag,
-            });
+            column.Children.Add(StepCard(steps, at, depth));
+            column.Children.Add(Between(steps, at + 1, depth));
         }
-        foreach (var (value, title, destructive) in _actions)
-            StepAction.Items.Add(new ComboBoxItem
+        return column;
+    }
+
+    /// <summary>
+    /// The place between two steps, and the way to put one there.
+    /// </summary>
+    /// <remarks>
+    /// The point of drawing the gaps at all: somebody who realises they
+    /// forgot to wait before the second step should be able to say so where
+    /// the waiting belongs, instead of adding it at the end and walking it up
+    /// with an arrow.
+    /// </remarks>
+    private UIElement Between(JsonArray steps, int at, int depth)
+    {
+        var add = new Button
+        {
+            Style = (Style)FindResource("Btn.Quiet"),
+            Content = "+",
+            Width = 22,
+            Height = 18,
+            Opacity = 0.3,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            ToolTip = S("Вставить шаг сюда"),
+        };
+        add.MouseEnter += (_, _) => add.Opacity = 1;
+        add.MouseLeave += (_, _) => add.Opacity = 0.3;
+        add.Click += (_, _) => OfferKinds(add, steps, at, depth);
+        return add;
+    }
+
+    /// <summary>What may go in here — and what may not, this deep.</summary>
+    /// <remarks>
+    /// The nesting limit belongs to the core and arrives with the kinds. A
+    /// window that let a person build something the core will refuse to run
+    /// would be lying to them while they worked.
+    /// </remarks>
+    private void OfferKinds(FrameworkElement near, JsonArray steps, int at,
+                            int depth)
+    {
+        var menu = new ContextMenu { PlacementTarget = near };
+        foreach (var (value, title, icon) in _stepKinds)
+        {
+            var nests = value is "repeat" or "if";
+            if (nests && depth + 2 >= _maxDepth) continue;
+            var item = new MenuItem { Header = icon + "  " + title };
+            item.Click += (_, _) =>
             {
-                Content = destructive ? title + S(" — необратимо") : title,
-                Tag = value,
+                steps.Insert(at, NewStep(value));
+                DrawSteps();
+                ShowSummary();
+            };
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
+
+    private static JsonObject NewStep(string kind) => new()
+    {
+        ["type"] = kind,
+        ["target"] = kind == "pause" ? "1" : "",
+        ["enabled"] = true,
+        ["triggers"] = new JsonArray(),
+        ["match"] = "contains",
+        ["response"] = "",
+        ["steps"] = new JsonArray(),
+        ["otherwise"] = new JsonArray(),
+        ["count"] = kind == "repeat" ? 2 : 1,
+        ["condition"] = kind == "if" ? "after" : "",
+        ["value"] = kind == "if" ? "18:00" : "",
+    };
+
+    /// <summary>One step: what it is, what it acts on, where it sits.</summary>
+    private UIElement StepCard(JsonArray steps, int at, int depth)
+    {
+        var step = (JsonObject)steps[at]!;
+        var kind = step["type"]?.GetValue<string>() ?? "speak";
+        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
+        var title = known.Title ?? kind;
+        var icon = known.Icon ?? "•";
+
+        var body = new StackPanel();
+        var head = new Grid();
+        head.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+
+        head.Children.Add(new TextBlock
+        {
+            Text = icon + "  " + title,
+            Style = (Style)FindResource("Text.Body"),
+            VerticalAlignment = VerticalAlignment.Center,
+            MinWidth = 140,
+        });
+
+        var middle = What(step, kind);
+        Grid.SetColumn(middle, 1);
+        head.Children.Add(middle);
+
+        var hands = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        hands.Children.Add(Hand("↑", S("Выше"), () => Move(steps, at, -1)));
+        hands.Children.Add(Hand("↓", S("Ниже"), () => Move(steps, at, +1)));
+        hands.Children.Add(Hand("✕", S("Убрать шаг"), () =>
+        {
+            steps.RemoveAt(at);
+            DrawSteps();
+            ShowSummary();
+        }));
+        Grid.SetColumn(hands, 2);
+        head.Children.Add(hands);
+        body.Children.Add(head);
+
+        // What happens inside, indented: indentation is how a person already
+        // reads "this belongs to that", and it needs no explaining.
+        if (kind is "repeat" or "if")
+        {
+            body.Children.Add(Nested(step, "steps", depth,
+                                     kind == "if" ? S("тогда") : ""));
+            if (kind == "if")
+                body.Children.Add(Nested(step, "otherwise", depth,
+                                         S("иначе")));
+        }
+
+        return new Border
+        {
+            Style = (Style)FindResource("Rows.Item"),
+            Margin = new Thickness(0, 0, 0, 2),
+            Child = body,
+        };
+    }
+
+    private UIElement Nested(JsonObject step, string branch, int depth,
+                             string label)
+    {
+        var box = new StackPanel { Margin = new Thickness(24, 6, 0, 2) };
+        if (label.Length > 0)
+            box.Children.Add(new TextBlock
+            {
+                Text = label,
+                Style = (Style)FindResource("Text.Meta"),
+                Margin = new Thickness(0, 0, 0, 2),
             });
-        if (StepKind.Items.Count > 0) StepKind.SelectedIndex = 0;
+        if (step[branch] is not JsonArray inner)
+        {
+            inner = [];
+            step[branch] = inner;
+        }
+        box.Children.Add(Chain(inner, depth + 1));
+        return box;
     }
 
-    private string StepSelectedKind =>
-        (StepKind.SelectedItem as ComboBoxItem)?.Tag as string ?? "app";
-
-    private void OnStepKindChanged(object sender, SelectionChangedEventArgs e)
+    private Button Hand(string mark, string tip, Action press)
     {
-        var kind = StepSelectedKind;
-        var system = kind == "system";
-        StepAction.Visibility = system ? Visibility.Visible
-                                       : Visibility.Collapsed;
-        StepTarget.Visibility = system ? Visibility.Collapsed
-                                       : Visibility.Visible;
-        StepBrowse.Visibility = kind is "app" or "folder"
-            ? Visibility.Visible : Visibility.Collapsed;
+        var button = new Button
+        {
+            Style = (Style)FindResource("Btn.Quiet"),
+            Content = mark,
+            Width = 26,
+            Height = 26,
+            ToolTip = tip,
+        };
+        button.Click += (_, _) => press();
+        return button;
     }
 
-    private void OnStepBrowse(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// The middle of a step: what it acts on, edited where it stands.
+    /// </summary>
+    /// <remarks>
+    /// In place rather than in a form above the list. A separate "new step"
+    /// panel meant that changing a step was impossible — one deleted it and
+    /// typed it again — and that the thing being edited was never beside the
+    /// things it would stand between.
+    /// </remarks>
+    private UIElement What(JsonObject step, string kind)
     {
-        if (StepSelectedKind == "folder")
+        // A wrapping row rather than a horizontal stack.
+        //
+        // A stack clips what does not fit, and what did not fit was the
+        // right-hand end of the time field — a step one could not finish
+        // filling in. Shaving pixels off the controls only moves the
+        // clipping to the next window size; wrapping survives any of them.
+        var row = new WrapPanel
+        {
+            Orientation = Orientation.Horizontal,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+
+        void Field(string key, string hint, double width)
+        {
+            var box = new TextBox
+            {
+                Style = (Style)FindResource("Field"),
+                Text = step[key]?.GetValue<string>() ?? "",
+                Width = width,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            Styles.Ui.SetHint(box, hint);
+            box.TextChanged += (_, _) =>
+            {
+                step[key] = box.Text;
+                ShowSummary();
+            };
+            row.Children.Add(box);
+        }
+
+        void Choice(IEnumerable<(string Value, string Title)> options,
+                    string key, double width)
+        {
+            var pick = new ComboBox
+            {
+                Style = (Style)FindResource("Choice"),
+                Width = width,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            foreach (var (value, said) in options)
+                pick.Items.Add(new ComboBoxItem { Content = said, Tag = value });
+            pick.SelectedItem = pick.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => (string?)i.Tag
+                                     == (step[key]?.GetValue<string>() ?? ""));
+            pick.SelectionChanged += (_, _) =>
+            {
+                step[key] = (pick.SelectedItem as ComboBoxItem)?.Tag as string
+                            ?? "";
+                DrawSteps();
+                ShowSummary();
+            };
+            row.Children.Add(pick);
+        }
+
+        switch (kind)
+        {
+            case "system":
+                // A fresh step picks the first harmless action rather than
+                // nothing. An empty dropdown in a step somebody just added
+                // is a question with no default answer, and the step is
+                // invalid until they notice it.
+                if ((step["target"]?.GetValue<string>() ?? "").Length == 0
+                    && _actions.FirstOrDefault(a => !a.Destructive)
+                        is { Value.Length: > 0 } safe)
+                    step["target"] = safe.Value;
+                Choice(_actions.Select(a => (a.Value, a.Destructive
+                           ? a.Title + S(" — необратимо") : a.Title)),
+                       "target", 230);
+                break;
+
+            case "pause":
+                Field("target", S("секунд"), 70);
+                row.Children.Add(new TextBlock
+                {
+                    Text = S("с"),
+                    Style = (Style)FindResource("Text.Meta"),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 0, 0),
+                });
+                break;
+
+            case "repeat":
+                var times = new TextBox
+                {
+                    Style = (Style)FindResource("Field"),
+                    Text = ((int)Number(step["count"])).ToString(),
+                    Width = 60,
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                times.TextChanged += (_, _) =>
+                {
+                    step["count"] = int.TryParse(times.Text, out var n)
+                        ? Math.Clamp(n, 0, _maxRepeat) : 1;
+                    ShowSummary();
+                };
+                row.Children.Add(times);
+                row.Children.Add(new TextBlock
+                {
+                    Text = S("раз"),
+                    Style = (Style)FindResource("Text.Meta"),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(6, 0, 0, 0),
+                });
+                break;
+
+            case "if":
+                // Narrower than it looks like it should be: the row also
+                // holds the value and the three controls on the right, and
+                // at 210 the time field went off the edge. A step whose
+                // right-hand end is off-screen is a step one cannot finish
+                // filling in.
+                Choice(_conditions, "condition", 180);
+                // Only a condition that asks about something gets a field for
+                // it: "today is a weekday" has nothing to fill in, and a box
+                // beside it would be a question with no answer.
+                var asks = step["condition"]?.GetValue<string>() ?? "";
+                if (asks is "after" or "before") Field("value", "18:00", 95);
+                else if (asks is "exists" or "missing")
+                    Field("value", S("путь"), 200);
+                break;
+
+            default:
+                Field("target", kind switch
+                {
+                    "app" => S(@"например, C:\Program Files\App\app.exe"),
+                    "folder" => S(@"например, D:\Проекты"),
+                    "website" => S("например, github.com"),
+                    _ => S("что произнести"),
+                }, 250);
+                if (kind is "app" or "folder")
+                {
+                    var browse = new Button
+                    {
+                        Style = (Style)FindResource("Btn"),
+                        Content = S("Обзор…"),
+                        Margin = new Thickness(8, 0, 0, 0),
+                    };
+                    browse.Click += (_, _) =>
+                    {
+                        var picked = Pick(kind);
+                        if (picked is null) return;
+                        step["target"] = picked;
+                        DrawSteps();
+                        ShowSummary();
+                    };
+                    row.Children.Add(browse);
+                }
+                break;
+        }
+        return row;
+    }
+
+    private static string? Pick(string kind)
+    {
+        if (kind == "folder")
         {
             var folder = new Microsoft.Win32.OpenFolderDialog();
-            if (folder.ShowDialog() == true) StepTarget.Text = folder.FolderName;
-            return;
+            return folder.ShowDialog() == true ? folder.FolderName : null;
         }
         var file = new Microsoft.Win32.OpenFileDialog
         {
             Filter = S("Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*"),
         };
-        if (file.ShowDialog() == true) StepTarget.Text = file.FileName;
+        return file.ShowDialog() == true ? file.FileName : null;
     }
 
-    private void OnAddStep(object sender, RoutedEventArgs e)
+    private static double Number(JsonNode? node)
     {
-        var kind = StepSelectedKind;
-        var target = kind == "system"
-            ? (StepAction.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
-            : StepTarget.Text.Trim();
-        if (target.Length == 0)
-        {
-            Note.Text = S("Шагу нужно указать, что делать.");
-            return;
-        }
-
-        // A step has neither phrases nor an answer of its own: the command
-        // as a whole is what fires and what answers, and a step is what it
-        // does along the way.
-        _steps.Add(new JsonObject
-        {
-            ["type"] = kind,
-            ["target"] = target,
-            ["enabled"] = true,
-            ["triggers"] = new JsonArray(),
-            ["match"] = "contains",
-            ["response"] = "",
-            ["steps"] = new JsonArray(),
-        });
-        StepTarget.Clear();
-        Note.Text = "";
-        DrawSteps();
-        ShowSummary();
+        if (node is not JsonValue value) return 0;
+        if (value.TryGetValue<int>(out var small)) return small;
+        if (value.TryGetValue<long>(out var whole)) return whole;
+        if (value.TryGetValue<double>(out var exact)) return exact;
+        return double.TryParse(value.ToJsonString(),
+                               System.Globalization.NumberStyles.Any,
+                               System.Globalization.CultureInfo.InvariantCulture,
+                               out var told) ? told : 0;
     }
 
-    /// <summary>Show the steps with their order and buttons.</summary>
-    private void DrawSteps()
+    private void Move(JsonArray steps, int at, int delta)
     {
-        Steps.Children.Clear();
-        StepsEmpty.Visibility = _steps.Count == 0 ? Visibility.Visible
-                                                  : Visibility.Collapsed;
-
-        for (var at = 0; at < _steps.Count; at++)
-        {
-            var index = at;
-            var step = _steps[at];
-            var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
-            row.ColumnDefinitions.Add(new ColumnDefinition
-            {
-                Width = GridLength.Auto,
-            });
-            row.ColumnDefinitions.Add(new ColumnDefinition
-            {
-                Width = new GridLength(1, GridUnitType.Star),
-            });
-            for (var i = 0; i < 3; i++)
-                row.ColumnDefinitions.Add(new ColumnDefinition
-                {
-                    Width = GridLength.Auto,
-                });
-
-            // A number, not a bullet: a person reads "first this, then
-            // that", and the order has to be visible, not implied.
-            var number = new TextBlock
-            {
-                Text = $"{index + 1}.",
-                Style = (Style)FindResource("Text.Meta"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 8, 0),
-            };
-            Grid.SetColumn(number, 0);
-            row.Children.Add(number);
-
-            var what = new TextBlock
-            {
-                Text = DescribeStep(step),
-                Style = (Style)FindResource("Text.Body"),
-                VerticalAlignment = VerticalAlignment.Center,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-            };
-            Grid.SetColumn(what, 1);
-            row.Children.Add(what);
-
-            var up = new Button
-            {
-                Style = (Style)FindResource("Btn"),
-                Content = "↑",
-                IsEnabled = index > 0,
-            };
-            up.Click += (_, _) => Move(index, -1);
-            Grid.SetColumn(up, 2);
-            row.Children.Add(up);
-
-            var down = new Button
-            {
-                Style = (Style)FindResource("Btn"),
-                Content = "↓",
-                IsEnabled = index < _steps.Count - 1,
-            };
-            down.Click += (_, _) => Move(index, +1);
-            Grid.SetColumn(down, 3);
-            row.Children.Add(down);
-
-            var drop = new Button
-            {
-                Style = (Style)FindResource("Btn"),
-                Content = S("Убрать"),
-            };
-            drop.Click += (_, _) =>
-            {
-                _steps.RemoveAt(index);
-                DrawSteps();
-                ShowSummary();
-            };
-            Grid.SetColumn(drop, 4);
-            row.Children.Add(drop);
-
-            Steps.Children.Add(row);
-        }
-    }
-
-    private void Move(int index, int delta)
-    {
-        var to = index + delta;
-        if (to < 0 || to >= _steps.Count) return;
-        (_steps[index], _steps[to]) = (_steps[to], _steps[index]);
+        var to = at + delta;
+        if (to < 0 || to >= steps.Count) return;
+        var moving = steps[at];
+        steps.RemoveAt(at);
+        steps.Insert(to, moving);
         DrawSteps();
         ShowSummary();
     }
@@ -512,7 +787,7 @@ public partial class CommandEditor : UserControl
             Note.Text = S("Нужно указать, что делать.");
             return;
         }
-        if (kind == "sequence" && _steps.Count == 0)
+        if (kind == "sequence" && _chain.Count == 0)
         {
             Note.Text = S("Нужен хотя бы один шаг.");
             return;
@@ -544,7 +819,7 @@ public partial class CommandEditor : UserControl
         ["target"] = target,
         ["response"] = Response.Text.Trim(),
         ["steps"] = new JsonArray(
-            _steps.Select(step => step.DeepClone()).ToArray()),
+            _chain.Select(step => step!.DeepClone()).ToArray()),
     };
 
     /// <summary>The person wants to see it happen (`4.0b-A09`).</summary>
@@ -574,7 +849,7 @@ public partial class CommandEditor : UserControl
             ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
             : Target.Text.Trim();
 
-        if (kind == "sequence" && _steps.Count == 0)
+        if (kind == "sequence" && _chain.Count == 0)
         {
             Note.Text = S("Нечего пробовать: шагов пока нет.");
             return;
@@ -595,12 +870,13 @@ public partial class CommandEditor : UserControl
     /// Assemble a sequence out of steps — for the end-to-end check.
     /// </summary>
     /// <remarks>
-    /// The check cannot click buttons, and a command assembled by hand
-    /// would be testing `JsonObject` rather than the editor. Here it goes
-    /// the same way: pick the kind, add the steps, save.
+    /// The check cannot click, and a command assembled by hand would be
+    /// testing `JsonObject` rather than the editor. So it goes the way a
+    /// person does: pick the kind, put a step in at a place, fill in what it
+    /// acts on, move one, save.
     /// </remarks>
-    public bool BuildSequenceForCheck(string phrase,
-                                      IEnumerable<(string Kind, string Target)> steps)
+    public bool BuildSequenceForCheck(
+        string phrase, IEnumerable<(string Kind, string Target)> steps)
     {
         _triggers.Clear();
         _triggers.Add(phrase);
@@ -610,37 +886,85 @@ public partial class CommandEditor : UserControl
             .FirstOrDefault(item => (string?)item.Tag == "sequence");
         if (SelectedKind != "sequence") return false;
 
+        _chain.Clear();
         foreach (var (kind, target) in steps)
         {
-            StepKind.SelectedItem = StepKind.Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(item => (string?)item.Tag == kind);
-
-            // A system step's target is picked from a list, not typed: the
-            // first edition of the check typed it — and the system step
-            // silently failed to be added, because the list stayed empty.
-            if (kind == "system")
-                StepAction.SelectedItem = StepAction.Items
-                    .OfType<ComboBoxItem>()
-                    .FirstOrDefault(item => (string?)item.Tag == target);
-            else
-                StepTarget.Text = target;
-
-            OnAddStep(this, new RoutedEventArgs());
+            var step = NewStep(kind);
+            step["target"] = target;
+            _chain.Add(step);
         }
-        if (_steps.Count == 0) return false;
+        DrawSteps();
+        if (_chain.Count == 0) return false;
 
-        // And the order: lift the last step to the top and put it back.
-        var wasFirst = _steps[0]["target"]?.GetValue<string>();
-        Move(_steps.Count - 1, -1);
-        Move(_steps.Count - 2, +1);
-        if (_steps[0]["target"]?.GetValue<string>() != wasFirst) return false;
+        // And the order: lift the last step one place and put it back.
+        //
+        // Up then **down**, not up then up: the first version moved the last
+        // step to index 1 and then moved index 1 up again, which walks it to
+        // the front instead of returning it. The check caught it, which is
+        // the whole reason it puts the order back at all.
+        var wasFirst = _chain[0]?["target"]?.GetValue<string>();
+        var wasLast = _chain[^1]?["target"]?.GetValue<string>();
+        Move(_chain, _chain.Count - 1, -1);
+        Move(_chain, _chain.Count - 2, +1);
+        if (_chain[0]?["target"]?.GetValue<string>() != wasFirst) return false;
+        if (_chain[^1]?["target"]?.GetValue<string>() != wasLast) return false;
 
         OnSave(this, new RoutedEventArgs());
         return true;
     }
 
+    /// <summary>Switch to a sequence — for the check.</summary>
+    public void ShowSequenceForCheck()
+    {
+        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
+            .FirstOrDefault(item => (string?)item.Tag == "sequence");
+    }
+
+    /// <summary>Put a step in at a place — for the check.</summary>
+    public void InsertStepForCheck(int at, string kind, string target = "")
+    {
+        var step = NewStep(kind);
+        if (target.Length > 0) step["target"] = target;
+        _chain.Insert(Math.Clamp(at, 0, _chain.Count), step);
+        DrawSteps();
+        ShowSummary();
+    }
+
+    /// <summary>Put a step inside another one — for the check.</summary>
+    public bool NestStepForCheck(int outer, string branch, string kind,
+                                 string target = "")
+    {
+        if (outer < 0 || outer >= _chain.Count) return false;
+        if (_chain[outer] is not JsonObject holder) return false;
+        if (holder[branch] is not JsonArray inner)
+        {
+            inner = [];
+            holder[branch] = inner;
+        }
+        var step = NewStep(kind);
+        if (target.Length > 0) step["target"] = target;
+        inner.Add(step);
+        DrawSteps();
+        ShowSummary();
+        return true;
+    }
+
+    /// <summary>The steps as the core will get them — for the check.</summary>
+    public JsonArray ChainForCheck => _chain;
+
+    /// <summary>Which kinds the window offers as steps — for the check.</summary>
+    public string[] StepKindsOffered =>
+        _stepKinds.Select(k => k.Value).ToArray();
+
+    /// <summary>Which kinds it offers as whole commands — for the check.</summary>
+    public string[] CommandKindsOffered =>
+        Kind.Items.OfType<ComboBoxItem>()
+            .Select(i => (string?)i.Tag ?? "").ToArray();
+
+
+
     /// <summary>How many steps were assembled — for the check.</summary>
-    public int StepCount => _steps.Count;
+    public int StepCount => _chain.Count;
 
     /// <summary>The command read back as one sentence — for the check.</summary>
     public string SummarySaid => Summary.Text;

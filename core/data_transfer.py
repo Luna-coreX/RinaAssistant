@@ -208,6 +208,31 @@ def sanitize_command(raw):
 
     steps = raw.get("steps") or []
     steps = [sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
+    # The "else" branch of a condition (`4.0b-A09`). Narrowed by the same
+    # function and capped the same way: a branch is a list of steps, and a
+    # branch that skipped the narrowing would be the way round it.
+    otherwise = raw.get("otherwise") or []
+    otherwise = [sanitize_command(s) for s in otherwise[:50]
+                 if isinstance(s, dict)]
+
+    # Repetition and choice, brought to their limits. An unreadable count is
+    # one repetition rather than a refusal: the card came from a file, and
+    # doing the thing once is the least surprising reading of "do it a
+    # nonsense number of times".
+    from voice.user_commands import CONDITIONS, MAX_REPEAT
+
+    try:
+        count = int(raw.get("count", 1) or 1)
+    except (TypeError, ValueError):
+        count = 1
+    count = max(0, min(count, MAX_REPEAT))
+
+    condition = str(raw.get("condition", ""))
+    if condition and condition not in {c for c, _ in CONDITIONS}:
+        # An unknown condition would be false at run time anyway; dropping
+        # it here makes the card say what it will do instead of carrying a
+        # word nothing understands.
+        condition = ""
 
     return {
         "id": str(raw.get("id", "")),
@@ -220,6 +245,10 @@ def sanitize_command(raw):
         "target_kind": "uwp" if raw.get("target_kind") == "uwp" else "file",
         "response": str(raw.get("response", ""))[:500],
         "steps": steps,
+        "otherwise": otherwise,
+        "count": count,
+        "condition": condition,
+        "value": str(raw.get("value", ""))[:1000],
     }
 
 

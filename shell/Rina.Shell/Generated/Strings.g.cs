@@ -258,6 +258,11 @@ public static partial class Loc
                 {
                     ["English"] = "Entries in all: {0}",
                 },
+            ["Вставить шаг сюда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Insert a step here",
+                },
             ["Всё сделано"] =
                 new Dictionary<string, string>
                 {
@@ -335,6 +340,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Learned matches",
+                },
+            ["Выше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Up",
                 },
             ["Где вы велели искать программы."] =
                 new Dictionary<string, string>
@@ -485,14 +495,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Add a phrase",
-                },
-            ["Добавить шаг"] =
-                new Dictionary<string, string>
-                {
-                    ["Deutsch"] = "Schritt hinzufügen",
-                    ["English"] = "Add step",
-                    ["Español"] = "Añadir paso",
-                    ["Українська"] = "Додати крок",
                 },
             ["Добавлено {0}, пропущено как уже известные {1}."] =
                 new Dictionary<string, string>
@@ -763,6 +765,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Model name on that server",
+                },
+            ["иначе"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "otherwise",
                 },
             ["Искать нераспознанное"] =
                 new Dictionary<string, string>
@@ -1119,6 +1126,11 @@ public static partial class Loc
                 {
                     ["English"] = "Nothing to try: there are no steps yet.",
                 },
+            ["Ниже"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Down",
+                },
             ["Ниже — реже слышит имя, выше — чаще ошибается"] =
                 new Dictionary<string, string>
                 {
@@ -1171,11 +1183,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "new word",
-                },
-            ["Новый шаг"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "New step",
                 },
             ["нужен Ctrl, Alt, Shift или Win"] =
                 new Dictionary<string, string>
@@ -1619,6 +1626,16 @@ public static partial class Loc
                 {
                     ["English"] = "Other",
                 },
+            ["путь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "path",
+                },
+            ["раз"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "times",
+                },
             ["разбор команд, память, речь"] =
                 new Dictionary<string, string>
                 {
@@ -1699,6 +1716,11 @@ public static partial class Loc
                 {
                     ["English"] = "Rina is a voice assistant that runs on this computer. A few questions, and that is all.",
                 },
+            ["с"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "s",
+                },
             ["С этих слов начинается обращение к Рине"] =
                 new Dictionary<string, string>
                 {
@@ -1756,6 +1778,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "now",
+                },
+            ["секунд"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "seconds",
                 },
             ["Серебро, чёрное или графит"] =
                 new Dictionary<string, string>
@@ -2002,6 +2029,11 @@ public static partial class Loc
                 {
                     ["English"] = "The things you asked to be reminded of.",
                 },
+            ["тогда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "then",
+                },
             ["Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит."] =
                 new Dictionary<string, string>
                 {
@@ -2024,6 +2056,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Delete",
+                },
+            ["Убрать шаг"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remove this step",
                 },
             ["Уведомления"] =
                 new Dictionary<string, string>
@@ -2219,11 +2256,6 @@ public static partial class Loc
                 {
                     ["English"] = "What to open",
                 },
-            ["что открыть или произнести"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "what to open or say",
-                },
             ["ЧТО ПОЛУЧИТСЯ"] =
                 new Dictionary<string, string>
                 {
@@ -2271,11 +2303,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Steps in order",
-                },
-            ["Шагу нужно указать, что делать."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "The step needs something to do.",
                 },
             ["Экспорт"] =
                 new Dictionary<string, string>
