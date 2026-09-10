@@ -181,6 +181,41 @@ about("T-10", "получившийся путь остаётся внутри �
       escaped == [], f"| вышло наружу {escaped}")
 
 
+# T-22 · a scenario looks at what a person is busy with.
+#
+# The same information as `T-19` — what is open — but reached by a question
+# from inside a command the person wrote, not by a subscription. What must
+# hold is that nothing is kept, and that no answer means no.
+from voice.user_commands import _condition_holds
+
+seen_questions = []
+
+
+def watcher(question, about=""):
+    seen_questions.append((question, about))
+    return "C:/Apps/Chrome/chrome.exe"
+
+
+held = _condition_holds("app_active", "chrome", "",
+                        {"vars": {}, "machine": watcher})
+about("T-22", "условие спрашивает у оболочки и получает ответ", held,
+      f"| {seen_questions}")
+
+# Nothing is kept: the state a run carries holds variables and nothing
+# about the machine. Asserted over what the run actually carries, because
+# "we do not store it" is the whole promise.
+carried = {"vars": {}, "machine": watcher}
+_condition_holds("app_active", "chrome", "", carried)
+_condition_holds("app_running", "chrome", "", carried)
+leftovers = [key for key, value in carried.items()
+             if key != "machine" and "chrome" in str(value).lower()]
+about("T-22", "об открытой программе ничего не оседает", leftovers == [],
+      f"| осело в {leftovers}")
+
+about("T-22", "без оболочки условие о машине ложно",
+      not _condition_holds("app_running", "chrome", "", {"vars": {}}))
+
+
 # ===========================================================================
 # Surface 4 — cloud connectors
 # ===========================================================================

@@ -126,6 +126,12 @@ _CAPABILITY_LIST = (
     # watch**, and that is visible in the journal, in the diagnostics and
     # to the person. A method hidden among the reminders would be declared
     # together with the timers — that is, silently.
+    # Asking what is going on outside the command (`4.0b-A09`). On the
+    # shell's side of the line, with `system.do`: both are the machine, and
+    # the machine is the shell's (ADR 0009).
+    Capability("system.context", Side.SHELL,
+               ("system.context",),
+               "что сейчас открыто и что запущено"),
     Capability("apps.watch", Side.CORE, ("system.foreground",),
                "напоминания по открытию программ (4.0b-A03, T-19)"),
     Capability("plugins", Side.CORE,

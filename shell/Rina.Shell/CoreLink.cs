@@ -470,6 +470,28 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
+        // What is going on outside the command (`4.0b-A09`). Asked by the
+        // core when a scenario's condition needs it; answered here because
+        // the machine is the shell's (ADR 0009). Nothing is written down on
+        // either side — the answer decides a branch and is gone (`T-19`).
+        if (request.Method == "system.context")
+        {
+            var question = request.Payload["question"]?.GetValue<string>()
+                           ?? "";
+            var about = request.Payload["about"]?.GetValue<string>() ?? "";
+            var answer = question switch
+            {
+                "foreground" => Platform.Foreground.Now(),
+                "running" => Platform.Foreground.Running(about) ? "1" : "",
+                _ => "",
+            };
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["answer"] = answer,
+            });
+            return;
+        }
+
         if (request.Method == "apps.index")
         {
             await ReplyIndexAsync(connection, request);

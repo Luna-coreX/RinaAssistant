@@ -249,6 +249,9 @@ def sanitize_command(raw):
         "count": count,
         "condition": condition,
         "value": str(raw.get("value", ""))[:1000],
+        # The name of a variable, for "remember" and for the conditions
+        # that ask about one (`4.0b-A09`).
+        "name": str(raw.get("name", ""))[:64],
     }
 
 

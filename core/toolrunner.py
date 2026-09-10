@@ -101,6 +101,11 @@ class ToolContext:
     #: than the runner writes to, and the two would agree only by accident.
     journal: Any = None
 
+    #: What to ask about the computer: which program is in front, whether
+    #: one is running (`4.0b-A09`). The shell answers (ADR 0009), and the
+    #: answer is used for a branch and dropped — never kept (`T-19`).
+    machine_out: Callable = None
+
     #: The tool catalogue, so an explanation can name what was done in the
     #: words the catalogue already uses. A second set of names for the same
     #: tools would drift from the first.
@@ -386,6 +391,25 @@ def _cancel_reminder(ctx, args):
     return ToolResult.done(tr("Отменила: {count}.", count=removed), removed)
 
 
+def _scenario(ctx):
+    """
+    What a scenario may reach for: other commands, and the machine.
+
+    Handed in rather than fetched, for the reason everything else here is:
+    the module that performs a step has no business knowing where the
+    command store lives or which side owns the computer.
+    """
+    def find(command_id):
+        if ctx.commands is None:
+            return None
+        for candidate in ctx.commands.all():
+            if str(candidate.get("id")) == str(command_id):
+                return candidate
+        return None
+
+    return {"lookup": find, "machine": getattr(ctx, "machine_out", None)}
+
+
 def _run_user_command(ctx, args):
     import threading
 
@@ -405,12 +429,12 @@ def _run_user_command(ctx, args):
     if command.get("type") == "sequence":
         # There is sometimes a pause between steps; the calling thread must not be blocked.
         def worker():
-            execute(command, ctx.host, ctx.emit)
+            execute(command, ctx.host, ctx.emit, **_scenario(ctx))
 
         threading.Thread(target=worker, daemon=True).start()
         return ToolResult.done(tr("Выполняю последовательность."))
 
-    ok, response = execute(command, ctx.host, ctx.emit)
+    ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
     return (ToolResult.done(response) if ok
             else ToolResult.failed(response, "internal"))
 
@@ -441,12 +465,12 @@ def _try_user_command(ctx, args):
 
     if command.get("type") == "sequence":
         def worker():
-            execute(command, ctx.host, ctx.emit)
+            execute(command, ctx.host, ctx.emit, **_scenario(ctx))
 
         threading.Thread(target=worker, daemon=True).start()
         return ToolResult.done(tr("Пробую последовательность."))
 
-    ok, response = execute(command, ctx.host, ctx.emit)
+    ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
     return (ToolResult.done(response) if ok
             else ToolResult.failed(response, "internal"))
 

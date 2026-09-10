@@ -106,6 +106,12 @@
       ],
       "side": "shell"
     },
+    "system.context": {
+      "methods": [
+        "system.context"
+      ],
+      "side": "shell"
+    },
     "tasks": {
       "methods": [
         "task.cancel"
@@ -505,6 +511,7 @@
     "stream.close": null,
     "stream.credit": null,
     "stream.open": null,
+    "system.context": "system.context",
     "system.do": "system",
     "system.foreground": "apps.watch",
     "task.cancel": "tasks",

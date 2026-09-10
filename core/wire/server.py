@@ -133,6 +133,11 @@ class ProtocolServer:
         # shell (ADR 0009). The core asks and matches.
         engine.apps_source = self.fetch_apps
         engine.launch_out = self.launch_app
+        # What is going on outside the command (`4.0b-A09`): which program
+        # is in front, whether one is running. The shell has the machine
+        # (ADR 0009); the core asks when a condition needs it and keeps
+        # nothing (`T-19`).
+        engine.machine_out = self.ask_machine
         # Anything dangerous is confirmed with a window, not with words alone (4.0-F11).
         engine.on_question = self._on_question
 
@@ -1456,6 +1461,26 @@ class ProtocolServer:
         except ProtocolFault as exc:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("detail", ""))
+
+    def ask_machine(self, question: str, about: str = "") -> str:
+        """
+        Ask the shell about the computer, for a condition.
+
+        Answers a string: the name of the program in front, or "1"/"" for
+        "is it running". A string rather than a shape of its own because
+        there are two questions and the answer to both is a fact about the
+        moment — inventing a type for it would be inventing a vocabulary
+        for a conversation of two words.
+        """
+        try:
+            answer = self.ask_shell_sync("system.context",
+                                         {"question": question,
+                                          "about": about})
+        except ProtocolFault:
+            # No answer is not "no": a condition that cannot be
+            # established is false, and the branch simply does not run.
+            return ""
+        return str(answer.get("answer", ""))
 
     def _on_question(self, question) -> None:
         """

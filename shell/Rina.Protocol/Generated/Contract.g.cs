@@ -134,6 +134,8 @@ public static class Methods
     public const string StreamCredit = "stream.credit";
     /// <summary>Базовый метод.</summary>
     public const string StreamOpen = "stream.open";
+    /// <summary>Возможность: system.context.</summary>
+    public const string SystemContext = "system.context";
     /// <summary>Возможность: system.</summary>
     public const string SystemDo = "system.do";
     /// <summary>Возможность: apps.watch.</summary>
@@ -213,6 +215,7 @@ public static class Methods
             ["stream.close"] = null,
             ["stream.credit"] = null,
             ["stream.open"] = null,
+            ["system.context"] = "system.context",
             ["system.do"] = "system",
             ["system.foreground"] = "apps.watch",
             ["task.cancel"] = "tasks",
@@ -432,6 +435,8 @@ public static class Capabilities
     public const string Stt = "stt";
     /// <summary>Объявляет shell.</summary>
     public const string System = "system";
+    /// <summary>Объявляет shell.</summary>
+    public const string SystemContext = "system.context";
     /// <summary>Объявляет core.</summary>
     public const string Tasks = "tasks";
     /// <summary>Объявляет core.</summary>
@@ -449,6 +454,7 @@ public static class Capabilities
         "audio.output",
         "permissions",
         "system",
+        "system.context",
         "window.actions",
     ];
 }

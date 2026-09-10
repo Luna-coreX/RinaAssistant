@@ -153,6 +153,45 @@ public sealed class Foreground : IDisposable
     /// better than a process name that matches nothing in the index and
     /// would look like a program that is not installed.
     /// </remarks>
+    /// <summary>
+    /// What is in front right now, asked once (<c>4.0b-A09</c>).
+    /// </summary>
+    /// <remarks>
+    /// Separate from the watching. The watch exists to fire reminders and
+    /// is off unless a person switched it on; this is one question asked
+    /// because a scenario they wrote contains a condition about it. Nothing
+    /// is kept either way — the answer goes back, decides a branch and is
+    /// gone (<c>T-19</c>).
+    /// </remarks>
+    public static string Now() => PathOf(GetForegroundWindow());
+
+    /// <summary>Is a program with this name running.</summary>
+    /// <remarks>
+    /// By name rather than by path: a person writing a condition says
+    /// "chrome", not the place it was installed to. Matched loosely for the
+    /// same reason — the name of a process is not something anybody looks
+    /// up before writing a command.
+    /// </remarks>
+    public static bool Running(string name)
+    {
+        var wanted = (name ?? "").Trim();
+        if (wanted.Length == 0) return false;
+        wanted = System.IO.Path.GetFileNameWithoutExtension(wanted);
+        try
+        {
+            return Process.GetProcesses().Any(
+                p => p.ProcessName.Contains(wanted,
+                                            StringComparison.OrdinalIgnoreCase));
+        }
+        catch
+        {
+            // Asking about processes can fail on a locked-down machine.
+            // "Could not tell" is answered as "no": a condition that cannot
+            // be established must not take the branch that acts.
+            return false;
+        }
+    }
+
     private static string PathOf(IntPtr window)
     {
         if (window == IntPtr.Zero) return "";
