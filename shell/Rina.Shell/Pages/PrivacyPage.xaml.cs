@@ -126,6 +126,10 @@ public partial class PrivacyPage : UserControl
         {
             Width = GridLength.Auto,
         });
+        head.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
 
         var words = new StackPanel();
         words.Children.Add(new TextBlock
@@ -151,6 +155,30 @@ public partial class PrivacyPage : UserControl
         };
         Grid.SetColumn(many, 1);
         head.Children.Add(many);
+
+        if (count > 0)
+        {
+            var all = new Button
+            {
+                Style = (Style)FindResource("Btn.Quiet"),
+                Content = "✕",
+                ToolTip = S("Забыть всю группу"),
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(12, 0, 0, 0),
+            };
+            all.Click += async (_, _) =>
+            {
+                var ask = new ConfirmWindow(
+                    S("Забыть всё в разделе «{0}»? Записей: {1}.",
+                      title, count),
+                    S("Вернуть это будет нельзя."), 0);
+                ask.ShowDialog();
+                if (ask.Result != Consent.Granted) return;
+                await ForgetAsync(id, null);
+            };
+            Grid.SetColumn(all, 2);
+            head.Children.Add(all);
+        }
         body.Children.Add(head);
 
         // An empty group is shown, with its zero. "Nothing is kept here" is
@@ -162,7 +190,33 @@ public partial class PrivacyPage : UserControl
             var shown = opened ? items : items.Take(Few).ToList();
 
             var rows = new StackPanel { Margin = new Thickness(0, 12, 0, 0) };
-            foreach (var item in shown) rows.Children.Add(Row(item));
+
+            // Opened out, entries that carry a time are gathered under the
+            // day they happened on, and a day can be forgotten in one
+            // press.
+            //
+            // The plan names "history for a date" among the things that
+            // must be removable, and a person thinking about a
+            // conversation thinks in days, not in rows: "forget yesterday"
+            // is one thought, and ticking forty rows to express it is a
+            // chore that ends in giving up. The rule is general rather
+            // than about the history — any group whose entries are stamped
+            // gets it, because "when" is what makes a day mean anything.
+            var day = "";
+            foreach (var item in shown)
+            {
+                var stamped = Number(item["when"]);
+                if (opened && stamped > 0)
+                {
+                    var its = Day(item);
+                    if (its != day)
+                    {
+                        day = its;
+                        rows.Children.Add(DayHead(id, its, items));
+                    }
+                }
+                rows.Children.Add(Row(id, item));
+            }
             body.Children.Add(rows);
 
             if (items.Count > Few)
@@ -195,10 +249,78 @@ public partial class PrivacyPage : UserControl
         };
     }
 
-    private UIElement Row(JsonObject item)
+    /// <summary>A day's heading, and the way to forget that day.</summary>
+    private UIElement DayHead(string group, string day, List<JsonObject> all)
+    {
+        var mine = DayIds(all, day);
+
+        var head = new Grid { Margin = new Thickness(0, 8, 0, 4) };
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+        head.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+        head.Children.Add(new TextBlock
+        {
+            Text = day,
+            Style = (Style)FindResource("Text.Section"),
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+
+        var drop = new Button
+        {
+            Style = (Style)FindResource("Btn.Quiet"),
+            Content = "✕",
+            ToolTip = S("Забыть этот день"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        drop.Click += async (_, _) =>
+        {
+            var ask = new ConfirmWindow(
+                S("Забыть всё за {0}? Записей: {1}.", day, mine.Length),
+                S("Вернуть это будет нельзя."), 0);
+            ask.ShowDialog();
+            if (ask.Result != Consent.Granted) return;
+            await ForgetAsync(group, mine);
+        };
+        Grid.SetColumn(drop, 1);
+        head.Children.Add(drop);
+        return head;
+    }
+
+    /// <summary>Which entries fall on this day.</summary>
+    /// <remarks>
+    /// Its own method so that the check can ask the same question the
+    /// button answers. Written inline, it would have been checkable only
+    /// through what came out of the store afterwards — and "the right rows
+    /// went" cannot tell a correct day from a day that happened to hold
+    /// everything.
+    /// </remarks>
+    private static string[] DayIds(List<JsonObject> all, string day) =>
+        all.Where(item => Number(item["when"]) > 0 && Day(item) == day)
+            .Select(item => item["id"]?.GetValue<string>() ?? "")
+            .ToArray();
+
+    private static string Day(JsonObject item) =>
+        DateTimeOffset.FromUnixTimeSeconds((long)Number(item["when"]))
+            .LocalDateTime.ToString("dd.MM.yyyy");
+
+    /// <summary>Which entries a day's button would forget — for the check.</summary>
+    public static string[] DayIdsForCheck(JsonArray items, string day) =>
+        DayIds(items.OfType<JsonObject>().ToList(), day);
+
+    /// <summary>Forget one day of a group — for the check.</summary>
+    public Task ForgetDayForCheck(string group, string[] ids) =>
+        ForgetAsync(group, ids);
+
+    private UIElement Row(string group, JsonObject item)
     {
         var row = new Grid { Margin = new Thickness(0, 0, 0, 6) };
         row.ColumnDefinitions.Add(new ColumnDefinition());
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = GridLength.Auto,
@@ -246,11 +368,104 @@ public partial class PrivacyPage : UserControl
             row.Children.Add(stamp);
         }
 
+        // One entry, forgotten without being asked twice.
+        //
+        // The confirmation is kept for a whole group and for everything:
+        // asked on every single row it would become the thing a person
+        // clicks through without reading, and then it would not be
+        // protecting the two operations that need it.
+        var drop = new Button
+        {
+            Style = (Style)FindResource("Btn.Quiet"),
+            Content = "✕",
+            ToolTip = S("Забыть эту запись"),
+            VerticalAlignment = VerticalAlignment.Top,
+            Margin = new Thickness(8, 0, 0, 0),
+        };
+        drop.Click += async (_, _) =>
+            await ForgetAsync(group,
+                              [item["id"]?.GetValue<string>() ?? ""]);
+        Grid.SetColumn(drop, 2);
+        row.Children.Add(drop);
+
         return row;
+    }
+
+    /// <summary>
+    /// Forget, and say how much went.
+    /// </summary>
+    /// <remarks>
+    /// The number comes from the core, not from what was asked for. "Done"
+    /// over an entry still on the screen is how a person learns to
+    /// distrust the button they came to this page to trust.
+    /// </remarks>
+    private async Task ForgetAsync(string group, string[]? ids)
+    {
+        var payload = new JsonObject { ["group"] = group };
+        if (ids is not null)
+            payload["ids"] = new JsonArray(
+                ids.Select(id => (JsonNode)id!).ToArray());
+
+        var answer = await Ask(Methods.PrivacyForget, payload);
+        if (answer is null)
+        {
+            Note.Text = S("Ядро не на связи.");
+            return;
+        }
+        var gone = (int)Number(answer["forgotten"]);
+        Note.Text = gone > 0 ? S("Забыто записей: {0}", gone)
+                             : S("Забывать было нечего.");
+        await ReloadAsync();
     }
 
     private async void OnRefresh(object sender, RoutedEventArgs e) =>
         await ReloadAsync();
+
+    /// <summary>
+    /// Forget everything on this page (`4.0b-B02`).
+    /// </summary>
+    /// <remarks>
+    /// Everything the page shows, preferences included: a person pressing
+    /// this while looking at nine groups means the nine, not six of them.
+    /// The confirmation says which, and says the count — "forget
+    /// everything" is easy to press and hard to picture.
+    /// </remarks>
+    private async void OnForgetAll(object sender, RoutedEventArgs e)
+    {
+        var told = await Ask(Methods.PrivacyInventory);
+        var total = (told?["groups"] as JsonArray ?? [])
+            .OfType<JsonObject>().Sum(g => (int)Number(g["count"]));
+        if (total == 0)
+        {
+            Note.Text = S("Забывать было нечего.");
+            return;
+        }
+
+        var ask = new ConfirmWindow(
+            S("Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию.",
+              total),
+            S("Вернуть это будет нельзя. Команды, дела и напоминания тоже уйдут."),
+            0);
+        ask.ShowDialog();
+        if (ask.Result != Consent.Granted) return;
+
+        var answer = await Ask(Methods.PrivacyForget,
+                               new JsonObject { ["everything"] = true });
+        if (answer is null)
+        {
+            Note.Text = S("Ядро не на связи.");
+            return;
+        }
+        Note.Text = S("Забыто записей: {0}", (int)Number(answer["forgotten"]));
+        await ReloadAsync();
+    }
+
+    /// <summary>Forget one group from outside — for the check.</summary>
+    public Task ForgetGroupForCheck(string group) => ForgetAsync(group, null);
+
+    /// <summary>Forget one entry from outside — for the check.</summary>
+    public Task ForgetEntryForCheck(string group, string id) =>
+        ForgetAsync(group, [id]);
 
     /// <summary>
     /// Draw an inventory handed in from outside — for the check.

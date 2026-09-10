@@ -79,6 +79,7 @@
     },
     "privacy": {
       "methods": [
+        "privacy.forget",
         "privacy.inventory"
       ],
       "side": "core"
@@ -483,6 +484,7 @@
     "plugins.page": "plugins",
     "plugins.set_enabled": "plugins",
     "pong": null,
+    "privacy.forget": "privacy",
     "privacy.inventory": "privacy",
     "reminders.cancel": "reminders",
     "reminders.create": "reminders",

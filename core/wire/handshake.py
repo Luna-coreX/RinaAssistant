@@ -147,7 +147,7 @@ _CAPABILITY_LIST = (
     # diagnostics can both see. Folded in among the history methods it
     # would be declared together with the transcript, that is, silently.
     Capability("privacy", Side.CORE,
-               ("privacy.inventory",),
+               ("privacy.inventory", "privacy.forget"),
                "опись того, что хранится о человеке"),
     Capability("commands", Side.CORE,
                ("commands.list", "commands.kinds", "commands.builtin",

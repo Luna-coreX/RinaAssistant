@@ -3187,6 +3187,70 @@ public partial class App
                   kept.Said.Any(said => said.Contains("о которой оболочка не знает")));
 
             await kept.ReloadAsync();
+
+            // --- and forgetting (`4.0b-B02`) ---
+            //
+            // Through the page and back through the core: what the page
+            // says went has to be gone from the store, not merely gone
+            // from the screen. A row removed from a list and left in the
+            // file is the exact failure this page exists to make
+            // impossible, and it looks like success.
+            var beforeTodo = await link.AskAsync(Rina.Protocol.Methods.TodoList);
+            var hadTodo = (beforeTodo?["items"] as JsonArray)?.Count ?? 0;
+            if (hadTodo == 0)
+            {
+                await link.AskAsync(Rina.Protocol.Methods.TodoAdd,
+                    new JsonObject { ["text"] = "забыть это дело" });
+                await kept.ReloadAsync();
+            }
+
+            var one = await link.AskAsync(Rina.Protocol.Methods.TodoList);
+            var first = (one?["items"] as JsonArray ?? []).OfType<JsonObject>()
+                .FirstOrDefault();
+            var itsId = first?["id"]?.GetValue<string>() ?? "";
+            Check("есть что забывать", itsId.Length > 0);
+
+            await kept.ForgetEntryForCheck("todo", itsId);
+            await Task.Delay(600);
+            var after = await link.AskAsync(Rina.Protocol.Methods.TodoList);
+            var left = (after?["items"] as JsonArray ?? []).OfType<JsonObject>()
+                .Any(i => i["id"]?.GetValue<string>() == itsId);
+            Check("забытое ушло из хранилища, а не только с экрана", !left);
+
+            // A day of the conversation, which is how the plan names it
+            // and how a person thinks of one: "forget yesterday" is a
+            // single thought, and ticking forty rows to say it is a chore
+            // that ends in giving up.
+            //
+            // Two entries a day apart, and one day asked for. A check with
+            // one day in it would pass on a page that forgot everything,
+            // which is the mistake worth catching.
+            var yesterday = DateTimeOffset.Now.AddDays(-1);
+            var spread = new JsonArray(
+                new JsonObject
+                {
+                    ["id"] = "вчера",
+                    ["when"] = yesterday.ToUnixTimeSeconds(),
+                },
+                new JsonObject
+                {
+                    ["id"] = "сегодня",
+                    ["when"] = DateTimeOffset.Now.ToUnixTimeSeconds(),
+                });
+            var picked = Pages.PrivacyPage.DayIdsForCheck(
+                spread, yesterday.LocalDateTime.ToString("dd.MM.yyyy"));
+            Check("день берёт свои записи и только свои",
+                  picked.SequenceEqual(["вчера"]),
+                  $"| выбрано [{string.Join(", ", picked)}]");
+
+            // A whole group, and the count the core answers with rather
+            // than the count that was asked for.
+            await kept.ForgetGroupForCheck("history");
+            await Task.Delay(600);
+            var history = await link.AskAsync(Rina.Protocol.Methods.HistoryList);
+            Check("группа забыта целиком",
+                  ((history?["items"] as JsonArray)?.Count ?? 0) == 0,
+                  $"| осталось {(history?["items"] as JsonArray)?.Count ?? 0}");
         }
 
         // --- the clear space around what cannot be undone ---

@@ -281,6 +281,144 @@ def _unclaimed(key, value):
              "where": "", "when": 0.0}]
 
 
+# ---------------------------------------------------------------------------
+# Forgetting (`4.0b-B02`)
+# ---------------------------------------------------------------------------
+#
+# Which key of the store a group lives in, and how an entry is picked out of
+# it. Deliberately the *same* table the inventory is built from: a group a
+# person can see and cannot forget would be worse than not showing it, and
+# two tables would drift into exactly that.
+
+
+def _drop_from_dict(value, ids):
+    """A mapping: the entry's id is its key."""
+    kept = {k: v for k, v in value.items() if str(k) not in ids}
+    return kept, len(value) - len(kept)
+
+
+def _drop_from_list(value, ids, key):
+    """A list: the entry's id is its own field, or its position."""
+    kept = []
+    for at, item in enumerate(value):
+        named = str(item.get(key, "")) if isinstance(item, dict) else ""
+        # An entry with an identifier of its own is matched only by it.
+        # Position is the fallback for entries that have none — the
+        # journal's, say — and matching both ways would forget the wrong
+        # row the first time an id happened to look like a number.
+        if named in ids if named else str(at) in ids:
+            continue
+        kept.append(item)
+    return kept, len(value) - len(kept)
+
+
+def _forget_settings(settings, ids):
+    """A preference is forgotten by going back to its default."""
+    gone = 0
+    for key in list(ids):
+        if key not in settings_schema.SETTABLE:
+            continue
+        default = settings_schema.DEFAULTS.get(key)
+        if settings.get(key, default) == default:
+            continue
+        settings.set(key, default)
+        gone += 1
+    return gone
+
+
+#: group id -> (store key, the field an entry is named by)
+FORGETTABLE = {
+    "aliases": ("app_aliases", None),
+    "history": ("history", None),
+    "reminders": ("reminders", "id"),
+    "todo": ("todo", "id"),
+    "commands": ("custom_commands", "id"),
+    "stats": ("command_stats", None),
+    "plugins": ("enabled_plugins", None),
+    "folders": ("program_folders", None),
+}
+
+
+def forget(settings, group, ids=None):
+    """
+    Forget entries of one group, or the group entire.
+
+    `ids` of `None` means the whole group. Returns how many entries went —
+    a number, because "done" and "there was nothing there" are different
+    answers, and a page that says "forgotten" over an entry still on the
+    screen teaches a person to distrust the button.
+
+    **A group not in the table above is still forgettable.** It reached the
+    page by the walk in `inventory`, and something a person can see and
+    cannot remove is worse than something never shown: the page would be
+    displaying their data next to a button that quietly does nothing.
+    """
+    wanted = None if ids is None else {str(i) for i in ids}
+
+    if group == "settings":
+        if wanted is None:
+            wanted = {item["id"] for item in _changed_settings(settings)}
+        gone = _forget_settings(settings, wanted)
+        settings.save()
+        return gone
+
+    key, named = FORGETTABLE.get(group, (group, None))
+    if key not in settings_schema.DEFAULTS:
+        return 0
+
+    value = settings.get(key, settings_schema.DEFAULTS.get(key))
+    empty = settings_schema.DEFAULTS.get(key)
+
+    if wanted is None:
+        gone = len(value) if isinstance(value, (dict, list)) else 1
+        settings.set(key, type(empty)() if isinstance(empty, (dict, list))
+                     else empty)
+    elif isinstance(value, dict):
+        kept, gone = _drop_from_dict(value, wanted)
+        settings.set(key, kept)
+    elif isinstance(value, list):
+        kept, gone = _drop_from_list(value, wanted, named or "id")
+        settings.set(key, kept)
+    else:
+        gone = 0
+
+    # `plugin_settings` rides along with `enabled_plugins`: they are one
+    # group on the page, so forgetting a plugin there has to take what the
+    # plugin kept as well. Leaving it would mean a page that says the
+    # plugin is forgotten while its store sits underneath.
+    if group == "plugins":
+        kept_settings = dict(settings.get("plugin_settings", {}) or {})
+        for name in list(kept_settings):
+            if wanted is None or str(name) in wanted:
+                kept_settings.pop(name, None)
+                gone += 1
+        settings.set("plugin_settings", kept_settings)
+
+    settings.save()
+    return gone
+
+
+def forget_everything(settings):
+    """
+    Everything kept about a person, in one operation.
+
+    **Everything the page shows**, preferences included: a person pressing
+    this on a screen listing eight groups means the eight, not six of them.
+    A chosen wake word and a chosen voice are things Rina knows about
+    somebody, which is exactly why they are on that page in the first place.
+
+    Group by group rather than by wiping the file. What the program needs in
+    order to start — the store's version, whether the wizard has run — is
+    not personal data, is not on the page, and is not in `SETTABLE`; going
+    through the groups leaves it alone without anybody having to remember a
+    list of exceptions.
+    """
+    gone = 0
+    for group in [name for name, _keys, _read in GROUPS] + ["settings"]:
+        gone += forget(settings, group)
+    return gone
+
+
 def summary(settings):
     """The counts alone — for anything that wants the size, not the content."""
     return {group["id"]: group["count"] for group in inventory(settings)}

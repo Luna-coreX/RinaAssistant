@@ -1411,5 +1411,38 @@
   },
   "Показать все {0}": {
     "English": "Show all {0}"
+  },
+  "Забыть эту запись": {
+    "English": "Forget this entry"
+  },
+  "Забыть всю группу": {
+    "English": "Forget this whole group"
+  },
+  "Забыть всё в разделе «{0}»? Записей: {1}.": {
+    "English": "Forget everything in “{0}”? Entries: {1}."
+  },
+  "Вернуть это будет нельзя.": {
+    "English": "There will be no getting this back."
+  },
+  "Забыть всё обо мне": {
+    "English": "Forget everything about me"
+  },
+  "Забыто записей: {0}": {
+    "English": "Entries forgotten: {0}"
+  },
+  "Забывать было нечего.": {
+    "English": "There was nothing to forget."
+  },
+  "Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию.": {
+    "English": "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults."
+  },
+  "Вернуть это будет нельзя. Команды, дела и напоминания тоже уйдут.": {
+    "English": "There will be no getting this back. Commands, things to do and reminders go too."
+  },
+  "Забыть этот день": {
+    "English": "Forget this day"
+  },
+  "Забыть всё за {0}? Записей: {1}.": {
+    "English": "Forget everything from {0}? Entries: {1}."
   }
 }

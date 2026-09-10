@@ -141,7 +141,7 @@
 | `tts` | ядро | `speech.say` |
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
 | `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
-| `privacy` | ядро | `privacy.inventory` |
+| `privacy` | ядро | `privacy.inventory`, `privacy.forget` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.try`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
 | `history` | ядро | `history.list`, `history.clear`, `history.export` |
@@ -286,6 +286,7 @@
 | `commands.export` | — | содержимое файла целиком: `kind`, `format`, `app_version`, `exported_at`, `payload.commands`, `payload.stats`. Файл пишет оболочка |
 | `commands.import` | `file` — содержимое, прочитанное оболочкой | `added`, `skipped`. Чужой вид файла отвергается кодом `transfer.wrong_kind` |
 | `privacy.inventory` | — | `groups`, `gathered_at`. Опись всего, что хранится о человеке (`4.0b-B01`). Группа — `id`, `count`, `items`; запись — `id`, `what`, `detail`, `where`, `when`. **Группы приходят без названий**: как их звать, решает оболочка (ADR 0006), и она обязана показать незнакомую группу под её же `id` — иначе новый вид хранимого исчезнет с той единственной страницы, которая обещает полноту |
+| `privacy.forget` | `group` и `ids` — эти записи; один `group` — группу целиком; `everything` — всё | `forgotten` — сколько записей ушло (`4.0b-B02`). Число, а не «готово»: «сделано» и «там ничего и не было» — разные ответы. Незнакомая группа тоже забывается: то, что человек видит и не может убрать, хуже непоказанного |
 | `history.list` | `limit` | `items`, `total` |
 | `history.clear` | — | сколько стёрто |
 | `history.export` | — | содержимое файла целиком: `kind`, `format`, `app_version`, `exported_at`, `payload.history`. Файл пишет оболочка |

@@ -187,6 +187,16 @@ public static partial class Loc
                 {
                     ["English"] = "the release has no manifest.json",
                 },
+            ["Вернуть это будет нельзя."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There will be no getting this back.",
+                },
+            ["Вернуть это будет нельзя. Команды, дела и напоминания тоже уйдут."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There will be no getting this back. Commands, things to do and reminders go too.",
+                },
             ["Версии, ссылки, из чего собрана"] =
                 new Dictionary<string, string>
                 {
@@ -524,6 +534,16 @@ public static partial class Loc
                 {
                     ["English"] = "Logs, versions and the link's state. The conversation history and your commands are not taken; what went in is written inside.",
                 },
+            ["Забывать было нечего."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There was nothing to forget.",
+                },
+            ["Забыто записей: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Entries forgotten: {0}",
+                },
             ["Забыть"] =
                 new Dictionary<string, string>
                 {
@@ -539,6 +559,36 @@ public static partial class Loc
                     ["English"] = "Forget all",
                     ["Español"] = "Olvidar todo",
                     ["Українська"] = "Забути все",
+                },
+            ["Забыть всю группу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this whole group",
+                },
+            ["Забыть всё в разделе «{0}»? Записей: {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything in “{0}”? Entries: {1}.",
+                },
+            ["Забыть всё за {0}? Записей: {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything from {0}? Entries: {1}.",
+                },
+            ["Забыть всё обо мне"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything about me",
+                },
+            ["Забыть этот день"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this day",
+                },
+            ["Забыть эту запись"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this entry",
                 },
             ["завтра в это же время"] =
                 new Dictionary<string, string>
@@ -1608,6 +1658,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Rina has not remembered anything about you yet: talk to her and entries will appear here.",
+                },
+            ["Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults.",
                 },
             ["Рина скажет это вместо «Готово»"] =
                 new Dictionary<string, string>

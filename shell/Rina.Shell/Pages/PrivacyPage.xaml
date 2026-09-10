@@ -35,6 +35,11 @@
     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
       <Button Style="{StaticResource Btn}" Content="{loc:S 'Обновить'}"
               Click="OnRefresh" />
+      <!-- The irreversible one: hatched, and set apart by the doubled gap
+           the design system asks for (SYSTEM §4). -->
+      <Button x:Name="ForgetAll" Style="{StaticResource Btn.Danger}"
+              Margin="{StaticResource Pad.DangerLeft}"
+              Content="{loc:S 'Забыть всё обо мне'}" Click="OnForgetAll" />
       <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
                  VerticalAlignment="Center" Margin="16,0,0,0"
                  TextWrapping="Wrap" />

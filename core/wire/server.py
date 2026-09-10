@@ -309,6 +309,7 @@ class ProtocolServer:
             "commands.export": self._commands_export,
             "commands.import": self._commands_import,
             "privacy.inventory": self._privacy_inventory,
+            "privacy.forget": self._privacy_forget,
             "history.list": self._history_list,
             "history.clear": self._history_clear,
             "history.export": self._history_export,
@@ -1008,6 +1009,37 @@ class ProtocolServer:
             "groups": privacy.inventory(settings),
             "gathered_at": privacy.gathered_at(),
         }
+
+    def _privacy_forget(self, message: Envelope) -> dict:
+        """
+        Forget what is kept about a person (`4.0b-B02`).
+
+        Three shapes, and the difference between them is the payload rather
+        than three methods: `ids` — these entries; a `group` alone — that
+        group entire; `everything` — all of it.
+
+        Answers with **how many** went. "Done" and "there was nothing
+        there" are different answers, and a page that says "forgotten" over
+        an entry still on the screen teaches a person to distrust the
+        button they came here to trust.
+        """
+        from core import privacy
+
+        settings = self._settings()
+        if settings is None:
+            return {"forgotten": 0}
+
+        if message.payload.get("everything"):
+            return {"forgotten": privacy.forget_everything(settings)}
+
+        group = str(message.payload.get("group") or "")
+        if not group:
+            return {"forgotten": 0}
+
+        ids = message.payload.get("ids")
+        if ids is not None and not isinstance(ids, list):
+            return {"forgotten": 0}
+        return {"forgotten": privacy.forget(settings, group, ids)}
 
     def _history_list(self, message: Envelope) -> dict:
         items = self._history().all()
