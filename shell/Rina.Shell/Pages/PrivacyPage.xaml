@@ -35,6 +35,8 @@
     <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
       <Button Style="{StaticResource Btn}" Content="{loc:S 'Обновить'}"
               Click="OnRefresh" />
+      <Button Style="{StaticResource Btn}" Margin="8,0,0,0"
+              Content="{loc:S 'Выгрузить всё'}" Click="OnExport" />
       <!-- The irreversible one: hatched, and set apart by the doubled gap
            the design system asks for (SYSTEM §4). -->
       <Button x:Name="ForgetAll" Style="{StaticResource Btn.Danger}"

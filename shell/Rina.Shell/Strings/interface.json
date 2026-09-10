@@ -1444,5 +1444,26 @@
   },
   "Забыть всё за {0}? Записей: {1}.": {
     "English": "Forget everything from {0}? Entries: {1}."
+  },
+  "Выгрузить всё": {
+    "English": "Export everything"
+  },
+  "Читаемый текст (*.txt)|*.txt|Данные (*.json)|*.json": {
+    "English": "Readable text (*.txt)|*.txt|Data (*.json)|*.json"
+  },
+  "Сохранено: {0}": {
+    "English": "Saved: {0}"
+  },
+  "Не сохранилось: {0}": {
+    "English": "Not saved: {0}"
+  },
+  "Выгружено: {0} · версия {1}": {
+    "English": "Exported: {0} · version {1}"
+  },
+  "Всё это хранилось на этом компьютере.": {
+    "English": "All of this was kept on this computer."
+  },
+  "  — пусто": {
+    "English": "  — empty"
   }
 }

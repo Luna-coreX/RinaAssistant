@@ -19,6 +19,12 @@ from version import APP_VERSION
 FORMAT_VERSION = 1
 KIND_COMMANDS = "rina.commands"
 KIND_HISTORY = "rina.history"
+#: Everything kept about a person (`4.0b-B03`). A kind of its own
+#: rather than a bigger commands file: what a file **is** has to be
+#: readable off its first line, and a person who exported everything
+#: and a person who exported their commands are holding different
+#: things — one of them fit to send to somebody, the other not.
+KIND_EVERYTHING = "rina.everything"
 
 
 class TransferError(Exception):
@@ -37,7 +43,15 @@ class TransferError(Exception):
         self.code = code
 
 
-def _envelope(kind, payload):
+def envelope(kind, payload):
+    """
+    What every export here is wrapped in.
+
+    Public because the exports are no longer all assembled in this
+    module: the whole-inventory one lives in `core/privacy.py`
+    (`4.0b-B03`). One envelope for all of them, so a file made by any
+    of them can be recognised the same way.
+    """
     return {
         "kind": kind,
         "format": FORMAT_VERSION,
@@ -52,7 +66,7 @@ def _envelope(kind, payload):
 # ---------------------------------------------------------------------------
 def export_commands(path, commands, stats=None):
     """Saves the commands (and the launch statistics) to a file."""
-    data = _envelope(KIND_COMMANDS, {
+    data = envelope(KIND_COMMANDS, {
         "commands": list(commands or []),
         "stats": dict(stats or {}),
     })
@@ -72,7 +86,7 @@ def commands_payload(commands, stats=None):
     and the divergence would show up as "the export from the new version
     does not open in the old one".
     """
-    return _envelope(KIND_COMMANDS, {
+    return envelope(KIND_COMMANDS, {
         "commands": list(commands or []),
         "stats": dict(stats or {}),
     })
@@ -80,7 +94,7 @@ def commands_payload(commands, stats=None):
 
 def history_payload(entries):
     """The content of a history file. Same reasoning as `commands_payload`."""
-    return _envelope(KIND_HISTORY, {"history": list(entries or [])})
+    return envelope(KIND_HISTORY, {"history": list(entries or [])})
 
 
 def commands_from_data(data, source="файл"):
@@ -245,7 +259,7 @@ def merge_commands(existing, incoming, new_id):
 # ---------------------------------------------------------------------------
 def export_history_json(path, entries):
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(_envelope(KIND_HISTORY, {"history": list(entries or [])}),
+        json.dump(envelope(KIND_HISTORY, {"history": list(entries or [])}),
                   f, ensure_ascii=False, indent=2)
     return len(entries or [])
 

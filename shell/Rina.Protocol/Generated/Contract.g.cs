@@ -95,6 +95,8 @@ public static class Methods
     /// <summary>Базовый метод.</summary>
     public const string Pong = "pong";
     /// <summary>Возможность: privacy.</summary>
+    public const string PrivacyExport = "privacy.export";
+    /// <summary>Возможность: privacy.</summary>
     public const string PrivacyForget = "privacy.forget";
     /// <summary>Возможность: privacy.</summary>
     public const string PrivacyInventory = "privacy.inventory";
@@ -191,6 +193,7 @@ public static class Methods
             ["plugins.page"] = "plugins",
             ["plugins.set_enabled"] = "plugins",
             ["pong"] = null,
+            ["privacy.export"] = "privacy",
             ["privacy.forget"] = "privacy",
             ["privacy.inventory"] = "privacy",
             ["reminders.cancel"] = "reminders",

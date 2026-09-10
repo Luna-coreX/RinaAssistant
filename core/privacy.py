@@ -218,10 +218,27 @@ def _changed_settings(settings):
     do.
     """
     spoken_for = {key for _id, keys, _read in GROUPS for key in keys}
+    schema = settings_schema.describe(sorted(settings_schema.SETTABLE))
     out = []
     for key in sorted(settings_schema.SETTABLE):
         if key in spoken_for:
             continue
+        # The store's own state is not a preference and is not about
+        # anybody: `config_version` and `first_run` say which shape the
+        # file is in and whether the wizard has run. The schema already
+        # marks them `secret` and `settings.get` already withholds them —
+        # taking that rule from there rather than writing a second list
+        # that would part company with it.
+        #
+        # **This was a real fault, not tidiness.** The export showed
+        # "изменённые настройки: config_version = 2", and «забыть всё»
+        # would have reset it to 0 — telling the store on next load that it
+        # was two migrations behind. Found by reading the exported file.
+        if schema.get(key, {}).get("secret"):
+            continue
+        # Obsolete keys stay. `theme` and `wake_word` were replaced, but
+        # what a person chose is still written on their disk, and this is
+        # the page that promises to say what is written there.
         default = settings_schema.DEFAULTS.get(key)
         value = settings.get(key, default)
         if value == default:
@@ -417,6 +434,31 @@ def forget_everything(settings):
     for group in [name for name, _keys, _read in GROUPS] + ["settings"]:
         gone += forget(settings, group)
     return gone
+
+
+def export(settings):
+    """
+    Everything kept about a person, as the contents of a file (`4.0b-B03`).
+
+    The same groups the page shows, in the same shape, wrapped in the
+    envelope every other export here uses. **The envelope is not decoration:**
+    a file whose first line says what it is can be recognised a year later
+    by the person who made it and refused by the importer that should not
+    take it — and `T-18` is the record of what happens without one.
+
+    The core hands over the contents; the file is written by the shell,
+    which is the side that touches the machine (ADR 0009, §6).
+
+    Nothing is dressed up here and nothing is left out: the export is the
+    inventory. A file that showed less than the page would make the page a
+    summary of itself, and a person exporting their data in order to read
+    it elsewhere would be handed a shorter answer for no stated reason.
+    """
+    from core import data_transfer
+
+    return data_transfer.envelope(data_transfer.KIND_EVERYTHING, {
+        "groups": inventory(settings),
+    })
 
 
 def summary(settings):

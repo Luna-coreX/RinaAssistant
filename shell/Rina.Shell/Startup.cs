@@ -3253,6 +3253,61 @@ public partial class App
                   $"| осталось {(history?["items"] as JsonArray)?.Count ?? 0}");
         }
 
+        // --- and the export (`4.0b-B03`) ---
+        //
+        // Two formats, and the readable one is the point: the program
+        // could already hand its data to another copy of itself, and could
+        // not hand it to the person whose data it is.
+        //
+        // Checked on what the core actually returns, and asserted on the
+        // text — not on "a file appeared". A file appears just as readily
+        // when it is empty.
+        if (window.CurrentPage is Pages.PrivacyPage)
+        {
+            var envelope = await link.AskAsync(
+                Rina.Protocol.Methods.PrivacyExport);
+            Check("выгрузка пришла конвертом",
+                  envelope?["kind"]?.GetValue<string>() == "rina.everything",
+                  $"| {envelope?["kind"]}");
+
+            var text = Pages.PrivacyPage.Readable(envelope ?? []);
+            Check("в читаемой выгрузке группы названы по-человечески",
+                  text.Contains("ВЫУЧЕННЫЕ СЛОВА"),
+                  $"| {text.Length} знаков");
+
+            // The rule that holds on the screen has to hold in the file:
+            // a group the shell does not know keeps its identifier and is
+            // written out. A file promising everything must not quietly
+            // hold less than the page it was made from.
+            var strange = new JsonObject
+            {
+                ["kind"] = "rina.everything",
+                ["app_version"] = "проба",
+                ["exported_at"] = 0,
+                ["payload"] = new JsonObject
+                {
+                    ["groups"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["id"] = "дневник_настроения",
+                            ["count"] = 1,
+                            ["items"] = new JsonArray(
+                                new JsonObject
+                                {
+                                    ["what"] = "чужая запись",
+                                    ["detail"] = "",
+                                    ["where"] = "",
+                                    ["when"] = 0,
+                                }),
+                        }),
+                },
+            };
+            var odd = Pages.PrivacyPage.Readable(strange);
+            Check("незнакомая группа попала и в файл",
+                  odd.Contains("ДНЕВНИК_НАСТРОЕНИЯ") && odd.Contains("чужая запись"),
+                  $"| знаков {odd.Length}");
+        }
+
         // --- the clear space around what cannot be undone ---
         //
         // The rule is written in SYSTEM §4, tokenised as `danger`, and its

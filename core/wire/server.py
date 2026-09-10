@@ -310,6 +310,7 @@ class ProtocolServer:
             "commands.import": self._commands_import,
             "privacy.inventory": self._privacy_inventory,
             "privacy.forget": self._privacy_forget,
+            "privacy.export": self._privacy_export,
             "history.list": self._history_list,
             "history.clear": self._history_clear,
             "history.export": self._history_export,
@@ -1040,6 +1041,23 @@ class ProtocolServer:
         if ids is not None and not isinstance(ids, list):
             return {"forgotten": 0}
         return {"forgotten": privacy.forget(settings, group, ids)}
+
+    def _privacy_export(self, message: Envelope) -> dict:
+        """
+        Everything kept about a person, as the contents of a file
+        (`4.0b-B03`).
+
+        The core hands over the contents; the shell picks the place and
+        writes it (§6, ADR 0009). Same division as the commands export, and
+        the same envelope, so a file can be told from another kind of file
+        by its first line.
+        """
+        from core import privacy
+
+        settings = self._settings()
+        if settings is None:
+            return {}
+        return privacy.export(settings)
 
     def _history_list(self, message: Envelope) -> dict:
         items = self._history().all()

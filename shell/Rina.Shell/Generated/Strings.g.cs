@@ -14,6 +14,11 @@ public static partial class Loc
         IReadOnlyDictionary<string, string>> Table =
         new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
+            ["  — пусто"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "  — empty",
+                },
             [" или "] =
                 new Dictionary<string, string>
                 {
@@ -268,6 +273,11 @@ public static partial class Loc
                 {
                     ["English"] = "All of this can be changed later in the settings.",
                 },
+            ["Всё это хранилось на этом компьютере."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All of this was kept on this computer.",
+                },
             ["Выберите файл модели"] =
                 new Dictionary<string, string>
                 {
@@ -287,6 +297,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Exported: {0}",
+                },
+            ["Выгружено: {0} · версия {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Exported: {0} · version {1}",
+                },
+            ["Выгрузить всё"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Export everything",
                 },
             ["Выйти"] =
                 new Dictionary<string, string>
@@ -1063,6 +1083,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "could not read the answer: {0}",
+                },
+            ["Не сохранилось: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Not saved: {0}",
                 },
             ["Не удалось спросить"] =
                 new Dictionary<string, string>
@@ -1893,6 +1918,11 @@ public static partial class Loc
                 {
                     ["English"] = "Report a problem",
                 },
+            ["Сохранено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Saved: {0}",
+                },
             ["Сохранить"] =
                 new Dictionary<string, string>
                 {
@@ -2168,6 +2198,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "in an hour",
+                },
+            ["Читаемый текст (*.txt)|*.txt|Данные (*.json)|*.json"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Readable text (*.txt)|*.txt|Data (*.json)|*.json",
                 },
             ["Что доустановить"] =
                 new Dictionary<string, string>

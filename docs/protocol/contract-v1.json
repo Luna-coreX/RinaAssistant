@@ -79,6 +79,7 @@
     },
     "privacy": {
       "methods": [
+        "privacy.export",
         "privacy.forget",
         "privacy.inventory"
       ],
@@ -484,6 +485,7 @@
     "plugins.page": "plugins",
     "plugins.set_enabled": "plugins",
     "pong": null,
+    "privacy.export": "privacy",
     "privacy.forget": "privacy",
     "privacy.inventory": "privacy",
     "reminders.cancel": "reminders",

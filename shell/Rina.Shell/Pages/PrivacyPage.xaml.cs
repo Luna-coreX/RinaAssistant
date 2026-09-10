@@ -460,6 +460,117 @@ public partial class PrivacyPage : UserControl
         await ReloadAsync();
     }
 
+    /// <summary>
+    /// Save everything to a file (`4.0b-B03`).
+    /// </summary>
+    /// <remarks>
+    /// Two formats, and the readable one is the point of the item: the
+    /// program could already hand its data to another copy of itself, and
+    /// what it could not do was hand it to the person whose data it is.
+    /// The `.json` is the same envelope every other export uses, for
+    /// moving between machines; the `.txt` is for reading.
+    /// </remarks>
+    private async void OnExport(object sender, RoutedEventArgs e)
+    {
+        var told = await Ask(Methods.PrivacyExport);
+        if (told is null)
+        {
+            Note.Text = S("Ядро не на связи.");
+            return;
+        }
+
+        var save = new Microsoft.Win32.SaveFileDialog
+        {
+            FileName = S("Что Рина знает обо мне"),
+            DefaultExt = ".txt",
+            Filter = S("Читаемый текст (*.txt)|*.txt|Данные (*.json)|*.json"),
+        };
+        if (save.ShowDialog() != true) return;
+
+        var asText = !save.FileName.EndsWith(".json",
+                                             StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            System.IO.File.WriteAllText(
+                save.FileName,
+                asText ? Readable(told) : told.ToJsonString(new()
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder
+                        .UnsafeRelaxedJsonEscaping,
+                }),
+                System.Text.Encoding.UTF8);
+            Note.Text = S("Сохранено: {0}", save.FileName);
+        }
+        catch (Exception why)
+        {
+            // Named, not swallowed. "Could not save" sends a person
+            // looking; "the folder is read-only" tells them where to look.
+            Note.Text = S("Не сохранилось: {0}", why.Message);
+        }
+    }
+
+    /// <summary>
+    /// The whole inventory as something a person can read.
+    /// </summary>
+    /// <remarks>
+    /// Rendered here rather than in the core because it needs the group
+    /// names, and those belong to the shell (ADR 0006). Which is also why
+    /// a group the shell does not know keeps its identifier here too — the
+    /// same rule as on the screen, and for the same reason: a file that
+    /// claims to hold everything must not quietly hold less.
+    /// </remarks>
+    public static string Readable(JsonObject told)
+    {
+        var out_ = new System.Text.StringBuilder();
+        out_.AppendLine(S("Что Рина знает обо мне"));
+
+        var at = Number(told["exported_at"]);
+        out_.AppendLine(S("Выгружено: {0} · версия {1}",
+            at > 0 ? DateTimeOffset.FromUnixTimeSeconds((long)at)
+                        .LocalDateTime.ToString("dd.MM.yyyy HH:mm")
+                   : "—",
+            told["app_version"]?.GetValue<string>() ?? "—"));
+        out_.AppendLine(S("Всё это хранилось на этом компьютере."));
+
+        foreach (var group in (told["payload"]?["groups"] as JsonArray ?? [])
+                     .OfType<JsonObject>())
+        {
+            var id = group["id"]?.GetValue<string>() ?? "";
+            var count = (int)Number(group["count"]);
+            var (title, note) = Named(id);
+
+            out_.AppendLine();
+            out_.AppendLine($"{title.ToUpperInvariant()} ({count})");
+            out_.AppendLine(note);
+            if (count == 0)
+            {
+                out_.AppendLine(S("  — пусто"));
+                continue;
+            }
+
+            foreach (var item in (group["items"] as JsonArray ?? [])
+                         .OfType<JsonObject>())
+            {
+                var aside = string.Join(" · ", new[]
+                {
+                    item["detail"]?.GetValue<string>() ?? "",
+                    item["where"]?.GetValue<string>() ?? "",
+                }.Where(part => part.Length > 0));
+                var when = Number(item["when"]);
+                var stamp = when > 0
+                    ? DateTimeOffset.FromUnixTimeSeconds((long)when)
+                        .LocalDateTime.ToString("dd.MM.yyyy HH:mm") + "  "
+                    : "";
+                out_.Append("  • ").Append(stamp)
+                    .Append(item["what"]?.GetValue<string>() ?? "");
+                if (aside.Length > 0) out_.Append("  (").Append(aside).Append(')');
+                out_.AppendLine();
+            }
+        }
+        return out_.ToString();
+    }
+
     /// <summary>Forget one group from outside — for the check.</summary>
     public Task ForgetGroupForCheck(string group) => ForgetAsync(group, null);
 

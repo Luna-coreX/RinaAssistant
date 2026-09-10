@@ -272,8 +272,29 @@ now_keys = set(s.all()) if hasattr(s, "all") else set()
 check("хранилище не выпотрошено, а очищено",
       kept_keys and kept_keys <= now_keys,
       f"| было ключей {len(kept_keys)}, стало {len(now_keys)}")
-check("версия хранилища на месте", s.get("config_version", None) is not None,
-      f"| {s.get('config_version', None)}")
+
+# The store's own version, set to something other than the default so that
+# "unchanged" cannot be true by accident. The first version of this check
+# compared with the default — after a full clear almost everything equals
+# the default, so it could not have failed.
+#
+# It would have failed for real: `config_version` counted as a changed
+# setting, so forgetting everything reset it to 0 and would have told the
+# store on next load that it was two migrations behind.
+s = loaded()
+s.set("config_version", 2)
+privacy.forget_everything(s)
+check("версия хранилища не сброшена вместе с остальным",
+      s.get("config_version") == 2, f"| {s.get('config_version')}")
+# And it is not in the inventory to begin with. On a store where it
+# **differs** from the default: asked after a full clear, it equals the
+# default and so is not "changed" whatever the rule says — the question
+# would answer itself.
+untouched = loaded()
+untouched.set("config_version", 2)
+check("и в опись она не попадает",
+      "config_version" not in said(privacy.inventory(untouched), "settings"),
+      f"| {said(privacy.inventory(untouched), 'settings')}")
 
 # --- the rule: what can be seen can be removed -----------------------------
 #
