@@ -48,10 +48,30 @@ class PluginInstallError(Exception):
 _PLUGIN_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
 
 
+#: Names Windows reserves for devices. A folder cannot be made with one,
+#: and a file opened at such a path is the device rather than a file.
+#:
+#: Found by fuzzing (`4.0b-C02`): `id: "nul"` in somebody's
+#: `plugin.json` passed the pattern — it is letters and nothing else —
+#: and `os.path.abspath` turned the result into a device path. The
+#: install refused it, but only because that path stopped looking like a
+#: folder inside the directory; `con`, `prn` and `com1` do **not** trip
+#: that check — they look like ordinary paths and are devices all the
+#: same. So the name is refused here, where the reason can be said,
+#: rather than left to the shape of a path.
+_DEVICE_NAMES = frozenset(
+    ["con", "prn", "aux", "nul"]
+    + [f"com{n}" for n in range(1, 10)]
+    + [f"lpt{n}" for n in range(1, 10)])
+
+
 def _safe_plugin_id(raw):
     """A checked plugin name, or PluginInstallError."""
     plugin_id = re.sub(r"[^\w.-]+", "_", str(raw or "").strip())
+    # The extension does not save it: `nul.txt` is the same device.
+    stem = plugin_id.split(".", 1)[0].lower()
     if (not plugin_id or plugin_id in (".", "..")
+            or stem in _DEVICE_NAMES
             or not _PLUGIN_ID_RE.match(plugin_id)):
         security_log().warning("Отклонено имя плагина из plugin.json: %r", raw)
         raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
