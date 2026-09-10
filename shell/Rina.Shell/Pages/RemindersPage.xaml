@@ -21,25 +21,45 @@
         <StackPanel>
           <TextBlock Text="{loc:S 'НОВОЕ НАПОМИНАНИЕ'}"
                      Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-          <StackPanel Orientation="Horizontal">
-            <TextBox x:Name="What" Style="{StaticResource Field}" Width="320"
-                     ui:Ui.Hint="{loc:S 'о чём напомнить'}" />
-            <ComboBox x:Name="When" Style="{StaticResource Choice}" Width="200"
-                      Margin="8,0,0,0" />
-            <Button Style="{StaticResource Btn.Primary}"
-                    Content="{loc:S 'Напомнить'}" Margin="8,0,0,0"
-                    Click="OnCreate" />
-          </StackPanel>
-          <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-            <TextBlock Text="{loc:S 'или ко времени'}"
+          <!-- What to remind about takes the whole width: it is the one
+               thing here a person has to write, and the rest is chosen. -->
+          <TextBox x:Name="What" Style="{StaticResource Field}"
+                   ui:Ui.Hint="{loc:S 'о чём напомнить'}" />
+
+          <!--
+            When — the two ways of saying it, on one line and visibly one
+            choice.
+
+            They were on separate lines, and the typed time silently won:
+            the dropdown went on reading «через 15 минут» while the
+            reminder was set for 19:30. Two controls, one of them lying,
+            and nothing on the screen to say which. Now the word «или»
+            stands between them and whichever is not in use goes quiet.
+          -->
+          <Grid Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="When" Grid.Column="0"
+                      Style="{StaticResource Choice}" Width="200" />
+            <TextBlock Grid.Column="1" Text="{loc:S 'или в'}"
                        Style="{StaticResource Text.Meta}"
-                       VerticalAlignment="Center" Margin="0,0,8,0" />
-            <TextBox x:Name="AtTime" Style="{StaticResource Field}" Width="90"
+                       VerticalAlignment="Center" Margin="12,0,12,0" />
+            <TextBox x:Name="AtTime" Grid.Column="2"
+                     Style="{StaticResource Field}" Width="90"
+                     TextChanged="OnAtTimeTyped"
                      ui:Ui.Hint="{loc:S '19:30'}" />
-            <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
-                       VerticalAlignment="Center" Margin="16,0,0,0"
+            <TextBlock x:Name="Note" Grid.Column="3"
+                       Style="{StaticResource Text.Meta}"
+                       VerticalAlignment="Center" Margin="16,0,16,0"
                        TextWrapping="Wrap" />
-          </StackPanel>
+            <Button Grid.Column="4" Style="{StaticResource Btn.Primary}"
+                    Content="{loc:S 'Напомнить'}" Click="OnCreate" />
+          </Grid>
         </StackPanel>
       </Border>
 

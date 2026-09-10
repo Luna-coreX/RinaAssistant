@@ -171,9 +171,35 @@ public sealed class SExtension : MarkupExtension
     /// rebuilding.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// The key as an indexer argument in a binding path.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A path is not a string. Inside <c>[…]</c> a comma separates the
+    /// arguments of a multi-argument indexer, so a key reading
+    /// <c>[one, two, three]</c> asked a one-argument dictionary for three
+    /// arguments, got nothing, and put nothing on the screen. <b>Ten
+    /// strings were blank</b> — among them the line saying nobody vouched
+    /// for a plugin, and the line saying an unanswered confirmation means
+    /// the action will not happen.
+    /// </para>
+    /// <para>
+    /// **It failed silently, and that is the part worth remembering.** A
+    /// binding that cannot resolve its path writes a line to the debug
+    /// trace and leaves the property at its default — an empty string
+    /// looks exactly like a caption somebody chose not to write. Every
+    /// check we had was about which language the string came back in, and
+    /// each of them called <c>S()</c> straight; not one of them went
+    /// through markup, which is where half the interface lives.
+    /// </para>
+    /// </remarks>
+    private string Path =>
+        Key.Replace("^", "^^").Replace(",", "^,").Replace("]", "^]");
+
     public override object ProvideValue(IServiceProvider provider)
     {
-        var binding = new System.Windows.Data.Binding($"[{Key}]")
+        var binding = new System.Windows.Data.Binding($"[{Path}]")
         {
             Source = Loc.Live,
             Mode = System.Windows.Data.BindingMode.OneWay,

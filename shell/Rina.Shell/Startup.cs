@@ -2200,6 +2200,120 @@ public partial class App
         await Task.Delay(500);
     }
 
+    /// <summary>
+    /// The clear space around every irreversible action on a page.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured in pixels on the screen, not read off a <c>Margin</c>. The
+    /// rule (SYSTEM §4) is about what a hand sees and misses: the hatch is
+    /// the first line, the doubled gap is the second, and it is the one
+    /// that works for a person who cannot make the pattern out. A margin
+    /// says what was asked for; a column of the wrong width, a neighbour
+    /// with a negative margin or a template that ignores it all leave the
+    /// property intact and the gap gone.
+    /// </para>
+    /// <para>
+    /// Only neighbours <b>on the same line</b> count — something under it
+    /// is not what a slipping hand hits — and only things one presses: a
+    /// caption beside a delete button is not a wrong press waiting to
+    /// happen.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<(System.Windows.Controls.Button Danger, double Gap, string Near)>
+        DangerGaps(FrameworkElement root)
+    {
+        var hatched = Application.Current.TryFindResource("Btn.Danger") as Style;
+        var all = Deep(root).OfType<FrameworkElement>()
+            .Where(e => e.IsVisible && e.ActualWidth > 0)
+            .ToList();
+
+        foreach (var button in all.OfType<System.Windows.Controls.Button>()
+                     .Where(b => ReferenceEquals(b.Style, hatched)))
+        {
+            var mine = Where(button, root);
+            var gap = double.PositiveInfinity;
+            var near = "";
+            foreach (var other in all.Where(
+                         e => e is System.Windows.Controls.Button or System.Windows.Controls.CheckBox or System.Windows.Controls.ComboBox or System.Windows.Controls.TextBox)
+                     .Where(e => !ReferenceEquals(e, button)))
+            {
+                // Not through it and not inside it: a button holding a
+                // border of its own is not its own neighbour.
+                if (button.IsAncestorOf(other) || other.IsAncestorOf(button))
+                    continue;
+                var theirs = Where(other, root);
+                if (theirs.Bottom <= mine.Top || theirs.Top >= mine.Bottom)
+                    continue;
+                var apart = theirs.Left >= mine.Right ? theirs.Left - mine.Right
+                          : mine.Left >= theirs.Right ? mine.Left - theirs.Right
+                          : 0;
+                if (apart >= gap) continue;
+                gap = apart;
+                near = (other as System.Windows.Controls.ContentControl)?.Content?.ToString()
+                       ?? other.GetType().Name;
+            }
+            yield return (button, gap, near);
+        }
+    }
+
+    /// <summary>
+    /// Captions that asked the string table for a word and got nothing.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Read off the screen, not out of the string table. Every language
+    /// check we had called <c>Loc.S</c> straight and asked which language
+    /// came back — and half the interface does not go that way. It goes
+    /// through the <c>{loc:S …}</c> markup, which builds a binding, and a
+    /// binding that cannot resolve its path leaves the property empty and
+    /// says so only in a debug trace nobody reads.
+    /// </para>
+    /// <para>
+    /// A key that is present and translated proves nothing about the
+    /// caption on the screen; this looks at the caption.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<string> BlankCaptions(FrameworkElement root)
+    {
+        foreach (var thing in Deep(root).OfType<DependencyObject>())
+        {
+            var (property, shown) = thing switch
+            {
+                System.Windows.Controls.TextBlock words =>
+                    (System.Windows.Controls.TextBlock.TextProperty,
+                     (object?)words.Text),
+                System.Windows.Controls.ContentControl holder =>
+                    (System.Windows.Controls.ContentControl.ContentProperty,
+                     holder.Content),
+                _ => (null, null),
+            };
+            if (property is null) continue;
+
+            var live = System.Windows.Data.BindingOperations
+                .GetBindingExpression(thing, property);
+            if (live?.ParentBinding.Source is not Rina.Shell.Strings.Loc.Lookup)
+                continue;
+            if (shown is string said && said.Length > 0) continue;
+
+            var path = live.ParentBinding.Path?.Path ?? "";
+            yield return path.Trim('[', ']').Replace("^", "");
+        }
+    }
+
+    private static Rect Where(FrameworkElement what, FrameworkElement root) =>
+        what.TransformToAncestor(root).TransformBounds(
+            new Rect(what.RenderSize));
+
+    private static IEnumerable<DependencyObject> Deep(DependencyObject root)
+    {
+        foreach (var child in Children(root))
+        {
+            yield return child;
+            foreach (var deeper in Deep(child)) yield return deeper;
+        }
+    }
+
     /// <summary>The list's rows in order of appearance.</summary>
     private static IEnumerable<System.Windows.Controls.Border> Rows(
         DependencyObject root)
@@ -2947,8 +3061,90 @@ public partial class App
             Check("и появилось в списке",
                   reminders.PlannedCount == before + 1,
                   $"| было {before}, стало {reminders.PlannedCount}");
+
+            // Two ways of saying when, and only one of them acted upon.
+            // The typed time has always won inside `OnCreate`; the
+            // dropdown went on showing «через 15 минут» beside it, so the
+            // screen said one thing and the reminder did another.
+            Check("пока времени не вписали — выбор предлагается",
+                  reminders.ChoiceOffered);
+            reminders.TypeTimeForCheck("19:30");
+            await Task.Delay(200);
+            Check("вписали время — выбор замолчал",
+                  !reminders.ChoiceOffered);
+            reminders.TypeTimeForCheck("");
+            await Task.Delay(200);
+            Check("стёрли — снова предлагается", reminders.ChoiceOffered);
         }
         else Check("страница напоминаний открылась", false);
+
+        // --- the clear space around what cannot be undone ---
+        //
+        // The rule is written in SYSTEM §4, tokenised as `danger`, and its
+        // ratio to `between` is checked in `check_design.py` — and until
+        // now **nothing checked that a button on the screen actually got
+        // it**. All three of those agree with each other about a number in
+        // a file; none of them looks at a window. I found the hole by
+        // falling into it: the delete button in a command's row was put
+        // there flush against `Править`, and every check stayed green.
+        //
+        // Measured over the pages that have such a button, in pixels, with
+        // real records under it — a page with no rows has no row to crowd.
+        var wanted = (double)Application.Current.FindResource("Sp.Danger");
+        var crowded = new List<string>();
+        var counted = 0;
+        foreach (var section in new[] { "commands", "settings" })
+        {
+            window.ShowSectionFor(section);
+            await Task.Delay(900);
+            if (window.CurrentPage is not FrameworkElement page) continue;
+            foreach (var (button, gap, near) in DangerGaps(page))
+            {
+                counted++;
+                if (gap + 0.5 < wanted)
+                    crowded.Add($"«{button.Content}» в {section}: "
+                                + $"{gap:0} до «{near}»");
+            }
+        }
+        // Nothing found is not agreement. An empty list of buttons would
+        // pass this silently, and the commonest way for it to be empty is
+        // that the page failed to load.
+        Check("необратимые кнопки вообще нашлись", counted > 0,
+              $"| {counted}");
+        Check($"вокруг необратимого просвет в {wanted:0}",
+              crowded.Count == 0,
+              crowded.Count == 0 ? $"| проверено {counted}"
+                                 : "| " + string.Join("; ", crowded));
+
+        // --- captions that came back empty ---
+        //
+        // Found by looking at a page: the line under the name on «about»
+        // was simply not there. It is written in the markup, it is in the
+        // string table, it is translated — and the binding behind
+        // `{loc:S …}` treated the commas in it as separators between the
+        // arguments of an indexer, asked a one-argument dictionary for
+        // four, and got nothing. **Ten strings were blank this way**,
+        // among them the one saying nobody vouched for a plugin.
+        //
+        // Every language check called `Loc.S` directly and asked which
+        // language came back. Not one of them went through the markup,
+        // which is where half of these strings live.
+        var blank = new List<string>();
+        var captions = 0;
+        foreach (var section in new[] { "home", "dialog", "commands",
+                                        "reminders", "plugins", "settings",
+                                        "about" })
+        {
+            window.ShowSectionFor(section);
+            await Task.Delay(700);
+            if (window.CurrentPage is not FrameworkElement page) continue;
+            captions += Deep(page).OfType<System.Windows.Controls.TextBlock>()
+                .Count();
+            blank.AddRange(BlankCaptions(page).Select(k => $"{section}: «{k}»"));
+        }
+        Check("подписи вообще нашлись", captions > 0, $"| {captions}");
+        Check("ни одна подпись не пришла пустой", blank.Count == 0,
+              blank.Count == 0 ? "" : "| " + string.Join("; ", blank.Take(6)));
 
         // A screenshot with real records: an empty page and a page with
         // one command look different, and it is the second one worth

@@ -86,6 +86,10 @@ public partial class CommandsPage : UserControl
             : null;
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
+        // The frame goes with the rows it frames: an empty bordered box
+        // above the empty state is a list claiming to be there.
+        MineBox.Visibility = _items.Count == 0 ? Visibility.Collapsed
+                                               : Visibility.Visible;
     }
 
     /// <summary>

@@ -169,6 +169,14 @@ def common_xaml(tokens: dict) -> str:
     for name, value in space.items():
         lines.append(f'  <sys:Double x:Key="Sp.{key(name)}">{value}</sys:Double>')
         lines.append(f'  <Thickness x:Key="Pad.{key(name)}">{value}</Thickness>')
+        # A left-side thickness too, for a gap wanted on one side only:
+        # the clear space around an irreversible action (SYSTEM §4) sits to
+        # the left of a button in a list row, and the same space on its
+        # right would push it off the edge. Writing the number into the
+        # markup instead would mean a second copy of the value -- the copy
+        # that quietly parts company with the scale when it next changes.
+        lines.append(
+            f'  <Thickness x:Key="Pad.{key(name)}Left">{value},0,0,0</Thickness>')
 
     lines.append("")
     lines.append("  <!-- Размеры -->")

@@ -125,6 +125,23 @@ public partial class RemindersPage : UserControl
     }
 
     /// <summary>
+    /// A typed time takes over, and says so.
+    /// </summary>
+    /// <remarks>
+    /// The field wins in <see cref="OnCreate"/> — it always did — and used
+    /// to win silently, leaving the dropdown to go on displaying an answer
+    /// that was no longer the one being used. Made visible rather than
+    /// changed: which of the two should win is a fair question, but a
+    /// control showing a value nobody will act on is wrong either way.
+    /// </remarks>
+    private void OnAtTimeTyped(object sender, TextChangedEventArgs e)
+    {
+        var typed = AtTime.Text.Trim().Length > 0;
+        When.IsEnabled = !typed;
+        When.Opacity = typed ? 0.4 : 1.0;
+    }
+
+    /// <summary>
     /// Set up a reminder.
     /// </summary>
     /// <remarks>
@@ -177,6 +194,20 @@ public partial class RemindersPage : UserControl
         Note.Text = S("Напомню {0}", when.ToString("dd.MM HH:mm"));
         await ReloadAsync();
     }
+
+    /// <summary>Type a time into the field — for the check.</summary>
+    public void TypeTimeForCheck(string time) => AtTime.Text = time;
+
+    /// <summary>
+    /// Is the dropdown still offering an answer — for the check.
+    /// </summary>
+    /// <remarks>
+    /// Both halves of "gone quiet" are read, not one: greying a control
+    /// while it still takes clicks, or refusing clicks while it still
+    /// looks live, are each half a lie, and either would pass a check that
+    /// asked about the other.
+    /// </remarks>
+    public bool ChoiceOffered => When.IsEnabled && When.Opacity > 0.9;
 
     /// <summary>How many reminders are shown — for the end-to-end check.</summary>
     public int PlannedCount => _items.Count;

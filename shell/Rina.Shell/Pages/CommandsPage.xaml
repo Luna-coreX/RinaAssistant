@@ -23,6 +23,11 @@
     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
       <StackPanel>
       <ContentControl x:Name="EditorBox" />
+      <!-- The same frame the built-in list has. Without it a person's own
+           commands floated as loose rows above a framed list, and the page
+           read as two lists of different kinds rather than as two parts of
+           one. -->
+      <Border x:Name="MineBox" Style="{StaticResource Rows}">
       <ItemsControl x:Name="Items">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
@@ -46,18 +51,30 @@
                           IsChecked="{Binding Enabled, Mode=OneWay}"
                           Tag="{Binding Id}" Click="OnToggle"
                           VerticalAlignment="Center" Margin="0,0,16,0" />
+                <!--
+                  Run, edit, remove — in that order, and removal last.
+
+                  It used to render run · **remove** · edit: the columns
+                  were declared in a sensible order and numbered in
+                  another, so the source read "run, edit, delete" while the
+                  screen showed the destroying one in the middle, between
+                  two harmless ones and exactly where a slip lands. And it
+                  looked like them: same weight, same colour, one word each.
+                -->
                 <Button Grid.Column="2" Style="{StaticResource Btn}"
                         Content="{loc:S 'Выполнить'}" Tag="{Binding Id}" Click="OnRun" />
-                <Button Grid.Column="4" Style="{StaticResource Btn}"
+                <Button Grid.Column="3" Style="{StaticResource Btn}"
                         Content="{loc:S 'Править'}" Tag="{Binding Id}"
                         Click="OnEdit" />
-                <Button Grid.Column="3" Style="{StaticResource Btn}"
+                <Button Grid.Column="4" Style="{StaticResource Btn.Danger}"
+                        Margin="{StaticResource Pad.DangerLeft}"
                         Content="{loc:S 'Удалить'}" Tag="{Binding Id}" Click="OnDelete" />
               </Grid>
             </Border>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
+      </Border>
 
       <!-- What Rina can do with no setting up at all. A new person has no
            commands of their own, and without this section the page would

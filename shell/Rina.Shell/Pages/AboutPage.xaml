@@ -11,11 +11,25 @@
            does: without it "Rina 4.0.0" tells a first-time reader nothing. -->
       <Border Style="{StaticResource Card}" Margin="0,0,0,16">
         <StackPanel>
-          <TextBlock Text="Rina Assistant"
-                     Style="{StaticResource Text.Body}" />
-          <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
-                     Margin="0,4,0,8" />
+          <!--
+            The name carries the card, and the version stands beside it.
+
+            It was the other way round: the name in body text and the
+            number under it in the figure face, larger — so the card
+            announced «4.0.0» and mentioned, in passing, what it was the
+            version of. On the one page a person opens to find out what
+            this program is, that is the wrong way round.
+          -->
+          <StackPanel Orientation="Horizontal">
+            <TextBlock Text="Rina Assistant"
+                       Style="{StaticResource Text.Title}"
+                       VerticalAlignment="Bottom" />
+            <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
+                       VerticalAlignment="Bottom"
+                       Margin="12,0,0,4" />
+          </StackPanel>
           <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                     Margin="0,8,0,0"
                      Text="{loc:S 'Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.'}" />
         </StackPanel>
       </Border>

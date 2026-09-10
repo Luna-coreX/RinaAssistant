@@ -621,10 +621,10 @@ public static partial class Loc
                 {
                     ["English"] = "AI",
                 },
-            ["или ко времени"] =
+            ["или в"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "or at a time",
+                    ["English"] = "or at",
                 },
             ["Импорт"] =
                 new Dictionary<string, string>

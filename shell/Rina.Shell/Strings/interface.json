@@ -1154,9 +1154,6 @@
   "записей: {0}": {
     "English": "entries: {0}"
   },
-  "или ко времени": {
-    "English": "or at a time"
-  },
   "источник обновлений обязан быть https, а это «{0}»": {
     "English": "the update source must be https, and this is “{0}”"
   },
@@ -1300,5 +1297,8 @@
   },
   "ядро не отвечает": {
     "English": "the core isn’t responding"
+  },
+  "или в": {
+    "English": "or at"
   }
 }

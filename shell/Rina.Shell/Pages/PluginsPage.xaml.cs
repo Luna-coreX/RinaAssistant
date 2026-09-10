@@ -314,16 +314,42 @@ public partial class PluginsPage : UserControl
         // it worked.
         var note = broken
             ? plugin["error"]?.GetValue<string>() ?? S("плагин не загрузился")
-            : Describe(plugin);
+            : plugin["description"]?.GetValue<string>() ?? "";
         about.Children.Add(new TextBlock
         {
             Text = note,
             Style = (Style)FindResource("Text.Meta"),
-            TextWrapping = TextWrapping.Wrap,
+            // One line, cut with an ellipsis, rather than wrapped.
+            //
+            // Wrapped, a long description made its row twice as tall as
+            // the others and pushed itself under the switch on the right:
+            // the list stopped being a list of the same kind of thing and
+            // became rows of assorted heights, and the longest description
+            // was the one hardest to read.
+            TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 2, 0, 0),
             Foreground = broken ? (System.Windows.Media.Brush)FindResource("C.Signal")
                                 : (System.Windows.Media.Brush)FindResource("C.InkFaint"),
+            ToolTip = note.Length > 0 ? note : null,
         });
+
+        // Version and author on a line of their own, and quieter.
+        //
+        // They were run into the description with a middle dot — "does
+        // this and that · версия 1.0.0 · NeuroSync" — where they read as a
+        // continuation of the sentence. They are not: one says what the
+        // plugin does, the other says which copy of it this is, and only
+        // the first is being read when a person looks down the list.
+        var origin = Origin(plugin);
+        if (!broken && origin.Length > 0)
+            about.Children.Add(new TextBlock
+            {
+                Text = origin,
+                Style = (Style)FindResource("Text.Meta"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Opacity = 0.65,
+                Margin = new Thickness(0, 1, 0, 0),
+            });
         Grid.SetColumn(about, 1);
         row.Children.Add(about);
 
@@ -364,11 +390,10 @@ public partial class PluginsPage : UserControl
         return card;
     }
 
-    private static string Describe(JsonObject plugin)
+    /// <summary>Which copy of the plugin this is, and whose.</summary>
+    private static string Origin(JsonObject plugin)
     {
         var parts = new List<string>();
-        var description = plugin["description"]?.GetValue<string>() ?? "";
-        if (description.Length > 0) parts.Add(description);
         var version = plugin["version"]?.GetValue<string>() ?? "";
         if (version.Length > 0) parts.Add(S("версия {0}", version));
         var author = plugin["author"]?.GetValue<string>() ?? "";
