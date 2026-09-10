@@ -289,6 +289,62 @@ about("T-17", "необратимое объявлено требующим по
 
 
 # ===========================================================================
+# The public statement of the boundary (`4.0b-C03`)
+# ===========================================================================
+#
+# `SECURITY.md` is what somebody outside reads before deciding how much to
+# trust this program. Prose cannot be checked, but the **values it quotes**
+# can — and quoting a value is exactly how a document goes quietly out of
+# date: the code moves, the sentence stays, and the sentence is the part the
+# reader believes.
+#
+# This item exists because that already happened: the file said "there is no
+# sandbox" long after plugins had moved into processes of their own. That
+# particular sentence cannot be caught by a check; the numbers and labels
+# around it can be, and those are what drift next.
+import json
+
+policy = io.open(os.path.join(ROOT, "SECURITY.md"), encoding="utf-8").read()
+strings = json.load(io.open(
+    os.path.join(ROOT, "shell", "Rina.Shell", "Strings", "interface.json"),
+    encoding="utf-8"))
+
+
+def in_english(key):
+    return (strings.get(key) or {}).get("English", key)
+
+
+check("SECURITY.md называет действующий адрес модели по умолчанию",
+      str(settings_schema.DEFAULTS.get("llm_url", "")) in policy,
+      f"| {settings_schema.DEFAULTS.get('llm_url')}")
+
+from core.logging_setup import logs_dir
+
+tail = os.path.basename(os.path.dirname(logs_dir())) + "/" +     os.path.basename(logs_dir())
+check("и действующее место журналов", tail in policy.replace("\\", "/"),
+      f"| {tail}")
+
+# The setting is named by its English label and by the section it is in.
+# Both move: the label was reworded once already, and `log_texts` sits under
+# Privacy, not under Diagnostics as the file used to say.
+label = in_english("Записывать тексты реплик")
+check("и действующее название настройки текстов", label in policy,
+      f"| «{label}»")
+
+layout = io.open(os.path.join(ROOT, "shell", "Rina.Shell", "Pages",
+                              "SettingsLayout.cs"), encoding="utf-8").read()
+before = layout[:layout.index('new("log_texts"')]
+section = re.findall(r'new\(Word\("([^"]+)"\)', before)[-1]
+# The whole phrase, not the bare word. "Privacy" appears twice in the file
+# for unrelated reasons, so asking whether it occurs at all answered yes
+# while the sentence said "Settings → Diagnostics" — the very drift this is
+# here to catch. Found by breaking it: the check stayed green.
+pointer = f"Settings → {in_english(section)}"
+check("и раздел настроек, в котором она лежит", pointer in policy,
+      f"| ждали «{pointer}»")
+
+
+# ===========================================================================
 # The sweep is only as good as its list of threats
 # ===========================================================================
 #
