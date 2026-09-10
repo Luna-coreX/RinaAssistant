@@ -308,6 +308,7 @@ class ProtocolServer:
             "commands.set_enabled": self._commands_set_enabled,
             "commands.export": self._commands_export,
             "commands.import": self._commands_import,
+            "privacy.inventory": self._privacy_inventory,
             "history.list": self._history_list,
             "history.clear": self._history_clear,
             "history.export": self._history_export,
@@ -983,6 +984,30 @@ class ProtocolServer:
 
     def _history(self):
         return getattr(self.engine, "_history", None)
+
+    def _privacy_inventory(self, message: Envelope) -> dict:
+        """
+        Everything kept about a person, group by group (`4.0b-B01`).
+
+        Assembled by walking the store, not from a list somebody maintains:
+        a kind of personal data added later has to appear here without
+        anybody remembering to add it. See `core/privacy.py`.
+
+        **Groups arrive unnamed.** The core says what it keeps; what a group
+        is called belongs to the shell (ADR 0006, `4.0-F08`). The shell is
+        obliged to show a group it does not recognise, under its own
+        identifier — a privacy page that quietly drops a category is worse
+        than no page at all.
+        """
+        from core import privacy
+
+        settings = self._settings()
+        if settings is None:
+            return {"groups": [], "gathered_at": privacy.gathered_at()}
+        return {
+            "groups": privacy.inventory(settings),
+            "gathered_at": privacy.gathered_at(),
+        }
 
     def _history_list(self, message: Envelope) -> dict:
         items = self._history().all()

@@ -94,6 +94,8 @@ public static class Methods
     public const string PluginsSetEnabled = "plugins.set_enabled";
     /// <summary>Базовый метод.</summary>
     public const string Pong = "pong";
+    /// <summary>Возможность: privacy.</summary>
+    public const string PrivacyInventory = "privacy.inventory";
     /// <summary>Возможность: reminders.</summary>
     public const string RemindersCancel = "reminders.cancel";
     /// <summary>Возможность: reminders.</summary>
@@ -187,6 +189,7 @@ public static class Methods
             ["plugins.page"] = "plugins",
             ["plugins.set_enabled"] = "plugins",
             ["pong"] = null,
+            ["privacy.inventory"] = "privacy",
             ["reminders.cancel"] = "reminders",
             ["reminders.create"] = "reminders",
             ["reminders.list"] = "reminders",
@@ -415,6 +418,8 @@ public static class Capabilities
     public const string Permissions = "permissions";
     /// <summary>Объявляет core.</summary>
     public const string Plugins = "plugins";
+    /// <summary>Объявляет core.</summary>
+    public const string Privacy = "privacy";
     /// <summary>Объявляет core.</summary>
     public const string Reminders = "reminders";
     /// <summary>Объявляет core.</summary>

@@ -141,6 +141,14 @@ _CAPABILITY_LIST = (
     # could neither show the list of commands nor clear the history. The
     # boundary rule forbids losing capabilities, and without these methods
     # six would have been lost.
+    # What is kept about a person (`4.0b-B01`). A capability of its own
+    # rather than a method among the history: a side declares that it can
+    # **say what it keeps**, and that is a promise a person and the
+    # diagnostics can both see. Folded in among the history methods it
+    # would be declared together with the transcript, that is, silently.
+    Capability("privacy", Side.CORE,
+               ("privacy.inventory",),
+               "опись того, что хранится о человеке"),
     Capability("commands", Side.CORE,
                ("commands.list", "commands.kinds", "commands.builtin",
                 "commands.save", "commands.try", "commands.delete",

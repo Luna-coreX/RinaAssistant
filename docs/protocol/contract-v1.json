@@ -77,6 +77,12 @@
       ],
       "side": "core"
     },
+    "privacy": {
+      "methods": [
+        "privacy.inventory"
+      ],
+      "side": "core"
+    },
     "reminders": {
       "methods": [
         "reminders.cancel",
@@ -477,6 +483,7 @@
     "plugins.page": "plugins",
     "plugins.set_enabled": "plugins",
     "pong": null,
+    "privacy.inventory": "privacy",
     "reminders.cancel": "reminders",
     "reminders.create": "reminders",
     "reminders.list": "reminders",

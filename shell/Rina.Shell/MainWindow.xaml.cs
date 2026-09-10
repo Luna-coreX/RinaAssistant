@@ -34,6 +34,11 @@ public partial class MainWindow : Window
         ("commands", Word("Команды")),
         ("reminders", Word("Напоминания")),
         ("plugins", Word("Плагины")),
+        // Between the plugins and the settings, not inside them. It is the
+        // page that makes "privacy-first" a thing a person can check rather
+        // than a claim, and a claim one has to go looking for inside the
+        // settings is a claim nobody reads.
+        ("privacy", Word("Приватность")),
         ("settings", Word("Настройки")),
     ];
 
@@ -87,6 +92,7 @@ public partial class MainWindow : Window
             ["commands"] = () => new Pages.CommandsPage(Link),
             ["reminders"] = () => new Pages.RemindersPage(Link),
             ["plugins"] = () => new Pages.PluginsPage(Link),
+            ["privacy"] = () => new Pages.PrivacyPage(Link),
             ["settings"] = () => new Pages.SettingsPage(Link),
             ["about"] = () => new Pages.AboutPage(Link),
         };

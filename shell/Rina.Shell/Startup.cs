@@ -3134,6 +3134,61 @@ public partial class App
         }
         else Check("страница напоминаний открылась", false);
 
+        // --- what Rina knows about me (`4.0b-B01`) ---
+        //
+        // The page's promise is completeness, so the assertions are about
+        // completeness: that what was stored a moment ago is on it, and
+        // that a group this shell has never heard of is on it too.
+        window.ShowSectionFor("privacy");
+        await Task.Delay(1200);
+        if (window.CurrentPage is not Pages.PrivacyPage kept)
+            Check("страница приватности открылась", false);
+        else
+        {
+            await kept.ReloadAsync();
+            await Until(() => kept.GroupsShown > 0, 6);
+            Check("опись пришла из ядра", kept.GroupsShown > 0,
+                  $"| групп {kept.GroupsShown}");
+
+            // The command made above, on the page that claims to show
+            // everything. Through the page rather than the store: that the
+            // store keeps it is checked elsewhere, and what is being asked
+            // here is whether a person can see it.
+            Check("заведённая команда видна в описи",
+                  kept.Said.Any(said => said.Contains("открой блокнот")),
+                  $"| строк {kept.Said.Length}");
+
+            // **The one that matters.** A group this shell does not
+            // recognise has to be shown all the same, under its own name.
+            // A privacy page that drops a category in silence is worse
+            // than no page: it is the screen a person opens in order to be
+            // told the truth, and it would be answering "this is
+            // everything" while leaving something out.
+            kept.ShowForCheck([
+                new JsonObject
+                {
+                    ["id"] = "дневник_настроения",
+                    ["count"] = 1,
+                    ["items"] = new JsonArray(
+                        new JsonObject
+                        {
+                            ["what"] = "запись, о которой оболочка не знает",
+                            ["detail"] = "",
+                            ["where"] = "",
+                            ["when"] = 0,
+                        }),
+                },
+            ]);
+            await Task.Delay(300);
+            Check("незнакомая группа всё равно показана",
+                  kept.ShowsGroup("дневник_настроения"),
+                  $"| {string.Join(" / ", kept.Said.Take(3))}");
+            Check("и её содержимое тоже",
+                  kept.Said.Any(said => said.Contains("о которой оболочка не знает")));
+
+            await kept.ReloadAsync();
+        }
+
         // --- the clear space around what cannot be undone ---
         //
         // The rule is written in SYSTEM §4, tokenised as `danger`, and its

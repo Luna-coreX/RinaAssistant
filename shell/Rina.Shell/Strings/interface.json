@@ -1339,5 +1339,77 @@
   },
   "бета": {
     "English": "beta"
+  },
+  "Что Рина знает обо мне": {
+    "English": "What Rina knows about me"
+  },
+  "Всё это лежит на этом компьютере и никуда не отправляется. Здесь видно каждую запись целиком.": {
+    "English": "All of this is kept on this computer and goes nowhere. Every entry is shown here in full."
+  },
+  "Выученные слова": {
+    "English": "Learned words"
+  },
+  "Как вы называете программы — Рина запомнила это из ваших поправок.": {
+    "English": "What you call your programs — Rina learned this from your corrections."
+  },
+  "История разговора": {
+    "English": "Conversation history"
+  },
+  "Сказанное и напечатанное вами, и ответы Рины. Ведётся, пока включено в настройках.": {
+    "English": "What you said and typed, and Rina's answers. Kept while switched on in the settings."
+  },
+  "То, о чём вы просили напомнить.": {
+    "English": "The things you asked to be reminded of."
+  },
+  "Список того, что ждёт.": {
+    "English": "The list of what is waiting."
+  },
+  "Свои команды": {
+    "English": "Your own commands"
+  },
+  "Фразы, которые вы завели, и что по ним происходит.": {
+    "English": "The phrases you set up, and what happens when they fire."
+  },
+  "Статистика команд": {
+    "English": "Command statistics"
+  },
+  "Сколько раз какая команда выполнялась и когда в последний раз.": {
+    "English": "How many times each command has run, and when it last did."
+  },
+  "Какие включены и что они у себя сохранили.": {
+    "English": "Which ones are switched on, and what they have kept."
+  },
+  "Папки поиска программ": {
+    "English": "Folders searched for programs"
+  },
+  "Где вы велели искать программы.": {
+    "English": "Where you told Rina to look for programs."
+  },
+  "Изменённые настройки": {
+    "English": "Changed settings"
+  },
+  "Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит.": {
+    "English": "Only what you changed yourself: an untouched default says nothing about you."
+  },
+  "Оболочка не знает, что это за данные, — поэтому показывает как есть.": {
+    "English": "The shell does not know what this data is, so it shows it as it stands."
+  },
+  "Не удалось спросить": {
+    "English": "Could not ask"
+  },
+  "Ядро не на связи, поэтому опись показать нечем.": {
+    "English": "The core is not connected, so there is no inventory to show."
+  },
+  "Пока ничего": {
+    "English": "Nothing yet"
+  },
+  "Рина ещё ничего о вас не запомнила: поговорите с ней, и здесь появятся записи.": {
+    "English": "Rina has not remembered anything about you yet: talk to her and entries will appear here."
+  },
+  "Всего записей: {0}": {
+    "English": "Entries in all: {0}"
+  },
+  "Показать все {0}": {
+    "English": "Show all {0}"
   }
 }
