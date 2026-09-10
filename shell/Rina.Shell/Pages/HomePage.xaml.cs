@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Rina.Protocol;
 
 using static Rina.Shell.Strings.Loc;
@@ -324,24 +325,84 @@ public partial class HomePage : UserControl
         Hold.Content = playing.Running ? "\u23F8" : "\u25B6";
     }
 
-    /// <summary>Open the list of things waiting (`4.0b-A13`).</summary>
+    private TodoList? _todo;
+
+    /// <summary>Open or close the list of things waiting (`4.0b-A13`).</summary>
     private void OnTodo(object sender, RoutedEventArgs e)
     {
-        var list = new TodoWindow(_link)
+        if (TodoLayer.Visibility == Visibility.Visible) HideTodo();
+        else ShowTodo();
+    }
+
+    /// <summary>A click beside the panel puts it away.</summary>
+    private void OnTodoAway(object sender, MouseButtonEventArgs e) =>
+        HideTodo();
+
+    /// <summary>A click inside it does not.</summary>
+    private void OnTodoInside(object sender, MouseButtonEventArgs e) =>
+        e.Handled = true;
+
+    /// <summary>
+    /// Bring the list up — appearing rather than switching on.
+    /// </summary>
+    /// <remarks>
+    /// Fades and rises a little, over the same span as a section change
+    /// (SYSTEM §7): it is the same kind of event — something arrived — and
+    /// two different speeds for one kind of event is how an interface stops
+    /// feeling like one thing.
+    /// </remarks>
+    private void ShowTodo()
+    {
+        _todo ??= new TodoList(_link);
+        if (TodoBody.Content is null) TodoBody.Content = _todo;
+        _ = _todo.ReloadAsync();
+
+        TodoLayer.Visibility = Visibility.Visible;
+        var span = (Duration)FindResource("Motion.Panel");
+        var ease = (System.Windows.Media.Animation.IEasingFunction)
+            FindResource("Ease.In");
+
+        TodoPanel.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 0, To = 1, Duration = span, EasingFunction = ease,
+            });
+        TodoRise.BeginAnimation(
+            System.Windows.Media.TranslateTransform.YProperty,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                From = 12, To = 0, Duration = span, EasingFunction = ease,
+            });
+    }
+
+    /// <summary>Put it away, and only then stop drawing it.</summary>
+    private void HideTodo()
+    {
+        var span = (Duration)FindResource("Motion.Panel");
+        var fade = new System.Windows.Media.Animation.DoubleAnimation
         {
-            Owner = Window.GetWindow(this),
+            From = 1, To = 0, Duration = span,
+            EasingFunction = (System.Windows.Media.Animation.IEasingFunction)
+                FindResource("Ease.Out"),
         };
-        list.ShowDialog();
+        // Hidden when the fade has finished, not before: collapsing it at
+        // once is the switching-off this animation exists to avoid.
+        fade.Completed += (_, _) => TodoLayer.Visibility = Visibility.Collapsed;
+        TodoPanel.BeginAnimation(OpacityProperty, fade);
     }
 
     /// <summary>Open it from outside — for the check.</summary>
-    public TodoWindow OpenTodoForCheck()
+    public TodoList OpenTodoForCheck()
     {
-        var list = new TodoWindow(_link);
-        var owner = Window.GetWindow(this);
-        if (owner is { IsLoaded: true, IsVisible: true }) list.Owner = owner;
-        return list;
+        ShowTodo();
+        return _todo!;
     }
+
+    /// <summary>Put it away from outside — for the check.</summary>
+    public void HideTodoForCheck() => HideTodo();
+
+    /// <summary>Is the list up — for the check.</summary>
+    public bool TodoShowing => TodoLayer.Visibility == Visibility.Visible;
 
     private async void OnPrevious(object sender, RoutedEventArgs e)
     {
@@ -362,11 +423,28 @@ public partial class HomePage : UserControl
     public string RemoteShows => Remote.Visibility == Visibility.Visible
         ? $"{Artist.Text} — {Track.Text}" : "";
 
-    private void ShowDoing() => DoingText.Text = _figure.State switch
-    {
-        Doing.Listening => S(Word("Слушаю")),
-        Doing.Thinking => S(Word("Думаю")),
-        Doing.Talking => S(Word("Говорю")),
-        _ => S(Word("Жду")),
-    };
+    /// <summary>
+    /// Say what she is doing — to whoever reads the screen aloud.
+    /// </summary>
+    /// <remarks>
+    /// The caption under the figure is gone: the figure says this already,
+    /// and a word repeating it was a second voice saying the same thing.
+    /// The **information** stays, on the figure itself, because a screen
+    /// reader has no figure to look at. Taking a caption off the screen and
+    /// taking it away from somebody who cannot see the screen are different
+    /// acts, and only the first was asked for.
+    /// </remarks>
+    private void ShowDoing() =>
+        System.Windows.Automation.AutomationProperties.SetName(Face,
+            _figure.State switch
+            {
+                Doing.Listening => S(Word("Слушаю")),
+                Doing.Thinking => S(Word("Думаю")),
+                Doing.Talking => S(Word("Говорю")),
+                _ => S(Word("Жду")),
+            });
+
+    /// <summary>What she is doing, in words — for the check.</summary>
+    public string DoingSaid =>
+        System.Windows.Automation.AutomationProperties.GetName(Face);
 }

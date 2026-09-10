@@ -21,7 +21,6 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
-      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <!--
@@ -43,23 +42,20 @@
     </Grid>
 
     <!--
-      What she is doing, in words. The figure says it without words for
-      anyone watching; this says it for anyone who is not, and for anyone
-      who reads the screen rather than sees it.
-    -->
-    <TextBlock x:Name="DoingText" Grid.Row="1"
-               HorizontalAlignment="Center" Margin="0,0,0,20"
-               Style="{StaticResource Text.Legend}" />
+      What she is doing is said by the figure and by nothing else.
 
-    <!--
-      Things to do (4.0b-A13). A button rather than a list in plain view:
-      the home screen is what one looks at, and a list is what one works
-      with — so it opens in a window of its own.
+      There was a word under it — "Жду", "Слушаю" — and it went: the figure
+      already says this, and a caption repeating it is a second voice
+      saying the same thing at the same time.
+
+      **The information did not go with it.** It moved onto the figure
+      itself, as an automation name, so a screen reader still says what is
+      happening. Removing a caption from the screen and removing it from
+      the machinery that reads the screen aloud are different acts, and only
+      the first was asked for.
     -->
-    <Button x:Name="TodoButton" Grid.Row="2"
-            HorizontalAlignment="Center" Margin="0,0,0,16"
-            Style="{StaticResource Btn}" Click="OnTodo"
-            Content="{loc:S 'Дела'}" />
+
+
 
     <!--
       What plugins asked to show here (4.0b-A07). By ADR 0010 a plugin
@@ -70,7 +66,7 @@
       is for, the remote belongs to something that is already happening, and
       a plugin's tile is something to glance at.
     -->
-    <ItemsControl x:Name="Tiles" Grid.Row="3"
+    <ItemsControl x:Name="Tiles" Grid.Row="2"
                   HorizontalAlignment="Center" Margin="0,0,0,16"
                   MaxWidth="440">
       <ItemsControl.ItemsPanel>
@@ -85,7 +81,7 @@
       nothing is: an empty panel with three dead buttons says the thing is
       broken, and most of the time nothing is playing.
     -->
-    <Border x:Name="Remote" Grid.Row="4" Visibility="Collapsed"
+    <Border x:Name="Remote" Grid.Row="3" Visibility="Collapsed"
             HorizontalAlignment="Center" Margin="0,0,0,40"
             MaxWidth="420" Style="{StaticResource Card}">
       <Grid>
@@ -123,5 +119,50 @@
         </StackPanel>
       </Grid>
     </Border>
+    <!--
+      Things to do (4.0b-A13), in the corner and out of the way.
+
+      Across every row rather than in one: it belongs to the screen, not to
+      the column of things on it, and a corner is where a thing one reaches
+      for occasionally belongs. An icon and no word — what it opens is
+      obvious from what it looks like, and a word here would be the second
+      caption removed from this screen today.
+    -->
+    <Button x:Name="TodoButton" Grid.RowSpan="4"
+            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+            Margin="0,0,20,20" Style="{StaticResource Btn.Corner}"
+            Click="OnTodo" Content="&#xE8FD;"
+            ToolTip="{loc:S 'Дела'}" />
+
+    <!--
+      The list itself, over the screen rather than in a window of its own.
+
+      It fades in and slides a little, and it is see-through: what is behind
+      it stays visible, so the list reads as something laid over the home
+      screen rather than as another place one has gone to. A window would
+      have taken the focus, dimmed the figure behind it and needed closing;
+      this is dismissed by clicking beside it.
+    -->
+    <Grid x:Name="TodoLayer" Grid.RowSpan="4" Visibility="Collapsed"
+          Background="#01000000" MouseLeftButtonDown="OnTodoAway">
+      <Border x:Name="TodoPanel" Width="420" MaxHeight="440"
+              HorizontalAlignment="Right" VerticalAlignment="Bottom"
+              Margin="0,0,20,76" Padding="20"
+              Background="{DynamicResource C.Glass.Popup}"
+              BorderBrush="{DynamicResource C.Seam}" BorderThickness="1"
+              CornerRadius="{StaticResource Radius.Max}"
+              MouseLeftButtonDown="OnTodoInside">
+        <Border.RenderTransform>
+          <TranslateTransform x:Name="TodoRise" />
+        </Border.RenderTransform>
+        <Border.Effect>
+          <DropShadowEffect BlurRadius="{StaticResource Lift.Overlay.Blur}"
+                            ShadowDepth="{StaticResource Lift.Overlay.Y}"
+                            Opacity="{StaticResource Lift.Overlay.Opacity}"
+                            Direction="270" Color="Black" />
+        </Border.Effect>
+        <ContentControl x:Name="TodoBody" />
+      </Border>
+    </Grid>
   </Grid>
 </UserControl>

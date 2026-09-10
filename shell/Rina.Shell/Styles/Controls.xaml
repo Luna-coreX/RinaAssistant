@@ -260,6 +260,31 @@
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
   </Style>
 
+  <!--
+    A button in the corner: transparent until you come near it.
+
+    It carries an icon and no word. Nothing about it should draw the eye —
+    the home screen is the figure, and this is a thing one reaches for
+    occasionally and does not look for the rest of the time. The hover is
+    the whole of its presence.
+  -->
+  <Style x:Key="Btn.Corner" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="Opacity" Value="0.55" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
   <!-- A section in the column. The active mark is the only accent. -->
   <Style x:Key="Nav.Item" TargetType="RadioButton">
     <Setter Property="Height" Value="{StaticResource Size.Row}" />

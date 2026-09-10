@@ -2302,11 +2302,18 @@ public partial class App
         else
         {
             var seen = new List<(Doing State, double Swell)>();
+            var said = new List<string>();
             foreach (var doing in new[] { Doing.Idle, Doing.Listening,
                                           Doing.Thinking, Doing.Talking })
             {
                 home.ShowDoingFor(doing, doing is Doing.Listening ? 0.8 : 0);
                 Check($"состояние {doing} принято", home.Doing == doing);
+                // The caption under the figure went; what it said did not.
+                // It moved onto the figure as an automation name, and that
+                // is the only thing left for a screen reader to read. If it
+                // were empty, the removal would have taken the state away
+                // from the one person who cannot see the figure say it.
+                said.Add(home.DoingSaid);
                 // Measured after the figure has actually settled, not
                 // after a guessed pause: the swell is worked out while
                 // painting, and it travels towards its target over several
@@ -2316,6 +2323,11 @@ public partial class App
                 await Settled(() => home.Swell);
                 seen.Add((doing, home.Swell));
             }
+
+            Check("состояние читается вслух, хоть подписи и нет",
+                  said.All(word => !string.IsNullOrWhiteSpace(word))
+                  && said.Distinct().Count() == said.Count,
+                  $"| {string.Join(", ", said.Select(w => $"«{w}»"))}");
 
             for (var at = 1; at < seen.Count; at++)
                 Check($"{seen[at].State} отличается от покоя",
@@ -2368,9 +2380,9 @@ public partial class App
         // written down is checked in `test_todo.py` with no window at all.
         // The question here is a different one — whether what was written
         // reaches the eye.
-        var list = ((Pages.HomePage)window.CurrentPage!).OpenTodoForCheck();
-        list.Show();
-        await Until(() => list.IsLoaded, 5);
+        var page = (Pages.HomePage)window.CurrentPage!;
+        var list = page.OpenTodoForCheck();
+        await Until(() => page.TodoShowing && list.IsLoaded, 5);
 
         // By its text, not by a count: counting races with the window's
         // own first load and depends on whatever earlier runs left behind.
@@ -2379,7 +2391,21 @@ public partial class App
         await Until(() => list.ShowsForCheck(wrote), 6);
         Check("записанное дело появилось в списке",
               list.ShowsForCheck(wrote), $"| строк {list.Shown}");
-        list.Close();
+        // Closed things are struck through. Through the same tick a person
+        // presses, not by setting the decoration and reading it back: the
+        // question is whether closing something puts a line through it,
+        // and a check that draws the line itself would answer yes on a
+        // list that never draws one.
+        await list.CloseForCheck(wrote);
+        await Until(() => list.StruckForCheck(wrote), 6);
+        Check("сделанное зачёркнуто", list.StruckForCheck(wrote),
+              list.StruckForCheck(wrote) ? "" : "| линии на строке нет");
+
+        // And it goes away again: a panel that cannot be dismissed is a
+        // window, which is what this stopped being.
+        page.HideTodoForCheck();
+        await Until(() => !page.TodoShowing, 5);
+        Check("панель убирается", !page.TodoShowing);
 
         var shown = (Pages.HomePage)window.CurrentPage!;
         await Until(() => shown.TilesShown == wanted, 8);
