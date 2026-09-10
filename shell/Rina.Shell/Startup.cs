@@ -23,6 +23,8 @@ public partial class App
     private Tray? _tray;
     private Hotkeys? _hotkeys;
     private string? _shotPath;
+    //: Whether a screenshot of the commands page should open the editor.
+    private bool _shotEditor;
     private double _shotScroll;
     private string _shotSection = "settings";
 
@@ -78,33 +80,34 @@ public partial class App
             _shotScroll = double.TryParse(Value(args, "--scroll"), out var down)
                 ? down : 0;
             _shotSection = Value(args, "--section") ?? "settings";
+            _shotEditor = args.Contains("--editor");
             // Without a window WPF shuts down as soon as OnStartup returns
             // control: by default an application lives while at least one
             // window lives. The self-check has no reason to show a window,
             // so we close ourselves, and only when we are done.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckCoreAsync(window);
+            Watched(CheckCoreAsync(window), "core");
             return;
         }
 
         if (args.Contains("--check-tray"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckTrayAsync(window);
+            Watched(CheckTrayAsync(window), "tray");
             return;
         }
 
         if (args.Contains("--check-system"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckSystemAsync(window);
+            Watched(CheckSystemAsync(window), "system");
             return;
         }
 
         if (args.Contains("--check-overlays"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckOverlaysAsync(window, Value(args, "--shot"));
+            Watched(CheckOverlaysAsync(window, Value(args, "--shot")), "overlays");
             return;
         }
 
@@ -125,21 +128,21 @@ public partial class App
         if (args.Contains("--check-hover"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckHoverAsync(window);
+            Watched(CheckHoverAsync(window), "hover");
             return;
         }
 
         if (args.Contains("--check-motion"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckMotionAsync(window);
+            Watched(CheckMotionAsync(window), "motion");
             return;
         }
 
         if (args.Contains("--check-home"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckHomeAsync(window);
+            Watched(CheckHomeAsync(window), "home");
             return;
         }
 
@@ -161,14 +164,14 @@ public partial class App
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             _shotSection = Value(args, "--section") ?? "commands";
-            _ = CheckPagesAsync(window);
+            Watched(CheckPagesAsync(window), "pages");
             return;
         }
 
         if (args.Contains("--check-voice"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckVoiceAsync(window);
+            Watched(CheckVoiceAsync(window), "voice");
             return;
         }
 
@@ -178,21 +181,21 @@ public partial class App
         if (args.Contains("--check-media"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckMediaAsync(window, Value(args, "--shot"));
+            Watched(CheckMediaAsync(window, Value(args, "--shot")), "media");
             return;
         }
 
         if (args.Contains("--check-dialogue"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckDialogueAsync(window, Value(args, "--shot"));
+            Watched(CheckDialogueAsync(window, Value(args, "--shot")), "dialogue");
             return;
         }
 
         if (args.Contains("--check-settings"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckSettingsAsync(window, Value(args, "--shot"));
+            Watched(CheckSettingsAsync(window, Value(args, "--shot")), "settings");
             return;
         }
 
@@ -214,7 +217,7 @@ public partial class App
         if (args.Contains("--check-watch"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = CheckWatchAsync(window);
+            Watched(CheckWatchAsync(window), "watch");
             return;
         }
 
@@ -656,7 +659,11 @@ public partial class App
             // screenshot of the commands page shows the list and the
             // button that opens the editor, and nothing of the editor —
             // which is the part being looked at when it is asked for.
-            if (_shotSection == "commands"
+            // Opening the editor for a screenshot is asked for, not
+            // assumed: the commands page has two things worth looking at
+            // now — the grouped lists and the chain — and one of them
+            // covers the other.
+            if (_shotSection == "commands" && _shotEditor
                 && window.CurrentPage is Pages.CommandsPage editing)
             {
                 await editing.OpenEditorAsync(null);
@@ -3009,6 +3016,36 @@ public partial class App
     /// check is possible — "set up" would otherwise mean leaving a trace in
     /// somebody else's data.
     /// </remarks>
+    /// <summary>
+    /// Run a check and never let it die in silence.
+    /// </summary>
+    /// <remarks>
+    /// A check is started with <c>_ = …Async(window)</c>: nobody awaits it,
+    /// so an exception inside leaves the method and goes nowhere. The
+    /// program then sits with <c>ShutdownMode.OnExplicitShutdown</c> and
+    /// never shuts down — and from outside that is indistinguishable from a
+    /// slow check, so the run is killed by a timeout with no red line and
+    /// no reason.
+    ///
+    /// It happened: a second draw of the commands page threw, and the whole
+    /// suite hung for eight minutes saying nothing. A failure that looks
+    /// like a hang is worse than a failure, because the first thing anybody
+    /// does with a hang is raise the timeout.
+    /// </remarks>
+    private static void Watched(Task running, string what)
+    {
+        _ = running.ContinueWith(done =>
+        {
+            var why = done.Exception?.GetBaseException();
+            Console.WriteLine();
+            Console.WriteLine($"  FAIL  проверка {what} упала: "
+                              + $"{why?.GetType().Name}: {why?.Message}");
+            Console.WriteLine("Ошибок: 1");
+            Console.Out.Flush();
+            Environment.Exit(1);
+        }, TaskContinuationOptions.OnlyOnFaulted);
+    }
+
     private async Task CheckPagesAsync(MainWindow window)
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
@@ -3176,6 +3213,47 @@ public partial class App
             Check("список показывает её словами, а не полями",
                   fresh?.FirstDescription().Contains("Программа") == true,
                   $"| «{fresh?.FirstDescription()}»");
+
+
+            // --- the lists, in groups that fold (`4.0b-A09`) ---
+            //
+            // The built-in group starts folded: it is the longest, the
+            // least often needed and the one nobody edits. Measured by how
+            // tall the lists stand rather than by the flag — a flag saying
+            // "folded" over eleven visible rows is not folding.
+            //
+            // **On `fresh`, not on `commands`.** The section was reopened a
+            // few lines above, so `commands` points at a page the window
+            // has already replaced: it is not on screen, its layout never
+            // runs, and every measurement of it comes back the same number.
+            // The same trap the settings check fell into once already.
+            var shown = fresh!;
+            await shown.ReloadForCheckAsync();
+            await Task.Delay(300);
+            Check("встроенные свёрнуты сразу",
+                  shown.FoldedForCheck("builtin"));
+            var closed = shown.ListHeight;
+            shown.FoldForCheck("builtin", false);
+            await Task.Delay(200);
+            var unfolded = shown.ListHeight;
+            Check("развернулись — список стал выше", unfolded > closed + 40,
+                  $"| было {closed:0}, стало {unfolded:0}");
+            shown.FoldForCheck("builtin", true);
+            await Task.Delay(200);
+            Check("свернулись — снова прежней высоты",
+                  Math.Abs(shown.ListHeight - closed) < 1,
+                  $"| {shown.ListHeight:0} против {closed:0}");
+
+            // Groups at all: a page with one heading over everything is
+            // the flat list this replaced.
+            // **Groups of different kinds**, not just "more than one
+            // group". Counting all of them answered yes with every command
+            // in one heap, because the built-in group made two: the break
+            // that put everything together stayed green.
+            var byKind = shown.GroupIds.Where(g => g.StartsWith("kind:"))
+                .ToArray();
+            Check("свои команды разложены по видам", byKind.Length > 1,
+                  $"| [{string.Join(", ", shown.GroupIds)}]");
         }
         else Check("страница команд открылась", false);
 

@@ -2,6 +2,55 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <UserControl.Resources>
+    <!-- One row of a command. A resource rather than an inline template:
+         every group has a list of its own, and they all draw a row the
+         same way. -->
+    <DataTemplate x:Key="CommandRow">
+      <Border Style="{StaticResource Rows.Item}">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <TextBlock Text="{Binding Name}"
+                       Style="{StaticResource Text.Body}" />
+            <TextBlock Text="{Binding What}"
+                       Style="{StaticResource Text.Meta}"
+                       Margin="0,2,0,0" />
+          </StackPanel>
+          <CheckBox Grid.Column="1" Style="{StaticResource Toggle}"
+                    IsChecked="{Binding Enabled, Mode=OneWay}"
+                    Tag="{Binding Id}" Click="OnToggle"
+                    VerticalAlignment="Center" Margin="0,0,16,0" />
+          <!--
+            Run, edit, remove — in that order, and removal last.
+
+            It used to render run · **remove** · edit: the columns were
+            declared in a sensible order and numbered in another, so the
+            source read "run, edit, delete" while the screen showed the
+            destroying one in the middle, between two harmless ones and
+            exactly where a slip lands.
+          -->
+          <Button Grid.Column="2" Style="{StaticResource Btn}"
+                  Content="{loc:S 'Выполнить'}" Tag="{Binding Id}"
+                  Click="OnRun" />
+          <Button Grid.Column="3" Style="{StaticResource Btn}"
+                  Content="{loc:S 'Править'}" Tag="{Binding Id}"
+                  Click="OnEdit" />
+          <Button Grid.Column="4" Style="{StaticResource Btn.Danger}"
+                  Margin="{StaticResource Pad.DangerLeft}"
+                  Content="{loc:S 'Удалить'}" Tag="{Binding Id}"
+                  Click="OnDelete" />
+        </Grid>
+      </Border>
+    </DataTemplate>
+  </UserControl.Resources>
+
   <Grid>
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto" />
@@ -14,7 +63,7 @@
                Margin="0,0,0,16" />
 
     <StackPanel Grid.Row="1" Margin="0,0,0,12">
-      <TextBlock x:Name="Legend" Text="{loc:S 'МОИ КОМАНДЫ'}"
+      <TextBlock x:Name="Legend" Text="{loc:S 'СВОИ И ВСТРОЕННЫЕ'}"
                  Style="{StaticResource Text.Section}" />
       <ContentControl x:Name="Empty" Margin="0,12,0,0"
                       Visibility="Collapsed" />
@@ -23,69 +72,17 @@
     <ScrollViewer Grid.Row="2" x:Name="Scroll" VerticalScrollBarVisibility="Auto">
       <StackPanel>
       <ContentControl x:Name="EditorBox" />
-      <!-- The same frame the built-in list has. Without it a person's own
-           commands floated as loose rows above a framed list, and the page
-           read as two lists of different kinds rather than as two parts of
-           one. -->
-      <Border x:Name="MineBox" Style="{StaticResource Rows}">
-      <ItemsControl x:Name="Items">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <Border Style="{StaticResource Rows.Item}">
-              <Grid>
-                <Grid.ColumnDefinitions>
-                  <ColumnDefinition Width="*" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                  <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                  <TextBlock Text="{Binding Name}"
-                             Style="{StaticResource Text.Body}" />
-                  <TextBlock Text="{Binding What}"
-                             Style="{StaticResource Text.Meta}"
-                             Margin="0,2,0,0" />
-                </StackPanel>
-                <CheckBox Grid.Column="1" Style="{StaticResource Toggle}"
-                          IsChecked="{Binding Enabled, Mode=OneWay}"
-                          Tag="{Binding Id}" Click="OnToggle"
-                          VerticalAlignment="Center" Margin="0,0,16,0" />
-                <!--
-                  Run, edit, remove — in that order, and removal last.
+      <!--
+        The lists, in groups that fold.
 
-                  It used to render run · **remove** · edit: the columns
-                  were declared in a sensible order and numbered in
-                  another, so the source read "run, edit, delete" while the
-                  screen showed the destroying one in the middle, between
-                  two harmless ones and exactly where a slip lands. And it
-                  looked like them: same weight, same colour, one word each.
-                -->
-                <Button Grid.Column="2" Style="{StaticResource Btn}"
-                        Content="{loc:S 'Выполнить'}" Tag="{Binding Id}" Click="OnRun" />
-                <Button Grid.Column="3" Style="{StaticResource Btn}"
-                        Content="{loc:S 'Править'}" Tag="{Binding Id}"
-                        Click="OnEdit" />
-                <Button Grid.Column="4" Style="{StaticResource Btn.Danger}"
-                        Margin="{StaticResource Pad.DangerLeft}"
-                        Content="{loc:S 'Удалить'}" Tag="{Binding Id}" Click="OnDelete" />
-              </Grid>
-            </Border>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
-      </Border>
-
-      <!-- What Rina can do with no setting up at all. A new person has no
-           commands of their own, and without this section the page would
-           answer "empty" to the question "what can she actually do". -->
-      <StackPanel x:Name="BuiltinBox" Margin="0,24,0,0">
-        <TextBlock x:Name="BuiltinLegend" Text="{loc:S 'УМЕЕТ СРАЗУ'}"
-                   Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-        <Border Style="{StaticResource Rows}">
-          <StackPanel x:Name="Builtin" />
-        </Border>
-      </StackPanel>
+        A flat column of every command a person has, with the built-in
+        ones piled underneath, answers "what can she do" by making them
+        scroll. Grouped, the page answers at a glance and opens out
+        where they look. The built-in group starts folded on purpose:
+        it is the longest, the least often needed, and the one nobody
+        edits.
+      -->
+      <StackPanel x:Name="Groups" />
       </StackPanel>
     </ScrollViewer>
 

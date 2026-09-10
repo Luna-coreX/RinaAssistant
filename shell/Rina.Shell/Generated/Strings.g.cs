@@ -922,16 +922,6 @@ public static partial class Loc
                 {
                     ["English"] = "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*",
                 },
-            ["МОИ КОМАНДЫ"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "MY COMMANDS",
-                },
-            ["МОИ КОМАНДЫ · {0}"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "MY COMMANDS · {0}",
-                },
             ["на чём они разговаривают"] =
                 new Dictionary<string, string>
                 {
@@ -1621,6 +1611,11 @@ public static partial class Loc
                 {
                     ["English"] = "Protocol",
                 },
+            ["ПРОЧЕЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "OTHER",
+                },
             ["Прочее"] =
                 new Dictionary<string, string>
                 {
@@ -1745,6 +1740,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Minimise",
+                },
+            ["СВОИ И ВСТРОЕННЫЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "YOURS AND BUILT-IN",
+                },
+            ["СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "YOURS AND BUILT-IN · programs found: {0}",
                 },
             ["Свои команды"] =
                 new Dictionary<string, string>
@@ -2092,11 +2097,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "WORKS OUT OF THE BOX",
-                },
-            ["УМЕЕТ СРАЗУ · программ найдено: {0}"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "WORKS OUT OF THE BOX · programs found: {0}",
                 },
             ["Установить"] =
                 new Dictionary<string, string>

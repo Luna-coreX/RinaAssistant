@@ -419,12 +419,6 @@
   "Куда сохранить диагностический пакет": {
     "English": "Where to save the diagnostic package"
   },
-  "МОИ КОМАНДЫ": {
-    "English": "MY COMMANDS"
-  },
-  "МОИ КОМАНДЫ · {0}": {
-    "English": "MY COMMANDS · {0}"
-  },
   "Микрофон": {
     "Deutsch": "Mikrofon",
     "English": "Microphone",
@@ -968,9 +962,6 @@
   "УМЕЕТ СРАЗУ": {
     "English": "WORKS OUT OF THE BOX"
   },
-  "УМЕЕТ СРАЗУ · программ найдено: {0}": {
-    "English": "WORKS OUT OF THE BOX · programs found: {0}"
-  },
   "УСТАНОВЛЕННЫЕ": {
     "English": "INSTALLED"
   },
@@ -1480,5 +1471,14 @@
   },
   "путь": {
     "English": "path"
+  },
+  "СВОИ И ВСТРОЕННЫЕ": {
+    "English": "YOURS AND BUILT-IN"
+  },
+  "СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}": {
+    "English": "YOURS AND BUILT-IN · programs found: {0}"
+  },
+  "ПРОЧЕЕ": {
+    "English": "OTHER"
   }
 }

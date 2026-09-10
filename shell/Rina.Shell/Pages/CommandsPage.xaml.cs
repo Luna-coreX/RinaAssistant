@@ -32,7 +32,6 @@ public partial class CommandsPage : UserControl
     {
         InitializeComponent();
         _link = link;
-        Items.ItemsSource = _items;
 
         if (_link is null)
         {
@@ -75,7 +74,9 @@ public partial class CommandsPage : UserControl
             }
         }
 
-        Legend.Text = S("МОИ КОМАНДЫ · {0}", _items.Count);
+        Legend.Text = _programsFound > 0
+            ? S("СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}", _programsFound)
+            : S("СВОИ И ВСТРОЕННЫЕ");
         // Here the empty state does not take over the page: below it is a
         // list of what Rina can do without any commands of one's own, and
         // that is far more useful than emptiness.
@@ -86,11 +87,25 @@ public partial class CommandsPage : UserControl
             : null;
         Empty.Visibility = _items.Count == 0 ? Visibility.Visible
                                              : Visibility.Collapsed;
-        // The frame goes with the rows it frames: an empty bordered box
-        // above the empty state is a list claiming to be there.
-        MineBox.Visibility = _items.Count == 0 ? Visibility.Collapsed
-                                               : Visibility.Visible;
+        DrawGroups();
     }
+
+    //: The built-in skills as **data**, not as ready-made rows.
+    //:
+    //: Rows were kept at first, and the second draw threw: an element that
+    //: still belongs to the panel from the previous draw cannot be added to
+    //: a new one. Clearing the group column does not detach what is inside
+    //: the columns it held. The failure did not look like a failure — the
+    //: check task died unobserved and the program sat there — which is why
+    //: the harness now says so out loud.
+    private readonly List<JsonObject> _builtin = [];
+    private int _programsFound;
+
+    //: The order and the names of the kinds, as the core gives them. Kept
+    //: so the page groups in the same order the editor offers, and calls a
+    //: kind what the editor calls it.
+    private readonly List<string> _kindOrder = [];
+    private readonly Dictionary<string, string> _kindTitles = [];
 
     /// <summary>
     /// What to call a command in the list.
@@ -212,20 +227,178 @@ public partial class CommandsPage : UserControl
         // The other order would leave the heading without its number for
         // the whole wait.
         var found = await Task.Run(() => Platform.AppIndex.Get().Count);
-        BuiltinLegend.Text = found > 0
-            ? S("УМЕЕТ СРАЗУ · программ найдено: {0}", found)
-            : S("УМЕЕТ СРАЗУ");
+        _programsFound = found;
 
         var got = await Ask(Methods.CommandsBuiltin);
-        Builtin.Children.Clear();
+        _builtin.Clear();
 
         foreach (var item in got?["items"]?.AsArray().OfType<JsonObject>()
                              ?? [])
         {
-            var card = new Border
+            _builtin.Add(item);
+        }
+        DrawGroups();
+
+        BuiltinCount = _builtin.Count;
+    }
+
+    /// <summary>How many built-in skills are shown — for the check.</summary>
+    public int BuiltinCount { get; private set; }
+
+    private async Task<JsonObject?> KindsAsync()
+    {
+        if (_kinds is not null) return _kinds;
+        _kinds = await Ask(Methods.CommandsKinds);
+        // The order and the names are kept as they arrive, so the page
+        // groups in the core's order and calls a kind what the editor
+        // calls it. Two lists of names for one set of kinds would part
+        // company at the first addition.
+        foreach (var kind in _kinds?["kinds"]?.AsArray().OfType<JsonObject>()
+                             ?? [])
+        {
+            var value = kind["value"]?.GetValue<string>() ?? "";
+            _kindOrder.Add(value);
+            _kindTitles[value] = kind["title"]?.GetValue<string>() ?? "";
+        }
+        return _kinds;
+    }
+
+    // -- the lists, in groups that fold (4.0b-A09) --------------------------
+
+    //: Which groups are folded. Kept on the page rather than in the
+    //: settings: it is where somebody happens to be looking right now, not
+    //: a preference, and a preference is a thing one has to find and undo.
+    private readonly HashSet<string> _folded = [];
+
+    //: Whether the folding has been set up once. The built-in group starts
+    //: folded — it is the longest, the least often needed and the one
+    //: nobody edits — but only the first time, so folding it open and
+    //: pressing "refresh" does not fold it shut again.
+    private bool _foldedOnce;
+
+    /// <summary>Draw the commands, grouped by what they do.</summary>
+    /// <remarks>
+    /// <para>
+    /// Grouped by kind rather than by a group a person names. Nothing new is
+    /// stored: the kind is already on every command, and a page that
+    /// organises itself out of what is there cannot go out of step with it.
+    /// A named group would be a new field, a new editor for it, and a new
+    /// way for a command to end up somewhere nobody looks.
+    /// </para>
+    /// <para>
+    /// The order of the groups is the core's order of kinds, so the page
+    /// and the editor's dropdown agree about which comes first. An
+    /// unfamiliar kind gets a group of its own under its own name — the
+    /// same rule as everywhere else here.
+    /// </para>
+    /// </remarks>
+    private void DrawGroups()
+    {
+        Groups.Children.Clear();
+        _drawn.Clear();
+
+        var order = _kindOrder.ToList();
+        var mine = _items
+            .GroupBy(c => _raw.TryGetValue(c.Id, out var raw)
+                          ? raw["type"]?.GetValue<string>() ?? "" : "")
+            .OrderBy(g => order.IndexOf(g.Key) < 0 ? int.MaxValue
+                                                   : order.IndexOf(g.Key));
+
+        foreach (var group in mine)
+            Groups.Children.Add(Group(
+                "kind:" + group.Key, KindTitle(group.Key),
+                group.Count(), Rows(group)));
+
+        if (_builtin.Count > 0)
+        {
+            if (!_foldedOnce)
             {
-                Style = (Style)FindResource("Rows.Item"),
-            };
+                _folded.Add("builtin");
+                _foldedOnce = true;
+            }
+            Groups.Children.Add(Group("builtin", S("УМЕЕТ СРАЗУ"),
+                                      _builtin.Count, BuiltinRows()));
+        }
+    }
+
+    /// <summary>One group: a heading that folds, and what is under it.</summary>
+    private UIElement Group(string id, string title, int count, UIElement body)
+    {
+        _drawn.Add(id);
+        var open = !_folded.Contains(id);
+
+        var head = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        head.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+        head.ColumnDefinitions.Add(new ColumnDefinition());
+
+        // The chevron points the way it will go, which is the convention
+        // every list of this shape already uses.
+        head.Children.Add(new TextBlock
+        {
+            Text = open ? "⌄" : "›",
+            Style = (Style)FindResource("Text.Meta"),
+            Width = 16,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        var words = new TextBlock
+        {
+            Text = $"{title} · {count}",
+            Style = (Style)FindResource("Text.Section"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(words, 1);
+        head.Children.Add(words);
+
+        // The whole heading is the target, not the chevron alone: a person
+        // aiming at a group aims at its name.
+        //
+        // A border that takes a click rather than a button. A button
+        // centres what is in it — the template does, and setting the
+        // content alignment does not overrule it — so the headings sat in
+        // the middle of the page above rows that began at the left edge.
+        var press = new Border
+        {
+            Background = System.Windows.Media.Brushes.Transparent,
+            Padding = new Thickness(0, 6, 0, 2),
+            Cursor = System.Windows.Input.Cursors.Arrow,
+            Child = head,
+        };
+        press.MouseLeftButtonDown += (_, _) =>
+        {
+            if (!_folded.Remove(id)) _folded.Add(id);
+            DrawGroups();
+        };
+        press.MouseEnter += (_, _) => head.Opacity = 0.75;
+        press.MouseLeave += (_, _) => head.Opacity = 1;
+
+        var column = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
+        column.Children.Add(press);
+        if (open) column.Children.Add(body);
+        return column;
+    }
+
+    private UIElement Rows(IEnumerable<UserCommand> commands)
+    {
+        var list = new ItemsControl
+        {
+            ItemsSource = commands.ToList(),
+            ItemTemplate = (DataTemplate)FindResource("CommandRow"),
+        };
+        return new Border
+        {
+            Style = (Style)FindResource("Rows"),
+            Child = list,
+        };
+    }
+
+    private UIElement BuiltinRows()
+    {
+        var column = new StackPanel();
+        foreach (var item in _builtin)
+        {
             var about = new StackPanel();
             about.Children.Add(new TextBlock
             {
@@ -239,24 +412,94 @@ public partial class CommandsPage : UserControl
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 0),
             });
-            card.Child = about;
-            Builtin.Children.Add(card);
+            column.Children.Add(new Border
+            {
+                Style = (Style)FindResource("Rows.Item"),
+                Child = about,
+            });
         }
-
         // The last row has no seam: it would coincide with the edge of the
         // block and cross out the rounding.
-        if (Builtin.Children.Count > 0
-            && Builtin.Children[^1] is Border tail)
+        if (column.Children.Count > 0
+            && column.Children[^1] is Border tail)
             tail.BorderThickness = new Thickness(0);
-
-        BuiltinCount = Builtin.Children.Count;
+        return new Border
+        {
+            Style = (Style)FindResource("Rows"),
+            Child = column,
+        };
     }
 
-    /// <summary>How many built-in skills are shown — for the check.</summary>
-    public int BuiltinCount { get; private set; }
+    /// <summary>What a group of commands of one kind is called.</summary>
+    /// <remarks>
+    /// The core's word for the kind, because the core is what runs it and
+    /// the editor's dropdown says the same. A kind this shell does not know
+    /// keeps its identifier: a group nobody named is still a group, and
+    /// hiding it would hide the commands in it.
+    /// </remarks>
+    private string KindTitle(string kind) =>
+        _kindTitles.TryGetValue(kind, out var said) && said.Length > 0
+            ? said.ToUpperInvariant()
+            : (kind.Length > 0 ? kind.ToUpperInvariant() : S("ПРОЧЕЕ"));
 
-    private async Task<JsonObject?> KindsAsync()
-        => _kinds ??= await Ask(Methods.CommandsKinds);
+    /// <summary>How many groups are drawn — for the check.</summary>
+    public int GroupsShown => Groups.Children.Count;
+
+    //: The identifiers of the groups drawn, in order. Kept as they are
+    //: built, because the check needs to tell a group of one kind from a
+    //: group of another and the panel holds only elements.
+    private readonly List<string> _drawn = [];
+
+    /// <summary>Which groups are drawn — for the check.</summary>
+    public string[] GroupIds => _drawn.ToArray();
+
+    /// <summary>Is this group folded — for the check.</summary>
+    public bool FoldedForCheck(string id) => _folded.Contains(id);
+
+    /// <summary>Fold or unfold one — for the check.</summary>
+    public void FoldForCheck(string id, bool folded)
+    {
+        if (folded) _folded.Add(id);
+        else _folded.Remove(id);
+        DrawGroups();
+    }
+
+    /// <summary>How tall the lists stand — for the check.</summary>
+    /// <remarks>
+    /// <para>
+    /// Height rather than a count of rows. Counting was tried and could not
+    /// be made to say the truth: rows of a person's own commands come from
+    /// a template inside an <c>ItemsControl</c> and exist in the tree only
+    /// once something has laid them out, while the built-in ones are added
+    /// by hand and are there at once. The number came out as eleven
+    /// built-in rows with the two above them missing — neither the rows on
+    /// the screen nor anything else.
+    /// </para>
+    /// <para>
+    /// What folding does is make the page shorter, and that is what is
+    /// measured. It is also what a person sees, which is the better thing
+    /// for a check to be looking at.
+    /// </para>
+    /// </remarks>
+    public double ListHeight
+    {
+        get
+        {
+            Groups.UpdateLayout();
+            return Groups.ActualHeight;
+        }
+    }
+
+    private static IEnumerable<DependencyObject> Deep(DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Deep(child)) yield return deeper;
+        }
+    }
 
     private async void OnCreate(object sender, RoutedEventArgs e)
         => await OpenEditorAsync(null);
