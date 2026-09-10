@@ -132,6 +132,14 @@ public static class Methods
     public const string SystemForeground = "system.foreground";
     /// <summary>Возможность: tasks.</summary>
     public const string TaskCancel = "task.cancel";
+    /// <summary>Возможность: todo.</summary>
+    public const string TodoAdd = "todo.add";
+    /// <summary>Возможность: todo.</summary>
+    public const string TodoClose = "todo.close";
+    /// <summary>Возможность: todo.</summary>
+    public const string TodoList = "todo.list";
+    /// <summary>Возможность: todo.</summary>
+    public const string TodoRemove = "todo.remove";
     /// <summary>Возможность: actuation.</summary>
     public const string WindowFocus = "window.focus";
     /// <summary>Возможность: actuation.</summary>
@@ -196,6 +204,10 @@ public static class Methods
             ["system.do"] = "system",
             ["system.foreground"] = "apps.watch",
             ["task.cancel"] = "tasks",
+            ["todo.add"] = "todo",
+            ["todo.close"] = "todo",
+            ["todo.list"] = "todo",
+            ["todo.remove"] = "todo",
             ["window.focus"] = "actuation",
             ["window.list"] = "actuation",
         };
@@ -408,6 +420,8 @@ public static class Capabilities
     public const string System = "system";
     /// <summary>Объявляет core.</summary>
     public const string Tasks = "tasks";
+    /// <summary>Объявляет core.</summary>
+    public const string Todo = "todo";
     /// <summary>Объявляет core.</summary>
     public const string Tts = "tts";
     /// <summary>Объявляет shell.</summary>

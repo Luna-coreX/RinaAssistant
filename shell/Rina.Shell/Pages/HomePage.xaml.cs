@@ -324,6 +324,25 @@ public partial class HomePage : UserControl
         Hold.Content = playing.Running ? "\u23F8" : "\u25B6";
     }
 
+    /// <summary>Open the list of things waiting (`4.0b-A13`).</summary>
+    private void OnTodo(object sender, RoutedEventArgs e)
+    {
+        var list = new TodoWindow(_link)
+        {
+            Owner = Window.GetWindow(this),
+        };
+        list.ShowDialog();
+    }
+
+    /// <summary>Open it from outside — for the check.</summary>
+    public TodoWindow OpenTodoForCheck()
+    {
+        var list = new TodoWindow(_link);
+        var owner = Window.GetWindow(this);
+        if (owner is { IsLoaded: true, IsVisible: true }) list.Owner = owner;
+        return list;
+    }
+
     private async void OnPrevious(object sender, RoutedEventArgs e)
     {
         if (_remote is not null) await _remote.Previous();

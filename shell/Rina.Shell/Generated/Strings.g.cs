@@ -208,6 +208,11 @@ public static partial class Loc
                 {
                     ["English"] = "Always listening",
                 },
+            ["Всё сделано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All done",
+                },
             ["Всё это потом можно поменять в настройках."] =
                 new Dictionary<string, string>
                 {
@@ -347,6 +352,16 @@ public static partial class Loc
                 {
                     ["English"] = "Data on disk",
                 },
+            ["Дел пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing here yet",
+                },
+            ["Дела"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To-do",
+                },
             ["ДИАГНОСТИКА"] =
                 new Dictionary<string, string>
                 {
@@ -444,6 +459,11 @@ public static partial class Loc
                 {
                     ["English"] = "Waiting",
                 },
+            ["Ждёт: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Waiting: {0}",
+                },
             ["Журналы"] =
                 new Dictionary<string, string>
                 {
@@ -475,6 +495,11 @@ public static partial class Loc
                 {
                     ["English"] = "tomorrow at this time",
                 },
+            ["Закрытые никуда не делись: их видно переключателем."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Closed ones are still here: the switch shows them.",
+                },
             ["Закрыть"] =
                 new Dictionary<string, string>
                 {
@@ -493,7 +518,7 @@ public static partial class Loc
             ["Записать"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Record",
+                    ["English"] = "Add",
                 },
             ["записей: {0}"] =
                 new Dictionary<string, string>
@@ -944,6 +969,11 @@ public static partial class Loc
                 {
                     ["English"] = "Nobody has confirmed who released it or that it wasn’t tampered with.",
                 },
+            ["Ничего не ждёт"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing waiting",
+                },
             ["Ничего не уходит в сеть без вашего ведома."] =
                 new Dictionary<string, string>
                 {
@@ -1272,6 +1302,11 @@ public static partial class Loc
                 {
                     ["English"] = "Show pop-up messages",
                 },
+            ["Показывать сделанные"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Show done",
+                },
             ["попытка {0}"] =
                 new Dictionary<string, string>
                 {
@@ -1527,6 +1562,11 @@ public static partial class Loc
                 {
                     ["English"] = "Synthesis engine",
                 },
+            ["Скажите «запиши купить хлеб» — или впишите сюда."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say «запиши купить хлеб» — or type it here.",
+                },
             ["Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."] =
                 new Dictionary<string, string>
                 {
@@ -1729,6 +1769,11 @@ public static partial class Loc
                     ["English"] = "Remove",
                     ["Español"] = "Quitar",
                     ["Українська"] = "Прибрати",
+                },
+            ["Убрать совсем"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Delete",
                 },
             ["Уведомления"] =
                 new Dictionary<string, string>

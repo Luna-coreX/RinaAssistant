@@ -21,6 +21,7 @@
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
       <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
     <!--
@@ -47,8 +48,18 @@
       who reads the screen rather than sees it.
     -->
     <TextBlock x:Name="DoingText" Grid.Row="1"
-               HorizontalAlignment="Center" Margin="0,0,0,24"
+               HorizontalAlignment="Center" Margin="0,0,0,20"
                Style="{StaticResource Text.Legend}" />
+
+    <!--
+      Things to do (4.0b-A13). A button rather than a list in plain view:
+      the home screen is what one looks at, and a list is what one works
+      with — so it opens in a window of its own.
+    -->
+    <Button x:Name="TodoButton" Grid.Row="2"
+            HorizontalAlignment="Center" Margin="0,0,0,16"
+            Style="{StaticResource Btn}" Click="OnTodo"
+            Content="{loc:S 'Дела'}" />
 
     <!--
       What plugins asked to show here (4.0b-A07). By ADR 0010 a plugin
@@ -59,7 +70,7 @@
       is for, the remote belongs to something that is already happening, and
       a plugin's tile is something to glance at.
     -->
-    <ItemsControl x:Name="Tiles" Grid.Row="2"
+    <ItemsControl x:Name="Tiles" Grid.Row="3"
                   HorizontalAlignment="Center" Margin="0,0,0,16"
                   MaxWidth="440">
       <ItemsControl.ItemsPanel>
@@ -74,7 +85,7 @@
       nothing is: an empty panel with three dead buttons says the thing is
       broken, and most of the time nothing is playing.
     -->
-    <Border x:Name="Remote" Grid.Row="3" Visibility="Collapsed"
+    <Border x:Name="Remote" Grid.Row="4" Visibility="Collapsed"
             HorizontalAlignment="Center" Margin="0,0,0,40"
             MaxWidth="420" Style="{StaticResource Card}">
       <Grid>

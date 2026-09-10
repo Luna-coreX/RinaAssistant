@@ -285,6 +285,10 @@ class ProtocolServer:
             "settings.set": self._settings_set,
             "settings.describe": self._settings_describe,
             "settings.options": self._settings_options,
+            "todo.list": self._todo_list,
+            "todo.add": self._todo_add,
+            "todo.close": self._todo_close,
+            "todo.remove": self._todo_remove,
             "reminders.list": self._reminders_list,
             "reminders.cancel": self._reminders_cancel,
             "system.foreground": self._foreground,
@@ -653,6 +657,35 @@ class ProtocolServer:
 
     def _reminders(self):
         return getattr(self.engine, "_reminders", None)
+
+    # -- things to do (4.0b-A13) --------------------------------------------
+
+    def _todo_list(self, message: Envelope) -> dict:
+        """
+        The whole list, closed ones included.
+
+        The closed ones are handed over too, and whoever shows them may
+        filter: "what did I get done today" is a fair question, and a core
+        that returns only the open ones leaves no way to answer it.
+        """
+        return {"items": self.engine.todo.all()}
+
+    def _todo_add(self, message: Envelope) -> dict:
+        item = self.engine.todo.add(str(message.payload.get("text", "")))
+        if item is None:
+            raise fault(ERROR_INVALID_PAYLOAD, "дело без текста")
+        return {"item": item}
+
+    def _todo_close(self, message: Envelope) -> dict:
+        todo_id = str(message.payload.get("todo_id", ""))
+        done = bool(message.payload.get("done", True))
+        store = self.engine.todo
+        changed = store.close(todo_id) if done else store.reopen(todo_id)
+        return {"changed": changed}
+
+    def _todo_remove(self, message: Envelope) -> dict:
+        return {"removed": self.engine.todo.remove(
+            str(message.payload.get("todo_id", "")))}
 
     def _reminders_list(self, message: Envelope) -> dict:
         store = self._reminders()

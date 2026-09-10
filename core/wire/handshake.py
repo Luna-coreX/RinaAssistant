@@ -147,6 +147,14 @@ _CAPABILITY_LIST = (
                 "commands.set_enabled", "commands.export",
                 "commands.import"),
                "свои команды пользователя"),
+    # Things to do (`4.0b-A13`). A capability of its own rather than a
+    # method among the reminders: the difference shows at the handshake — a
+    # side declares that it **keeps a list**, and that is visible to a
+    # person and in the diagnostics. A method hidden among the reminders
+    # would be declared together with the timers, that is, silently.
+    Capability("todo", Side.CORE,
+               ("todo.list", "todo.add", "todo.close", "todo.remove"),
+               "дела: то, что ждёт, а не срабатывает"),
     Capability("history", Side.CORE,
                ("history.list", "history.clear", "history.export"),
                "разговор: посмотреть, стереть, выгрузить"),

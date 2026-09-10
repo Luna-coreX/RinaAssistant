@@ -243,6 +243,45 @@ DISPATCH_PLUGIN_COMMAND = Tool(
 
 
 # ---------------------------------------------------------------------------
+# Things to do (4.0b-A13)
+# ---------------------------------------------------------------------------
+ADD_TODO = Tool(
+    name="add_todo",
+    summary="Записать дело — то, что ждёт, а не срабатывает.",
+    params=(Param("text", "string", "Что надо сделать."),),
+    # Launches nothing and touches no system: it writes to its own
+    # settings.
+    permissions=set(),
+    # Writing the same thing twice makes two: the person may well have
+    # meant two.
+    idempotent=False,
+    returns="Подтверждение с текстом дела.",
+    errors=("tool.invalid_arguments",),
+)
+
+LIST_TODO = Tool(
+    name="list_todo",
+    summary="Какие дела ждут.",
+    params=(),
+    permissions=set(),
+    idempotent=True,
+    returns="Список открытых дел.",
+    errors=(),
+)
+
+CLOSE_TODO = Tool(
+    name="close_todo",
+    summary="Пометить дело сделанным.",
+    params=(Param("todo_id", "string", "Идентификатор дела."),),
+    permissions=set(),
+    # Closing what is closed is the same as closing it once.
+    idempotent=True,
+    returns="Подтверждение.",
+    errors=(),
+)
+
+
+# ---------------------------------------------------------------------------
 # Answers
 # ---------------------------------------------------------------------------
 CALCULATE = Tool(
@@ -294,6 +333,7 @@ ALL_TOOLS = (
     LAUNCH_APP, LIST_APPS, TEACH_ALIAS, FORGET_ALIAS,
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
+    ADD_TODO, LIST_TODO, CLOSE_TODO,
     RUN_USER_COMMAND, DISPATCH_PLUGIN_COMMAND,
     CALCULATE, WEB_SEARCH, ASK_MODEL,
 )

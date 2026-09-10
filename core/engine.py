@@ -29,6 +29,7 @@ from core.executor import Executor
 from core.toolrunner import NO_SHELL, ToolContext, ToolRunner
 from voice.wake import get_wake_words
 from voice.reminders import ReminderStore
+from voice.todo import TodoStore
 from core.logging_setup import get_logger, safe, security_log
 from core.protocol import Events
 from core.features import default_features
@@ -131,6 +132,7 @@ class RinaEngine:
         self._speak_lock = threading.Lock()
         self._speak_count = 0
         self._reminders = ReminderStore(settings)
+        self._todo = TodoStore(settings)
 
         # Parsing, memory of the question asked, and execution are separated
         # into distinct objects (4.0-B02, B03, B04). The core ties them
@@ -144,6 +146,7 @@ class RinaEngine:
             ToolContext(
                 settings=settings,
                 reminders=self._reminders,
+                todo=self._todo,
                 commands=self._cmd_store,
                 plugins=plugin_manager,
                 # Through a lambda rather than a bound method: the core may
@@ -618,7 +621,13 @@ class RinaEngine:
             llm_enabled=llm.is_enabled(),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
             last_launch_query=self._last_launch_query,
+            todo_find=self._todo.find,
         )
+
+    @property
+    def todo(self):
+        """The list of things to do (`4.0b-A13`) — for the protocol."""
+        return self._todo
 
     def _remember_choice(self, query, entry):
         from voice import app_launcher

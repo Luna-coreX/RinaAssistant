@@ -104,6 +104,9 @@
   "Всегда слушаю": {
     "English": "Always listening"
   },
+  "Всё сделано": {
+    "English": "All done"
+  },
   "Всё это потом можно поменять в настройках.": {
     "English": "All of this can be changed later in the settings."
   },
@@ -191,6 +194,12 @@
   "Данные на диске": {
     "English": "Data on disk"
   },
+  "Дел пока нет": {
+    "English": "Nothing here yet"
+  },
+  "Дела": {
+    "English": "To-do"
+  },
   "Диалог": {
     "English": "Dialogue"
   },
@@ -251,6 +260,9 @@
   "Жду": {
     "English": "Waiting"
   },
+  "Ждёт: {0}": {
+    "English": "Waiting: {0}"
+  },
   "Журналы": {
     "English": "Logs"
   },
@@ -278,6 +290,9 @@
     "Español": "Olvidar todo",
     "Українська": "Забути все"
   },
+  "Закрытые никуда не делись: их видно переключателем.": {
+    "English": "Closed ones are still here: the switch shows them."
+  },
   "Закрыть": {
     "English": "Close"
   },
@@ -288,7 +303,7 @@
     "English": "Notice which programs are open"
   },
   "Записать": {
-    "English": "Record"
+    "English": "Add"
   },
   "Записывать тексты реплик": {
     "Deutsch": "Nachrichtentexte protokollieren",
@@ -512,6 +527,9 @@
   "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
     "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
   },
+  "Ничего не ждёт": {
+    "English": "Nothing waiting"
+  },
   "Ничего не уходит в сеть без вашего ведома.": {
     "English": "Nothing leaves for the network without your knowing."
   },
@@ -689,6 +707,9 @@
   "Показывать всплывающие сообщения": {
     "English": "Show pop-up messages"
   },
+  "Показывать сделанные": {
+    "English": "Show done"
+  },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
   },
@@ -833,6 +854,9 @@
   "Система синтеза": {
     "English": "Synthesis engine"
   },
+  "Скажите «запиши купить хлеб» — или впишите сюда.": {
+    "English": "Say «запиши купить хлеб» — or type it here."
+  },
   "Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск.": {
     "English": "Say it out loud or type below. Everything said lands here and survives a restart."
   },
@@ -967,6 +991,9 @@
     "English": "Remove",
     "Español": "Quitar",
     "Українська": "Прибрати"
+  },
+  "Убрать совсем": {
+    "English": "Delete"
   },
   "Уведомления": {
     "Deutsch": "Benachrichtigungen",

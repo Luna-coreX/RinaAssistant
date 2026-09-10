@@ -50,6 +50,15 @@ INTENTS = {
     # name of its own on purpose — the two would be carried out
     # identically, and the catalogue would promise a difference the
     # behaviour does not have. The difference is recorded in `said`.
+    "todo.add":           "Записать дело. Аргументы: text",
+    "todo.list":          "Показать дела",
+    "todo.done":          "Закрыть дело. Аргументы: query",
+    # Named but not found. An intent of its own, because the answer is a
+    # different one: "no such thing" and "nothing on the list at all" are
+    # different news, and a person who hears the second instead of the first
+    # will decide the list has gone.
+    "todo.not_found":     "Такого дела нет. Аргументы: query",
+
     "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app, said",
     "reminder.ambiguous": "Напоминание к программе: кандидатов несколько. Аргументы: options, query",
     "reminder.unknown_app": "Напоминание к программе: такой программы нет. Аргументы: query",

@@ -33,6 +33,7 @@ import re
 from dataclasses import dataclass, field
 
 from core import apps as apps_mod
+from voice import todo as todo_mod
 from core.intent import Intent
 
 
@@ -89,6 +90,11 @@ class RouterContext:
     #: time.
     last_launch_query: str = ""
 
+    #: Find a thing to do by what was said. The list lives in the core and
+    #: the router is obliged to work without it — hence a way to ask rather
+    #: than the list itself.
+    todo_find: object = None
+
 
 def route(text, ctx=None):
     """Text -> Intent. Performs nothing."""
@@ -117,8 +123,8 @@ def route(text, ctx=None):
     # pending stays a refusal. A correction comes when there is no
     # question: Rina has already launched the wrong thing and is being
     # corrected after the fact.
-    for stage in (_answer_to_question, _reminder, _system, _teach, _launch,
-                  _builtin, _tail):
+    for stage in (_answer_to_question, _todo, _reminder, _system, _teach,
+                  _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
             return intent.with_(text=command)
@@ -325,6 +331,42 @@ _CORRECTION = re.compile(
     r"^(?:нет[,\s]+|не\s+т[оа]т[,\s]+|)?"
     r"я\s+имел[а]?\s+в\s+виду\s+(?P<app>.+)$",
     re.IGNORECASE)
+
+
+def _todo(command, ctx):
+    """
+    Things to do (`4.0b-A13`).
+
+    **The boundary is held by the vocabulary, not by the order.** Proved by
+    breaking it: move this stage after the reminders and nothing changes —
+    the reminder parsing takes none of these phrases. The word "напомни"
+    belongs to reminders and is deliberately not given to the list as well:
+    giving one word to two things makes a person guess which they will get.
+
+    It stands early simply because the parsing is cheap and definite — but
+    nothing depends on that, and writing here that something does would be
+    untrue.
+
+    Only a named thing can be closed: finding it among the list is the job
+    of whoever holds the list, and the router hands on what was said.
+    """
+    parsed = todo_mod.parse(command)
+    if parsed is None:
+        return None
+    what, rest = parsed
+
+    if what == "list":
+        return Intent("todo.list", stage="todo")
+    if what == "add":
+        return Intent("todo.add", {"text": rest}, stage="todo")
+
+    # `done`: which one it is, the store knows, and the store answers if
+    # there is none. The router decides nothing here — it has no list.
+    found = ctx.todo_find(rest) if ctx.todo_find else None
+    if found is None:
+        return Intent("todo.not_found", {"query": rest}, stage="todo")
+    return Intent("todo.done", {"todo_id": found["id"], "text": found["text"]},
+                  stage="todo")
 
 
 def _teach(command, ctx):

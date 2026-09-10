@@ -142,6 +142,7 @@
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
 | `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
+| `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
 | `history` | ядро | `history.list`, `history.clear`, `history.export` |
 | `llm` | ядро | — |
 | `tasks` | ядро | `task.cancel` |
@@ -261,6 +262,10 @@
 | `system.foreground` | `launch` | сколько напоминаний сработало и следим ли (`4.0b-A03`) |
 | `plugins.list` | — | список с состоянием |
 | `plugins.set_enabled` | `plugin_id`, `enabled` | состояние |
+| `todo.list` | — | дела целиком, вместе с закрытыми (`4.0b-A13`) |
+| `todo.add` | `text` | записать дело |
+| `todo.close` | `todo_id`, `done` | пометить сделанным или вернуть в работу |
+| `todo.remove` | `todo_id` | убрать дело совсем |
 | `plugins.page` | `plugin_id` | декларативное описание страницы |
 | `plugins.home` | — | плитки включённых плагинов для главного экрана (`4.0b-A07`); всё сразу, потому что главная рисует их вместе |
 | `plugins.action` | `plugin_id`, `action`, `values` | новое описание страницы |

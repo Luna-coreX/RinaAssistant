@@ -50,6 +50,9 @@ class ToolContext:
 
     settings: Any = None
     reminders: Any = None
+    #: Things to do (`4.0b-A13`). A store of their own rather than a field
+    #: on the reminders: they grow independently and live different spans.
+    todo: Any = None
     commands: Any = None
     plugins: Any = None
     emit: Callable = None
@@ -411,6 +414,32 @@ def _calculate(ctx, args):
         result["result"])
 
 
+def _add_todo(ctx, args):
+    item = ctx.todo.add(str(args["text"]))
+    if item is None:
+        return ToolResult.failed(tr("Не поняла, что записать."),
+                                 "tool.invalid_arguments")
+    return ToolResult.done(tr("Записала: {text}.", text=item["text"]),
+                           value=item)
+
+
+def _list_todo(ctx, args):
+    from voice import todo as todo_mod
+
+    items = ctx.todo.all(done=False)
+    return ToolResult.done(todo_mod.say_list(items), value=items)
+
+
+def _close_todo(ctx, args):
+    todo_id = str(args["todo_id"])
+    # What was closed is asked **before** closing it: afterwards it is no
+    # longer on the open list, and there would be nothing left to name.
+    named = next((i["text"] for i in ctx.todo.all() if i["id"] == todo_id), "")
+    if not ctx.todo.close(todo_id):
+        return ToolResult.failed(tr("Такого дела нет."), "internal")
+    return ToolResult.done(tr("Готово: {text}.", text=named))
+
+
 def _web_search(ctx, args):
     from voice import websearch
 
@@ -499,6 +528,9 @@ IMPLEMENTATIONS = {
     "run_user_command": _run_user_command,
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
+    "add_todo": _add_todo,
+    "list_todo": _list_todo,
+    "close_todo": _close_todo,
     "web_search": _web_search,
     "ask_model": _ask_model,
 }

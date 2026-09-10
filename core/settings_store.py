@@ -120,6 +120,13 @@ GROUPS = {
     "reminders": {
         "reminders": [],
     },
+    # Things to do get a group of their own rather than a field among the
+    # reminders (`4.0b-A13`). They grow independently and outlive different
+    # spans: a person keeps a list for months, while reminders fire and
+    # vanish. In one file, frequent writes to one would touch the other.
+    "todo": {
+        "todo": [],
+    },
 }
 
 # A flat dictionary of every default (for API backward compatibility).

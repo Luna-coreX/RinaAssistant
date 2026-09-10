@@ -199,6 +199,30 @@ class Executor:
     def _do_reminder_cancel(self, intent, source):
         return self._run("cancel_reminder", {}, source=source)
 
+    # ---------- things to do (4.0b-A13) ----------
+    def _do_todo_add(self, intent, source):
+        return self._run("add_todo", {"text": intent.arg("text")},
+                         source=source)
+
+    def _do_todo_list(self, intent, source):
+        return self._run("list_todo", {}, source=source)
+
+    def _do_todo_done(self, intent, source):
+        return self._run("close_todo", {"todo_id": intent.arg("todo_id")},
+                         source=source)
+
+    def _do_todo_not_found(self, intent, source):
+        """
+        There is no such thing on the list.
+
+        An answer of its own rather than "nothing on the list": a person who
+        hears the second instead of the first will decide the whole list has
+        gone.
+        """
+        return self._fail(
+            tr("Не нашла дело «{query}».", query=intent.arg("query")),
+            "internal")
+
     # ---------- user commands and plugins ----------
     def _do_user_command(self, intent, source):
         return self._run("run_user_command",

@@ -103,6 +103,15 @@
       ],
       "side": "core"
     },
+    "todo": {
+      "methods": [
+        "todo.add",
+        "todo.close",
+        "todo.list",
+        "todo.remove"
+      ],
+      "side": "core"
+    },
     "tts": {
       "methods": [
         "speech.say",
@@ -486,6 +495,10 @@
     "system.do": "system",
     "system.foreground": "apps.watch",
     "task.cancel": "tasks",
+    "todo.add": "todo",
+    "todo.close": "todo",
+    "todo.list": "todo",
+    "todo.remove": "todo",
     "window.focus": "actuation",
     "window.list": "actuation"
   },

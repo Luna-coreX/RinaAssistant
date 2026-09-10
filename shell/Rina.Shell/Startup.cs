@@ -2362,6 +2362,25 @@ public partial class App
         // is a lawful answer and the commonest one.
         var offered = await link.AskAsync(Rina.Protocol.Methods.PluginsHome);
         var wanted = offered?["tiles"]?.AsArray()?.Count ?? 0;
+        // --- the list: a button on the home screen and a window behind it ---
+        //
+        // Through the window rather than the store: that something gets
+        // written down is checked in `test_todo.py` with no window at all.
+        // The question here is a different one — whether what was written
+        // reaches the eye.
+        var list = ((Pages.HomePage)window.CurrentPage!).OpenTodoForCheck();
+        list.Show();
+        await Until(() => list.IsLoaded, 5);
+
+        // By its text, not by a count: counting races with the window's
+        // own first load and depends on whatever earlier runs left behind.
+        var wrote = $"проверочное дело {DateTime.Now:HHmmss}";
+        await list.AddForCheck(wrote);
+        await Until(() => list.ShowsForCheck(wrote), 6);
+        Check("записанное дело появилось в списке",
+              list.ShowsForCheck(wrote), $"| строк {list.Shown}");
+        list.Close();
+
         var shown = (Pages.HomePage)window.CurrentPage!;
         await Until(() => shown.TilesShown == wanted, 8);
         Check("плиток нарисовано столько, сколько предложило ядро",
