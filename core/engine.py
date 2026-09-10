@@ -172,9 +172,22 @@ class RinaEngine:
                     else (False, NO_SHELL)),
                 # The same list as the router's: see `_apps`.
                 apps=self._apps,
+                # For "Why?" (`4.0b-B04`). Through lambdas because the
+                # runner is being built on this very line: the journal and
+                # the registry belong to it, and taking them now would take
+                # them from an object that does not exist yet.
+                journal=lambda: None,
+                registry=lambda: None,
             ),
             features=self._features,
         )
+
+        # And now that the runner exists, the two fields point at its own
+        # journal and its own registry. An explanation must come out of the
+        # journal that is actually being written to; a second one would
+        # agree with the first only by accident.
+        self._tools._ctx.journal = self._tools.audit
+        self._tools._ctx.registry = self._tools._registry
 
         # A plugin's tools are created and removed together with the plugin
         # (`4.0-H03`). A subscription rather than a one-off walk: a plugin is

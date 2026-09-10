@@ -50,6 +50,7 @@ INTENTS = {
     # name of its own on purpose — the two would be carried out
     # identically, and the catalogue would promise a difference the
     # behaviour does not have. The difference is recorded in `said`.
+    "why.last":           "Объяснить последнее действие",
     "todo.add":           "Записать дело. Аргументы: text",
     "todo.list":          "Показать дела",
     "todo.done":          "Закрыть дело. Аргументы: query",

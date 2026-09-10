@@ -70,7 +70,8 @@ CREATE TABLE IF NOT EXISTS calls (
     error_code      TEXT    NOT NULL DEFAULT '',
     duration_ms     INTEGER NOT NULL DEFAULT 0,
     confirmation_id TEXT    NOT NULL DEFAULT '',
-    trace_id        TEXT    NOT NULL DEFAULT ''
+    trace_id        TEXT    NOT NULL DEFAULT '',
+    reason          TEXT    NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_calls_ts   ON calls(ts);
 CREATE INDEX IF NOT EXISTS idx_calls_tool ON calls(tool);
@@ -133,11 +134,30 @@ class AuditLog:
             # held by the lock.
             self._db = sqlite3.connect(self._path, check_same_thread=False)
             self._db.executescript(SCHEMA)
+            self._add_missing_columns()
             self._db.commit()
         except sqlite3.Error:
             # The application works without a journal; it must not fall over because of one.
             log.exception("Не удалось открыть журнал вызовов: %s", self._path)
             self._db = None
+
+    def _add_missing_columns(self):
+        """
+        Columns added to the schema after journals were already on disk.
+
+        `CREATE TABLE IF NOT EXISTS` does nothing to a table that exists, so
+        a new column would be in the schema and absent from every journal
+        that had already been written — and the failure would show up as
+        "why?" answering nothing on exactly the machines that have most to
+        explain. Nobody's entries are rewritten: what was recorded before
+        the column existed has an empty reason, which is the truth.
+        """
+        have = {row[1] for row in
+                self._db.execute("PRAGMA table_info(calls)").fetchall()}
+        for name, kind in (("reason", "TEXT NOT NULL DEFAULT ''"),):
+            if name not in have:
+                self._db.execute(f"ALTER TABLE calls ADD COLUMN {name} {kind}")
+                log.info("Журнал вызовов дополнен столбцом %s", name)
 
     @property
     def path(self):
@@ -149,7 +169,8 @@ class AuditLog:
 
     # ------------------------------------------------------------------
     def record(self, *, tool, args, source, permissions, ok, error_code="",
-               duration_ms=0, confirmation_id="", trace_id="", verbatim=False):
+               duration_ms=0, confirmation_id="", trace_id="", reason="",
+               verbatim=False):
         """Record one call. `tool` is a Tool object or its name."""
         if self._db is None:
             return None
@@ -162,13 +183,14 @@ class AuditLog:
                source or "", json.dumps(sorted(permissions or []),
                                         ensure_ascii=False),
                1 if ok else 0, error_code or "", int(duration_ms),
-               confirmation_id or "", trace_id or "")
+               confirmation_id or "", trace_id or "", reason or "")
         try:
             with self._lock:
                 cursor = self._db.execute(
                     "INSERT INTO calls (ts, tool, args, source, permissions,"
-                    " ok, error_code, duration_ms, confirmation_id, trace_id)"
-                    " VALUES (?,?,?,?,?,?,?,?,?,?)", row)
+                    " ok, error_code, duration_ms, confirmation_id,"
+                    " trace_id, reason)"
+                    " VALUES (?,?,?,?,?,?,?,?,?,?,?)", row)
                 self._db.commit()
                 self._writes += 1
                 if self._writes % 200 == 0:
@@ -184,8 +206,8 @@ class AuditLog:
         if self._db is None:
             return []
         query = ("SELECT id, ts, tool, args, source, permissions, ok,"
-                 " error_code, duration_ms, confirmation_id, trace_id"
-                 " FROM calls")
+                 " error_code, duration_ms, confirmation_id, trace_id,"
+                 " reason FROM calls")
         where, params = [], []
         if tool:
             where.append("tool = ?")
@@ -209,6 +231,7 @@ class AuditLog:
             "permissions": json.loads(row[5]), "ok": bool(row[6]),
             "error_code": row[7], "duration_ms": row[8],
             "confirmation_id": row[9], "trace_id": row[10],
+            "reason": row[11] if len(row) > 11 else "",
         }
 
     def count(self):

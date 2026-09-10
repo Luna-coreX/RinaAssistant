@@ -199,6 +199,10 @@ class Executor:
     def _do_reminder_cancel(self, intent, source):
         return self._run("cancel_reminder", {}, source=source)
 
+    # ---------- "Why?" (4.0b-B04) ----------
+    def _do_why_last(self, intent, source):
+        return self._run("explain_last", {}, source=source)
+
     # ---------- things to do (4.0b-A13) ----------
     def _do_todo_add(self, intent, source):
         return self._run("add_todo", {"text": intent.arg("text")},

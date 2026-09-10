@@ -123,8 +123,13 @@ def route(text, ctx=None):
     # pending stays a refusal. A correction comes when there is no
     # question: Rina has already launched the wrong thing and is being
     # corrected after the fact.
-    for stage in (_answer_to_question, _todo, _reminder, _system, _teach,
-                  _launch, _builtin, _tail):
+    # `_why` after the pending question and before everything else: "why"
+    # while a question is on the table is still not an answer to it, and
+    # before the rest because no other stage wants the word — but it is
+    # cheap to parse and definite, and a phrase it does not take falls
+    # through untouched.
+    for stage in (_answer_to_question, _why, _todo, _reminder, _system,
+                  _teach, _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
             return intent.with_(text=command)
@@ -367,6 +372,35 @@ def _todo(command, ctx):
         return Intent("todo.not_found", {"query": rest}, stage="todo")
     return Intent("todo.done", {"todo_id": found["id"], "text": found["text"]},
                   stage="todo")
+
+
+#: "Why?" (`4.0b-B04`) — and only about **her own** doing.
+#:
+#: Deliberately narrow. "Почему трава зелёная" is a question about the
+#: world, and answering it with "because you pressed a button" would be
+#: worse than not understanding it at all. So: the bare word, or a question
+#: addressed to her — «почему ты…», «зачем ты…» — or an explicit «объясни».
+#: Everything else about the world goes on down the stages as before.
+_WHY = re.compile(
+    r"^(?:а\s+)?(?:"
+    r"почему|зачем|отчего"
+    r")\s*[?!.]*$"
+    r"|^(?:а\s+)?(?:почему|зачем|отчего)\s+(?:ты|вы)\b"
+    r"|^объясни(?:те)?(?:[,\s]+(?:почему|зачем))?\s*[?!.]*$",
+    re.IGNORECASE)
+
+
+def _why(command, ctx):
+    """
+    The person is asking about the last thing she did (`4.0b-B04`).
+
+    The answer comes out of the call journal, and the router does not have
+    one — nor should it: it decides what was meant, and what was actually
+    done is known to whoever wrote it down.
+    """
+    if not _WHY.search(command.strip()):
+        return None
+    return Intent("why.last", stage="why")
 
 
 def _teach(command, ctx):

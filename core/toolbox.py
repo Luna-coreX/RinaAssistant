@@ -257,6 +257,21 @@ TRY_USER_COMMAND = Tool(
     errors=("internal",),
 )
 
+EXPLAIN_LAST = Tool(
+    name="explain_last",
+    summary="Объяснить последнее действие.",
+    params=(),
+    # Reads the call journal and changes nothing. It is a tool all the
+    # same, for the same reason `list_reminders` is one: everything that
+    # touches what the core keeps goes through the one door, and an
+    # explanation that went round it would be the one action the journal
+    # had no record of.
+    permissions=set(),
+    idempotent=True,
+    returns="Объяснение последнего действия словами.",
+    errors=(),
+)
+
 DISPATCH_PLUGIN_COMMAND = Tool(
     name="dispatch_plugin_command",
     summary="Передать фразу плагинам.",
@@ -366,7 +381,8 @@ ALL_TOOLS = (
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     ADD_TODO, LIST_TODO, CLOSE_TODO,
-    RUN_USER_COMMAND, TRY_USER_COMMAND, DISPATCH_PLUGIN_COMMAND,
+    RUN_USER_COMMAND, TRY_USER_COMMAND, EXPLAIN_LAST,
+    DISPATCH_PLUGIN_COMMAND,
     CALCULATE, WEB_SEARCH, ASK_MODEL,
 )
 

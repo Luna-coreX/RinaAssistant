@@ -94,25 +94,47 @@ class ToolContext:
     #: choice of three and then answered that she had found none.
     apps: Callable = None
 
+    #: The call journal, for "Why?" (`4.0b-B04`).
+    #:
+    #: Handed in like everything else here rather than opened on the spot: a
+    #: tool that opened its own journal would explain from a different one
+    #: than the runner writes to, and the two would agree only by accident.
+    journal: Any = None
+
+    #: The tool catalogue, so an explanation can name what was done in the
+    #: words the catalogue already uses. A second set of names for the same
+    #: tools would drift from the first.
+    registry: Any = None
+
 
 class ToolResult:
     """What a tool returned."""
 
-    __slots__ = ("ok", "value", "message", "error_code")
+    __slots__ = ("ok", "value", "message", "error_code", "reason")
 
-    def __init__(self, ok=True, value=None, message="", error_code=""):
+    def __init__(self, ok=True, value=None, message="", error_code="",
+                 reason=""):
         self.ok = ok
         self.value = value
         self.message = message
         self.error_code = error_code
+        #: Why it turned out this way, in one word (`4.0b-B04`).
+        #:
+        #: Set by the tool, because the tool is the only place that knows.
+        #: "Where did that path come from" cannot be worked out afterwards
+        #: from the journal: by then there is a path and no memory of
+        #: whether it came from a word the person taught, from the Start
+        #: menu, or from a folder they pointed at. Written down at the
+        #: moment of the decision or not at all.
+        self.reason = reason
 
     @classmethod
-    def done(cls, message="", value=None):
-        return cls(True, value, message)
+    def done(cls, message="", value=None, reason=""):
+        return cls(True, value, message, reason=reason)
 
     @classmethod
-    def failed(cls, message, error_code="internal"):
-        return cls(False, None, message, error_code)
+    def failed(cls, message, error_code="internal", reason=""):
+        return cls(False, None, message, error_code, reason)
 
     def __repr__(self):
         state = "ok" if self.ok else f"ошибка {self.error_code}"
@@ -162,7 +184,8 @@ def _launch_app(ctx, args):
             break
     if entry is None:
         return ToolResult.failed(
-            tr("Не нашла программу «{name}».", name=name), "app.not_found")
+            tr("Не нашла программу «{name}».", name=name), "app.not_found",
+            "not_indexed")
 
     # The shell launches (ADR 0009): it is also what checks the canonical
     # path, the forbidden directory and the signature, and it is what asks
@@ -191,6 +214,9 @@ def _launch_app(ctx, args):
     if not started and why == NO_SHELL:
         started, why = app_index.launch(entry), ""
 
+    # Where the path came from — kept for "Why?" (`4.0b-B04`). The index
+    # entry knows: a word the person taught, the Start menu, the desktop, a
+    # folder they pointed at. A moment later there is only a path.
     if not started:
         # "The person refused" is not a fault: they answered, and the
         # answer was no. The error code is the same as for a denied
@@ -201,15 +227,17 @@ def _launch_app(ctx, args):
         # substring of prose broke the moment the shell was translated.
         if why == "refused":
             return ToolResult.failed(tr("Не стала запускать."),
-                                     "permission.denied")
+                                     "permission.denied", entry.source)
         return ToolResult.failed(
             tr("Не получилось запустить {app} — программу удалили "
-               "или перенесли.", app=entry.name), "app.launch_failed")
+               "или перенесли.", app=entry.name), "app.launch_failed",
+            entry.source)
 
     query = args.get("query")
     if query and ctx.on_alias:
         ctx.on_alias(query, entry)
-    return ToolResult.done(tr("Запускаю {app}.", app=entry.name), entry.name)
+    return ToolResult.done(tr("Запускаю {app}.", app=entry.name), entry.name,
+                           reason=entry.source)
 
 
 def _list_apps(ctx, args):
@@ -423,6 +451,27 @@ def _try_user_command(ctx, args):
             else ToolResult.failed(response, "internal"))
 
 
+def _explain_last(ctx, args):
+    """
+    Why the last thing happened — or did not (`4.0b-B04`).
+
+    Everything said comes out of one journal record and the tool catalogue.
+    An explanation assembled from anything else could disagree with the
+    journal, and then there would be two accounts of one event with nothing
+    to say which is true.
+    """
+    from core import why
+
+    journal = getattr(ctx, "journal", None)
+    record = why.last_doing(journal)
+    if record is None:
+        return ToolResult.done(
+            tr("Я пока ничего не делала — объяснять нечего."))
+    return ToolResult.done(
+        why.explain(record, registry=getattr(ctx, "registry", None)),
+        value=record.get("id"), reason=record.get("tool", ""))
+
+
 def _dispatch_plugin_command(ctx, args):
     if ctx.plugins is None:
         return ToolResult.done(value=False)
@@ -563,6 +612,7 @@ IMPLEMENTATIONS = {
     "cancel_reminder": _cancel_reminder,
     "run_user_command": _run_user_command,
     "try_user_command": _try_user_command,
+    "explain_last": _explain_last,
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
     "add_todo": _add_todo,
@@ -712,11 +762,12 @@ class ToolRunner:
             return ToolResult.failed(str(e), "internal")
 
         self._write(tool, checked, source, tool.permissions, result.ok,
-                    result.error_code, started, confirmation_id, trace_id)
+                    result.error_code, started, confirmation_id, trace_id,
+                    getattr(result, "reason", ""))
         return result
 
     def _write(self, tool, args, source, permissions, ok, error_code,
-               started, confirmation_id, trace_id):
+               started, confirmation_id, trace_id, reason=""):
         """An entry in the call journal. A journal failure does not get in the way of work."""
         if self._audit is None:
             return
@@ -728,7 +779,7 @@ class ToolRunner:
                 ok=ok, error_code=error_code,
                 duration_ms=int((time.perf_counter() - started) * 1000),
                 confirmation_id=confirmation_id or "", trace_id=trace_id or "",
-                verbatim=texts_allowed())
+                reason=reason or "", verbatim=texts_allowed())
         except Exception:
             log.exception("Не удалось записать вызов в журнал")
 
