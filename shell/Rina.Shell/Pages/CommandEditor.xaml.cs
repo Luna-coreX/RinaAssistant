@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Shapes;
 
 using static Rina.Shell.Strings.Loc;
 
@@ -64,22 +65,13 @@ public partial class CommandEditor : UserControl
     {
         InitializeComponent();
 
-        foreach (var kind in kinds["kinds"]?.AsArray()
-                             .OfType<JsonObject>() ?? [])
-        {
-            // What is only ever a step does not appear here. A command of
-            // kind "wait" would do nothing on purpose; one that is only a
-            // repeat says nothing about what it repeats. The core says which
-            // those are — it is a statement about meaning, not presentation.
-            if (kind["step_only"]?.GetValue<bool>() == true) continue;
-            Kind.Items.Add(new ComboBoxItem
-            {
-                Content = $"{kind["icon"]?.GetValue<string>()} "
-                          + kind["title"]?.GetValue<string>(),
-                Tag = kind["value"]?.GetValue<string>(),
-            });
-        }
-
+        // There is no list of "what kind of command this is" any more.
+        //
+        // It named the command's one action, and a command with several
+        // actions had to choose "sequence" first before it had anywhere to
+        // put them — so the shape of the thing depended on how many of it
+        // there were. A command is a graph now, and a simple one is a graph
+        // of one node.
         foreach (var kind in kinds["kinds"]?.AsArray()
                              .OfType<JsonObject>() ?? [])
         {
@@ -111,16 +103,28 @@ public partial class CommandEditor : UserControl
                           action["title"]?.GetValue<string>() ?? "",
                           action["destructive"]?.GetValue<bool>() ?? false));
 
-        foreach (var (value, title, destructive) in _actions)
-            Action.Items.Add(new ComboBoxItem
-            {
-                Content = destructive ? title + S(" — необратимо") : title,
-                Tag = value,
-            });
-        Action.SelectionChanged += (_, _) => ShowWarning();
-
         if (existing is not null) Fill(existing);
-        else Kind.SelectedIndex = 0;
+        DrawSteps();
+        ShowSummary();
+    }
+
+    //: Other commands this one may call. Filled from outside, because the
+    //: list of commands belongs to the page that has it.
+    private readonly List<(string Value, string Title)> _callable = [];
+
+    /// <summary>Which commands may be called from here.</summary>
+    /// <remarks>
+    /// This one is left out of its own list. A command calling itself is
+    /// refused by the core at run time, and offering it here would be
+    /// offering something that will not work — a window should not propose
+    /// what the thing behind it will decline.
+    /// </remarks>
+    public void CanCall(IEnumerable<(string Id, string Name)> commands)
+    {
+        _callable.Clear();
+        foreach (var (id, name) in commands)
+            if (id != _id)
+                _callable.Add((id, name));
     }
 
     private void Fill(JsonObject command)
@@ -132,79 +136,44 @@ public partial class CommandEditor : UserControl
             _triggers.Add(phrase?.GetValue<string>() ?? "");
         DrawTriggers();
 
-        var kind = command["type"]?.GetValue<string>() ?? "app";
-        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == kind)
-            ?? Kind.Items.OfType<ComboBoxItem>().FirstOrDefault();
-
-        var target = command["target"]?.GetValue<string>() ?? "";
-        Target.Text = target;
-        Action.SelectedItem = Action.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == target);
         Response.Text = command["response"]?.GetValue<string>() ?? "";
 
-        foreach (var step in command["steps"]?.AsArray().OfType<JsonObject>()
-                             ?? [])
-            _chain.Add(step.DeepClone());
+        // A command of any other kind becomes a graph of one node. That is
+        // what it always was; it simply had no picture of itself. Cards
+        // written by every earlier version open here without conversion,
+        // and a person who wanted to add a second step can now do it
+        // without first re-declaring what they are making.
+        var kind = command["type"]?.GetValue<string>() ?? "app";
+        if (kind == "sequence")
+        {
+            foreach (var step in command["steps"]?.AsArray()
+                                 .OfType<JsonObject>() ?? [])
+                _chain.Add(step.DeepClone());
+        }
+        else
+        {
+            var only = NewStep(kind);
+            foreach (var field in new[] { "target", "value", "name",
+                                          "condition", "count" })
+                if (command[field] is { } had) only[field] = had.DeepClone();
+            _chain.Add(only);
+        }
         DrawSteps();
         ShowSummary();
     }
 
-    private string SelectedKind =>
-        (Kind.SelectedItem as ComboBoxItem)?.Tag as string ?? "app";
-
     /// <summary>
-    /// The target field changes together with the kind.
+    /// Which kinds are plain enough to stand alone as a whole command.
     /// </summary>
     /// <remarks>
-    /// For "program" it is a path, for "site" an address, for "system
-    /// action" a choice from a list, and "say out loud" is not about a
-    /// target at all but about text. One "target" field for every case
-    /// would make a person work out what exactly belongs in it.
+    /// A graph of one node is saved as the ordinary card it is —
+    /// `app`, `website`, `speak` — rather than as a sequence wrapping one
+    /// step. The card stays the shape it has always been, files written by
+    /// older versions still read, and nothing in the core has to learn that
+    /// a sequence of one is the same as the thing inside it.
     /// </remarks>
-    private void OnKindChanged(object sender, SelectionChangedEventArgs e)
-    {
-        var kind = SelectedKind;
-        var picks = kind is "app" or "folder";
-        var system = kind == "system";
-
-        TargetRow.Visibility = kind == "sequence" ? Visibility.Collapsed
-                                                  : Visibility.Visible;
-        Action.Visibility = system ? Visibility.Visible : Visibility.Collapsed;
-        Target.Visibility = system ? Visibility.Collapsed : Visibility.Visible;
-        Browse.Visibility = picks ? Visibility.Visible : Visibility.Collapsed;
-
-        // The hint changes with the kind: one and the same field takes now
-        // a path, now an address, now a phrase, and "What to open" for
-        // every case would leave a person guessing in what form.
-        Styles.Ui.SetHint(Target, kind switch
-        {
-            "app" => S(@"например, C:\Program Files\App\app.exe"),
-            "folder" => S(@"например, D:\Проекты"),
-            "website" => S("например, github.com"),
-            "speak" => S("что произнести"),
-            _ => "",
-        });
-
-        TargetLabel.Text = kind switch
-        {
-            "app" => S("Какую программу открыть"),
-            "folder" => S("Какую папку открыть"),
-            "website" => S("Какой адрес открыть"),
-            "speak" => S("Что произнести"),
-            "system" => S("Какое действие"),
-            _ => S("Что открыть"),
-        };
-
-        StepsBox.Visibility = kind == "sequence" ? Visibility.Visible
-                                                 : Visibility.Collapsed;
-        StepsLabel.Visibility = StepsBox.Visibility;
-        if (kind == "sequence") DrawSteps();
-        TargetLabel.Visibility = TargetRow.Visibility;
-        Note.Text = "";
-        ShowWarning();
-        ShowSummary();
-    }
+    private static bool StandsAlone(string kind) =>
+        kind is "app" or "folder" or "website" or "speak" or "system";
 
     /// <summary>The whole command in one sentence.</summary>
     /// <remarks>
@@ -225,32 +194,16 @@ public partial class CommandEditor : UserControl
     /// </remarks>
     private void ShowSummary()
     {
-        var kind = SelectedKind;
         var said = _triggers.Count == 0
             ? S("Скажите фразу…")
             : string.Join(S(" или "), _triggers.Select(p => $"«{p}»"));
 
-        string happens;
-        if (kind == "sequence")
-            happens = _chain.Count == 0
-                ? S("ничего — шагов пока нет")
-                : string.Join(S(", затем "),
-                              _chain.OfType<JsonObject>()
-                                  .Select(step => DescribeStep(step)
-                                      .Replace(" · ", " ")));
-        else
-        {
-            var target = kind == "system"
-                ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
-                : Target.Text.Trim();
-            happens = target.Length == 0
-                ? S("ничего — не указано, что делать")
-                : DescribeStep(new JsonObject
-                {
-                    ["type"] = kind,
-                    ["target"] = target,
-                }).Replace(" · ", " ");
-        }
+        var happens = _chain.Count == 0
+            ? S("ничего — шагов пока нет")
+            : string.Join(S(", затем "),
+                          _chain.OfType<JsonObject>()
+                              .Select(step => DescribeStep(step)
+                                  .Replace(" · ", " ")));
 
         var answer = Response.Text.Trim();
         Summary.Text = S("{0} → {1}. Ответит: {2}.", said, happens,
@@ -267,17 +220,41 @@ public partial class CommandEditor : UserControl
     private void OnAnythingChanged(object sender, TextChangedEventArgs e) =>
         ShowSummary();
 
+    /// <summary>
+    /// Say if anything in the graph cannot be undone.
+    /// </summary>
+    /// <remarks>
+    /// The whole graph, not the one node selected. A destroying step three
+    /// nodes down is still a destroying step, and a warning that only
+    /// showed while that node happened to be selected would be a warning
+    /// nobody sees.
+    /// </remarks>
     private void ShowWarning()
     {
         ShowSummary();
-        var chosen = (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-        var destructive = SelectedKind == "system"
-                          && _actions.Any(a => a.Value == chosen
-                                               && a.Destructive);
+        var destructive = Anywhere(_chain).Any(
+            step => step["type"]?.GetValue<string>() == "system"
+                    && _actions.Any(
+                        a => a.Destructive
+                             && a.Value == step["target"]?.GetValue<string>()));
         Warning.Text = destructive
-            ? S("Это действие необратимо — Рина спросит подтверждение.") : "";
+            ? S("В команде есть необратимое действие — Рина спросит подтверждение.")
+            : "";
         Warning.Visibility = destructive ? Visibility.Visible
                                          : Visibility.Collapsed;
+    }
+
+    /// <summary>Every step of the graph, at every depth.</summary>
+    private static IEnumerable<JsonObject> Anywhere(JsonArray steps)
+    {
+        foreach (var step in steps.OfType<JsonObject>())
+        {
+            yield return step;
+            foreach (var branch in new[] { "steps", "otherwise" })
+                if (step[branch] is JsonArray inner)
+                    foreach (var deeper in Anywhere(inner))
+                        yield return deeper;
+        }
     }
 
     private void OnAddTrigger(object sender, RoutedEventArgs e)
@@ -323,93 +300,293 @@ public partial class CommandEditor : UserControl
         }
     }
 
-    // -- the chain of steps (4.0b-A09) --------------------------------------
+    // -- the inspector: the selected node, in full (4.0b-A09) ---------------
 
     /// <summary>
-    /// The steps, drawn as the chain they are.
+    /// Show whichever node is selected, and nothing else.
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// This is what the plan asked for and what the previous attempt did not
-    /// do. There was a list of rows with arrows beside them, which is a
-    /// <b>description</b> of a sequence; a person still had to hold its shape
-    /// in their head. Here the shape is the picture: steps stand in a column,
-    /// what happens inside a repeat or a branch is drawn inside it, and a new
-    /// step goes in <b>between</b> two others rather than only at the end.
-    /// </para>
-    /// <para>
-    /// Drawn recursively because the thing is recursive. A repeat contains
-    /// steps; so does each branch of a condition; and each of those is an
-    /// ordinary step. One function that draws a list of steps and calls
-    /// itself is the whole of it — any other arrangement would have a second
-    /// place where "what a step looks like" is decided.
-    /// </para>
+    /// The fields used to sit in the row itself, which meant every row was
+    /// as wide as its widest field and a graph of them could not be read at
+    /// a glance. A node now carries its name on the canvas and its details
+    /// here: the canvas answers "what shape is this", the inspector answers
+    /// "what exactly does this one do", and neither has to do both.
     /// </remarks>
-    private void DrawSteps()
+    private void ShowPicked()
     {
-        Steps.Children.Clear();
-        Steps.Children.Add(Chain(_chain, 0));
-        StepsEmpty.Visibility = _chain.Count == 0 ? Visibility.Visible
-                                                  : Visibility.Collapsed;
-    }
-
-    private UIElement Chain(JsonArray steps, int depth)
-    {
-        var column = new StackPanel();
-        column.Children.Add(Between(steps, 0, depth));
-        for (var at = 0; at < steps.Count; at++)
+        Picked.Children.Clear();
+        if (_picked is null)
         {
-            column.Children.Add(StepCard(steps, at, depth));
-            column.Children.Add(Between(steps, at + 1, depth));
+            PickedTitle.Text = S("НИЧЕГО НЕ ВЫБРАНО");
+            PickedHint.Visibility = Visibility.Visible;
+            return;
         }
-        return column;
+        PickedHint.Visibility = Visibility.Collapsed;
+
+        var step = _picked;
+        var kind = step["type"]?.GetValue<string>() ?? "speak";
+        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
+        PickedTitle.Text = ((known.Icon ?? "") + " "
+                            + (known.Title ?? kind)).ToUpperInvariant();
+
+        foreach (var control in Fields(step, kind))
+            Picked.Children.Add(control);
+
+        // Moving and removing live here too: they are about the node, and
+        // three small controls on every card of the canvas would be three
+        // things competing with the one thing a node is for — saying what
+        // it is.
+        var hands = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 14, 0, 0),
+        };
+        hands.Children.Add(Hand("↑", S("Выше"), () => Move(-1)));
+        hands.Children.Add(Hand("↓", S("Ниже"), () => Move(+1)));
+        hands.Children.Add(Hand("✕", S("Убрать шаг"), Remove));
+        Picked.Children.Add(hands);
     }
 
-    /// <summary>
-    /// The place between two steps, and the way to put one there.
-    /// </summary>
-    /// <remarks>
-    /// The point of drawing the gaps at all: somebody who realises they
-    /// forgot to wait before the second step should be able to say so where
-    /// the waiting belongs, instead of adding it at the end and walking it up
-    /// with an arrow.
-    /// </remarks>
-    private UIElement Between(JsonArray steps, int at, int depth)
+    private IEnumerable<UIElement> Fields(JsonObject step, string kind)
     {
-        var add = new Button
+        var made = new List<UIElement>();
+
+        void Label(string said) => made.Add(new TextBlock
+        {
+            Text = said,
+            Style = (Style)FindResource("Text.Meta"),
+            Margin = new Thickness(0, 8, 0, 4),
+        });
+
+        void Field(string key, string hint)
+        {
+            var box = new TextBox
+            {
+                Style = (Style)FindResource("Field"),
+                Text = step[key]?.GetValue<string>() ?? "",
+            };
+            Styles.Ui.SetHint(box, hint);
+            box.TextChanged += (_, _) =>
+            {
+                step[key] = box.Text;
+                DrawSteps();
+                ShowSummary();
+            };
+            made.Add(box);
+        }
+
+        void Choice(IEnumerable<(string Value, string Title)> options,
+                    string key)
+        {
+            var pick = new ComboBox
+            {
+                Style = (Style)FindResource("Choice"),
+            };
+            foreach (var (value, said) in options)
+                pick.Items.Add(new ComboBoxItem { Content = said, Tag = value });
+            pick.SelectedItem = pick.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => (string?)i.Tag
+                                     == (step[key]?.GetValue<string>() ?? ""));
+            pick.SelectionChanged += (_, _) =>
+            {
+                step[key] = (pick.SelectedItem as ComboBoxItem)?.Tag as string
+                            ?? "";
+                DrawSteps();
+                ShowSummary();
+                ShowWarning();
+            };
+            made.Add(pick);
+        }
+
+        switch (kind)
+        {
+            case "system":
+                // A fresh step picks the first harmless action rather than
+                // nothing: an empty dropdown in a node somebody just added
+                // is a question with no default answer.
+                if ((step["target"]?.GetValue<string>() ?? "").Length == 0
+                    && _actions.FirstOrDefault(a => !a.Destructive)
+                        is { Value.Length: > 0 } safe)
+                    step["target"] = safe.Value;
+                Label(S("Какое действие"));
+                Choice(_actions.Select(a => (a.Value, a.Destructive
+                           ? a.Title + S(" — необратимо") : a.Title)),
+                       "target");
+                break;
+
+            case "pause":
+                Label(S("Сколько секунд"));
+                Field("target", S("секунд"));
+                break;
+
+            case "repeat":
+                Label(S("Сколько раз"));
+                var times = new TextBox
+                {
+                    Style = (Style)FindResource("Field"),
+                    Text = ((int)Number(step["count"])).ToString(),
+                };
+                times.TextChanged += (_, _) =>
+                {
+                    step["count"] = int.TryParse(times.Text, out var n)
+                        ? Math.Clamp(n, 0, _maxRepeat) : 1;
+                    DrawSteps();
+                    ShowSummary();
+                };
+                made.Add(times);
+                break;
+
+            case "while":
+            case "if":
+                Label(S("Условие"));
+                Choice(_conditions, "condition");
+                var asks = step["condition"]?.GetValue<string>() ?? "";
+                // Only a condition that asks about something gets a field
+                // for it: "today is a weekday" has nothing to fill in, and
+                // a box beside it would be a question with no answer.
+                if (asks is "var_is" or "var_set")
+                {
+                    Label(S("Имя значения"));
+                    Field("name", S("например, режим"));
+                }
+                if (asks is "after" or "before")
+                {
+                    Label(S("Во сколько"));
+                    Field("value", "18:00");
+                }
+                else if (asks is "exists" or "missing")
+                {
+                    Label(S("Путь"));
+                    Field("value", S("путь"));
+                }
+                else if (asks is "app_active" or "app_running")
+                {
+                    Label(S("Какая программа"));
+                    Field("value", S("например, chrome"));
+                }
+                else if (asks == "date_is")
+                {
+                    Label(S("Какое число"));
+                    Field("value", "1");
+                }
+                else if (asks == "var_is")
+                {
+                    Label(S("Равно чему"));
+                    Field("value", S("значение"));
+                }
+                break;
+
+            case "set":
+                Label(S("Имя значения"));
+                Field("name", S("например, режим"));
+                Label(S("Что запомнить"));
+                Field("value", S("значение"));
+                break;
+
+            case "call":
+                Label(S("Какую команду вызвать"));
+                Choice(_callable, "target");
+                break;
+
+            case "stop":
+                Label(S("Дальше ничего не выполнится."));
+                break;
+
+            default:
+                Label(kind switch
+                {
+                    "app" => S("Какую программу открыть"),
+                    "folder" => S("Какую папку открыть"),
+                    "website" => S("Какой адрес открыть"),
+                    _ => S("Что произнести"),
+                });
+                Field("target", kind switch
+                {
+                    "app" => S(@"например, C:\Program Files\App\app.exe"),
+                    "folder" => S(@"например, D:\Проекты"),
+                    "website" => S("например, github.com"),
+                    _ => S("что произнести"),
+                });
+                if (kind is "app" or "folder")
+                {
+                    var browse = new Button
+                    {
+                        Style = (Style)FindResource("Btn"),
+                        Content = S("Обзор…"),
+                        HorizontalAlignment = HorizontalAlignment.Left,
+                        Margin = new Thickness(0, 8, 0, 0),
+                    };
+                    browse.Click += (_, _) =>
+                    {
+                        var got = Pick(kind);
+                        if (got is null) return;
+                        step["target"] = got;
+                        DrawSteps();
+                        ShowSummary();
+                    };
+                    made.Add(browse);
+                }
+                break;
+        }
+        return made;
+    }
+
+    private Button Hand(string mark, string tip, Action press)
+    {
+        var button = new Button
         {
             Style = (Style)FindResource("Btn.Quiet"),
-            Content = "+",
-            Width = 22,
-            Height = 18,
-            Opacity = 0.3,
-            HorizontalAlignment = HorizontalAlignment.Left,
-            ToolTip = S("Вставить шаг сюда"),
+            Content = mark,
+            Width = 30,
+            Height = 30,
+            ToolTip = tip,
         };
-        add.MouseEnter += (_, _) => add.Opacity = 1;
-        add.MouseLeave += (_, _) => add.Opacity = 0.3;
-        add.Click += (_, _) => OfferKinds(add, steps, at, depth);
-        return add;
+        button.Click += (_, _) => press();
+        return button;
     }
 
-    /// <summary>What may go in here — and what may not, this deep.</summary>
+    private void Move(int delta)
+    {
+        if (_pickedOwner is null || _picked is null) return;
+        var to = _pickedAt + delta;
+        if (to < 0 || to >= _pickedOwner.Count) return;
+        var moving = _pickedOwner[_pickedAt];
+        _pickedOwner.RemoveAt(_pickedAt);
+        _pickedOwner.Insert(to, moving);
+        _pickedAt = to;
+        DrawSteps();
+        ShowSummary();
+    }
+
+    private void Remove()
+    {
+        if (_pickedOwner is null) return;
+        _pickedOwner.RemoveAt(_pickedAt);
+        _picked = null;
+        _pickedOwner = null;
+        DrawSteps();
+        ShowSummary();
+    }
+
+    /// <summary>What may go in here.</summary>
     /// <remarks>
     /// The nesting limit belongs to the core and arrives with the kinds. A
     /// window that let a person build something the core will refuse to run
     /// would be lying to them while they worked.
     /// </remarks>
-    private void OfferKinds(FrameworkElement near, JsonArray steps, int at,
-                            int depth)
+    private void OfferKinds(FrameworkElement near, JsonArray steps, int at)
     {
         var menu = new ContextMenu { PlacementTarget = near };
         foreach (var (value, title, icon) in _stepKinds)
         {
-            var nests = value is "repeat" or "if";
-            if (nests && depth + 2 >= _maxDepth) continue;
             var item = new MenuItem { Header = icon + "  " + title };
             item.Click += (_, _) =>
             {
-                steps.Insert(at, NewStep(value));
+                var made = NewStep(value);
+                steps.Insert(Math.Clamp(at, 0, steps.Count), made);
+                _picked = made;
+                _pickedOwner = steps;
+                _pickedAt = at;
                 DrawSteps();
                 ShowSummary();
             };
@@ -429,275 +606,10 @@ public partial class CommandEditor : UserControl
         ["steps"] = new JsonArray(),
         ["otherwise"] = new JsonArray(),
         ["count"] = kind == "repeat" ? 2 : 1,
-        ["condition"] = kind == "if" ? "after" : "",
-        ["value"] = kind == "if" ? "18:00" : "",
+        ["condition"] = kind is "if" or "while" ? "after" : "",
+        ["value"] = kind is "if" or "while" ? "18:00" : "",
+        ["name"] = "",
     };
-
-    /// <summary>One step: what it is, what it acts on, where it sits.</summary>
-    private UIElement StepCard(JsonArray steps, int at, int depth)
-    {
-        var step = (JsonObject)steps[at]!;
-        var kind = step["type"]?.GetValue<string>() ?? "speak";
-        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
-        var title = known.Title ?? kind;
-        var icon = known.Icon ?? "•";
-
-        var body = new StackPanel();
-        var head = new Grid();
-        head.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = GridLength.Auto,
-        });
-        head.ColumnDefinitions.Add(new ColumnDefinition());
-        head.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = GridLength.Auto,
-        });
-
-        head.Children.Add(new TextBlock
-        {
-            Text = icon + "  " + title,
-            Style = (Style)FindResource("Text.Body"),
-            VerticalAlignment = VerticalAlignment.Center,
-            MinWidth = 140,
-        });
-
-        var middle = What(step, kind);
-        Grid.SetColumn(middle, 1);
-        head.Children.Add(middle);
-
-        var hands = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-        hands.Children.Add(Hand("↑", S("Выше"), () => Move(steps, at, -1)));
-        hands.Children.Add(Hand("↓", S("Ниже"), () => Move(steps, at, +1)));
-        hands.Children.Add(Hand("✕", S("Убрать шаг"), () =>
-        {
-            steps.RemoveAt(at);
-            DrawSteps();
-            ShowSummary();
-        }));
-        Grid.SetColumn(hands, 2);
-        head.Children.Add(hands);
-        body.Children.Add(head);
-
-        // What happens inside, indented: indentation is how a person already
-        // reads "this belongs to that", and it needs no explaining.
-        if (kind is "repeat" or "if")
-        {
-            body.Children.Add(Nested(step, "steps", depth,
-                                     kind == "if" ? S("тогда") : ""));
-            if (kind == "if")
-                body.Children.Add(Nested(step, "otherwise", depth,
-                                         S("иначе")));
-        }
-
-        return new Border
-        {
-            Style = (Style)FindResource("Rows.Item"),
-            Margin = new Thickness(0, 0, 0, 2),
-            Child = body,
-        };
-    }
-
-    private UIElement Nested(JsonObject step, string branch, int depth,
-                             string label)
-    {
-        var box = new StackPanel { Margin = new Thickness(24, 6, 0, 2) };
-        if (label.Length > 0)
-            box.Children.Add(new TextBlock
-            {
-                Text = label,
-                Style = (Style)FindResource("Text.Meta"),
-                Margin = new Thickness(0, 0, 0, 2),
-            });
-        if (step[branch] is not JsonArray inner)
-        {
-            inner = [];
-            step[branch] = inner;
-        }
-        box.Children.Add(Chain(inner, depth + 1));
-        return box;
-    }
-
-    private Button Hand(string mark, string tip, Action press)
-    {
-        var button = new Button
-        {
-            Style = (Style)FindResource("Btn.Quiet"),
-            Content = mark,
-            Width = 26,
-            Height = 26,
-            ToolTip = tip,
-        };
-        button.Click += (_, _) => press();
-        return button;
-    }
-
-    /// <summary>
-    /// The middle of a step: what it acts on, edited where it stands.
-    /// </summary>
-    /// <remarks>
-    /// In place rather than in a form above the list. A separate "new step"
-    /// panel meant that changing a step was impossible — one deleted it and
-    /// typed it again — and that the thing being edited was never beside the
-    /// things it would stand between.
-    /// </remarks>
-    private UIElement What(JsonObject step, string kind)
-    {
-        // A wrapping row rather than a horizontal stack.
-        //
-        // A stack clips what does not fit, and what did not fit was the
-        // right-hand end of the time field — a step one could not finish
-        // filling in. Shaving pixels off the controls only moves the
-        // clipping to the next window size; wrapping survives any of them.
-        var row = new WrapPanel
-        {
-            Orientation = Orientation.Horizontal,
-            VerticalAlignment = VerticalAlignment.Center,
-        };
-
-        void Field(string key, string hint, double width)
-        {
-            var box = new TextBox
-            {
-                Style = (Style)FindResource("Field"),
-                Text = step[key]?.GetValue<string>() ?? "",
-                Width = width,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            Styles.Ui.SetHint(box, hint);
-            box.TextChanged += (_, _) =>
-            {
-                step[key] = box.Text;
-                ShowSummary();
-            };
-            row.Children.Add(box);
-        }
-
-        void Choice(IEnumerable<(string Value, string Title)> options,
-                    string key, double width)
-        {
-            var pick = new ComboBox
-            {
-                Style = (Style)FindResource("Choice"),
-                Width = width,
-                VerticalAlignment = VerticalAlignment.Center,
-            };
-            foreach (var (value, said) in options)
-                pick.Items.Add(new ComboBoxItem { Content = said, Tag = value });
-            pick.SelectedItem = pick.Items.OfType<ComboBoxItem>()
-                .FirstOrDefault(i => (string?)i.Tag
-                                     == (step[key]?.GetValue<string>() ?? ""));
-            pick.SelectionChanged += (_, _) =>
-            {
-                step[key] = (pick.SelectedItem as ComboBoxItem)?.Tag as string
-                            ?? "";
-                DrawSteps();
-                ShowSummary();
-            };
-            row.Children.Add(pick);
-        }
-
-        switch (kind)
-        {
-            case "system":
-                // A fresh step picks the first harmless action rather than
-                // nothing. An empty dropdown in a step somebody just added
-                // is a question with no default answer, and the step is
-                // invalid until they notice it.
-                if ((step["target"]?.GetValue<string>() ?? "").Length == 0
-                    && _actions.FirstOrDefault(a => !a.Destructive)
-                        is { Value.Length: > 0 } safe)
-                    step["target"] = safe.Value;
-                Choice(_actions.Select(a => (a.Value, a.Destructive
-                           ? a.Title + S(" — необратимо") : a.Title)),
-                       "target", 230);
-                break;
-
-            case "pause":
-                Field("target", S("секунд"), 70);
-                row.Children.Add(new TextBlock
-                {
-                    Text = S("с"),
-                    Style = (Style)FindResource("Text.Meta"),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(6, 0, 0, 0),
-                });
-                break;
-
-            case "repeat":
-                var times = new TextBox
-                {
-                    Style = (Style)FindResource("Field"),
-                    Text = ((int)Number(step["count"])).ToString(),
-                    Width = 60,
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
-                times.TextChanged += (_, _) =>
-                {
-                    step["count"] = int.TryParse(times.Text, out var n)
-                        ? Math.Clamp(n, 0, _maxRepeat) : 1;
-                    ShowSummary();
-                };
-                row.Children.Add(times);
-                row.Children.Add(new TextBlock
-                {
-                    Text = S("раз"),
-                    Style = (Style)FindResource("Text.Meta"),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(6, 0, 0, 0),
-                });
-                break;
-
-            case "if":
-                // Narrower than it looks like it should be: the row also
-                // holds the value and the three controls on the right, and
-                // at 210 the time field went off the edge. A step whose
-                // right-hand end is off-screen is a step one cannot finish
-                // filling in.
-                Choice(_conditions, "condition", 180);
-                // Only a condition that asks about something gets a field for
-                // it: "today is a weekday" has nothing to fill in, and a box
-                // beside it would be a question with no answer.
-                var asks = step["condition"]?.GetValue<string>() ?? "";
-                if (asks is "after" or "before") Field("value", "18:00", 95);
-                else if (asks is "exists" or "missing")
-                    Field("value", S("путь"), 200);
-                break;
-
-            default:
-                Field("target", kind switch
-                {
-                    "app" => S(@"например, C:\Program Files\App\app.exe"),
-                    "folder" => S(@"например, D:\Проекты"),
-                    "website" => S("например, github.com"),
-                    _ => S("что произнести"),
-                }, 250);
-                if (kind is "app" or "folder")
-                {
-                    var browse = new Button
-                    {
-                        Style = (Style)FindResource("Btn"),
-                        Content = S("Обзор…"),
-                        Margin = new Thickness(8, 0, 0, 0),
-                    };
-                    browse.Click += (_, _) =>
-                    {
-                        var picked = Pick(kind);
-                        if (picked is null) return;
-                        step["target"] = picked;
-                        DrawSteps();
-                        ShowSummary();
-                    };
-                    row.Children.Add(browse);
-                }
-                break;
-        }
-        return row;
-    }
 
     private static string? Pick(string kind)
     {
@@ -725,25 +637,13 @@ public partial class CommandEditor : UserControl
                                out var told) ? told : 0;
     }
 
-    private void Move(JsonArray steps, int at, int delta)
-    {
-        var to = at + delta;
-        if (to < 0 || to >= steps.Count) return;
-        var moving = steps[at];
-        steps.RemoveAt(at);
-        steps.Insert(to, moving);
-        DrawSteps();
-        ShowSummary();
-    }
-
     /// <summary>A step in human words: the kind and what exactly.</summary>
     private string DescribeStep(JsonObject step)
     {
         var kind = step["type"]?.GetValue<string>() ?? "";
         var target = step["target"]?.GetValue<string>() ?? "";
-        var title = Kind.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == kind)
-            ?.Content?.ToString() ?? kind;
+        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
+        var title = known.Title ?? kind;
 
         // A system action's target is a code from a list, and there is no
         // point showing it to a person: the action has a name.
@@ -755,21 +655,6 @@ public partial class CommandEditor : UserControl
         return target.Length > 0 ? $"{title} · {target}" : title;
     }
 
-    private void OnBrowse(object sender, RoutedEventArgs e)
-    {
-        if (SelectedKind == "folder")
-        {
-            var folder = new Microsoft.Win32.OpenFolderDialog();
-            if (folder.ShowDialog() == true) Target.Text = folder.FolderName;
-            return;
-        }
-        var file = new Microsoft.Win32.OpenFileDialog
-        {
-            Filter = S("Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*"),
-        };
-        if (file.ShowDialog() == true) Target.Text = file.FileName;
-    }
-
     private void OnSave(object sender, RoutedEventArgs e)
     {
         if (_triggers.Count == 0)
@@ -777,23 +662,13 @@ public partial class CommandEditor : UserControl
             Note.Text = S("Нужна хотя бы одна фраза.");
             return;
         }
-
-        var kind = SelectedKind;
-        var target = kind == "system"
-            ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
-            : Target.Text.Trim();
-        if (kind != "sequence" && target.Length == 0)
-        {
-            Note.Text = S("Нужно указать, что делать.");
-            return;
-        }
-        if (kind == "sequence" && _chain.Count == 0)
+        if (_chain.Count == 0)
         {
             Note.Text = S("Нужен хотя бы один шаг.");
             return;
         }
 
-        var command = Card(kind, target);
+        var command = Card();
         // The number is assigned by the core; we send our own only when
         // editing one that already exists — otherwise editing would turn
         // into creating a twin.
@@ -804,76 +679,53 @@ public partial class CommandEditor : UserControl
 
     /// <summary>The card as the core expects it.</summary>
     /// <remarks>
-    /// One place, used by both saving and trying. Two builders would part
-    /// company the first time a field was added, and the trial would then
-    /// be a trial of something slightly different from what gets saved —
-    /// which is the one thing a trial must not be.
+    /// <para>
+    /// One place, used by saving and by trying alike. Two builders would
+    /// part company the first time a field was added, and a trial would
+    /// then be a trial of something slightly different from what gets
+    /// saved — the one thing a trial must not be.
+    /// </para>
+    /// <para>
+    /// <b>A graph of one plain node is saved as the plain card it is.</b>
+    /// A sequence wrapping a single "open the browser" would be a new shape
+    /// for a thing that has had a shape since 2.0.0: files from older
+    /// versions would still read, but files written here would stop reading
+    /// in them, and the list would start calling every command a sequence.
+    /// </para>
     /// </remarks>
-    private JsonObject Card(string kind, string target) => new()
+    private JsonObject Card()
     {
-        ["enabled"] = true,
-        ["type"] = kind,
-        ["triggers"] = new JsonArray(
-            _triggers.Select(t => (JsonNode)t!).ToArray()),
-        ["match"] = "contains",
-        ["target"] = target,
-        ["response"] = Response.Text.Trim(),
-        ["steps"] = new JsonArray(
-            _chain.Select(step => step!.DeepClone()).ToArray()),
-    };
+        var only = _chain.Count == 1 ? _chain[0] as JsonObject : null;
+        var alone = only is not null
+                    && StandsAlone(only["type"]?.GetValue<string>() ?? "");
+
+        var card = new JsonObject
+        {
+            ["enabled"] = true,
+            ["type"] = alone ? only!["type"]!.DeepClone() : "sequence",
+            ["triggers"] = new JsonArray(
+                _triggers.Select(p => (JsonNode)p!).ToArray()),
+            ["match"] = "contains",
+            ["target"] = alone ? (only!["target"]?.DeepClone() ?? "") : "",
+            ["response"] = Response.Text.Trim(),
+            ["steps"] = alone
+                ? new JsonArray()
+                : new JsonArray(_chain.Select(s => s!.DeepClone()).ToArray()),
+        };
+        return card;
+    }
 
     /// <summary>The person wants to see it happen (`4.0b-A09`).</summary>
     public event Action<JsonObject>? Tried;
 
     /// <summary>
-    /// Try it without saving.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// Assembling a command and finding out whether it does what was meant
-    /// were two separate acts: save, close the editor, find the row, press
-    /// «Выполнить» — and if it was wrong, open it again. Trying it four
-    /// times left four commands to delete.
-    /// </para>
-    /// <para>
-    /// <b>Phrases are not needed for this.</b> A phrase is how the command
-    /// is found when spoken; a trial is pressed, not said, so demanding one
-    /// would be demanding a thing that has no part in what is about to
-    /// happen. What to do is still needed — that is the thing being tried.
-    /// </para>
-    /// </remarks>
-    private void OnTry(object sender, RoutedEventArgs e)
-    {
-        var kind = SelectedKind;
-        var target = kind == "system"
-            ? (Action.SelectedItem as ComboBoxItem)?.Tag as string ?? ""
-            : Target.Text.Trim();
-
-        if (kind == "sequence" && _chain.Count == 0)
-        {
-            Note.Text = S("Нечего пробовать: шагов пока нет.");
-            return;
-        }
-        if (kind != "sequence" && target.Length == 0)
-        {
-            Note.Text = S("Нечего пробовать: не указано, что делать.");
-            return;
-        }
-
-        Note.Text = S("Пробую…");
-        Tried?.Invoke(Card(kind, target));
-    }
-
-    private void OnCancel(object sender, RoutedEventArgs e) => Cancelled?.Invoke();
-
-    /// <summary>
-    /// Assemble a sequence out of steps — for the end-to-end check.
+    /// Assemble a graph out of steps — for the end-to-end check.
     /// </summary>
     /// <remarks>
     /// The check cannot click, and a command assembled by hand would be
     /// testing `JsonObject` rather than the editor. So it goes the way a
-    /// person does: pick the kind, put a step in at a place, fill in what it
-    /// acts on, move one, save.
+    /// person does: put a node in at a place, fill in what it acts on,
+    /// move one, save.
     /// </remarks>
     public bool BuildSequenceForCheck(
         string phrase, IEnumerable<(string Kind, string Target)> steps)
@@ -881,10 +733,6 @@ public partial class CommandEditor : UserControl
         _triggers.Clear();
         _triggers.Add(phrase);
         DrawTriggers();
-
-        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == "sequence");
-        if (SelectedKind != "sequence") return false;
 
         _chain.Clear();
         foreach (var (kind, target) in steps)
@@ -896,16 +744,14 @@ public partial class CommandEditor : UserControl
         DrawSteps();
         if (_chain.Count == 0) return false;
 
-        // And the order: lift the last step one place and put it back.
-        //
-        // Up then **down**, not up then up: the first version moved the last
-        // step to index 1 and then moved index 1 up again, which walks it to
-        // the front instead of returning it. The check caught it, which is
-        // the whole reason it puts the order back at all.
+        // And the order: lift the last node one place and put it back.
         var wasFirst = _chain[0]?["target"]?.GetValue<string>();
         var wasLast = _chain[^1]?["target"]?.GetValue<string>();
-        Move(_chain, _chain.Count - 1, -1);
-        Move(_chain, _chain.Count - 2, +1);
+        _picked = _chain[^1] as JsonObject;
+        _pickedOwner = _chain;
+        _pickedAt = _chain.Count - 1;
+        Move(-1);
+        Move(+1);
         if (_chain[0]?["target"]?.GetValue<string>() != wasFirst) return false;
         if (_chain[^1]?["target"]?.GetValue<string>() != wasLast) return false;
 
@@ -916,14 +762,16 @@ public partial class CommandEditor : UserControl
     /// <summary>Close it as a person would — for the check.</summary>
     public void CancelForCheck() => OnCancel(this, new RoutedEventArgs());
 
-    /// <summary>Switch to a sequence — for the check.</summary>
-    public void ShowSequenceForCheck()
+    /// <summary>Start from an empty canvas — for the check.</summary>
+    public void ClearForCheck()
     {
-        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == "sequence");
+        _chain.Clear();
+        _picked = null;
+        _pickedOwner = null;
+        DrawSteps();
     }
 
-    /// <summary>Put a step in at a place — for the check.</summary>
+    /// <summary>Put a node in at a place — for the check.</summary>
     public void InsertStepForCheck(int at, string kind, string target = "")
     {
         var step = NewStep(kind);
@@ -933,7 +781,7 @@ public partial class CommandEditor : UserControl
         ShowSummary();
     }
 
-    /// <summary>Put a step inside another one — for the check.</summary>
+    /// <summary>Put a node inside another one — for the check.</summary>
     public bool NestStepForCheck(int outer, string branch, string kind,
                                  string target = "")
     {
@@ -952,6 +800,28 @@ public partial class CommandEditor : UserControl
         return true;
     }
 
+    /// <summary>Select a node — for the check.</summary>
+    public bool PickForCheck(int at)
+    {
+        if (at < 0 || at >= _chain.Count) return false;
+        _picked = _chain[at] as JsonObject;
+        _pickedOwner = _chain;
+        _pickedAt = at;
+        DrawSteps();
+        return _picked is not null;
+    }
+
+    /// <summary>Is the inspector showing something — for the check.</summary>
+    public bool InspectorShows => _picked is not null
+                                  && Picked.Children.Count > 0;
+
+    /// <summary>How many nodes are drawn on the canvas — for the check.</summary>
+    public int NodesDrawn => Board.Children.OfType<Border>()
+        .Count(b => b.Width > 100);
+
+    /// <summary>How many wires are drawn — for the check.</summary>
+    public int WiresDrawn => Board.Children.OfType<Polyline>().Count();
+
     /// <summary>The steps as the core will get them — for the check.</summary>
     public JsonArray ChainForCheck => _chain;
 
@@ -959,12 +829,8 @@ public partial class CommandEditor : UserControl
     public string[] StepKindsOffered =>
         _stepKinds.Select(k => k.Value).ToArray();
 
-    /// <summary>Which kinds it offers as whole commands — for the check.</summary>
-    public string[] CommandKindsOffered =>
-        Kind.Items.OfType<ComboBoxItem>()
-            .Select(i => (string?)i.Tag ?? "").ToArray();
-
-
+    /// <summary>The card that would be saved — for the check.</summary>
+    public JsonObject CardForCheck() => Card();
 
     /// <summary>How many steps were assembled — for the check.</summary>
     public int StepCount => _chain.Count;
@@ -1010,15 +876,51 @@ public partial class CommandEditor : UserControl
     }
 
     /// <summary>Fill in a simple command — for the check.</summary>
+    /// <remarks>
+    /// A simple command is a graph of one node now, so filling one in means
+    /// putting that node on the canvas. There is no "kind of command" to
+    /// choose first.
+    /// </remarks>
     public void FillForCheck(string phrase, string kind, string target)
     {
         _triggers.Clear();
         _triggers.Add(phrase);
         DrawTriggers();
-        Kind.SelectedItem = Kind.Items.OfType<ComboBoxItem>()
-            .FirstOrDefault(item => (string?)item.Tag == kind);
-        Target.Text = target;
+        _chain.Clear();
+        var only = NewStep(kind);
+        only["target"] = target;
+        _chain.Add(only);
+        DrawSteps();
         ShowSummary();
+    }
+
+    private void OnCancel(object sender, RoutedEventArgs e) =>
+        Cancelled?.Invoke();
+
+    /// <summary>
+    /// Try it without saving.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Assembling a command and finding out whether it does what was meant
+    /// were two separate acts: save, close the editor, find the row, press
+    /// «Выполнить» — and if it was wrong, open it again. Trying four times
+    /// left four commands to delete.
+    /// </para>
+    /// <para>
+    /// <b>Phrases are not needed for this.</b> A phrase is how a command is
+    /// found when spoken; a trial is pressed, not said.
+    /// </para>
+    /// </remarks>
+    private void OnTry(object sender, RoutedEventArgs e)
+    {
+        if (_chain.Count == 0)
+        {
+            Note.Text = S("Нечего пробовать: шагов пока нет.");
+            return;
+        }
+        Note.Text = S("Пробую…");
+        Tried?.Invoke(Card());
     }
 
     /// <summary>Press «Проверить» — for the check.</summary>

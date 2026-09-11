@@ -533,9 +533,6 @@
   "Нужно для напоминаний «когда открою…». Выключено по умолчанию": {
     "English": "Needed for the «when I open…» reminders. Off by default"
   },
-  "Нужно указать, что делать.": {
-    "English": "You need to say what to do."
-  },
   "О программе": {
     "Deutsch": "Über",
     "English": "About",
@@ -676,9 +673,6 @@
   },
   "Пока ни одного напоминания": {
     "English": "No reminders yet"
-  },
-  "Пока ни одного шага. Добавьте первый — он выполнится первым.": {
-    "English": "No steps yet. Add the first one — it runs first."
   },
   "Показать": {
     "English": "Show"
@@ -1046,14 +1040,8 @@
   "Что ответить (необязательно)": {
     "English": "What to answer (optional)"
   },
-  "Что открыть": {
-    "English": "What to open"
-  },
   "Что произнести": {
     "English": "What to say out loud"
-  },
-  "Что сделать": {
-    "English": "What to do"
   },
   "Что скачано и где лежит": {
     "English": "What is downloaded and where it lies"
@@ -1067,9 +1055,6 @@
   "Шаг {0} из {1}": {
     "English": "Step {0} of {1}"
   },
-  "Шаги по порядку": {
-    "English": "Steps in order"
-  },
   "Экспорт": {
     "Deutsch": "Exportieren",
     "English": "Export",
@@ -1078,9 +1063,6 @@
   },
   "Эта программа не подписана": {
     "English": "This program isn’t signed"
-  },
-  "Это действие необратимо — Рина спросит подтверждение.": {
-    "English": "This action is irreversible — Rina will ask for confirmation."
   },
   "Ядро": {
     "English": "Core"
@@ -1286,23 +1268,14 @@
   "Бета-возможность: поведение может измениться в следующих версиях.": {
     "English": "A beta capability: its behaviour may change in later versions."
   },
-  "ЧТО ПОЛУЧИТСЯ": {
-    "English": "WHAT YOU GET"
-  },
   "Скажите фразу…": {
     "English": "Say a phrase…"
   },
   "ничего — шагов пока нет": {
     "English": "nothing — there are no steps yet"
   },
-  "ничего — не указано, что делать": {
-    "English": "nothing — what to do is not set"
-  },
   "Нечего пробовать: шагов пока нет.": {
     "English": "Nothing to try: there are no steps yet."
-  },
-  "Нечего пробовать: не указано, что делать.": {
-    "English": "Nothing to try: what to do is not set."
   },
   "Пробую…": {
     "English": "Trying…"
@@ -1457,12 +1430,6 @@
   "секунд": {
     "English": "seconds"
   },
-  "с": {
-    "English": "s"
-  },
-  "раз": {
-    "English": "times"
-  },
   "путь": {
     "English": "path"
   },
@@ -1477,5 +1444,77 @@
   },
   "Правка команды": {
     "English": "Editing a command"
+  },
+  "{0} раз": {
+    "English": "{0} times"
+  },
+  "{0} с": {
+    "English": "{0} s"
+  },
+  "В команде есть необратимое действие — Рина спросит подтверждение.": {
+    "English": "The command contains an irreversible action — Rina will ask to confirm."
+  },
+  "Во сколько": {
+    "English": "At what time"
+  },
+  "Выберите узел на холсте, чтобы поправить его.": {
+    "English": "Select a node on the canvas to edit it."
+  },
+  "делать": {
+    "English": "do"
+  },
+  "пусто": {
+    "English": "empty"
+  },
+  "не выбрана": {
+    "English": "not chosen"
+  },
+  "не заполнено": {
+    "English": "not filled in"
+  },
+  "НИЧЕГО НЕ ВЫБРАНО": {
+    "English": "NOTHING SELECTED"
+  },
+  "Сколько секунд": {
+    "English": "How many seconds"
+  },
+  "Сколько раз": {
+    "English": "How many times"
+  },
+  "Условие": {
+    "English": "Condition"
+  },
+  "Имя значения": {
+    "English": "Name of the value"
+  },
+  "например, режим": {
+    "English": "for example, mode"
+  },
+  "Путь": {
+    "English": "Path"
+  },
+  "Какая программа": {
+    "English": "Which program"
+  },
+  "например, chrome": {
+    "English": "for example, chrome"
+  },
+  "Какое число": {
+    "English": "Which day"
+  },
+  "Равно чему": {
+    "English": "Equal to what"
+  },
+  "значение": {
+    "English": "value"
+  },
+  "Что запомнить": {
+    "English": "What to remember"
+  },
+  "Какую команду вызвать": {
+    "English": "Which command to call"
+  },
+  "Дальше ничего не выполнится.": {
+    "English": "Nothing after this will run."
   }
 }

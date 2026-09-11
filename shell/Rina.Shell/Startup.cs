@@ -673,7 +673,6 @@ public partial class App
                 // form and none of it.
                 if (editing.OpenEditor is { } built)
                 {
-                    built.ShowSequenceForCheck();
                     built.InsertStepForCheck(0, "app",
                         @"C:\Windows\System32\notepad.exe");
                     built.InsertStepForCheck(1, "pause", "2");
@@ -3146,10 +3145,32 @@ public partial class App
             // do: a step goes in **between** two others, what happens
             // inside a repeat is drawn inside it, and the window offers
             // exactly the kinds the core will run.
-            editor!.ShowSequenceForCheck();
+            // From an empty canvas: the node put there a few lines above
+            // is still on it, and "inserted between two others" cannot be
+            // read off a graph whose contents came from somewhere else.
+            editor!.ClearForCheck();
             editor!.InsertStepForCheck(0, "app", "первый");
             editor!.InsertStepForCheck(1, "speak", "третий");
             editor!.InsertStepForCheck(1, "pause", "1");
+            // --- it is a graph, not an indented list (`4.0b-A09`) ---
+            //
+            // Nodes on a surface with wires between them. Asserted on what
+            // is drawn: a picture that had the nodes and no wires would be
+            // the list again with more space around it.
+            Check("узлы нарисованы на холсте", editor!.NodesDrawn >= 3,
+                  $"| узлов {editor!.NodesDrawn}");
+            Check("и связаны проводами", editor!.WiresDrawn >= 2,
+                  $"| проводов {editor!.WiresDrawn}");
+
+            // The inspector shows the selected node and nothing until one
+            // is: a panel that showed the first node by default would make
+            // "selected" mean nothing.
+            Check("пока ничего не выбрано — осматривать нечего",
+                  !editor!.InspectorShows);
+            editor!.PickForCheck(0);
+            await Task.Delay(200);
+            Check("выбранный узел показан в осмотре", editor!.InspectorShows);
+
             var order = editor!.ChainForCheck.OfType<JsonObject>()
                 .Select(s => s["type"]?.GetValue<string>() ?? "").ToArray();
             Check("шаг вставляется между двумя другими, а не в конец",
@@ -3181,13 +3202,38 @@ public partial class App
             // would hide a capability with nothing to notice it by. It was
             // the second of those that hid `pause` since 2.0.0.
             var asSteps = editor!.StepKindsOffered;
-            var asCommands = editor!.CommandKindsOffered;
+
             Check("ожидание, повтор и условие предлагаются как шаги",
                   new[] { "pause", "repeat", "if" }.All(asSteps.Contains),
                   $"| [{string.Join(", ", asSteps)}]");
-            Check("и не предлагаются как целая команда",
-                  !new[] { "pause", "repeat", "if" }.Any(asCommands.Contains),
-                  $"| [{string.Join(", ", asCommands)}]");
+            // There is no longer a list of "what kind of command this is"
+            // to keep them out of: a command is a graph, and these are
+            // nodes like any other. The rule they existed for — a command
+            // that is only a wait does nothing on purpose — is now kept by
+            // the card itself: a graph of one node is saved as a plain
+            // command only when that node is a plain kind.
+            // **One node, and only one.** The first version of this left
+            // whatever was already on the canvas there, so the card was a
+            // sequence because it held several steps — and the break that
+            // removed the rule stayed green, because the answer never
+            // depended on the rule.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "pause", "1");
+            var wrapped = editor!.CardForCheck();
+            Check("граф из одного ожидания сохраняется последовательностью",
+                  wrapped["type"]?.GetValue<string>() == "sequence",
+                  $"| {wrapped["type"]}");
+
+            // And a graph of one plain node keeps the plain shape a command
+            // has had since 2.0.0 — a sequence wrapping one "open the
+            // browser" would make the list call every command a sequence.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "website", "example.com");
+            var plain = editor!.CardForCheck();
+            Check("а граф из одного простого узла — обычной командой",
+                  plain["type"]?.GetValue<string>() == "website"
+                  && plain["target"]?.GetValue<string>() == "example.com",
+                  $"| {plain["type"]} · {plain["target"]}");
 
             // The place goes when the work is done: a column that keeps
             // offering "new command" after it was saved is a column that
