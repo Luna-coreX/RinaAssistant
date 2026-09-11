@@ -1,0 +1,71 @@
+name: Что-то сломалось
+description: Рина повела себя не так, как должна
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо, что пишете. Ниже спрашивается ровно то, без чего разбирать
+        нечего, — а не всё, что можно придумать спросить.
+
+        **Если это уязвимость — не сюда.** Она идёт закрытым каналом:
+        [SECURITY.md](../../blob/main/SECURITY.md).
+
+  - type: textarea
+    id: what
+    attributes:
+      label: Что вы сделали и что получилось
+      description: >
+        Сказанное или напечатанное — дословно, и что случилось вместо
+        ожидаемого. «Не работает» разбору не поддаётся.
+      placeholder: |
+        Сказала «открой телеграм». Рина ответила «не нашла программу»,
+        хотя Telegram установлен из магазина.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Чего вы ждали
+      description: >
+        Иногда это очевидно, иногда нет — и там, где нет, это самое важное
+        поле во всей форме.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Версия
+      description: «О программе» — верхняя строка. Или номер выпуска.
+      placeholder: 4.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      placeholder: Windows 11 23H2
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Диагностический пакет
+      description: >
+        **О программе → Диагностика → Собрать.** Он кладёт рядом журналы
+        обеих половин, версии и состояние связи — и **пишет внутри, что
+        именно не взял**. Тексты реплик туда не попадают, пока вы сами не
+        включили это в «Настройки → Приватность», так что прикладывать его
+        обычно безопасно. Загляните внутрь, если сомневаетесь.
+
+  - type: checkboxes
+    id: repeats
+    attributes:
+      label: Повторяется ли
+      options:
+        - label: Повторил(а) — происходит каждый раз
+        - label: Случилось один раз, повторить не вышло

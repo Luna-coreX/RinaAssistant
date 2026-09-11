@@ -1,0 +1,12 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Уязвимость
+    url: https://github.com/Luna-coreX/RinaAssistant/security/advisories/new
+    about: >
+      Закрытым каналом, не публичной задачей — чтобы дыра не стала известна
+      раньше, чем закрыта.
+  - name: Вопрос или разговор
+    url: https://github.com/Luna-coreX/RinaAssistant/discussions
+    about: >
+      «Как сделать…», «а зачем так…», «работает ли с…» — это обсуждения, а
+      не задачи.

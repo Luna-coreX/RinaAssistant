@@ -338,6 +338,55 @@ missing = [name for name in re.findall(r'src="(docs/screens/[^"]+)"', readme)
            if not os.path.exists(os.path.join(ROOT, name.replace("/", os.sep)))]
 check("все снимки на месте", missing == [], f"| нет: {missing}")
 
+# ---------------------------------------------------------------------------
+# The documents somebody arriving meets first (`4.0b-C05`)
+# ---------------------------------------------------------------------------
+#
+# A person who wants to help meets four things before they meet the code:
+# how to contribute, how to behave, how to report, and the form that asks
+# them what is needed. Missing any of them is not a gap in the docs — it is
+# a person guessing, and then being told they guessed wrong.
+print()
+print("=== документы сообщества ===")
+
+COMMUNITY = {
+    "CONTRIBUTING.md": "как участвовать",
+    "CODE_OF_CONDUCT.md": "как себя вести",
+    "SECURITY.md": "куда нести уязвимость",
+    os.path.join(".github", "ISSUE_TEMPLATE", "bug.yml"): "форма для поломки",
+    os.path.join(".github", "ISSUE_TEMPLATE", "idea.yml"): "форма для идеи",
+    os.path.join(".github", "PULL_REQUEST_TEMPLATE.md"): "форма для правки",
+}
+for name, what in COMMUNITY.items():
+    check(f"есть {name} — {what}",
+          os.path.exists(os.path.join(ROOT, name)))
+
+contributing = io.open(os.path.join(ROOT, "CONTRIBUTING.md"),
+                       encoding="utf-8").read()
+
+# The licensing sentence has to match the decision, not the other way round.
+# `ADR 0001` chose Apache-2.0 with no CLA; a CONTRIBUTING that asked for one
+# would be asking for a signature nobody can accept.
+check("вклад принимается без отдельного соглашения",
+      "no CLA" in contributing or "нет CLA" in contributing,
+      "| ADR 0001 выбрал Apache-2.0 без CLA")
+
+# And the two things it tells a contributor to run must exist.
+check("CONTRIBUTING называет действующий набор проверок",
+      "tools/regress.py" in contributing
+      and os.path.exists(os.path.join(ROOT, "tools", "regress.py")))
+check("и действующий порождатель строк оболочки",
+      "tools/gen_shell_strings.py" in contributing
+      and os.path.exists(os.path.join(ROOT, "tools",
+                                      "gen_shell_strings.py")))
+
+# The habit this repository actually runs on. A CONTRIBUTING that left it
+# out would be describing a different project: every check here has been
+# broken on purpose at least once, and several were rewritten because of it.
+check("и правило ломать собственную проверку",
+      "break it" in contributing or "сломайте" in contributing.lower(),
+      "| без него прочтут «напишите проверку» и напишут соглашающуюся")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
