@@ -387,6 +387,58 @@ check("и правило ломать собственную проверку",
       "break it" in contributing or "сломайте" in contributing.lower(),
       "| без него прочтут «напишите проверку» и напишут соглашающуюся")
 
+# ---------------------------------------------------------------------------
+# The promises made in public (`4.0b-C06`, `4.0b-C07`)
+# ---------------------------------------------------------------------------
+#
+# Two of them, and both are the kind that is kept by being written down
+# **before** there is any reason to break them.
+#
+# The one about money: said once, plainly, so that it cannot later read as a
+# change of mind. The same sentence spoken after a paid plan appears is not
+# the same sentence — the person chose without knowing.
+#
+# The one about incoming: a channel with no stated order of business is not
+# a channel but a heap. Somebody who wrote on Monday and heard nothing by
+# Wednesday should be able to look up whether that is normal.
+print()
+print("=== обещания, данные вслух ===")
+
+product = io.open(os.path.join(ROOT, "PRODUCT.md"), encoding="utf-8").read()
+
+check("README говорит, чего это стоит", "## What this costs" in readme,
+      "| сказанное после появления платного читается как подмена")
+check("и обещает, что локальная база останется бесплатной",
+      "local base stays free" in readme)
+check("и называет, что остаётся открытым",
+      "What is open stays open" in readme)
+check("то же обещание записано в PRODUCT.md",
+      "Деньги — сказано один раз" in product)
+
+# The promise names the class that keeps it. A promise pointing at code that
+# does not exist is the shape this goes wrong in: the sentence survives a
+# rename and stops being about anything.
+check("обещание ссылается на существующий класс возможностей",
+      "CommunityFeatures" in product
+      and "class CommunityFeatures" in io.open(
+          os.path.join(ROOT, "core", "features.py"),
+          encoding="utf-8").read(),
+      "| PRODUCT.md называет CommunityFeatures")
+
+triage = os.path.join(ROOT, "docs", "TRIAGE.md")
+check("есть порядок разбора входящего", os.path.exists(triage))
+if os.path.exists(triage):
+    order = io.open(triage, encoding="utf-8").read()
+    # Four outcomes, and the fifth — silence — is the one it exists to
+    # forbid. A document listing three of them leaves the fourth to chance.
+    check("и он называет все четыре исхода",
+          all(word in order for word in ("Берётся", "Уже есть",
+                                         "Так задумано", "Не будет")),
+          "| пятый исход — молчание — и есть то, что он запрещает")
+    check("и обещает срок, а не «когда-нибудь»",
+          "в течение недели" in order)
+    check("README ведёт к нему", "docs/TRIAGE.md" in readme)
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

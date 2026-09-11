@@ -246,6 +246,35 @@ How to debug two processes at once — [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
 
 ---
 
+## What this costs
+
+**Nothing, and the part you are using now will go on costing nothing.**
+
+Said once, plainly, because the alternative is saying it later and having it
+read as a change of mind:
+
+- **The beta is free.** All of it. Nothing is held back behind a plan, and
+  there is no payment code in the program to hold anything back with.
+- **The local base stays free.** Everything that runs on your machine —
+  voice in and out, launching programs, commands, reminders, plugins, the
+  local model, the privacy page — is the product, not a trial of it. It is
+  Apache-2.0, and a licence cannot be taken back from a copy you already
+  have.
+- **Some advanced capabilities may be paid later.** Most likely candidates
+  are things that cost money to run — a service on somebody's server, a
+  connector to a paid third party. If that happens it will be *additional*,
+  and this list is the promise it will be measured against.
+
+**What is open stays open**, and that is decided rather than hoped: the code
+that handles audio and your data, the safe launching of programs, the
+confirmation of dangerous actions, the security journal, the protocol, and
+the base functionality. What could reasonably close later is a licence
+server, billing, and paid connectors — none of which is on your computer.
+
+There is no telemetry, no account, and nothing to opt out of.
+
+---
+
 ## Roadmap
 
 **4.0.0-port — separation and redesign.** Nearly complete: the core is a standalone service, the shell and system layer are C#, the protocol is between them, the interface is redesigned. What remains is the installer.
@@ -269,9 +298,18 @@ Reporting a vulnerability: [`SECURITY.md`](SECURITY.md).
 
 ---
 
-## Contributing
+## Contributing and feedback
 
-Issues and pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). When reporting a bug, attach a diagnostic package: **About → Diagnostics → Collect**. It gathers the logs of both layers, the versions and the state of the link, and says inside exactly what it left out.
+Issues and pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+- **Something broke** or **something is missing** — [Issues](https://github.com/Luna-coreX/RinaAssistant/issues); the forms ask for what is actually needed to look into it.
+- **A question, or "does it work with…"** — [Discussions](https://github.com/Luna-coreX/RinaAssistant/discussions).
+- **A vulnerability** — not in public: [`SECURITY.md`](SECURITY.md).
+
+What happens to something once it arrives — who reads it, in what time, and
+what the four possible outcomes are — is written down in
+[`docs/TRIAGE.md`](docs/TRIAGE.md), so that "no answer yet" can be told from
+"nobody is reading". When reporting a bug, attach a diagnostic package: **About → Diagnostics → Collect**. It gathers the logs of both layers, the versions and the state of the link, and says inside exactly what it left out.
 
 ---
 
