@@ -49,6 +49,12 @@
   <CornerRadius x:Key="Radius.Max">3</CornerRadius>
   <CornerRadius x:Key="Radius.Window">8</CornerRadius>
 
+  <!-- Густота подсветки состояний (4.0b-E03) -->
+  <sys:Double x:Key="State.Hover.Wash">0.45</sys:Double>
+  <sys:Double x:Key="State.Press.Wash">0.7</sys:Double>
+  <sys:Double x:Key="State.PrimaryHover.Wash">0.45</sys:Double>
+  <sys:Double x:Key="State.PrimaryPress.Wash">0.7</sys:Double>
+
   <!-- Гарнитуры -->
   <FontFamily x:Key="Font.Display">Century Gothic, Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
   <FontFamily x:Key="Font.Ui">Segoe UI Variable Text, Segoe UI Variable Text, Segoe UI, Arial</FontFamily>

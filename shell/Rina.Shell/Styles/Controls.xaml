@@ -59,6 +59,13 @@
   <Style x:Key="Btn" TargetType="Button">
     <Setter Property="Background" Value="{DynamicResource C.Glass.Control}" />
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <!--
+      What the state washes over the face (4.0b-E03). Named here rather
+      than in the template so a button whose face is not the panel's can
+      say so: see Btn.Primary, whose face is ink.
+    -->
+    <Setter Property="ui:Ui.Warm" Value="{DynamicResource C.FaceHigh}" />
+    <Setter Property="ui:Ui.Sunk" Value="{DynamicResource C.FaceLow}" />
     <Setter Property="BorderThickness" Value="0" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
     <Setter Property="FontSize" Value="13" />
@@ -94,10 +101,12 @@
               </Border.Effect>
             </Border>
             <Border x:Name="Warm" Opacity="0"
-                    Background="{DynamicResource C.FaceHigh}"
+                    Background="{Binding Path=(ui:Ui.Warm),
+                                RelativeSource={RelativeSource TemplatedParent}}"
                     CornerRadius="{StaticResource Radius.Max}" />
             <Border x:Name="Sunk" Opacity="0"
-                    Background="{DynamicResource C.FaceLow}"
+                    Background="{Binding Path=(ui:Ui.Sunk),
+                                RelativeSource={RelativeSource TemplatedParent}}"
                     CornerRadius="{StaticResource Radius.Max}" />
             <!--
               And a single line of light along the top edge, saying where
@@ -121,7 +130,7 @@
                   <Storyboard>
                     <DoubleAnimation Storyboard.TargetName="Warm"
                                      Storyboard.TargetProperty="Opacity"
-                                     To="1"
+                                     To="{StaticResource State.Hover.Wash}"
                                      Duration="{StaticResource Motion.State}"
                                      EasingFunction="{StaticResource Ease.In}" />
                   </Storyboard>
@@ -148,7 +157,7 @@
                   <Storyboard>
                     <DoubleAnimation Storyboard.TargetName="Sunk"
                                      Storyboard.TargetProperty="Opacity"
-                                     To="1"
+                                     To="{StaticResource State.Press.Wash}"
                                      Duration="{StaticResource Motion.Press}"
                                      EasingFunction="{StaticResource Ease.In}" />
                   </Storyboard>
@@ -221,10 +230,23 @@
     <Setter Property="Padding" Value="20,0" />
   </Style>
 
-  <!-- Primary: one per screen. Filled with ink, not with the accent. -->
+  <!--
+    Primary: one per screen. Filled with ink, not with the accent.
+
+    Its states are its own (4.0b-E03). The general highlight is the panel's
+    raised face, and laying that over ink left the button's text — the
+    panel's own colour — standing on the panel's own colour: a contrast of
+    1.1 where reading needs 4.5. On a dark finish, where the ink is light,
+    it read as black text on a button that went dark under the pointer,
+    which is how a person found it. Washed with the soft ink instead: the
+    face darkens or lightens with the finish and the text keeps 5.3 at the
+    worst of the three.
+  -->
   <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
     <Setter Property="Background" Value="{DynamicResource C.Ink}" />
     <Setter Property="Foreground" Value="{DynamicResource C.Face}" />
+    <Setter Property="ui:Ui.Warm" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="ui:Ui.Sunk" Value="{DynamicResource C.InkSoft}" />
   </Style>
 
   <!-- Window controls: marks, not words. That is the system's convention. -->
@@ -315,7 +337,7 @@
                   <Storyboard>
                     <DoubleAnimation Storyboard.TargetName="Warm"
                                      Storyboard.TargetProperty="Opacity"
-                                     To="1"
+                                     To="{StaticResource State.Hover.Wash}"
                                      Duration="{StaticResource Motion.State}"
                                      EasingFunction="{StaticResource Ease.In}" />
                   </Storyboard>

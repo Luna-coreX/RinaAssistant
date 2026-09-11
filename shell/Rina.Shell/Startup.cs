@@ -1985,6 +1985,43 @@ public partial class App
     private static extern bool SetCursorPos(int x, int y);
 
     [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr window);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool AttachThreadInput(uint from, uint to,
+                                                 bool attach);
+
+    /// <summary>Take the foreground, the way Windows actually allows.</summary>
+    /// <remarks>
+    /// <c>Activate</c> alone is refused: Windows gives the foreground only
+    /// to the process that already holds it, so a check started from a
+    /// terminal asks for it and is quietly turned down. Without the
+    /// foreground the pointer lands on whoever does hold it, and every
+    /// question about hovering is answered by a button at rest.
+    ///
+    /// Attaching to the holder's input queue is the documented way round:
+    /// while attached we count as the same input context, and the request
+    /// is granted.
+    /// </remarks>
+    private static void TakeForeground(Window window)
+    {
+        var ours = new System.Windows.Interop.WindowInteropHelper(window)
+            .Handle;
+        var theirs = GetForegroundWindow();
+        if (theirs == ours) return;
+
+        var them = GetWindowThreadProcessId(theirs, IntPtr.Zero);
+        var us = GetCurrentThreadId();
+        AttachThreadInput(them, us, true);
+        SetForegroundWindow(ours);
+        window.Activate();
+        AttachThreadInput(them, us, false);
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
     private static extern bool GetCursorPos(out System.Drawing.Point point);
 
     /// <summary>
@@ -2032,6 +2069,27 @@ public partial class App
             window.Topmost = true;
             window.Show();
             window.Activate();
+            TakeForeground(window);
+
+            // And say so if it did not come forward. Everything below moves
+            // the real pointer and then asks what changed; with somebody
+            // else's window in front the pointer lands on theirs, nothing
+            // changes, and the questions are answered by an interface at
+            // rest — which is a lawful-looking answer to every one of them.
+            // One honest line beats six puzzling ones.
+            await Until(() => window.IsActive, 3);
+            Check("окно вышло на передний план", window.IsActive,
+                  window.IsActive ? ""
+                  : "| без этого курсор попадает в чужое окно, "
+                    + "и вся проверка меряет покой");
+            if (!window.IsActive)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {fails}");
+                Environment.ExitCode = 1;
+                Shutdown();
+                return;
+            }
 
             // With a core of its own: without a link the commands page
             // shows "the core is not connected" and not a single row —
@@ -2050,6 +2108,23 @@ public partial class App
 
             window.ShowSectionFor("commands");
             await Task.Delay(2000);
+
+            // Two commands of our own, written here. A fresh store under
+            // the sandbox has none, and the built-in group is folded when
+            // the page is drawn (`4.0b-A11`) — so the rows this check is
+            // about were there only on a machine whose real store happened
+            // to hold a couple, and that is what it had been measuring.
+            // Written rather than unfolded, because a row of one's own is
+            // the row with the dangerous button on it, and that button is
+            // checked below.
+            if (window.CurrentPage is Pages.CommandsPage listing)
+            {
+                await listing.CreateForCheckAsync(
+                    "проверка наводки раз", "speak", "раз");
+                await listing.CreateForCheckAsync(
+                    "проверка наводки два", "speak", "два");
+                await Task.Delay(800);
+            }
 
             var rows = Rows(window).Take(2).ToArray();
             Check("строки списка нашлись", rows.Length == 2,
@@ -2072,6 +2147,28 @@ public partial class App
                   "| общая подсветила бы всю таблицу разом");
 
             await HoverAsync(rows[0]);
+
+            // The pointer is where we put it, and that is not the same as
+            // being over us. Somebody else's window that stays on top —
+            // a terminal, a recorder, a messenger — takes the hit test, and
+            // then nothing anywhere below lights up. Every assertion in this
+            // check reads "nothing lit", which is exactly what a broken
+            // highlight reads as: the check cannot tell the two apart, so
+            // it has to ask outright.
+            Check("курсор дошёл до окна", rows[0].IsMouseOver,
+                  rows[0].IsMouseOver ? ""
+                  : "| поверх нашего стоит чужое окно; наводку здесь "
+                    + "не измерить, и «не подсветилось» ничего не значит");
+            if (!rows[0].IsMouseOver)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {fails}");
+                Environment.ExitCode = 1;
+                SetCursorPos(was.X, was.Y);
+                Shutdown();
+                return;
+            }
+
             Check("наведённая строка подсветилась",
                   Lit(rows[0]) > 0.5, $"| {Lit(rows[0]):0.00}");
             Check("соседняя осталась тёмной",
@@ -2086,6 +2183,91 @@ public partial class App
             await Task.Delay(500);
             Check("ушли — погасло", Lit(rows[1]) < 0.1,
                   $"| {Lit(rows[1]):0.00}");
+
+            // --- what stands written on a button under the pointer ----
+            Console.WriteLine();
+            Console.WriteLine("=== наведение: текст на кнопке под курсором ===");
+
+            // Asked of the picture, not of the palette. The palette is
+            // checked by `check_contrast.py`, and it was green while the
+            // button was unreadable: the highlight is a layer of its own,
+            // and which layer lands on which button is a fact about the
+            // styles rather than about the colours. Only the drawn button
+            // knows both.
+            var dpi = PresentationSource.FromVisual(window)
+                          ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            foreach (var (style, what) in new[]
+                     {
+                         ("Btn.Primary", "первичной"),
+                         ("Btn.Danger", "опасной"),
+                         ("Btn", "обычной"),
+                     })
+            {
+                var look = (Style)window.FindResource(style);
+                var button = Buttons(window).FirstOrDefault(
+                    b => ReferenceEquals(b.Style, look) && b.IsVisible
+                         && b.ActualWidth > 40);
+                if (button is null)
+                {
+                    Check($"кнопка {style} нашлась", false);
+                    continue;
+                }
+
+                var ink = (button.Foreground as
+                           System.Windows.Media.SolidColorBrush)?.Color
+                          ?? System.Windows.Media.Colors.Black;
+                // The left-hand padding, where the button is filled and
+                // nothing is written: a glyph is a mixture of ink and face
+                // at every anti-aliased edge, and averaging that would
+                // measure the blend rather than the ground it stands on.
+                var box = button.TransformToVisual(window)
+                                .Transform(new Point(0, 0));
+                System.Windows.Media.Color Fill() => Mean(
+                    window, dpi, box.X + 4, box.X + 12,
+                    box.Y + button.ActualHeight * 0.3,
+                    box.Y + button.ActualHeight * 0.7);
+
+                var calm = Fill();
+                await HoverAsync(button);
+                var warm = Fill();
+
+                // First that the pointer arrived at all. Without this the
+                // reading below is of the button at rest, and a button at
+                // rest passes: the whole difficulty is in the state the
+                // check is named after. On a screen with somebody else's
+                // window over ours the pointer lands on theirs, and every
+                // assertion here went green while measuring nothing.
+                Check($"{what} кнопка отзывается на курсор",
+                      Apartness(calm, warm) > 1.02,
+                      $"| {calm} → {warm}");
+
+                var seen = Apartness(ink, warm);
+                Check($"на {what} кнопке под курсором текст читается",
+                      seen >= 4.5,
+                      $"| {seen:0.0} при нужных 4.5, {ink} на {warm}");
+            }
+
+            // And the hatching survives the pointer. It is the only sign of
+            // danger in the system, and the highlight used to be opaque, so
+            // the one moment a person is certainly looking at the button was
+            // the one moment it had nothing on it.
+            var danger = Buttons(window).FirstOrDefault(
+                b => ReferenceEquals(b.Style, window.FindResource("Btn.Danger"))
+                     && b.IsVisible && b.ActualWidth > 40);
+            if (danger is not null)
+            {
+                var at = danger.TransformToVisual(window)
+                               .Transform(new Point(0, 0));
+                await HoverAsync(danger);
+                var lit = Grain(window, dpi, at.X + 4, at.X + 16,
+                                at.Y + 6, at.Y + danger.ActualHeight - 6);
+                SetCursorPos((int)window.Left + 20, (int)window.Top + 600);
+                await Task.Delay(400);
+                var calm = Grain(window, dpi, at.X + 4, at.X + 16,
+                                 at.Y + 6, at.Y + danger.ActualHeight - 6);
+                Check("штриховка видна и под курсором", lit > calm / 2,
+                      $"| рябь {lit:0.0} против {calm:0.0} без курсора");
+            }
 
             // --- options of an opened list ----------------------------
             Console.WriteLine();
@@ -2167,6 +2349,100 @@ public partial class App
         Shutdown();
     }
 
+    /// <summary>The page's buttons in order of appearance.</summary>
+    private static IEnumerable<System.Windows.Controls.Button> Buttons(
+        DependencyObject root)
+    {
+        foreach (var child in Children(root))
+        {
+            if (child is System.Windows.Controls.Button one) yield return one;
+            foreach (var deeper in Buttons(child)) yield return deeper;
+        }
+    }
+
+    /// <summary>The average colour of a patch of the drawn window.</summary>
+    private static System.Windows.Media.Color Mean(
+        Window window, double dpi, double left, double right,
+        double top, double bottom)
+    {
+        var (pixels, width, height) = Drawn(window, dpi);
+        double r = 0, g = 0, b = 0;
+        var seen = 0;
+        for (var y = Math.Max(0, (int)(top * dpi));
+             y < Math.Min(height, (int)(bottom * dpi)); y++)
+            for (var x = Math.Max(0, (int)(left * dpi));
+                 x < Math.Min(width, (int)(right * dpi)); x++)
+            {
+                var at = (y * width + x) * 4;
+                b += pixels[at];
+                g += pixels[at + 1];
+                r += pixels[at + 2];
+                seen++;
+            }
+        if (seen == 0) return System.Windows.Media.Colors.Black;
+        return System.Windows.Media.Color.FromRgb(
+            (byte)(r / seen), (byte)(g / seen), (byte)(b / seen));
+    }
+
+    /// <summary>How uneven a patch is: a pattern shows here, a fill does not.</summary>
+    private static double Grain(
+        Window window, double dpi, double left, double right,
+        double top, double bottom)
+    {
+        var (pixels, width, height) = Drawn(window, dpi);
+        var seen = new List<double>();
+        for (var y = Math.Max(0, (int)(top * dpi));
+             y < Math.Min(height, (int)(bottom * dpi)); y++)
+            for (var x = Math.Max(0, (int)(left * dpi));
+                 x < Math.Min(width, (int)(right * dpi)); x++)
+                seen.Add(pixels[(y * width + x) * 4 + 1]);
+        if (seen.Count == 0) return 0;
+        var middle = seen.Average();
+        return Math.Sqrt(seen.Sum(one => (one - middle) * (one - middle))
+                         / seen.Count);
+    }
+
+    /// <summary>The window as drawn, in pixels.</summary>
+    private static (byte[] Pixels, int Width, int Height) Drawn(
+        Window window, double dpi)
+    {
+        var width = (int)(window.ActualWidth * dpi);
+        var height = (int)(window.ActualHeight * dpi);
+        var frame = new RenderTargetBitmap(width, height, 96 * dpi, 96 * dpi,
+                                           PixelFormats.Pbgra32);
+        frame.Render(window);
+        var pixels = new byte[width * height * 4];
+        frame.CopyPixels(pixels, width * 4, 0);
+        return (pixels, width, height);
+    }
+
+    /// <summary>WCAG contrast between two colours.</summary>
+    /// <remarks>
+    /// The same formula as <c>tools/check_contrast.py</c>, and the same
+    /// threshold. Two implementations of one formula part company at the
+    /// first change to it — but these two measure different things: the
+    /// table of colours there, the drawn window here, and the drawn window
+    /// is where a highlight lands on a button the table never paired it
+    /// with.
+    /// </remarks>
+    private static double Apartness(System.Windows.Media.Color one,
+                                    System.Windows.Media.Color other)
+    {
+        static double Channel(byte value)
+        {
+            var part = value / 255.0;
+            return part <= 0.03928 ? part / 12.92
+                                   : Math.Pow((part + 0.055) / 1.055, 2.4);
+        }
+        static double Light(System.Windows.Media.Color colour)
+            => 0.2126 * Channel(colour.R) + 0.7152 * Channel(colour.G)
+               + 0.0722 * Channel(colour.B);
+
+        var a = Light(one);
+        var b = Light(other);
+        return (Math.Max(a, b) + 0.05) / (Math.Min(a, b) + 0.05);
+    }
+
     /// <summary>The page's dropdowns in order of appearance.</summary>
     private static IEnumerable<System.Windows.Controls.ComboBox> Boxes(
         DependencyObject root)
@@ -2227,22 +2503,12 @@ public partial class App
         => (Warm(option) as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
 
     /// <summary>Move the cursor to the middle of an option.</summary>
-    private static async Task HoverAsync(
-        System.Windows.Controls.ComboBoxItem option)
-    {
-        var middle = option.PointToScreen(new Point(option.ActualWidth / 2,
-                                                    option.ActualHeight / 2));
-        SetCursorPos((int)middle.X, (int)middle.Y);
-        System.Windows.Input.Mouse.Synchronize();
-        await Task.Delay(500);
-    }
-
     /// <summary>How brightly a row is lit right now.</summary>
     private static double Lit(System.Windows.Controls.Border row)
         => (row.Background as System.Windows.Media.SolidColorBrush)?.Opacity ?? -1;
 
     /// <summary>Move the cursor to the middle of a row and let the motion run.</summary>
-    private static async Task HoverAsync(System.Windows.Controls.Border row)
+    private static async Task HoverAsync(FrameworkElement row)
     {
         var middle = row.PointToScreen(new Point(row.ActualWidth / 2,
                                                  row.ActualHeight / 2));

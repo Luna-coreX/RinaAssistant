@@ -202,6 +202,18 @@ def common_xaml(tokens: dict) -> str:
         lines.append('  <CornerRadius x:Key="Radius.Window">'
                      f'{window["corner"]}</CornerRadius>')
 
+    # How densely a state's highlight is laid on. From the states table and
+    # not from a number in the markup: it was opaque there, which made it a
+    # repaint rather than a highlight -- the hatching of a dangerous button
+    # vanished under the pointer, and the pointer is when it is read.
+    lines.append("")
+    lines.append("  <!-- Густота подсветки состояний (4.0b-E03) -->")
+    for name, state in tokens["states"].items():
+        if not isinstance(state, dict) or "wash" not in state:
+            continue
+        lines.append(f'  <sys:Double x:Key="State.{key(name)}.Wash">'
+                     f'{state["wash"]}</sys:Double>')
+
     lines.append("")
     lines.append("  <!-- Гарнитуры -->")
     #: What to fall back on when the family is missing. Named per family

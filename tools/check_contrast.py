@@ -77,6 +77,13 @@ PAIRS = (
     ("SIGNAL",     "FACE",       4.5, "признак ошибки — это текст, не рамка"),
     ("SIGNAL",     "FACE_HIGH",  3.0, "рамка фокуса на приподнятом"),
     ("FACE",       "INK",        4.5, "первичная кнопка: панель на чернилах"),
+    # And the same button under the pointer. It was missing here, and the
+    # state it was missing for was the one that did not work: the general
+    # highlight is the panel's raised face, and laid over ink it left the
+    # button's text — the panel's colour — on the panel's colour. 1.1 where
+    # 4.5 is needed, in all three finishes, and no check had a word to say
+    # about it. A pair nobody writes down is a pair nobody measures.
+    ("FACE",       "INK_SOFT",   4.5, "первичная кнопка под курсором"),
     ("SEAM",       "FACE",       1.2, "волосяной шов между областями"),
 )
 
