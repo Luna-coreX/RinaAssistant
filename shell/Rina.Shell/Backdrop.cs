@@ -124,6 +124,7 @@ public sealed class Backdrop
     private double _step;
     private (byte R, byte G, byte B)[] _ramp = [];
     private bool _visible;
+    private bool _frozen;
 
     public Backdrop(Image view, Image? calmView = null)
     {
@@ -322,6 +323,37 @@ public sealed class Backdrop
         return [.. ramp];
     }
 
+    /// <summary>Stop the flow and paint a picture a check can recognise.</summary>
+    /// <remarks>
+    /// Only a check calls this, and it exists because the question the bar
+    /// raises cannot be put to the flow itself. The question is whether what
+    /// the bar shows carries less detail than what lies behind it; the flow
+    /// is a smooth field two hundred points wide stretched across a window,
+    /// so it has almost no detail to lose, and softening it changes nothing
+    /// a number can see. A picture with detail in it makes the difference
+    /// measurable.
+    ///
+    /// Frozen rather than merely stopped: the clock is restarted by every
+    /// reason the window has to think somebody is looking, and one tick
+    /// would paint the answer over.
+    /// </remarks>
+    public void PaintForCheck(Func<int, int, (byte R, byte G, byte B)> ink)
+    {
+        _frozen = true;
+        Settle();
+        for (var y = 0; y < High; y++)
+            for (var x = 0; x < Wide; x++)
+            {
+                var (r, g, b) = ink(x, y);
+                var at = (y * Wide + x) * 4;
+                _pixels[at] = b;
+                _pixels[at + 1] = g;
+                _pixels[at + 2] = r;
+                _pixels[at + 3] = 255;
+            }
+        _film.WritePixels(new Int32Rect(0, 0, Wide, High), _pixels, Wide * 4, 0);
+    }
+
     /// <summary>Run or stop, to match whether there is anybody to look.</summary>
     /// <remarks>
     /// One method for both, because the caller has one thing to say: is the
@@ -346,7 +378,7 @@ public sealed class Backdrop
     /// </remarks>
     private void Settle()
     {
-        var wanted = _visible && !WantsStillness;
+        var wanted = _visible && !WantsStillness && !_frozen;
         if (wanted == Running) return;
         if (wanted) _clock.Start();
         else _clock.Stop();

@@ -139,6 +139,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-glass"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckGlassAsync(window, Value(args, "--shot")), "glass");
+            return;
+        }
+
         if (args.Contains("--check-home"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -2592,6 +2599,137 @@ public partial class App
               $"| {shown.TilesShown}");
 
         await link.DisposeAsync();
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The bar shows what is behind it, softened (4.0b-E01).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked of the rendered window, not of the element. "Is there a blur
+    /// on it, and of what radius" is the code read back aloud: it stays
+    /// green when the layer is the wrong size, when it sits under the
+    /// background instead of over it, and when the row clips it away
+    /// entirely — every way this can actually be broken.
+    /// </para>
+    /// <para>
+    /// The background is frozen on a striped picture first, because its own
+    /// flow has no detail to lose: two hundred points stretched across a
+    /// window is already softer than the blur. Measured against the flow,
+    /// the check came out the same with the blur taken out.
+    /// </para>
+    /// <para>
+    /// And it measures the same place twice — once with the layer, once
+    /// without. The second reading is what gives the first one a size:
+    /// "soft" means nothing until it is said next to how sharp the picture
+    /// behind the bar really is.
+    /// </para>
+    /// </remarks>
+    private async Task CheckGlassAsync(MainWindow window, string? shot)
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== стекло: размытие под верхней полосой ===");
+
+        window.Width = 940;
+        window.Height = 620;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        await Task.Delay(500);
+
+        // Stripes above, one plain colour below. Two questions in one
+        // picture: the stripes are the detail the bar is meant to lose, and
+        // the colour says which part of the picture it is showing — a layer
+        // squeezed into the row's forty points instead of laid out over the
+        // whole window would come out blue.
+        static (byte R, byte G, byte B) Ink(int x, int y)
+        {
+            const int band = 30;
+            if (y >= band) return (20, 30, 240);
+            return y % 2 == 0 ? ((byte)240, (byte)30, (byte)30)
+                              : ((byte)30, (byte)0, (byte)0);
+        }
+
+        window.PaintBackdropForCheck(Ink);
+        await Task.Delay(300);
+
+        if (shot is not null) Save(window, shot);
+
+        var dpi = PresentationSource.FromVisual(window)
+                      ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+
+        // Below the layer's own top edge. A blur samples nothing outside
+        // the picture, so its first points fade towards transparency, and a
+        // reading taken there would be of the fade rather than of the bar.
+        var top = (int)(22 * dpi);
+        var bottom = (int)(38 * dpi);
+
+        (double Red, double Blue, double Detail) Read()
+        {
+            var width = (int)(window.ActualWidth * dpi);
+            var height = (int)(window.ActualHeight * dpi);
+            var frame = new RenderTargetBitmap(width, height, 96 * dpi,
+                                               96 * dpi, PixelFormats.Pbgra32);
+            frame.Render(window);
+            var pixels = new byte[width * height * 4];
+            frame.CopyPixels(pixels, width * 4, 0);
+
+            // The middle of the row across: the title stands on the left and
+            // the three window buttons on the right, and both would be read
+            // as detail of the background.
+            var from = (int)(width * 0.45);
+            var to = (int)(width * 0.55);
+            var rows = new List<double>();
+            double red = 0, blue = 0;
+            for (var y = top; y < bottom; y++)
+            {
+                double r = 0, b = 0;
+                for (var x = from; x < to; x++)
+                {
+                    var at = (y * width + x) * 4;
+                    b += pixels[at];
+                    r += pixels[at + 2];
+                }
+                rows.Add(r / (to - from));
+                red += r / (to - from);
+                blue += b / (to - from);
+            }
+            return (red / rows.Count, blue / rows.Count,
+                    rows.Max() - rows.Min());
+        }
+
+        var glass = Read();
+
+        window.BarGlass.Visibility = Visibility.Collapsed;
+        await Task.Delay(300);
+        var bare = Read();
+        window.BarGlass.Visibility = Visibility.Visible;
+
+        Check("за полосой действительно резкая картинка",
+              bare.Detail > 100,
+              $"| перепад {bare.Detail:0} из 210");
+        Check("полоса показывает верх картинки, а не всю",
+              glass.Red > glass.Blue * 2,
+              $"| красного {glass.Red:0}, синего {glass.Blue:0}");
+        Check("и показывает её размытой",
+              glass.Detail < bare.Detail / 5,
+              $"| перепад {glass.Detail:0} против {bare.Detail:0}");
 
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");

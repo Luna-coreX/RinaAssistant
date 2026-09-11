@@ -34,9 +34,30 @@
     <Image x:Name="Backdrop" Grid.RowSpan="3" Stretch="Fill"
            IsHitTestVisible="False" />
 
-    <!-- The title bar: our own, because the typography is our own -->
+    <!--
+      The title bar: our own, because the typography is our own.
+
+      **Blurred, and still not a surface** (4.0b-E01). The glasswork keeps
+      the bar at a density of zero — it is a place, not a plane, and what
+      separates it is typography rather than a fill. Blur is a different
+      property: a fill adds a layer, blur takes detail away from the layer
+      below. The title stops competing with an eddy of the background, and
+      the place stays a place.
+
+      Noticed by the person using it: beside a tab whose content lies on
+      glass, a bar with nothing at all read as unfinished.
+    -->
     <Grid Grid.Row="0" Background="{DynamicResource C.Glass.Bar}"
+          ClipToBounds="True"
           Height="{StaticResource Size.Row}">
+      <!--
+        The same picture as the background, blurred and clipped to the
+        bar. It works because the background is ours: a second view of the
+        same bitmap, laid out over the whole window and cut to this row,
+        shows exactly what is behind the bar and nothing else.
+      -->
+      <Image x:Name="BarGlass" Stretch="Fill" VerticalAlignment="Top"
+             HorizontalAlignment="Stretch" IsHitTestVisible="False" />
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
         <!--
           Three lines (4.0b-A07). The sections used to stand in a column

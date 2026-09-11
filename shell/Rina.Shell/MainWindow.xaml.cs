@@ -63,6 +63,24 @@ public partial class MainWindow : Window
         // nobody, and then it stops. See Backdrop for why that is the task
         // rather than an optimisation.
         _backdrop = new Backdrop(Backdrop, BackdropCalm);
+
+        // The bar shows the same picture, blurred (`4.0b-E01`). The same
+        // bitmap rather than a second one: two pictures of one flow would
+        // drift apart by a frame and the seam would show exactly where the
+        // bar ends.
+        BarGlass.Source = Backdrop.Source;
+        BarGlass.Effect = new System.Windows.Media.Effects.BlurEffect
+        {
+            Radius = (double)FindResource("Glass.Blur"),
+            KernelType = System.Windows.Media.Effects.KernelType.Gaussian,
+            RenderingBias = System.Windows.Media.Effects.RenderingBias
+                .Performance,
+        };
+        // Laid out over the whole window and cut to the bar by the row's
+        // clip: that is what makes it show what is behind the bar rather
+        // than the whole flow squeezed into forty points.
+        SizeChanged += (_, _) => BarGlass.Height = ActualHeight;
+        BarGlass.Height = Height;
         // The flow takes its colour from the accent, so it has to be told
         // when the accent changes — and it is changed from two places, the
         // settings page and the link's first hello, neither of which should
@@ -409,6 +427,11 @@ public partial class MainWindow : Window
     /// do with the field.
     /// </remarks>
     public void RunBackdropForShot() => _backdrop.Follow(true);
+
+    /// <summary>Freeze the background on a picture the check drew — for the check.</summary>
+    public void PaintBackdropForCheck(
+        Func<int, int, (byte R, byte G, byte B)> ink)
+        => _backdrop.PaintForCheck(ink);
 
     /// <summary>How much the background moved over a second — for the check.</summary>
     public double BackdropDrift => _backdrop.DriftPerSecond;

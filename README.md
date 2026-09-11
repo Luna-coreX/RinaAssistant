@@ -236,7 +236,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 65 checks, about four minutes
+python tools/regress.py          # 66 checks, about four minutes
 python tools/regress.py --list   # what they are
 ```
 
