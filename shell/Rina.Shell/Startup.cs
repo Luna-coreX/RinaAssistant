@@ -3237,6 +3237,27 @@ public partial class App
                   $"| {plain["type"]} · {plain["target"]}");
 
 
+            // --- dragging says it can be dragged (`4.0b-A09`) ---
+            //
+            // It worked before any of this and was invisible, which is the
+            // same as not being there. Asserted on the marks a person sees.
+            await Task.Delay(150);
+            Check("у каждого узла есть ручка",
+                  editor!.GripsShown == editor!.NodesDrawn,
+                  $"| ручек {editor!.GripsShown} при узлах {editor!.NodesDrawn}");
+            Check("и курсор говорит, что узел двигается",
+                  editor!.NodeSaysItMoves);
+
+            Check("в покое порты не горят", editor!.PortsLit == 0,
+                  $"| горит {editor!.PortsLit} из {editor!.PortsShown}");
+            editor!.ShowPortsForCheck(true);
+            await Task.Delay(120);
+            Check("пока узел в воздухе — горят все",
+                  editor!.PortsLit == editor!.PortsShown
+                  && editor!.PortsShown > 0,
+                  $"| горит {editor!.PortsLit} из {editor!.PortsShown}");
+            editor!.ShowPortsForCheck(false);
+
             // --- the trial, shown running (`4.0b-A09`) ---
             //
             // Asserted on the colour the node is wearing, not on the state

@@ -1516,5 +1516,8 @@
   },
   "Дальше ничего не выполнится.": {
     "English": "Nothing after this will run."
+  },
+  "Потяните, чтобы переставить": {
+    "English": "Drag to move it"
   }
 }

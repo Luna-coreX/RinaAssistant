@@ -1569,6 +1569,11 @@ public static partial class Loc
                 {
                     ["English"] = "Installed: {0}. Turn it on to make it work.",
                 },
+            ["Потяните, чтобы переставить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Drag to move it",
+                },
             ["Почти тихо: {0}%. Проверьте, тот ли микрофон выбран."] =
                 new Dictionary<string, string>
                 {

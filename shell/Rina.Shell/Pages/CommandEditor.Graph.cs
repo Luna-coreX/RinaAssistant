@@ -58,6 +58,7 @@ public partial class CommandEditor
         Board.Children.Clear();
         _boxes.Clear();
         _byPath.Clear();
+        _ports.Clear();
 
         // The paths match the ones the core reports. A sequence's steps
         // arrive as `steps.0`, so the canvas names them the same way; a
@@ -169,7 +170,42 @@ public partial class CommandEditor
         var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
         var chosen = ReferenceEquals(step, _picked);
 
-        var body = new StackPanel { Margin = new Thickness(10, 6, 10, 6) };
+        // The grip. Without it nothing on the node says it can be moved:
+        // the dragging worked and was invisible, which is the same as not
+        // being there. Six dots is what a grip looks like everywhere, and
+        // the cursor over the node says the same thing a second time for
+        // anybody who does not read marks.
+        var whole = new Grid();
+        whole.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+        whole.ColumnDefinitions.Add(new ColumnDefinition());
+
+        var grip = new TextBlock
+        {
+            Text = "⠿",
+            Style = (Style)FindResource("Text.Meta"),
+            // Soft ink at three quarters, not faint ink at a half. At a
+            // half it read as a smudge on the box rather than as something
+            // to take hold of — and an affordance nobody recognises is the
+            // same as no affordance, which is what this was added to fix.
+            Foreground = (Brush)FindResource("C.InkSoft"),
+            FontSize = 14,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(8, 0, 0, 0),
+            Opacity = 0.75,
+            ToolTip = S("Потяните, чтобы переставить"),
+        };
+        whole.Children.Add(grip);
+
+        var body = new StackPanel
+        {
+            Margin = new Thickness(8, 6, 10, 6),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(body, 1);
+        whole.Children.Add(body);
         body.Children.Add(new TextBlock
         {
             Text = (known.Icon ?? "•") + "  " + (known.Title ?? kind),
@@ -203,8 +239,11 @@ public partial class CommandEditor
                 chosen ? "C.Ink" : "C.Seam"),
             BorderThickness = new Thickness(chosen ? 2 : 1),
             CornerRadius = (CornerRadius)FindResource("Radius.Max"),
-            Child = body,
+            Cursor = System.Windows.Input.Cursors.SizeAll,
+            Child = whole,
         };
+        box.MouseEnter += (_, _) => grip.Opacity = 1;
+        box.MouseLeave += (_, _) => grip.Opacity = 0.75;
         box.MouseLeftButtonDown += (_, e) =>
         {
             _picked = step;
@@ -235,6 +274,10 @@ public partial class CommandEditor
             _dragging = step;
             _draggingFrom = owner;
             _draggingAt = at;
+            // Every port lights up while a node is in the air. A person who
+            // has picked one up is asking "where may this go", and the
+            // answer should be on the screen before they have to guess.
+            ShowPorts(true);
             try
             {
                 DragDrop.DoDragDrop((DependencyObject)sender, step,
@@ -267,6 +310,22 @@ public partial class CommandEditor
     private int _draggingAt;
     private Point _grabbedAt;
 
+    //: Every port on the board, so they can all be lit while a node is
+    //: being dragged.
+    private readonly List<Border> _ports = [];
+
+    /// <summary>Show or hide where a dragged node may land.</summary>
+    private void ShowPorts(bool during)
+    {
+        foreach (var port in _ports)
+        {
+            port.Opacity = during ? 1 : PortRest;
+            port.BorderBrush = (Brush)FindResource(during ? "C.Ink" : "C.Seam");
+        }
+    }
+
+    private const double PortRest = 0.45;
+
     /// <summary>A place a node may be added, between two others.</summary>
     private void Port(JsonArray steps, int at, double x, double y)
     {
@@ -284,7 +343,7 @@ public partial class CommandEditor
             Background = (Brush)FindResource("C.Glass.Control"),
             BorderBrush = (Brush)FindResource("C.Seam"),
             BorderThickness = new Thickness(1),
-            Opacity = 0.45,
+            Opacity = PortRest,
             ToolTip = S("Вставить шаг сюда"),
             Child = new TextBlock
             {
@@ -295,7 +354,8 @@ public partial class CommandEditor
             },
         };
         add.MouseEnter += (_, _) => add.Opacity = 1;
-        add.MouseLeave += (_, _) => add.Opacity = 0.45;
+        add.MouseLeave += (_, _) =>
+            add.Opacity = _dragging is null ? PortRest : 1;
         add.MouseLeftButtonDown += (_, e) =>
         {
             e.Handled = true;
@@ -314,14 +374,19 @@ public partial class CommandEditor
         };
         add.DragLeave += (_, _) =>
         {
-            add.Opacity = 0.45;
-            add.BorderBrush = (Brush)FindResource("C.Seam");
+            // Back to "lit because something is in the air", not to
+            // "asleep": the node is still being dragged, and the other
+            // ports are still where it may go.
+            add.Opacity = _dragging is null ? PortRest : 1;
+            add.BorderBrush = (Brush)FindResource(
+                _dragging is null ? "C.Seam" : "C.Ink");
         };
         add.Drop += (_, e) =>
         {
             e.Handled = true;
             DropInto(steps, at);
         };
+        _ports.Add(add);
         Canvas.SetLeft(add, x + NodeWidth / 2 - PortSize / 2);
         Canvas.SetTop(add, y);
         Board.Children.Add(add);
@@ -507,6 +572,44 @@ public partial class CommandEditor
             if (ReferenceEquals(box.BorderBrush, TryFindResource(name)))
                 return name;
         return "?";
+    }
+
+    /// <summary>
+    /// How many nodes carry a grip — for the check.
+    /// </summary>
+    /// <remarks>
+    /// Dragging worked before any of this existed and was invisible, which
+    /// is the same as not being there. So what is asserted is the mark a
+    /// person sees, not the handler behind it.
+    /// </remarks>
+    public int GripsShown => _boxes.Values
+        .SelectMany(box => Deep(box).OfType<TextBlock>())
+        .Count(words => words.Text == "⠿");
+
+    /// <summary>Does a node's cursor say it moves — for the check.</summary>
+    public bool NodeSaysItMoves => _boxes.Values.All(
+        box => box.Cursor == System.Windows.Input.Cursors.SizeAll);
+
+    /// <summary>How many ports are lit right now — for the check.</summary>
+    public int PortsLit => _ports.Count(p => p.Opacity > 0.9);
+
+    /// <summary>How many ports there are at all — for the check.</summary>
+    public int PortsShown => _ports.Count;
+
+    /// <summary>Light the ports as a drag does — for the check.</summary>
+    public void ShowPortsForCheck(bool during) => ShowPorts(during);
+
+    private static IEnumerable<DependencyObject> Deep(DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper
+            .GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper
+                .GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Deep(child)) yield return deeper;
+        }
     }
 
     /// <summary>Which nodes the canvas knows — for the check.</summary>
