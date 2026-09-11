@@ -68,7 +68,15 @@ public partial class App
         // is on the home screen, where the menu is folded away and the
         // figure has the window to itself. Without this the plain `--shot`
         // photographed a screen the check was never written about.
-        if (Value(args, "--shot") is not null)
+        //
+        // Only for a plain screenshot. Every check below opens the section
+        // it is about, and this line used to run first for any `--shot` at
+        // all — so asking the home check for a picture handed it a window
+        // standing in the settings. It said so and fell over; had it been a
+        // check that merely photographed, the picture would have been of
+        // the wrong screen and nobody the wiser.
+        if (Value(args, "--shot") is not null
+            && !args.Any(one => one.StartsWith("--check-")))
             window.ShowSectionFor(Value(args, "--section") ?? "settings");
 
         // The end-to-end self-check: raise a real core, wait for the link,
@@ -149,7 +157,7 @@ public partial class App
         if (args.Contains("--check-home"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            Watched(CheckHomeAsync(window), "home");
+            Watched(CheckHomeAsync(window, Value(args, "--shot")), "home");
             return;
         }
 
@@ -2403,7 +2411,7 @@ public partial class App
     /// this a check of the microphone.
     /// </para>
     /// </remarks>
-    private async Task CheckHomeAsync(MainWindow window)
+    private async Task CheckHomeAsync(MainWindow window, string? shot)
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
         {
@@ -2542,9 +2550,40 @@ public partial class App
         // written down is checked in `test_todo.py` with no window at all.
         // The question here is a different one — whether what was written
         // reaches the eye.
-        var page = (Pages.HomePage)window.CurrentPage!;
+        //
+        // The page is taken **after** it has stopped being replaced. When
+        // the core announces its plugins the column is rebuilt and the open
+        // section is shown afresh, and the instance captured a moment
+        // earlier is a home screen with no parent. It answers every
+        // question sensibly — its layer is visible, its list holds the row
+        // that was written — and none of it is anywhere a person could
+        // look. This whole block ran against such a page and was green.
+        // Found by asking it for a screenshot and getting an empty corner.
+        var page = (Pages.HomePage)(await SettledPage(window))!;
         var list = page.OpenTodoForCheck();
         await Until(() => page.TodoShowing && list.IsLoaded, 5);
+        await Until(() => page.TodoOnScreen, 5);
+        Check("список поднялся на экране, а не в отвязанной странице",
+              page.TodoOnScreen, $"| {page.TodoSizeForCheck}");
+
+        // In the window's corner, not the page's (4.0b-E02). The window
+        // gives every page a margin of thirty-two, and a button that obeys
+        // it sits fifty-two points off the glass — in a corner nobody sees.
+        // Measured against the window because that is the edge a person
+        // means by "the corner".
+        var far = page.TodoButton.TransformToVisual(window).Transform(
+            new Point(page.TodoButton.ActualWidth,
+                      page.TodoButton.ActualHeight));
+        var offRight = window.ActualWidth - far.X;
+        var offFoot = window.ActualHeight - far.Y;
+        // Against the page's own margin rather than a number picked here:
+        // the whole point is that this button is nearer the glass than
+        // anything the page lays out, and thirty-two is what "the page
+        // lays out" means.
+        var room = ((Thickness)window.PaneRoom).Right;
+        Check("кнопка дел — у края окна, а не у края страницы",
+              offRight < room && offFoot < room,
+              $"| {offRight:0} справа, {offFoot:0} снизу при поле {room:0}");
 
         // By its text, not by a count: counting races with the window's
         // own first load and depends on whatever earlier runs left behind.
@@ -2562,6 +2601,15 @@ public partial class App
         await Until(() => list.StruckForCheck(wrote), 6);
         Check("сделанное зачёркнуто", list.StruckForCheck(wrote),
               list.StruckForCheck(wrote) ? "" : "| линии на строке нет");
+
+        // A screenshot with the list open, if asked for. The ordinary shot
+        // of this screen shows the button and nothing the button opens, and
+        // the panel is the one thing here nobody can look at otherwise.
+        if (shot is not null)
+        {
+            await Task.Delay(400);
+            Save(window, shot);
+        }
 
         // And it goes away again: a panel that cannot be dismissed is a
         // window, which is what this stopped being.
@@ -2604,6 +2652,35 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>Wait until the window stops replacing the open page.</summary>
+    /// <remarks>
+    /// The column of sections is rebuilt when the core announces its
+    /// plugins, and rebuilding it shows the open section afresh — a new
+    /// page, the old one detached. A check that took hold of the page
+    /// before that went on questioning an object with no parent and got
+    /// sensible answers to everything it asked.
+    ///
+    /// A second of quiet rather than waiting for the plugins by name: what
+    /// is installed differs from machine to machine, and a check that waits
+    /// for a particular plugin is green for a reason that has nothing to do
+    /// with what it is about.
+    /// </remarks>
+    private static async Task<object?> SettledPage(MainWindow window)
+    {
+        var page = window.CurrentPage;
+        for (var still = 0; still < 10;)
+        {
+            await Task.Delay(100);
+            if (ReferenceEquals(window.CurrentPage, page)) still++;
+            else
+            {
+                page = window.CurrentPage;
+                still = 0;
+            }
+        }
+        return page;
     }
 
     /// <summary>
@@ -2731,10 +2808,127 @@ public partial class App
               glass.Detail < bare.Detail / 5,
               $"| перепад {glass.Detail:0} против {bare.Detail:0}");
 
+        // --- a window that draws its own corner ----------------------
+        Console.WriteLine();
+        Console.WriteLine("=== стекло: угол отдельного окна ===");
+
+        // Measured off the picture, not read off the markup. A corner can
+        // be lost to a style, to a border that does not clip what stands
+        // inside it, or to transparency that was never switched on, and
+        // "the markup says eight" agrees with the author through every one
+        // of those.
+        var sheet = new Pages.SheetWindow("", "", [])
+        {
+            Left = -4000,
+            Top = -4000,
+        };
+        sheet.Show();
+        await Task.Delay(400);
+        var cut = CornerOf(sheet, dpi);
+        sheet.Close();
+        Check("окно с прозрачностью скруглено как все прочие окна",
+              cut >= 6, $"| срезано {cut} точек по краю, ждали около 8");
+
+        // --- the list laid over the home screen ----------------------
+        Console.WriteLine();
+        Console.WriteLine("=== стекло: накладка поверх главной ===");
+
+        window.ShowSectionFor("home");
+        await Task.Delay(400);
+        var home = (Pages.HomePage)(await SettledPage(window))!;
+        home.OpenTodoForCheck();
+        await Until(() => home.TodoOnScreen, 5);
+
+        // Stripes everywhere this time: the question is not which part of
+        // the picture the panel shows but whether it shows any of it, and
+        // whether what it shows has been softened on the way.
+        static (byte R, byte G, byte B) Bars(int x, int y) =>
+            y % 2 == 0 ? ((byte)240, (byte)30, (byte)30)
+                       : ((byte)30, (byte)0, (byte)0);
+
+        window.PaintBackdropForCheck(Bars);
+        await Task.Delay(300);
+
+        var panel = home.TodoPanel;
+        var corner = panel.TransformToVisual(window)
+                          .Transform(new Point(0, 0));
+        var shape = new Rect(corner.X, corner.Y,
+                             panel.ActualWidth, panel.ActualHeight);
+
+        // Inside the panel's own padding, where nothing is written, and the
+        // same height just outside it. Two readings of one picture: what
+        // reaches the eye through the panel, and what reaches it beside.
+        var inside = Detail(window, dpi,
+                            shape.Right - 16, shape.Right - 6,
+                            shape.Top + 30, shape.Bottom - 30);
+        var beside = Detail(window, dpi,
+                            shape.Left - 26, shape.Left - 16,
+                            shape.Top + 30, shape.Bottom - 30);
+        home.HideTodoForCheck();
+
+        Check("рядом с панелью полосы видны резко", beside.Detail > 100,
+              $"| перепад {beside.Detail:0} из 210");
+        Check("сквозь панель — размытыми",
+              inside.Detail < beside.Detail / 5,
+              $"| перепад {inside.Detail:0} против {beside.Detail:0}");
+        Check("и панель всё-таки не дыра — заливка своя",
+              Math.Abs(inside.Red - beside.Red) > 20,
+              $"| {inside.Red:0} против {beside.Red:0}");
+
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>How much of the corner a window cuts away, in points.</summary>
+    /// <remarks>
+    /// Along the top edge until something is drawn. A square window paints
+    /// its first point at the very corner; a rounded one starts as far in as
+    /// its radius. It reads alpha rather than colour because a window with
+    /// transparency has nothing at all outside its own shape.
+    /// </remarks>
+    private static int CornerOf(Window window, double dpi)
+    {
+        var width = (int)(window.ActualWidth * dpi);
+        var height = (int)(window.ActualHeight * dpi);
+        var frame = new RenderTargetBitmap(width, height, 96 * dpi, 96 * dpi,
+                                           PixelFormats.Pbgra32);
+        frame.Render(window);
+        var pixels = new byte[width * height * 4];
+        frame.CopyPixels(pixels, width * 4, 0);
+        for (var x = 0; x < width / 2; x++)
+            if (pixels[x * 4 + 3] > 128) return (int)(x / dpi);
+        return -1;
+    }
+
+    /// <summary>Colour and detail in one patch of the rendered window.</summary>
+    private static (double Red, double Detail) Detail(
+        Window window, double dpi, double left, double right,
+        double top, double bottom)
+    {
+        var width = (int)(window.ActualWidth * dpi);
+        var height = (int)(window.ActualHeight * dpi);
+        var frame = new RenderTargetBitmap(width, height, 96 * dpi, 96 * dpi,
+                                           PixelFormats.Pbgra32);
+        frame.Render(window);
+        var pixels = new byte[width * height * 4];
+        frame.CopyPixels(pixels, width * 4, 0);
+
+        var from = Math.Max(0, (int)(left * dpi));
+        var to = Math.Min(width, (int)(right * dpi));
+        var rows = new List<double>();
+        double red = 0;
+        for (var y = Math.Max(0, (int)(top * dpi));
+             y < Math.Min(height, (int)(bottom * dpi)); y++)
+        {
+            double one = 0;
+            for (var x = from; x < to; x++) one += pixels[(y * width + x) * 4 + 2];
+            rows.Add(one / Math.Max(1, to - from));
+            red += rows[^1];
+        }
+        if (rows.Count == 0) return (0, 0);
+        return (red / rows.Count, rows.Max() - rows.Min());
     }
 
     /// <summary>

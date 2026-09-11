@@ -100,7 +100,7 @@ def finish_xaml(name: str, finish: dict, glass: dict) -> str:
     for part, surface in (("Bar", "FACE_LOW"), ("Column", "FACE_LOW"),
                           ("Strip", "FACE_SUNK"), ("Control", "FACE_HIGH"),
                           ("Raised", "FACE_HIGH"), ("Popup", "FACE_HIGH"),
-                          ("Field", "GLASS")):
+                          ("Overlay", "FACE_HIGH"), ("Field", "GLASS")):
         share = glass.get(part.lower())
         if share is None:
             continue
@@ -191,6 +191,16 @@ def common_xaml(tokens: dict) -> str:
     lines.append("  <!-- Скругление: у приборов углы тугие, не больше 3 -->")
     for name, value in radius.items():
         lines.append(f'  <CornerRadius x:Key="Radius.{key(name)}">{value}</CornerRadius>')
+
+    # The window's outer corner, and it is deliberately outside the ladder
+    # above. The design system exempts it by name -- Windows draws it, and
+    # it is not our value -- and for a window with transparency Windows
+    # draws nothing, so the exemption has to be honoured by hand instead of
+    # quietly becoming ours.
+    window = tokens.get("window")
+    if window and "corner" in window:
+        lines.append('  <CornerRadius x:Key="Radius.Window">'
+                     f'{window["corner"]}</CornerRadius>')
 
     lines.append("")
     lines.append("  <!-- Гарнитуры -->")

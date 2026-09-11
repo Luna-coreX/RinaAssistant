@@ -17,9 +17,11 @@
     on its first run has two lives to keep working. This one appears once
     and goes.
   -->
+  <!-- The outer corner is the one Windows draws for every other window
+       (`4.0b-E02`, an amendment to §4 of the design system). -->
   <Border Background="{DynamicResource C.Face}"
           BorderBrush="{DynamicResource C.Seam}" BorderThickness="1"
-          CornerRadius="{StaticResource Radius.Tight}" Padding="28">
+          CornerRadius="{StaticResource Radius.Window}" Padding="28">
     <StackPanel>
       <TextBlock x:Name="Heading" Style="{StaticResource Text.Title}"
                  Margin="0,0,0,6" />

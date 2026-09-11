@@ -215,6 +215,9 @@ public partial class MainWindow : Window
     /// <summary>What is shown right now — for the checks.</summary>
     public object? CurrentPage => Pane.Content;
 
+    /// <summary>The room a page is given — for the check.</summary>
+    public object PaneRoom => Pane.Margin;
+
     /// <summary>Open a section from outside — for screenshots and checks.</summary>
     /// <remarks>
     /// The menu is opened along with it, and that is not a convenience for

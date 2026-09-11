@@ -2,6 +2,7 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using Rina.Protocol;
 
 using static Rina.Shell.Strings.Loc;
@@ -86,6 +87,25 @@ public partial class HomePage : UserControl
             if (_backdrop is not null) _backdrop.Ticked -= OnTick;
         };
 
+        // What the list is laid over, blurred, so the panel is see-through
+        // without cutting the figure off at its edge (4.0b-E02). The flow
+        // behind it is added later, when the background arrives.
+        Glaze.Follow(TodoOver, Screen, (double)FindResource("Glass.Blur"));
+
+        // The glass under the list hangs out past the panel on every side —
+        // a blur fades where its element ends, and without the overhang the
+        // fade showed as a pale rim all the way round. It is cut back here
+        // and not by the border: a border rounds its own line and does not
+        // clip what stands inside it, so the three points of corner have to
+        // be taken off by hand.
+        TodoRoom.SizeChanged += (_, _) =>
+        {
+            var round = ((CornerRadius)FindResource("Radius.Max")).TopLeft;
+            TodoRoom.Clip = new RectangleGeometry(
+                new Rect(0, 0, TodoRoom.ActualWidth, TodoRoom.ActualHeight),
+                round, round);
+        };
+
         ShowDoing();
     }
 
@@ -96,6 +116,14 @@ public partial class HomePage : UserControl
     {
         _backdrop = backdrop;
         backdrop.Ticked += OnTick;
+
+        // The list of things to do lies over this screen, so it is glass and
+        // shows the flow through it (4.0b-E02). Asked of the background
+        // rather than of the window: the page is handed the flow already,
+        // and a page that reaches up to its window is the first step back
+        // towards the god object.
+        Glaze.Follow(TodoGlass, backdrop.Under,
+                     (double)FindResource("Glass.Blur"));
     }
 
     /// <summary>What the figure is doing — for the check.</summary>
@@ -400,6 +428,25 @@ public partial class HomePage : UserControl
 
     /// <summary>Put it away from outside — for the check.</summary>
     public void HideTodoForCheck() => HideTodo();
+
+    /// <summary>Is the list on the screen — for the check.</summary>
+    /// <remarks>
+    /// Not the same question as <see cref="TodoShowing"/>, and the
+    /// difference is what a whole block of the home check was getting
+    /// wrong. A page the window has replaced keeps every property it had:
+    /// its layer is still "visible", its list still holds the row that was
+    /// written, and none of it is anywhere a person could look. Size is the
+    /// part a detached page cannot fake — nothing measures what is not in a
+    /// window.
+    /// </remarks>
+    public bool TodoOnScreen =>
+        TodoPanel.IsVisible && TodoPanel.ActualWidth > 0
+        && TodoPanel.ActualHeight > 0;
+
+    /// <summary>The panel, in points — for the check.</summary>
+    public string TodoSizeForCheck =>
+        $"{TodoPanel.ActualWidth:0}x{TodoPanel.ActualHeight:0}, "
+        + $"IsVisible={TodoPanel.IsVisible}";
 
     /// <summary>Is the list up — for the check.</summary>
     public bool TodoShowing => TodoLayer.Visibility == Visibility.Visible;

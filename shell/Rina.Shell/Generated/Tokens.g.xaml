@@ -47,6 +47,7 @@
   <CornerRadius x:Key="Radius.None">0</CornerRadius>
   <CornerRadius x:Key="Radius.Tight">2</CornerRadius>
   <CornerRadius x:Key="Radius.Max">3</CornerRadius>
+  <CornerRadius x:Key="Radius.Window">8</CornerRadius>
 
   <!-- Гарнитуры -->
   <FontFamily x:Key="Font.Display">Century Gothic, Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
@@ -123,6 +124,7 @@
   <sys:Double x:Key="Glass.Raised">0.5</sys:Double>
   <sys:Double x:Key="Glass.Edge">0.14</sys:Double>
   <sys:Double x:Key="Glass.Popup">0.9</sys:Double>
+  <sys:Double x:Key="Glass.Overlay">0.5</sys:Double>
   <sys:Double x:Key="Glass.Blur">18.0</sys:Double>
 
   <!-- Дыхание фона (4.0b-A06). Когда фон замирает, решает оболочка, а не эти числа -->

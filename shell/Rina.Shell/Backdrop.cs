@@ -323,6 +323,16 @@ public sealed class Backdrop
         return [.. ramp];
     }
 
+    /// <summary>Where the flow is painted.</summary>
+    /// <remarks>
+    /// Handed out, not copied. Glass laid over the flow has to show the
+    /// piece of it that lies behind the glass, and "behind" is a question
+    /// about position on the screen: it can be answered against the element
+    /// the picture occupies and against nothing else. A second copy of the
+    /// bitmap would know what to draw and not where.
+    /// </remarks>
+    public Image Under => _view;
+
     /// <summary>Stop the flow and paint a picture a check can recognise.</summary>
     /// <remarks>
     /// Only a check calls this, and it exists because the question the bar
