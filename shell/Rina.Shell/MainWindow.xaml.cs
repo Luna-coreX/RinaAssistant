@@ -127,12 +127,18 @@ public partial class MainWindow : Window
         ShowCoreState(_coreState, _coreReason);
     }
 
+    //: Sections that exist only while something is open in them: a command
+    //: being written (`4.0b-A09`). They sit under the fixed ones and go when
+    //: the work is done.
+    private readonly List<(string Name, string Title)> _openWork = [];
+
     private void BuildSections()
     {
         Sections.Children.Clear();
         foreach (var (name, title) in SectionList.Select(
                      s => (s.Name, S(s.Title)))
-                 .Concat(_pluginSections))
+                 .Concat(_pluginSections)
+                 .Concat(_openWork))
         {
             var item = new RadioButton
             {
@@ -145,6 +151,48 @@ public partial class MainWindow : Window
             Sections.Children.Add(item);
         }
     }
+
+    /// <summary>
+    /// Open a command in a place of its own (<c>4.0b-A09</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Writing a command is work, not a glance. It used to unfold inside
+    /// the list, above the very rows a person was comparing it against, and
+    /// it pushed them off the screen: the thing being written and the
+    /// things it should not clash with could not be seen together, and
+    /// there was nowhere to put a chain of eight steps.
+    /// </para>
+    /// <para>
+    /// A section rather than a window. A window would take the focus and
+    /// have to be dismissed; a section is a place one goes and comes back
+    /// from, and the column already says which places there are. It stands
+    /// under the fixed sections and leaves when the work is done — the
+    /// menu tells the truth about what is open.
+    /// </para>
+    /// </remarks>
+    public void OpenWork(string id, string title, Func<UIElement> page)
+    {
+        var name = "work:" + id;
+        if (!_openWork.Any(w => w.Name == name))
+            _openWork.Add((name, title));
+        _pages[name] = page;
+        BuildSections();
+        ShowSection(name);
+    }
+
+    /// <summary>The work is done; the place goes with it.</summary>
+    public void CloseWork(string id, string back = "commands")
+    {
+        var name = "work:" + id;
+        _openWork.RemoveAll(w => w.Name == name);
+        _pages.Remove(name);
+        BuildSections();
+        ShowSection(back);
+    }
+
+    /// <summary>Which pieces of work are open — for the check.</summary>
+    public string[] OpenWorkNames => _openWork.Select(w => w.Name).ToArray();
 
     /// <summary>What is shown right now — for the checks.</summary>
     public object? CurrentPage => Pane.Content;

@@ -71,7 +71,6 @@
 
     <ScrollViewer Grid.Row="2" x:Name="Scroll" VerticalScrollBarVisibility="Auto">
       <StackPanel>
-      <ContentControl x:Name="EditorBox" />
       <!--
         The lists, in groups that fold.
 

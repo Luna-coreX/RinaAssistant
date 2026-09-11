@@ -3082,6 +3082,18 @@ public partial class App
             var opened = await commands.OpenEditorAsync(null);
             Check("конструктор открылся", opened && commands.EditorOpen);
 
+            // --- and in a place of its own (`4.0b-A09`) ---
+            //
+            // Writing a command is work, not a glance. It used to unfold
+            // inside the list, above the very rows a person compares it
+            // against, and pushed them off the screen.
+            Check("конструктор занял свой раздел",
+                  window.OpenWorkNames.Contains("work:new"),
+                  $"| [{string.Join(", ", window.OpenWorkNames)}]");
+            Check("и окно показывает именно его",
+                  window.CurrentPage is Pages.CommandEditor,
+                  $"| {window.CurrentPage?.GetType().Name}");
+
             // --- the command read back as one thing (`4.0b-A09`) ---
             //
             // Everything in the editor is the command in pieces: a phrase
@@ -3176,6 +3188,25 @@ public partial class App
             Check("и не предлагаются как целая команда",
                   !new[] { "pause", "repeat", "if" }.Any(asCommands.Contains),
                   $"| [{string.Join(", ", asCommands)}]");
+
+            // The place goes when the work is done: a column that keeps
+            // offering "new command" after it was saved is a column that
+            // has stopped saying what is open.
+            editor!.CancelForCheck();
+            await Task.Delay(300);
+            Check("закрыли — раздел ушёл",
+                  !window.OpenWorkNames.Contains("work:new"),
+                  $"| [{string.Join(", ", window.OpenWorkNames)}]");
+            Check("и вернулись к списку",
+                  window.CurrentPage is Pages.CommandsPage,
+                  $"| {window.CurrentPage?.GetType().Name}");
+
+            window.ShowSectionFor("commands");
+            await Task.Delay(400);
+            commands = (Pages.CommandsPage)window.CurrentPage!;
+            await commands.OpenEditorAsync(null);
+            await Task.Delay(400);
+            editor = commands.OpenEditor;
 
             var saved = await commands.CreateForCheckAsync(
                 "открой блокнот", "app", @"C:\Windows\System32\notepad.exe");

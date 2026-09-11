@@ -434,9 +434,6 @@
   "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*": {
     "English": "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*"
   },
-  "НОВАЯ КОМАНДА": {
-    "English": "NEW COMMAND"
-  },
   "НОВОЕ НАПОМИНАНИЕ": {
     "English": "NEW REMINDER"
   },
@@ -619,9 +616,6 @@
   },
   "Очистить": {
     "English": "Clear"
-  },
-  "ПРАВКА КОМАНДЫ": {
-    "English": "EDITING A COMMAND"
   },
   "Папка с плагином": {
     "English": "Plugin folder"
@@ -1480,5 +1474,8 @@
   },
   "ПРОЧЕЕ": {
     "English": "OTHER"
+  },
+  "Правка команды": {
+    "English": "Editing a command"
   }
 }

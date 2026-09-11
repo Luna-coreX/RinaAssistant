@@ -1151,11 +1151,6 @@ public static partial class Loc
                 {
                     ["English"] = "nothing — there are no steps yet",
                 },
-            ["НОВАЯ КОМАНДА"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "NEW COMMAND",
-                },
             ["Новая команда"] =
                 new Dictionary<string, string>
                 {
@@ -1524,10 +1519,10 @@ public static partial class Loc
                 {
                     ["English"] = "Edit",
                 },
-            ["ПРАВКА КОМАНДЫ"] =
+            ["Правка команды"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "EDITING A COMMAND",
+                    ["English"] = "Editing a command",
                 },
             ["Предыдущий"] =
                 new Dictionary<string, string>

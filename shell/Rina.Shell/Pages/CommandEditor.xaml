@@ -27,7 +27,26 @@
     </Style>
   </UserControl.Resources>
 
-  <Border Style="{StaticResource Card}" Margin="0,0,0,12">
+  <!--
+    A place of its own, not a card inside the list.
+
+    The chain is the thing being worked on, and it needs room: eight steps
+    with branches inside them do not fit under a heading in a list that is
+    also trying to show the commands it must not clash with. The page keeps
+    the same two columns — what a thing is called on the left, what it is on
+    the right — so moving here changed where it lives, not how it reads.
+  -->
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" x:Name="PageTitle"
+               Text="{loc:S 'Новая команда'}"
+               Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
     <Grid>
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="{StaticResource Col.LegendColumn}" />
@@ -45,9 +64,6 @@
         <RowDefinition Height="Auto" />
       </Grid.RowDefinitions>
 
-      <TextBlock Grid.Row="0" Grid.ColumnSpan="2" x:Name="Legend"
-                 Text="{loc:S 'НОВАЯ КОМАНДА'}"
-                 Style="{StaticResource Text.Section}" Margin="0,0,0,16" />
 
       <!-- What to say. There can be several phrases: "start discord" and
            "open discord" are one intent said in different ways. -->
@@ -176,5 +192,6 @@
                    TextWrapping="Wrap" />
       </StackPanel>
     </Grid>
-  </Border>
+    </ScrollViewer>
+  </Grid>
 </UserControl>

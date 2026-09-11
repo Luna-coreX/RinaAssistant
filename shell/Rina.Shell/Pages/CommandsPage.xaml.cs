@@ -176,7 +176,7 @@ public partial class CommandsPage : UserControl
             },
         });
         if (saved is null) return false;
-        EditorBox.Content = null;
+        _editor = null;
         await ReloadAsync();
         return true;
     }
@@ -195,10 +195,15 @@ public partial class CommandsPage : UserControl
     private JsonObject? _kinds;
 
     /// <summary>The open editor — for the end-to-end check.</summary>
-    public CommandEditor? Editor => EditorBox.Content as CommandEditor;
+    public CommandEditor? Editor => _editor;
 
-    /// <summary>Whether the editor is showing right now — for the end-to-end check.</summary>
-    public bool EditorOpen => EditorBox.Content is not null;
+    /// <summary>Whether the editor is open right now — for the check.</summary>
+    /// <remarks>
+    /// The editor no longer lives inside this page, so "is it open" is no
+    /// longer "is there something in that box". It is open while this page
+    /// holds it and the window has a place for it.
+    /// </remarks>
+    public bool EditorOpen => _editor is not null;
 
     /// <summary>How many commands are in the list — for the end-to-end check.</summary>
     public int CommandCount => _items.Count;
@@ -525,11 +530,25 @@ public partial class CommandsPage : UserControl
         if (kinds is null) return false;
 
         var editor = new CommandEditor(kinds, existing);
-        editor.Cancelled += () =>
+        var id = existing?["id"]?.GetValue<string>() ?? "new";
+        var title = existing is null
+            ? S("Новая команда")
+            : "✎  " + NameOf(existing);
+
+        // The editor opens in a place of its own rather than inside the
+        // list. It used to unfold above the very rows a person was
+        // comparing it against and push them off the screen: the thing
+        // being written and the things it must not clash with could not be
+        // seen together, and a chain of eight steps had nowhere to go.
+        var window = Window.GetWindow(this) as MainWindow;
+
+        void Done()
         {
-            EditorBox.Content = null;
             _editor = null;
-        };
+            window?.CloseWork(id);
+        }
+
+        editor.Cancelled += Done;
         editor.Saved += async command =>
         {
             var saved = await Ask(Methods.CommandsSave, new JsonObject
@@ -537,7 +556,7 @@ public partial class CommandsPage : UserControl
                 ["command"] = command,
             });
             if (saved is null) return;
-            EditorBox.Content = null;
+            Done();
             Note.Text = S("Команда сохранена.");
             await ReloadAsync();
         };
@@ -550,8 +569,16 @@ public partial class CommandsPage : UserControl
                 ["command"] = command,
             });
 
-        EditorBox.Content = editor;
         _editor = editor;
+        if (window is null)
+        {
+            // No window to put a section in — a check holding the page on
+            // its own. The editor still exists and still works; it simply
+            // has nowhere to be shown, and saying so is better than
+            // pretending it opened.
+            return false;
+        }
+        window.OpenWork(id, title, () => editor);
         return true;
     }
 

@@ -125,7 +125,7 @@ public partial class CommandEditor : UserControl
 
     private void Fill(JsonObject command)
     {
-        Legend.Text = S("ПРАВКА КОМАНДЫ");
+        PageTitle.Text = S("Правка команды");
         _id = command["id"]?.GetValue<string>() ?? "";
 
         foreach (var phrase in command["triggers"]?.AsArray() ?? [])
@@ -912,6 +912,9 @@ public partial class CommandEditor : UserControl
         OnSave(this, new RoutedEventArgs());
         return true;
     }
+
+    /// <summary>Close it as a person would — for the check.</summary>
+    public void CancelForCheck() => OnCancel(this, new RoutedEventArgs());
 
     /// <summary>Switch to a sequence — for the check.</summary>
     public void ShowSequenceForCheck()
