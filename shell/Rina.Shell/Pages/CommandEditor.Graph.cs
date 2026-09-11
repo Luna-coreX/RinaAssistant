@@ -56,16 +56,35 @@ public partial class CommandEditor
     private void DrawSteps()
     {
         Board.Children.Clear();
-        var bottom = Place(_chain, 0, 0, null);
+        _boxes.Clear();
+        _byPath.Clear();
+
+        // The paths match the ones the core reports. A sequence's steps
+        // arrive as `steps.0`, so the canvas names them the same way; a
+        // command of one node reports an empty path, and that node answers
+        // to it. Two ways of naming the same place would agree only until
+        // somebody changed one of them.
+        // A graph of one plain node is saved as a plain command, and a
+        // plain command reports one path: the empty one. Anything else is
+        // a sequence, whose steps report as `steps.0`, `steps.1`.
+        var only = _chain.Count == 1 ? _chain[0] as JsonObject : null;
+        _alone = only is not null
+                 && StandsAlone(only["type"]?.GetValue<string>() ?? "");
+        var bottom = Place(_chain, 0, 0, null, "steps.");
 
         // The board is as large as what is on it. Fixed, it either cut the
         // graph off or left a field of emptiness under a graph of two.
         Board.Width = Math.Max(520, _widest + NodeWidth + 40);
         Board.Height = Math.Max(220, bottom + 40);
+        Paint();
         ShowPicked();
     }
 
     private double _widest;
+
+    //: Whether this graph will be saved as a plain command —
+    //: which decides what the core will call its one node.
+    private bool _alone;
 
     /// <summary>
     /// Put a list of steps on the board, one under another.
@@ -76,7 +95,8 @@ public partial class CommandEditor
     /// any other, drawn one column to the right so that "inside" is visible
     /// as inside.
     /// </remarks>
-    private double Place(JsonArray steps, double x, double y, JsonObject? from)
+    private double Place(JsonArray steps, double x, double y, JsonObject? from,
+                         string path = "")
     {
         _widest = Math.Max(_widest, x);
         var previous = from;
@@ -89,23 +109,27 @@ public partial class CommandEditor
         for (var at = 0; at < steps.Count; at++)
         {
             if (steps[at] is not JsonObject step) continue;
-            var node = Node(step, steps, at, x, y);
+            // The one node of a plain command answers to the empty
+            // path, because that is what the core reports for it.
+            var where = _alone && path == "steps." ? "" : path + at;
+            var node = Node(step, steps, at, x, y, where);
             if (previous is not null || at > 0)
                 Wire(x + NodeWidth / 2, top - 8, x + NodeWidth / 2, y);
 
             var kind = step["type"]?.GetValue<string>() ?? "";
             var below = y + NodeHeight;
 
+            var mine = path + at + ".";
             if (kind is "repeat" or "while")
             {
-                below = Branch(step, "steps", x, below, S("делать"));
+                below = Branch(step, "steps", x, below, S("делать"), mine);
             }
             else if (kind == "if")
             {
-                var left = Branch(step, "steps", x, below, S("тогда"));
+                var left = Branch(step, "steps", x, below, S("тогда"), mine);
                 var right = Branch(step, "otherwise",
                                    x + NodeWidth + GapAcross, below,
-                                   S("иначе"));
+                                   S("иначе"), mine);
                 below = Math.Max(left, right);
             }
 
@@ -124,7 +148,7 @@ public partial class CommandEditor
 
     /// <summary>What happens inside a node, drawn inside it.</summary>
     private double Branch(JsonObject step, string name, double x, double y,
-                          string label)
+                          string label, string path)
     {
         if (step[name] is not JsonArray inner)
         {
@@ -134,12 +158,12 @@ public partial class CommandEditor
         var at = x + GapAcross;
         Board.Children.Add(Text(label, at + 4, y + 2, "Text.Meta"));
         Wire(x + 20, y, at + NodeWidth / 2, y + 26);
-        return Place(inner, at, y + 26, step);
+        return Place(inner, at, y + 26, step, path + name + ".");
     }
 
     /// <summary>One node: what it is, and how much of what it does fits.</summary>
     private UIElement Node(JsonObject step, JsonArray owner, int at,
-                           double x, double y)
+                           double x, double y, string path)
     {
         var kind = step["type"]?.GetValue<string>() ?? "speak";
         var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
@@ -186,9 +210,46 @@ public partial class CommandEditor
             _picked = step;
             _pickedOwner = owner;
             _pickedAt = at;
+            _grabbedAt = e.GetPosition(Board);
             e.Handled = true;
             DrawSteps();
         };
+
+        // Dragging a node moves it **in the chain**, not on the surface.
+        //
+        // A node editor usually lets one put a box anywhere; this one puts
+        // it somewhere in the order, because that is what a step has. The
+        // drop targets are the ports — the same places a new node goes —
+        // so "drag it there" and "add it there" mean the same place, and
+        // nothing about where a person let go has to be remembered
+        // afterwards.
+        box.MouseMove += (sender, e) =>
+        {
+            if (e.LeftButton != System.Windows.Input.MouseButtonState.Pressed)
+                return;
+            if (_dragging is not null) return;
+            var now = e.GetPosition(Board);
+            if (Math.Abs(now.X - _grabbedAt.X) < 6
+                && Math.Abs(now.Y - _grabbedAt.Y) < 6) return;
+
+            _dragging = step;
+            _draggingFrom = owner;
+            _draggingAt = at;
+            try
+            {
+                DragDrop.DoDragDrop((DependencyObject)sender, step,
+                                    DragDropEffects.Move);
+            }
+            finally
+            {
+                _dragging = null;
+                _draggingFrom = null;
+                DrawSteps();
+            }
+        };
+
+        _boxes[path] = box;
+        _byPath[path] = step;
 
         Canvas.SetLeft(box, x);
         Canvas.SetTop(box, y);
@@ -199,6 +260,12 @@ public partial class CommandEditor
     //: Where the selected node sits, so the inspector can move or remove it.
     private JsonArray? _pickedOwner;
     private int _pickedAt;
+
+    //: The node being dragged, and where it came from.
+    private JsonObject? _dragging;
+    private JsonArray? _draggingFrom;
+    private int _draggingAt;
+    private Point _grabbedAt;
 
     /// <summary>A place a node may be added, between two others.</summary>
     private void Port(JsonArray steps, int at, double x, double y)
@@ -234,10 +301,220 @@ public partial class CommandEditor
             e.Handled = true;
             OfferKinds(add, steps, at);
         };
+
+        // A port is also where a dragged node lands.
+        add.AllowDrop = true;
+        add.DragOver += (_, e) =>
+        {
+            var may = CanDrop(steps);
+            e.Effects = may ? DragDropEffects.Move : DragDropEffects.None;
+            add.Opacity = may ? 1 : 0.45;
+            add.BorderBrush = (Brush)FindResource(may ? "C.Ink" : "C.Seam");
+            e.Handled = true;
+        };
+        add.DragLeave += (_, _) =>
+        {
+            add.Opacity = 0.45;
+            add.BorderBrush = (Brush)FindResource("C.Seam");
+        };
+        add.Drop += (_, e) =>
+        {
+            e.Handled = true;
+            DropInto(steps, at);
+        };
         Canvas.SetLeft(add, x + NodeWidth / 2 - PortSize / 2);
         Canvas.SetTop(add, y);
         Board.Children.Add(add);
     }
+
+    /// <summary>
+    /// May the dragged node land in this list?
+    /// </summary>
+    /// <remarks>
+    /// Not inside itself. A repeat dropped into its own body would be a
+    /// node that contains the thing that contains it: the tree stops being
+    /// a tree, drawing it never finishes, and the card that gets saved
+    /// cannot be read back. Refused rather than repaired afterwards — by
+    /// then the graph a person was looking at has already gone.
+    /// </remarks>
+    private bool CanDrop(JsonArray into)
+    {
+        if (_dragging is null) return false;
+        return !Inside(_dragging, into);
+    }
+
+    private static bool Inside(JsonObject node, JsonArray list)
+    {
+        foreach (var branch in new[] { "steps", "otherwise" })
+        {
+            if (node[branch] is not JsonArray inner) continue;
+            if (ReferenceEquals(inner, list)) return true;
+            foreach (var deeper in inner.OfType<JsonObject>())
+                if (Inside(deeper, list)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Move the dragged node to this place in the chain.</summary>
+    private void DropInto(JsonArray steps, int at)
+    {
+        if (_dragging is null || _draggingFrom is null) return;
+        if (!CanDrop(steps)) return;
+
+        // Taken out first, then put in. The index shifts when both ends are
+        // the same list and the node came from above the place it is going:
+        // removing it moves everything below up by one, and inserting at
+        // the old number would put it one place further on than where the
+        // person let go.
+        var moving = _draggingFrom[_draggingAt];
+        var landing = at;
+        if (ReferenceEquals(_draggingFrom, steps) && _draggingAt < at)
+            landing -= 1;
+
+        _draggingFrom.RemoveAt(_draggingAt);
+        steps.Insert(Math.Clamp(landing, 0, steps.Count), moving);
+
+        _picked = _dragging;
+        _pickedOwner = steps;
+        _pickedAt = Math.Clamp(landing, 0, steps.Count - 1);
+        _dragging = null;
+        _draggingFrom = null;
+        DrawSteps();
+        ShowSummary();
+    }
+
+    /// <summary>Drag a node onto a port — for the check.</summary>
+    /// <remarks>
+    /// The same two calls the mouse makes, in the same order. A check that
+    /// moved the step itself would be checking `JsonArray`.
+    /// </remarks>
+    public bool DragForCheck(JsonArray from, int at, JsonArray onto, int to)
+    {
+        if (from[at] is not JsonObject step) return false;
+        _dragging = step;
+        _draggingFrom = from;
+        _draggingAt = at;
+        var may = CanDrop(onto);
+        if (may) DropInto(onto, to);
+        _dragging = null;
+        _draggingFrom = null;
+        return may;
+    }
+
+    // -- the trial, shown running (4.0b-A09) --------------------------------
+
+    //: Which node is doing what right now, by its path in the tree.
+    //: Cleared when a trial starts, so the previous run's colours do not
+    //: sit under the next one.
+    private readonly Dictionary<string, string> _running = [];
+
+    /// <summary>
+    /// The core says a step has started, finished or failed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Green while it runs and after it is done, red where it failed — the
+    /// same two answers a person is actually asking a trial for: how far
+    /// did it get, and where did it stop.
+    /// </para>
+    /// <para>
+    /// The path is where the step stands in the tree, not an identifier on
+    /// it: a step has none, and giving it one would put a field in the
+    /// core's card for the sake of a colour in a window. The top-level
+    /// steps of a sequence arrive as <c>steps.0</c>, <c>steps.1</c>; the
+    /// command as a whole arrives as an empty path, which is the only
+    /// thing a command of one action ever reports.
+    /// </para>
+    /// </remarks>
+    public void StepReported(string path, string state)
+    {
+        _running[path] = state;
+        Paint();
+    }
+
+    /// <summary>A trial is starting; forget the last one's colours.</summary>
+    public void TrialStarting()
+    {
+        _running.Clear();
+        Paint();
+    }
+
+    /// <summary>
+    /// Colour whatever the run has reached, without redrawing the graph.
+    /// </summary>
+    /// <remarks>
+    /// The nodes are not rebuilt. A step reports twice and a scenario of
+    /// twenty reports forty times; rebuilding the canvas on each would make
+    /// the picture flicker through the very moment it is meant to show, and
+    /// would drop whatever the person had selected.
+    /// </remarks>
+    private void Paint()
+    {
+        foreach (var (path, box) in _boxes)
+        {
+            var state = _running.GetValueOrDefault(path, "");
+            var chosen = ReferenceEquals(_picked,
+                                         _byPath.GetValueOrDefault(path));
+
+            // Green for what is going and what went, the accent for what
+            // failed. The accent is already this program's word for
+            // "something is wrong"; green is a colour of its own, because
+            // the accent moves with the finish — under the "moss" accent it
+            // **is** green, and one colour for both answers would be no
+            // answer at all.
+            box.BorderBrush = (Brush)FindResource(state switch
+            {
+                "running" or "done" => "C.Live",
+                "failed" => "C.Signal",
+                _ => chosen ? "C.Ink" : "C.Seam",
+            });
+            box.BorderThickness = new Thickness(
+                state.Length > 0 || chosen ? 2 : 1);
+
+            // Running is filled as well as outlined: the eye finds one
+            // filled shape among twenty outlined ones without looking for
+            // it, and "where is it now" is a question asked at a glance.
+            box.Background = (Brush)FindResource(
+                state == "running" ? "C.Glass.Raised" : "C.Glass.Control");
+        }
+    }
+
+    //: Where each node's box is, by path — so a colour can be put on it
+    //: without rebuilding the canvas.
+    private readonly Dictionary<string, Border> _boxes = [];
+    private readonly Dictionary<string, JsonObject> _byPath = [];
+
+    /// <summary>What the run has said about each node — for the check.</summary>
+    public string StateOfNode(string path) =>
+        _running.GetValueOrDefault(path, "");
+
+    /// <summary>
+    /// The colour a node is wearing right now — for the check.
+    /// </summary>
+    /// <remarks>
+    /// The brush on the box, not the word in the dictionary. "The state was
+    /// recorded" and "the node turned green" are different claims, and only
+    /// the second is what a person sees; a check that read the dictionary
+    /// would stay green with the painting removed.
+    /// </remarks>
+    public string ColourOfNode(string path)
+    {
+        // The name of the brush, or an empty string. Facts, not prose: a
+        // line a person never sees has no business among the ones that get
+        // translated, and the check is better at wording its own report.
+        if (!_boxes.TryGetValue(path, out var box)) return "";
+        foreach (var name in new[] { "C.Live", "C.Signal", "C.Ink", "C.Seam" })
+            if (ReferenceEquals(box.BorderBrush, TryFindResource(name)))
+                return name;
+        return "?";
+    }
+
+    /// <summary>Which nodes the canvas knows — for the check.</summary>
+    public string[] NodePaths => _boxes.Keys.ToArray();
+
+    /// <summary>Pretend the core reported a step — for the check.</summary>
+    public void ReportForCheck(string path, string state) =>
+        StepReported(path, state);
 
     /// <summary>A wire from one node to the next.</summary>
     /// <remarks>

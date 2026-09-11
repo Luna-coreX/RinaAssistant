@@ -239,6 +239,8 @@ public static class Events
     public const string AssistantResponse = "assistant.response";
     /// <summary>active: boolean</summary>
     public const string AssistantThinking = "assistant.thinking";
+    /// <summary>path: string, state: string</summary>
+    public const string CommandStep = "command.step";
     /// <summary>без полей</summary>
     public const string HistoryChanged = "history.changed";
     /// <summary>enabled: boolean</summary>
@@ -277,6 +279,7 @@ public static class Events
         "assistant.error",
         "assistant.response",
         "assistant.thinking",
+        "command.step",
         "history.changed",
         "listening.always",
         "listening.capturing",

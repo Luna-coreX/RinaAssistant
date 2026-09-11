@@ -33,6 +33,8 @@ class Events:
     # --- data ---
     HISTORY_CHANGED = "history.changed"       # {}
     REMINDER_FIRED = "reminder.fired"         # {"item": dict}
+    #: Which step of a scenario is running (`4.0b-A09`).
+    COMMAND_STEP = "command.step"             # {"path": str, "state": str}
 
     # --- requests to the shell ---
     # The core cannot show windows: it reports an intent, and the shell

@@ -3149,6 +3149,7 @@ public partial class App
             // is still on it, and "inserted between two others" cannot be
             // read off a graph whose contents came from somewhere else.
             editor!.ClearForCheck();
+            await Task.Delay(150);
             editor!.InsertStepForCheck(0, "app", "первый");
             editor!.InsertStepForCheck(1, "speak", "третий");
             editor!.InsertStepForCheck(1, "pause", "1");
@@ -3234,6 +3235,61 @@ public partial class App
                   plain["type"]?.GetValue<string>() == "website"
                   && plain["target"]?.GetValue<string>() == "example.com",
                   $"| {plain["type"]} · {plain["target"]}");
+
+
+            // --- the trial, shown running (`4.0b-A09`) ---
+            //
+            // Asserted on the colour the node is wearing, not on the state
+            // written down: "the state was recorded" and "the node turned
+            // green" are different claims, and only the second is what a
+            // person sees.
+            var paths = editor!.NodePaths;
+            Check("холст знает пути узлов", paths.Length > 0,
+                  $"| [{string.Join(", ", paths)}]");
+
+            // **Through a real trial**, because the names the canvas gives
+            // its nodes have to be the names the core gives its steps, and
+            // nothing else here checks that they agree. Reporting a path
+            // taken from the canvas proved only that the canvas can colour
+            // a path it made up itself: the break that renamed them all
+            // stayed green.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "website", "example.com");
+            editor!.InsertStepForCheck(1, "website", "example.org");
+            await Task.Delay(200);
+            editor!.TryForCheck();
+            var lit = await Until(
+                () => editor!.ColourOfNode("steps.0") == "C.Live", 6);
+            Check("настоящая проба красит узел на холсте", lit,
+                  lit ? "" : $"| кисть «{editor!.ColourOfNode("steps.0")}», узлы [{string.Join(", ", editor!.NodePaths)}]");
+
+            editor!.TrialStarting();
+            await Task.Delay(150);
+
+            // The canvas is left as it was found: the checks below build
+            // their own graphs, and two stray nodes from this one made the
+            // next assertion read a chain nobody assembled.
+            var first = editor!.NodePaths.OrderBy(p => p).First();
+            editor!.ReportForCheck(first, "running");
+            await Task.Delay(150);
+            Check("идущий шаг зеленеет",
+                  editor!.ColourOfNode(first) == "C.Live",
+                  $"| {editor!.ColourOfNode(first)}");
+
+            editor!.ReportForCheck(first, "failed");
+            await Task.Delay(150);
+            Check("упавший шаг краснеет",
+                  editor!.ColourOfNode(first) == "C.Signal",
+                  $"| {editor!.ColourOfNode(first)}");
+
+            // A new trial forgets the last one's colours: left on, they
+            // would be read as this run's, and a scenario would look
+            // finished a moment before it began.
+            editor!.TrialStarting();
+            await Task.Delay(150);
+            Check("новая проба забывает прежние цвета",
+                  editor!.ColourOfNode(first) is "C.Seam" or "C.Ink",
+                  $"| {editor!.ColourOfNode(first)}");
 
             // The place goes when the work is done: a column that keeps
             // offering "new command" after it was saved is a column that

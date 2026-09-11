@@ -376,7 +376,7 @@ def _open_path(path):
         return False
 
 
-def _fresh_state(lookup=None, machine=None):
+def _fresh_state(lookup=None, machine=None, trace=False):
     """
     What a scenario carries with it for the length of one run.
 
@@ -390,7 +390,51 @@ def _fresh_state(lookup=None, machine=None):
     answers the questions that are about the computer rather than about the
     card, and both are handed in because neither belongs to this module.
     """
-    return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine}
+    return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine,
+            # Where in the tree we are, as a prefix: "2.steps." while
+            # inside the third node's body.
+            "at": "",
+            # Whether anybody is watching the run step by step. A trial
+            # from the editor asks for it; a command fired by voice has
+            # nobody looking at a canvas.
+            "trace": trace}
+
+
+def _say_step(emit, state, where, doing):
+    """
+    Tell whoever is watching which step is running.
+
+    Only while somebody is watching. A trial from the editor asks for it; a
+    scenario fired by voice has nobody looking at a canvas, and filling the
+    event channel with steps nobody reads would be paying for a picture
+    that is not on a screen.
+    """
+    if emit is None or not (state or {}).get("trace"):
+        return
+    try:
+        emit("command.step", path=where, state=doing)
+    except Exception:
+        # A scenario must not fall over because a picture could not be
+        # drawn. The steps keep running; the canvas simply stops moving.
+        log.exception("Не удалось сообщить о шаге сценария")
+
+
+def _in_branch(command, branch, host, emit, depth, state):
+    """
+    Run one branch of a node, remembering where in the tree it is.
+
+    The prefix is put back afterwards rather than left: the node's own
+    siblings come next, and a path that kept growing would report the step
+    after a repeat as though it were inside it.
+    """
+    was = (state or {}).get("at", "")
+    if state is not None:
+        state["at"] = was + branch + "."
+    try:
+        return _run_steps(command.get(branch) or [], host, emit, depth, state)
+    finally:
+        if state is not None:
+            state["at"] = was
 
 
 def _run_steps(steps, host, emit, depth, state):
@@ -407,8 +451,25 @@ def _run_steps(steps, host, emit, depth, state):
         log.warning("Слишком глубокая вложенность шагов, дальше не идём")
         return False
     ok = True
-    for step in steps or []:
-        step_ok, _ = execute(step, host, emit, depth + 1, state)
+    for at, step in enumerate(steps or []):
+        # The path is where the step stands, written out: "2.steps.0" is
+        # the first step inside the third node. Built from the indices
+        # rather than from an identifier on the step — a step has none, and
+        # giving it one would put a field in the core's card for the sake
+        # of a picture in a window.
+        where = f"{(state or {}).get('at', '')}{at}"
+        _say_step(emit, state, where, "running")
+
+        was = (state or {}).get("at", "")
+        if state is not None:
+            state["at"] = where + "."
+        try:
+            step_ok, _ = execute(step, host, emit, depth + 1, state)
+        finally:
+            if state is not None:
+                state["at"] = was
+
+        _say_step(emit, state, where, "done" if step_ok else "failed")
         ok = ok and step_ok
     return ok
 
@@ -552,7 +613,7 @@ def _condition_holds(kind, value, name="", state=None):
 
 
 def execute(command, host=None, emit=None, depth=0, state=None,
-            lookup=None, machine=None):
+            lookup=None, machine=None, trace=False):
     """
     Performs a command. host is an object with methods for system actions
     (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
@@ -567,16 +628,27 @@ def execute(command, host=None, emit=None, depth=0, state=None,
 
     outermost = state is None
     if outermost:
-        state = _fresh_state(lookup, machine)
+        state = _fresh_state(lookup, machine, trace)
 
     # The stop signal is caught **here**, at the outermost call, and
     # nowhere else. Caught deeper it would stop a branch rather than the
     # scenario, which is not what "stop the scenario" says.
     if outermost:
+        # The command itself is a step too, and says so.
+        #
+        # Without this a command of one action reports nothing at all: it
+        # never reaches `_run_steps`, because there is no list of steps to
+        # run. The canvas would then show a trial of such a command as
+        # nothing happening, which is the one thing a trial must not look
+        # like.
+        _say_step(emit, state, "", "running")
         try:
-            return _perform(command, host, emit, depth, state)
+            done = _perform(command, host, emit, depth, state)
+            _say_step(emit, state, "", "done" if done[0] else "failed")
+            return done
         except ScenarioStopped:
             log.info("Сценарий остановлен шагом «остановить»")
+            _say_step(emit, state, "", "done")
             return True, command.get("response", "") or _default_response(
                 command, True)
     return _perform(command, host, emit, depth, state)
@@ -630,7 +702,7 @@ def _perform(command, host, emit, depth, state):
         time.sleep(seconds)
         ok = True
     elif ctype == "sequence":
-        ok = _run_steps(command.get("steps", []), host, emit, depth, state)
+        ok = _in_branch(command, "steps", host, emit, depth, state)
     elif ctype == "stop":
         # Nothing after this runs, at any depth. See `ScenarioStopped`.
         raise ScenarioStopped()
@@ -667,8 +739,7 @@ def _perform(command, host, emit, depth, state):
                 ok = False
                 break
             rounds += 1
-            if not _run_steps(command.get("steps", []), host, emit, depth,
-                              state):
+            if not _in_branch(command, "steps", host, emit, depth, state):
                 ok = False
                 break
     elif ctype == "repeat":
@@ -682,8 +753,7 @@ def _perform(command, host, emit, depth, state):
         times = max(0, min(times, MAX_REPEAT))
         ok = True
         for _ in range(times):
-            if not _run_steps(command.get("steps", []), host, emit, depth,
-                              state):
+            if not _in_branch(command, "steps", host, emit, depth, state):
                 # A repeat stops at the first failure rather than trying
                 # again four more times. Whatever went wrong is unlikely to
                 # go right on its own, and repeating a failing action is the
@@ -695,7 +765,7 @@ def _perform(command, host, emit, depth, state):
                                command.get("value", ""),
                                command.get("name", ""), state)
         branch = "steps" if met else "otherwise"
-        ok = _run_steps(command.get(branch) or [], host, emit, depth, state)
+        ok = _in_branch(command, branch, host, emit, depth, state)
     else:
         ok = False
 

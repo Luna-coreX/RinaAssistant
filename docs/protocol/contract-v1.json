@@ -298,6 +298,26 @@
         "type": "boolean"
       }
     },
+    "command.step": {
+      "path": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      },
+      "state": {
+        "choices": [
+          "running",
+          "done",
+          "failed"
+        ],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "string"
+      }
+    },
     "history.changed": {},
     "listening.always": {
       "enabled": {

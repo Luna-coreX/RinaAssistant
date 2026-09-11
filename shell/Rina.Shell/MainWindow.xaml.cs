@@ -559,6 +559,15 @@ public partial class MainWindow : Window
             ShowLevel(message.Payload["active"]?.GetValue<bool>() == true
                       ? 0.4f : 0f);
 
+        // A scenario being tried says which step it is on (`4.0b-A09`).
+        // Passed to whatever is open, because only the editor has a canvas
+        // to light up and only while it is showing one.
+        if (message.Method == "command.step"
+            && Pane.Content is Pages.CommandEditor editing)
+            editing.StepReported(
+                message.Payload["path"]?.GetValue<string>() ?? "",
+                message.Payload["state"]?.GetValue<string>() ?? "");
+
         Overlay(message);
     }
 

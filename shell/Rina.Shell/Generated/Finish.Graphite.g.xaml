@@ -40,6 +40,8 @@
   <SolidColorBrush x:Key="C.SignalSunk" Color="#cf5c12" />
   <Color x:Key="Color.Hatch">#dcdbd5</Color>
   <SolidColorBrush x:Key="C.Hatch" Color="#dcdbd5" />
+  <Color x:Key="Color.Live">#6cba74</Color>
+  <SolidColorBrush x:Key="C.Live" Color="#6cba74" />
 
   <Color x:Key="Color.Shadow">#05070a</Color>
   <SolidColorBrush x:Key="C.Glass.Bar" Color="#0016181a" />

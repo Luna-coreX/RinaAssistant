@@ -920,6 +920,10 @@ public partial class CommandEditor : UserControl
             return;
         }
         Note.Text = S("Пробую…");
+        // The last run's colours go before the next one starts. Left on,
+        // they would be read as this run's, and a person would see a
+        // scenario "already finished" a moment before it began.
+        TrialStarting();
         Tried?.Invoke(Card());
     }
 

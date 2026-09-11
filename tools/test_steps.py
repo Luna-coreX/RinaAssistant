@@ -309,6 +309,39 @@ finally:
     user_commands.webbrowser = was
 
 
+# --- a trial says which step it is on --------------------------------------
+#
+# Only while somebody is watching. A scenario fired by voice has nobody
+# looking at a canvas, and filling the event channel with steps nobody reads
+# would be paying for a picture that is not on a screen.
+was = user_commands.webbrowser
+user_commands.webbrowser = Opener
+try:
+    told = []
+    opened.clear()
+    execute({"type": "sequence", "steps": [
+        visit("a"),
+        {"type": "repeat", "count": 2, "steps": [visit("b")]},
+        {"type": "выдумка"},
+    ]}, emit=lambda name, **p: told.append((p["path"], p["state"])),
+        trace=True)
+
+    check("проба сообщает о каждом шаге", len(told) >= 8, f"| {len(told)}")
+    check("путь называет место в дереве, а не порядок вызова",
+          ("steps.1.steps.0", "running") in told,
+          f"| {[p for p, _ in told]}")
+    check("упавший шаг назван упавшим",
+          ("steps.2", "failed") in told, f"| {told[-2:]}")
+
+    # And silence when nobody asked. The same run without `trace`.
+    quiet = []
+    execute({"type": "sequence", "steps": [visit("c")]},
+            emit=lambda name, **p: quiet.append(p), trace=False)
+    check("без наблюдателя ничего не сообщается", quiet == [], f"| {quiet}")
+finally:
+    user_commands.webbrowser = was
+
+
 # --- these kinds are steps, not commands -----------------------------------
 #
 # A command of type "wait" would do nothing on purpose; one that is only a

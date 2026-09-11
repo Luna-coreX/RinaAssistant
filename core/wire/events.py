@@ -99,6 +99,12 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
     _e("reminder.fired", _f("item", "object"),
        note="первый настоящий потребитель канала событий (4.0-E05)"),
 
+    # --- a scenario, step by step (4.0b-A09) --------------------------------
+    _e("command.step", _f("path", "string"),
+       _f("state", "string", "running", "done", "failed"),
+       note="какой шаг сценария идёт сейчас; путь — индексы через точку, "
+            "«2.steps.0» есть первый шаг внутри третьего узла"),
+
     # --- requests to the shell, expressed as an event -----------------------
     _e("apps.not_found", _f("query", "string")),
     _e("window.action",

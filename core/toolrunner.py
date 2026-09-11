@@ -463,14 +463,19 @@ def _try_user_command(ctx, args):
         return ToolResult.failed(tr("Нечего пробовать."), "internal")
     command = sanitize_command(card)
 
+    # A trial is watched, and says which step it is on (`4.0b-A09`). An
+    # ordinary run is not: the events would go to a window that is not
+    # showing a canvas.
+    watched = dict(_scenario(ctx), trace=True)
+
     if command.get("type") == "sequence":
         def worker():
-            execute(command, ctx.host, ctx.emit, **_scenario(ctx))
+            execute(command, ctx.host, ctx.emit, **watched)
 
         threading.Thread(target=worker, daemon=True).start()
         return ToolResult.done(tr("Пробую последовательность."))
 
-    ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
+    ok, response = execute(command, ctx.host, ctx.emit, **watched)
     return (ToolResult.done(response) if ok
             else ToolResult.failed(response, "internal"))
 

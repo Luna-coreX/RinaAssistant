@@ -63,6 +63,15 @@ PAIRS = (
     # came out at 2.90, so the list lies on the raised one: that is
     # semantically right too — a popup above the panel, not a hollow in it.
     ("INK_FAINT",  "FACE_HIGH",  3.0, "недоступный вариант в списке"),
+    # The colour of a step that is running or has run (`4.0b-A09`). It is
+    # an outline around a node, not text, so the threshold is the one for a
+    # shape rather than for reading — but it has to be **seen**, and a
+    # green nobody notices would make the whole picture of a trial useless.
+    #
+    # Checked because a colour nobody checks is a colour that stops working
+    # at the next change of a finish and says nothing about it.
+    ("LIVE",       "FACE",       3.0, "идущий шаг на панели"),
+    ("LIVE",       "FACE_HIGH",  3.0, "идущий шаг на приподнятом"),
     ("GLASS_TEXT", "GLASS",      4.5, "реплики на стекле"),
     ("GLASS_DIM",  "GLASS",      4.5, "время и служебное на стекле"),
     ("SIGNAL",     "FACE",       4.5, "признак ошибки — это текст, не рамка"),

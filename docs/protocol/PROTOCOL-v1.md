@@ -335,6 +335,7 @@
 | `assistant.thinking` | `active` |
 | `history.changed` | — |
 | `reminder.fired` | `item` |
+| `command.step` | `path`, `state` | Какой шаг сценария идёт сейчас (`4.0b-A09`). Путь — индексы через точку: `2.steps.0` есть первый шаг внутри третьего узла. `state`: `running`, `done`, `failed`. Нужен окну, чтобы показать ход пробы на холсте; ничего не хранится |
 | `apps.not_found` | `query` |
 | `window.action` | `action` (`screenshot`, `minimize`, `show`, `quit`) |
 

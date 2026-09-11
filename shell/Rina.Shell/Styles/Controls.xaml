@@ -888,6 +888,68 @@
     <Setter Property="SnapsToDevicePixels" Value="True" />
   </Style>
 
+  <!--
+    The menu that picks a kind of node (4.0b-A09).
+
+    Without a style of its own it came out in the system's colours: a white
+    panel with blue highlights in the middle of a dark window. It is the
+    only menu in the program, which is exactly why it had been missed — one
+    of a thing gets looked at once and then never again.
+
+    Dressed as the dropdown of a choice, because that is what it is: a list
+    one picks from. The same glass, the same seam, the same warmth under the
+    item the cursor is on.
+  -->
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Popup}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContextMenu">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource Radius.Max}"
+                  Padding="{TemplateBinding Padding}">
+            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="Well" Background="Transparent"
+                  CornerRadius="{StaticResource Radius.Tight}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter ContentSource="Header"
+                              VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Well" Property="Background"
+                      Value="{DynamicResource C.Glass.Raised}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
   <Style x:Key="Card" TargetType="Border">
     <Setter Property="Background" Value="{DynamicResource C.Glass.Raised}" />
     <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
