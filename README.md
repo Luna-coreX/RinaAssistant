@@ -14,26 +14,55 @@ A desktop voice assistant for Windows — launches your apps, keeps your timers,
 
 ---
 
-## About
+## Say it, and it happens
 
-**Rina Assistant** listens, understands what you asked for, and does it: opens the program you named even if you named it in the wrong alphabet, sets a timer, changes the volume, does the arithmetic, searches the web, or — if you enable it — answers the question with a language model running on your own machine.
+**Rina Assistant** listens, works out what you asked for, and does it: opens the
+program you named even if you named it in the wrong alphabet, sets a timer,
+changes the volume, does the arithmetic, searches the web, or — if you switch it
+on — answers with a language model running on your own machine.
 
-Everything runs locally by default. No account, no cloud service, no telemetry.
+**Everything runs on your computer.** No account, no cloud service, no
+telemetry. There is a page inside the program that lists every single thing it
+has remembered about you, and a button to make it forget any of it.
 
-Rina Assistant is developed as part of the **NeuroSync Foundry** ecosystem.
+<p align="center">
+  <img src="docs/screens/home.png" width="760"><br>
+  <sub>She is one shape when waiting, another when listening, another when
+  answering — the window says what is happening without a word for it.</sub>
+</p>
 
 ---
 
-## Screenshots
+## Try it in five minutes
+
+Requires **Windows**, **Python 3.10+** and **.NET 9**.
+
+```bash
+git clone https://github.com/Luna-coreX/RinaAssistant.git
+cd RinaAssistant
+pip install -r requirements.txt
+dotnet run --project shell/Rina.Shell
+```
+
+The shell starts the core itself — you never run it separately. On the first
+launch a short wizard asks which voice and which recognition you want and
+downloads only those.
+
+Then say — or type — **«открой блокнот»**, **«поставь таймер на 5 минут»**,
+**«сколько будет 17 на 23»**.
+
+---
+
+## What it looks like
 
 | | |
 |---|---|
-| <img src="docs/screens/dialog.png" width="420"> | <img src="docs/screens/commands.png" width="420"> |
-| **Dialogue** — the conversation, the input line, two modes | **Commands** — your own phrases, sequences, and what she can do already |
-| <img src="docs/screens/reminders.png" width="420"> | <img src="docs/screens/plugins.png" width="420"> |
-| **Reminders** — timers, alarms, reminders | **Plugins** — install, enable, and each plugin's own page |
-| <img src="docs/screens/settings.png" width="420"> | |
-| **Settings** — the core sends the meaning, the shell decides the look | |
+| <img src="docs/screens/commands.png" width="420"> | <img src="docs/screens/privacy.png" width="420"> |
+| **Commands** — your own, grouped by kind; the built-in ones folded away | **What Rina knows about me** — every stored thing, and a way to forget it |
+| <img src="docs/screens/dialog.png" width="420"> | <img src="docs/screens/reminders.png" width="420"> |
+| **Dialogue** — the conversation, with who said what and when | **Reminders** — timers, alarms, and reminders tied to a program |
+| <img src="docs/screens/plugins.png" width="420"> | <img src="docs/screens/settings.png" width="420"> |
+| **Plugins** — install, switch on, each with a page of its own | **Settings** — the core sends the meaning, the shell decides the look |
 
 ---
 
@@ -73,9 +102,25 @@ Speech synthesis and recognition are pluggable — pick what suits the machine.
 
 The models live in the core, the microphone and the speaker in the shell — the sound travels between them over a channel of its own, so a second of speech never queues behind a button press.
 
-### Commands and sequences
+### Commands, assembled as a graph
 
-Six kinds of user commands — launch an app, open a folder, open a website, say something, run a system action, or run a **sequence** that chains several steps with pauses. Built from an editor, not typed as a string. Commands can be exported and imported between machines; anything imported arrives **disabled**, so nothing runs before you have looked at it.
+A command is a **graph**: steps stand as nodes with wires between them, and a
+simple command is a graph of one node. Six kinds of thing can happen — launch an
+app, open a folder, open a website, say something, run a system action, run a
+sequence — and seven more exist only as steps inside one: wait, repeat N times,
+repeat while, if/else, stop the scenario, call another command, remember a
+value.
+
+Conditions can ask about the world as well as the clock: which program is in
+front, whether one is running, whether a file exists, whether Ollama answers,
+the time, the day, a value you set earlier in the same run.
+
+Nodes are dragged onto the ports between other nodes, and «Проверить» runs the
+graph without saving it — lighting each step green as it goes and red where it
+stops.
+
+Commands can be exported and imported between machines; anything imported
+arrives **disabled**, so nothing runs before you have looked at it.
 
 ### Reminders
 
@@ -83,7 +128,8 @@ Timers, alarms and reminders in plain language — "поставь таймер 
 
 ### System control
 
-Eleven actions: volume up/down/mute, media next/previous/play-pause, lock, screenshot, sleep, restart, shutdown. Destructive ones always ask first, and the question shows **what will happen** rather than the action's name — a single misheard phrase can never power off the machine.
+Sixteen actions: volume up/down/mute, media next/previous/play-pause, lock,
+screenshot, sleep, restart, shutdown, and the ones that move Rina's own window. Destructive ones always ask first, and the question shows **what will happen** rather than the action's name — a single misheard phrase can never power off the machine.
 
 ### Answers
 
@@ -101,7 +147,7 @@ See [`docs/plugins/WRITING-PLUGINS.md`](docs/plugins/WRITING-PLUGINS.md).
 
 ### Interface
 
-Two finishes (silver and black) with a choice of accent, five interface languages (Русский, English, Українська, Español, Deutsch), a floating command bar, tray integration, autostart, global hotkeys, and a full history with export.
+Three finishes (silver, black and graphite) with a choice of accent, five interface languages (Русский, English, Українська, Español, Deutsch), a floating command bar, tray integration, autostart, global hotkeys, and a full history with export.
 
 The design is a document, not a mood: [`docs/design/SYSTEM.md`](docs/design/SYSTEM.md). Every colour pair is checked for contrast, and the drawn window is compared with the tokens pixel by pixel.
 
@@ -162,20 +208,18 @@ is cheaper than reconstructing it from the log.
 
 ---
 
-## Installation
+## Installation, in more detail
 
-Requires **Windows**, **Python 3.10+** and **.NET 9** for the shell.
+The short version is at the top. What is worth knowing beyond it:
 
-```bash
-git clone https://github.com/Luna-coreX/RinaAssistant.git
-cd RinaAssistant
-pip install -r requirements.txt
-dotnet run --project shell/Rina.Shell
-```
+The shell takes the Python from the project's environment if there is one, and
+only then whatever is in `PATH`. The voices and the recognition models are
+installed **in the environment**, so a core started with "just python" comes up
+and honestly reports that it has no engines.
 
-The shell starts the core itself — you do not run it separately. It takes the Python from the project's environment if there is one, and only then whatever is in `PATH`: the voices and the recognition models are installed **in the environment**, and a core started with "just python" comes up and honestly reports that it has no engines.
-
-Voice engines are optional and listed in `requirements.txt` — install the ones you intend to use. Some (Vosk, Piper) need a model file downloaded separately.
+Voice engines are optional and listed in `requirements.txt`. The first-run
+wizard installs the ones you pick; you can also install them by hand. Some
+(Vosk, Piper) need a model file, which the wizard downloads.
 
 ### Optional: local AI answers
 
@@ -192,7 +236,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 39 checks, about two minutes
+python tools/regress.py          # 65 checks, about four minutes
 python tools/regress.py --list   # what they are
 ```
 
@@ -216,7 +260,10 @@ Full plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Security
 
-What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Four surfaces, seventeen threats, and for each of them the **residual risk** written down, because a defence without one has stopped being thought about.
+What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-two threats, and for each of them the **residual risk**
+written down, because a defence without one has stopped being thought about.
+The sweep that walks that document rather than a list somebody maintains is
+`tools/test_security.py`.
 
 Reporting a vulnerability: [`SECURITY.md`](SECURITY.md).
 

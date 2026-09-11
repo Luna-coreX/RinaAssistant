@@ -255,6 +255,89 @@ check("старых скриншотов в README нет",
       not re.search(r"docs/0\d-\w+\.png", readme),
       "| это интерфейс, которого больше не существует")
 
+# ---------------------------------------------------------------------------
+# The numbers the README quotes (`4.0b-C04`)
+# ---------------------------------------------------------------------------
+#
+# A product page is read by somebody deciding whether to try the thing, and
+# a number in it is the part they believe without checking. Which is exactly
+# how it rots: the code moves, the sentence stays, and the sentence is what
+# the reader takes away.
+#
+# It had rotted. "Eleven system actions" when there were sixteen, "two
+# finishes" when there were three, "four surfaces, seventeen threats" when
+# there were six and twenty-two, "39 checks" when there were sixty-five.
+# None of it was noticed by anybody, because nothing was looking.
+import json
+import subprocess
+
+print()
+print("=== числа, которые называет README ===")
+
+
+def quoted(word, said):
+    """Does the README say this number for this thing?"""
+    return said in readme
+
+
+with io.open(os.path.join(ROOT, "docs", "design", "tokens.json"),
+             encoding="utf-8") as handle:
+    finishes = len(json.load(handle)["finishes"])
+
+model = io.open(os.path.join(ROOT, "docs", "security", "THREAT-MODEL.md"),
+                encoding="utf-8").read()
+threats = len(re.findall(r"^### T-", model, re.MULTILINE))
+surfaces = len(re.findall(r"^## Поверхность", model, re.MULTILINE))
+
+sys.path.insert(0, ROOT)
+from voice.user_commands import COMMAND_TYPES, STEP_ONLY, SYSTEM_ACTIONS
+
+#: Numbers written out as words, because that is how a page for people
+#: writes them. A page that said "16 actions" would read like a table.
+WORDS = {
+    2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven",
+    11: "Eleven", 16: "Sixteen", 17: "seventeen", 22: "twenty-two",
+}
+
+check(f"отделок в README столько же, сколько в системе ({finishes})",
+      quoted("finishes", f"{WORDS.get(finishes, finishes)} finishes"),
+      f"| ждали «{WORDS.get(finishes, finishes)} finishes»")
+
+check(f"системных действий ({len(SYSTEM_ACTIONS)})",
+      quoted("actions", f"{WORDS.get(len(SYSTEM_ACTIONS))} actions"),
+      f"| ждали «{WORDS.get(len(SYSTEM_ACTIONS))} actions»")
+
+check(f"видов шага ({len(STEP_ONLY)})",
+      quoted("steps", f"{WORDS.get(len(STEP_ONLY), '').lower()} more exist"),
+      f"| ждали «{WORDS.get(len(STEP_ONLY), '').lower()} more exist»")
+
+check(f"поверхностей и угроз ({surfaces} и {threats})",
+      f"{WORDS.get(surfaces)} surfaces" in readme
+      and f"{WORDS.get(threats)} threats" in readme,
+      f"| ждали «{WORDS.get(surfaces)} surfaces, {WORDS.get(threats)} threats»")
+
+# The number of checks comes from the suite itself: asking it is the only
+# way to be sure, and the suite is what the sentence is about.
+try:
+    listed = subprocess.run(
+        [sys.executable, os.path.join(ROOT, "tools", "regress.py"), "--list"],
+        capture_output=True, text=True, encoding="utf-8", timeout=120).stdout
+    total = re.search(r"всего:\s*(\d+)", listed or "")
+    if total:
+        check(f"проверок в README столько же, сколько в наборе ({total.group(1)})",
+              f"# {total.group(1)} checks" in readme,
+              f"| ждали «# {total.group(1)} checks»")
+    else:
+        check("набор сказал, сколько в нём проверок", False, f"| {listed[-80:]}")
+except subprocess.TimeoutExpired:
+    check("набор ответил, сколько в нём проверок", False, "| не дождались")
+
+# Every screenshot the README points at exists. A picture that does not open
+# is a broken promise on the page that makes the first impression.
+missing = [name for name in re.findall(r'src="(docs/screens/[^"]+)"', readme)
+           if not os.path.exists(os.path.join(ROOT, name.replace("/", os.sep)))]
+check("все снимки на месте", missing == [], f"| нет: {missing}")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
