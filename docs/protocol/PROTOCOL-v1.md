@@ -329,6 +329,7 @@
 | `listening.started` / `listening.stopped` | — |
 | `listening.capturing` | `active` |
 | `listening.always` | `enabled` |
+| `listening.conversation` | `open`, `seconds` | Разговор открыт: слово активации пока не нужно (`4.0b-E06`). `seconds` — сколько его осталось. Открытое ухо обязано быть видимым, поэтому событие есть, а не подразумевается |
 | `speech.recognized` | `text` |
 | `assistant.response` | `text` |
 | `assistant.error` | `text` |

@@ -308,9 +308,9 @@
       },
       "state": {
         "choices": [
-          "running",
           "done",
-          "failed"
+          "failed",
+          "running"
         ],
         "high": null,
         "low": null,
@@ -335,6 +335,22 @@
         "low": null,
         "required": true,
         "type": "boolean"
+      }
+    },
+    "listening.conversation": {
+      "open": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "boolean"
+      },
+      "seconds": {
+        "choices": [],
+        "high": null,
+        "low": null,
+        "required": true,
+        "type": "number"
       }
     },
     "listening.started": {},

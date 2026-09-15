@@ -21,6 +21,10 @@ class Events:
     LISTENING_STOPPED = "listening.stopped"   # {}
     CAPTURING = "listening.capturing"         # {"active": bool}
     ALWAYS_LISTEN = "listening.always"        # {"enabled": bool}
+    #: A conversation is open: the wake word is not needed for the moment
+    #: (`4.0b-E06`). `seconds` is how long is left of it — the shell shows
+    #: that, because an ear that is open has to be visibly open.
+    CONVERSATION = "listening.conversation"   # {"open": bool, "seconds": float}
     RECOGNIZED = "speech.recognized"          # {"text": str}
 
     # --- the assistant's answers ---

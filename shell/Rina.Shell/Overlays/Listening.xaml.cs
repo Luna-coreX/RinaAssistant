@@ -52,6 +52,15 @@ public partial class Listening : Window
     /// </remarks>
     public bool Always => _always && IsVisible;
 
+    //: A conversation is open, so the wake word may be left out
+    //: (`4.0b-E06`). Held apart from `Always` because the two overlap:
+    //: the mode can be on while no conversation is, and a conversation
+    //: can run in one-off listening where the mode is off.
+    private bool _talking;
+
+    /// <summary>Is a conversation open — for the check.</summary>
+    public bool Talking => _talking && IsVisible;
+
     /// <summary>Is the plaque visible — for the end-to-end check.</summary>
     public bool Visible => IsVisible && Card.Opacity > 0.5;
 
@@ -64,6 +73,7 @@ public partial class Listening : Window
     public void Appear(bool always)
     {
         _always = always;
+        _talking = false;
         Label.Text = always ? S("Всегда слушаю") : S("Слушаю…");
         Place();
         if (!IsVisible) Show();
@@ -73,10 +83,41 @@ public partial class Listening : Window
         Pulse();
     }
 
+    /// <summary>
+    /// A conversation is open: say so, and say how long is left.
+    /// </summary>
+    /// <remarks>
+    /// The boundary this feature was given is that an open ear must be
+    /// finite, visible, and close itself. This is the visible part, and
+    /// it is not decoration: for the length of this plaque a phrase said
+    /// near the machine is taken as addressed to it, and a person is
+    /// entitled to know that without having to remember it.
+    /// </remarks>
+    public void Converse(double seconds)
+    {
+        _talking = true;
+        Label.Text = S("Разговор");
+        Place();
+        if (!IsVisible) Show();
+
+        Card.BeginAnimation(OpacityProperty, new DoubleAnimation(
+            Card.Opacity, 1, TimeSpan.FromMilliseconds(140)));
+        Pulse();
+    }
+
+    /// <summary>The conversation is over; the plaque goes unless something else holds it.</summary>
+    public void Hush()
+    {
+        _talking = false;
+        if (!_always) Vanish();
+        else Appear(always: true);
+    }
+
     /// <summary>Hide it. The "always" mode is not put out this way — only by cancelling.</summary>
     public void Vanish()
     {
         _always = false;
+        _talking = false;
         Dot.BeginAnimation(OpacityProperty, null);
         var fade = new DoubleAnimation(Card.Opacity, 0,
                                        TimeSpan.FromMilliseconds(180));

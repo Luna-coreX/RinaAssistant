@@ -1650,6 +1650,51 @@ public partial class App
         await Task.Delay(400);
         Check("отмена режима убирает плашку", !window.Plaque.Visible);
 
+        // --- the conversation, and its being visible (`4.0b-E06`) -------
+        //
+        // The plan sets the boundary: an open conversation is an open ear
+        // — the same surface as `T-19` — and it must be finite, visible,
+        // and close itself. The core answers for the first and the third;
+        // this is the second, and it is not decoration. For as long as
+        // this plaque stands, a phrase said near the machine counts as
+        // addressed to it, and a person is entitled to know that without
+        // having to remember it.
+        window.OnCoreEvent(Event("listening.conversation",
+            new System.Text.Json.Nodes.JsonObject
+            { ["open"] = true, ["seconds"] = 15.0 }));
+        await Task.Delay(300);
+        Check("открытый разговор видно", window.Plaque.Visible);
+        Check("и он назван своим словом",
+              window.Plaque.Caption.Contains("Разговор"),
+              $"| {window.Plaque.Caption}");
+
+        window.OnCoreEvent(Event("listening.conversation",
+            new System.Text.Json.Nodes.JsonObject
+            { ["open"] = false, ["seconds"] = 0.0 }));
+        await Task.Delay(400);
+        Check("закрылся — плашка ушла", !window.Plaque.Visible);
+
+        // And a conversation inside the mode does not take the mode's
+        // plaque away when it ends: the microphone is still open, and a
+        // sign that goes out while it is would be worse than no sign.
+        window.OnCoreEvent(Event("listening.always",
+            new System.Text.Json.Nodes.JsonObject { ["enabled"] = true }));
+        window.OnCoreEvent(Event("listening.conversation",
+            new System.Text.Json.Nodes.JsonObject
+            { ["open"] = true, ["seconds"] = 15.0 }));
+        await Task.Delay(300);
+        window.OnCoreEvent(Event("listening.conversation",
+            new System.Text.Json.Nodes.JsonObject
+            { ["open"] = false, ["seconds"] = 0.0 }));
+        await Task.Delay(400);
+        Check("разговор кончился, а режим остался виден",
+              window.Plaque.Visible
+              && window.Plaque.Caption.Contains("Всегда"),
+              $"| {window.Plaque.Caption}");
+        window.OnCoreEvent(Event("listening.always",
+            new System.Text.Json.Nodes.JsonObject { ["enabled"] = false }));
+        await Task.Delay(300);
+
         // A screenshot, if asked for: the line and the plaque together.
         if (shot is not null)
         {

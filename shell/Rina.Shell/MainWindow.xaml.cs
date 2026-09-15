@@ -879,6 +879,18 @@ public partial class MainWindow : Window
                 else Plaque?.Vanish();
                 break;
 
+            // A conversation is open: the wake word may be left out for a
+            // while (`4.0b-E06`). Shown because it has to be — for as
+            // long as this stands, a phrase near the machine counts as
+            // addressed to it.
+            case "listening.conversation":
+                var talking = message.Payload["open"]?.GetValue<bool>() == true;
+                if (talking)
+                    Plaque?.Converse(
+                        message.Payload["seconds"]?.GetValue<double>() ?? 0);
+                else Plaque?.Hush();
+                break;
+
             case "assistant.response":
                 if (ShowToasts && !IsVisible)
                     Toast?.Say(message.Payload["text"]?.GetValue<string>() ?? "");

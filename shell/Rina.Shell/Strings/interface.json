@@ -1528,5 +1528,8 @@
   },
   "Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках».": {
     "English": "No voice yet: Rina will hear you and answer in text. You can fix that in Settings."
+  },
+  "Разговор": {
+    "English": "Talking"
   }
 }

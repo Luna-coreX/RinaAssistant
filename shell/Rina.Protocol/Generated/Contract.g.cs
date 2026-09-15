@@ -247,6 +247,8 @@ public static class Events
     public const string ListeningAlways = "listening.always";
     /// <summary>active: boolean</summary>
     public const string ListeningCapturing = "listening.capturing";
+    /// <summary>open: boolean, seconds: number</summary>
+    public const string ListeningConversation = "listening.conversation";
     /// <summary>без полей</summary>
     public const string ListeningStarted = "listening.started";
     /// <summary>без полей</summary>
@@ -283,6 +285,7 @@ public static class Events
         "history.changed",
         "listening.always",
         "listening.capturing",
+        "listening.conversation",
         "listening.started",
         "listening.stopped",
         "reminder.fired",

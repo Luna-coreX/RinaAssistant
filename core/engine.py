@@ -113,6 +113,17 @@ class RinaEngine:
         self._always_listen = False
         self._always_thread = None
         self._stop_always = threading.Event()
+
+        #: Until when the wake word may be left out, because a
+        #: conversation is going on (`4.0b-E06`).
+        #:
+        #: The complaint that started this: "the activation word has to be
+        #: said before every phrase". A person says a name once and then
+        #: talks; saying it again before each sentence is addressing a
+        #: machine, not speaking to somebody.
+        self._talking_until = 0.0
+        self._talking_since = 0.0
+        self._talk_timer = None
         self._cmd_store = UserCommandStore(settings)
         self._history = HistoryStore(settings)
         self._host = None                    # actions on the window (see set_host)
@@ -375,6 +386,83 @@ class RinaEngine:
             # the engines give the error text in Russian — we translate at the boundary
             self._emit(Events.ERROR, text=tr(result.error))
 
+    #: How long a conversation stays open after the last thing said.
+    #:
+    #: Long enough to draw breath and go on; short enough that a phrase
+    #: said to somebody else in the room a minute later is not taken for a
+    #: command. Fifteen seconds is about as long as a pause can be and
+    #: still belong to the same exchange.
+    TALK_WINDOW = 15.0
+
+    #: And how long one conversation may last altogether.
+    #:
+    #: **The boundary written into the plan.** An open conversation is an
+    #: open ear — the same surface as `T-19` — and it has to be finite,
+    #: visible, and close itself. Extended turn by turn without a ceiling
+    #: it would satisfy the first two and quietly fail the third: an
+    #: afternoon of talking near the machine would leave the word
+    #: optional until the program was shut down.
+    TALK_LIMIT = 180.0
+
+    def talking(self, now=None):
+        """Is a conversation open right now."""
+        now = time.monotonic() if now is None else now
+        return now < self._talking_until
+
+    def _open_talk(self):
+        """Start a conversation, or push its end further off."""
+        now = time.monotonic()
+        fresh = not self.talking(now)
+        if fresh:
+            self._talking_since = now
+
+        # The ceiling wins over the extension: the last exchange of a long
+        # conversation gets a shorter window, and then it is over.
+        until = min(now + self.TALK_WINDOW,
+                    self._talking_since + self.TALK_LIMIT)
+        if until <= now:
+            self._close_talk()
+            return
+
+        self._talking_until = until
+        self._emit(Events.CONVERSATION, open=True,
+                   seconds=round(until - now, 1))
+        self._arm_talk_timer()
+
+    def _close_talk(self):
+        """End the conversation: the wake word is needed again."""
+        if self._talk_timer is not None:
+            self._talk_timer.cancel()
+            self._talk_timer = None
+        if self._talking_until == 0.0:
+            return
+        self._talking_until = 0.0
+        self._talking_since = 0.0
+        self._emit(Events.CONVERSATION, open=False, seconds=0.0)
+
+    def _arm_talk_timer(self):
+        """
+        Close it by the clock, not by the next phrase.
+
+        A conversation that ended only when something else was said would
+        be open for hours in a quiet room, and nothing would say so. It
+        closes itself, and the closing is announced — that is two thirds
+        of the boundary this feature was given.
+        """
+        if self._talk_timer is not None:
+            self._talk_timer.cancel()
+        left = max(0.05, self._talking_until - time.monotonic())
+        self._talk_timer = threading.Timer(left, self._talk_ran_out)
+        self._talk_timer.daemon = True
+        self._talk_timer.start()
+
+    def _talk_ran_out(self):
+        # Extended while the timer was waiting: rearm rather than close.
+        if self.talking():
+            self._arm_talk_timer()
+            return
+        self._close_talk()
+
     def set_always_listen(self, on):
         on = bool(on)
         if on == self._always_listen:
@@ -393,6 +481,11 @@ class RinaEngine:
             log.exception("Не удалось запомнить режим «всегда слушать»")
 
         self._emit(Events.ALWAYS_LISTEN, enabled=on)
+        # A conversation belongs to an open microphone. Switching the mode
+        # off leaves it hanging otherwise: the word would still be
+        # optional for the next quarter minute, with nothing listening.
+        if not on:
+            self._close_talk()
         if on:
             # every start has its own stop flag: an old thread may still be
             # waiting on the microphone, and a shared cleared flag would
@@ -628,7 +721,10 @@ class RinaEngine:
             aliases=dict(self._settings.get("app_aliases", {}) or {}),
             pending=question.to_dict() if question else None,
             wake_words=tuple(get_wake_words(self._settings)),
-            require_wake=require_wake,
+            # The wake word is not asked for while a conversation is
+            # open (`4.0b-E06`): it is said once, and what follows is the
+            # same exchange.
+            require_wake=require_wake and not self.talking(),
             source=source,
             # Asked of ourselves rather than read off the name of the
             # source: see `RouterContext.unbidden`.
@@ -793,6 +889,14 @@ class RinaEngine:
 
         if intent.name == "silence":
             return
+
+        # She was spoken to — so the conversation is open, and for the
+        # next little while the name need not be said again (`4.0b-E06`).
+        # Only for what was said aloud: a typed line needs no wake word
+        # anyway, and opening the ear because somebody typed would be
+        # answering a question nobody asked.
+        if source in ("voice", "always"):
+            self._open_talk()
 
         if intent.name == "ask.wake":
             self._history.add("user", "Рина", source=source)

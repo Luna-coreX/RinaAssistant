@@ -1726,6 +1726,11 @@ public static partial class Loc
                 {
                     ["English"] = "Maximise",
                 },
+            ["Разговор"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Talking",
+                },
             ["Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."] =
                 new Dictionary<string, string>
                 {

@@ -86,6 +86,10 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
        note="идёт захват звука"),
     _e("listening.always", _f("enabled", "boolean"),
        note="режим постоянного прослушивания"),
+    _e("listening.conversation", _f("open", "boolean"),
+       _f("seconds", "number"),
+       note="разговор открыт: слово активации пока не нужно (4.0b-E06); "
+            "сколько его осталось — чтобы открытое ухо было видно"),
     _e("speech.recognized", _f("text", "string"), note="распознанная фраза"),
 
     # --- the assistant's answers --------------------------------------------

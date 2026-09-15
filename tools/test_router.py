@@ -150,6 +150,90 @@ check("и поиска по такому контексту не будет да
       f"| {route('Рина, столица австралии', open_ctx).name}")
 
 print()
+print("=== разговор: слово активации говорится один раз ===")
+# The complaint that started `4.0b-E06`: "the activation word has to be
+# said before every phrase". A person says a name once and then talks;
+# saying it again before each sentence is addressing a machine, not
+# speaking to somebody.
+#
+# The boundary the plan sets against it: an open conversation is an open
+# ear — the same surface as `T-19` — so it must be **finite**, **visible**
+# and **close itself**. All three are asked here; the visible part is
+# asked of the shell in `--check-overlays`.
+import time as _time
+
+talker = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [], "web_search_fallback": True,
+}))
+talker.ears_outside = True
+talker._always_listen = True
+
+said = []
+talker.bus.on("listening.conversation", lambda data: said.append(dict(data)))
+
+check("в покое разговора нет", not talker.talking())
+ctx_shut = talker._router_context("voice", require_wake=True)
+check("и слово активации спрашивается",
+      route("что ты умеешь", ctx_shut).name == "silence",
+      "| без имени и без разговора — молчание")
+
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+check("после обращения разговор открыт", talker.talking())
+check("и об этом сказано наружу",
+      bool(said) and said[0].get("open") is True,
+      f"| {said}")
+
+ctx_open = talker._router_context("voice", require_wake=True)
+check("внутри разговора имя уже не нужно",
+      route("что ты умеешь", ctx_open).name == "builtin.answer",
+      f"| {route('что ты умеешь', ctx_open).name}")
+
+# Finite. The window is a length of time, not a mood: it is asked here by
+# moving the deadline into the past rather than by waiting fifteen
+# seconds, because a check that sleeps for its subject is a check nobody
+# runs.
+talker._talking_until = _time.monotonic() - 0.01
+check("время вышло — разговор закрыт", not talker.talking())
+ctx_shut = talker._router_context("voice", require_wake=True)
+check("и имя спрашивается снова",
+      route("что ты умеешь", ctx_shut).name == "silence")
+
+# Closes itself, out loud. The timer is what does it in life; here it is
+# called directly, because what is being checked is that closing is
+# announced, not that `threading.Timer` works.
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+said.clear()
+talker._talking_until = _time.monotonic() - 0.01
+talker._talk_ran_out()
+check("закрылся сам — и сказал об этом",
+      bool(said) and said[-1].get("open") is False,
+      f"| {said}")
+
+# And it does not grow for ever. Extended turn by turn without a ceiling
+# the word would stay optional for an afternoon — the third part of the
+# boundary, and the easiest of the three to lose.
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+talker._talking_since = _time.monotonic() - RinaEngine.TALK_LIMIT + 3
+talker.handle_command("что ты умеешь", require_wake=True, source="voice")
+left = talker._talking_until - _time.monotonic()
+check("у долгого разговора есть потолок", left <= 3.5,
+      f"| осталось {left:.1f} с при окне {RinaEngine.TALK_WINDOW:.0f}")
+
+# A typed line opens nothing: it needs no wake word anyway, and opening
+# the ear because somebody typed would be answering a question nobody
+# asked.
+quiet = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [],
+}))
+quiet.handle_command("что ты умеешь", source="typed")
+check("напечатанное разговора не открывает", not quiet.talking())
+
+print()
 print("=== неизменяемость намерения ===")
 i = route("запусти телеграм", ctx)
 try:
