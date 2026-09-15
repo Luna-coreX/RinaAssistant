@@ -630,6 +630,9 @@ class RinaEngine:
             wake_words=tuple(get_wake_words(self._settings)),
             require_wake=require_wake,
             source=source,
+            # Asked of ourselves rather than read off the name of the
+            # source: see `RouterContext.unbidden`.
+            unbidden=bool(self._always_listen),
             reminders_active=len(self._reminders.active()),
             llm_enabled=llm.is_enabled(),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
@@ -946,11 +949,13 @@ class RinaEngine:
         """
         The fallback — a search on the internet.
 
-        In "always listen" mode we do not search: noise and chance speech
-        land there, and a browser must not be opened on them.
+        With the microphone open on her own initiative we do not search:
+        noise and chance speech land here, and a browser must not be
+        opened on them. Asked of the mode, not of the name of the source —
+        that name is `voice` in both modes, and the rule had never fired.
         """
         allowed = (self._settings.get("web_search_fallback", True)
-                   and source != "always")
+                   and not self._always_listen)
         if allowed:
             result = self._tools.call("web_search", {"query": command},
                                       source=source)

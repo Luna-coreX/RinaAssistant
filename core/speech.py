@@ -443,10 +443,52 @@ class FasterWhisperRecogniser:
             return Heard(ok=False, error=self._error or "stt.unavailable")
         try:
             pieces, _ = self._model.transcribe(
-                wave_from(pcm), language=language or None)
-            return Heard(text="".join(p.text for p in pieces).strip())
+                wave_from(pcm), language=language or None,
+                # **Whisper answers something to anything.** A second of a
+                # quiet room came back as "Редактор субтитров
+                # Н.Семкирова" — a line of subtitle credits out of what it
+                # was trained on — and the assistant went and searched the
+                # internet for it. Measured rather than guessed: on
+                # silence this model gives that phrase with a
+                # `no_speech_prob` of 0.7, and with the filter it gives
+                # nothing at all, twice as fast.
+                #
+                # The segmenter's threshold does not catch this: a phrase
+                # begins on a loud chunk and carries the quiet ones after
+                # it, so most of what reaches the model is silence even
+                # when a word did sound.
+                vad_filter=True,
+                # Each phrase on its own. The segmenter hands over whole
+                # phrases, and letting the model carry the last one into
+                # the next is how "Рина" turns into "Рина, что ты? Рина,
+                # что ты?" — the repetition Whisper is known for, and it
+                # was in the journal.
+                condition_on_previous_text=False)
+            kept = [piece for piece in pieces
+                    if getattr(piece, "no_speech_prob", 0.0) <= self.NOT_SPEECH]
+            return Heard(text="".join(p.text for p in kept).strip())
         except Exception as exc:                        # noqa: BLE001
             return Heard(ok=False, error=str(exc))
+
+    #: Above this the model itself says the sound was probably not speech.
+    #:
+    #: A second gate behind the filter, and it costs nothing: the number
+    #: comes back with every piece. Set where the measured hallucination
+    #: sat (0.71) rather than at some round figure — it is the only
+    #: reading we have of what one looks like from inside the model.
+    NOT_SPEECH = 0.6
+
+    def warm(self) -> bool:
+        """
+        Load the model before it is needed. Returns whether it is ready.
+
+        The first phrase of a session used to wait for the model: in a
+        person's journal a phrase of 1.2 seconds took **eighteen** to come
+        back, and eighteen seconds of nothing is indistinguishable from not
+        being heard. Loading starts when the microphone opens, where a
+        person is already expecting a moment's pause.
+        """
+        return self.available() and self._load()
 
 
 def whisper_for(settings) -> Recogniser:

@@ -68,8 +68,8 @@ check("с моделью — намерение модели", answer.name == "l
 check("уверенность ниже единицы", answer.confidence < 1.0,
       f"| {answer.confidence}")
 
-always = RouterContext(apps=APPS, source="always")
-check("в режиме «всегда слушать» поиска нет",
+always = RouterContext(apps=APPS, unbidden=True)
+check("при открытом микрофоне поиска нет",
       route("столица австралии", always).name == "fallback.none")
 
 full = RouterContext(apps=APPS, reminders_active=3)
@@ -84,8 +84,8 @@ check("с активацией — команда",
       route("Рина запусти телеграм", wake).name == "app.launch")
 check("голое слово активации",
       route("Рина", wake).name == "ask.wake")
-wake_always = RouterContext(apps=APPS, require_wake=True, source="always")
-check("голое слово в режиме «всегда» — молчание",
+wake_always = RouterContext(apps=APPS, require_wake=True, unbidden=True)
+check("голое слово при открытом микрофоне — молчание",
       route("Рина", wake_always).name == "silence")
 
 print()
@@ -109,6 +109,45 @@ check("выбор порядковым", picked.name == "app.launch"
 check("выбор именем",
       route("visual studio code", choose).arg("app") == "Visual Studio Code")
 check("отмена выбора", route("отмена", choose).name == "cancelled")
+
+print()
+print("=== то же самое ядро и собирает ===")
+# **Both checks above were green while both rules were dead.** They asked
+# `source="always"`, and that name is passed by the 3.1.0 path where the
+# core opened the microphone itself. Since `4.0-G` the sound comes from
+# the shell and calls itself `voice` in either mode — so "do not search
+# the internet for chance speech" had never once fired in the running
+# program, and an open microphone answered a web search to every noise in
+# the room. A person met that; no check could, because the checks built a
+# context the program does not build.
+#
+# So the context is taken from the core here, not written out by hand.
+# Two objects agreeing on a rule is worth nothing if only one of them is
+# ever asked.
+from core.engine import RinaEngine
+from core.settings_api import MemorySettings
+
+brain = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [], "web_search_fallback": True,
+}))
+brain.ears_outside = True
+
+quiet_ctx = brain._router_context("voice", require_wake=False)
+check("при закрытом микрофоне контекст не «непрошеный»",
+      quiet_ctx.unbidden is False, f"| {quiet_ctx.unbidden}")
+
+brain._always_listen = True
+open_ctx = brain._router_context("voice", require_wake=True)
+check("при открытом — «непрошеный», хотя источник тот же",
+      open_ctx.unbidden is True and open_ctx.source == "voice",
+      f"| unbidden={open_ctx.unbidden}, source={open_ctx.source!r}")
+# With the wake word, or the phrase never reaches the tail: without it
+# the wake stage answers `silence`, and the check would be green about
+# the wrong rule.
+check("и поиска по такому контексту не будет даже при обращении",
+      route("Рина, столица австралии", open_ctx).name == "fallback.none",
+      f"| {route('Рина, столица австралии', open_ctx).name}")
 
 print()
 print("=== неизменяемость намерения ===")

@@ -284,6 +284,77 @@ check("и лишнее именно отброшено, а не потеряно
 jam.go.set()
 
 print()
+print("=== тишину распознаватель молчанием и считает ===")
+# **Whisper answers something to anything.** In a person's journal a
+# phrase of 1.2 seconds from a quiet room came back as "Редактор
+# субтитров Н.Семкирова" — a line of subtitle credits out of the data it
+# was trained on — and the assistant went and searched the internet for
+# it. Reproduced here before it was fixed: on a second of digital silence
+# this model gives that very phrase, with a `no_speech_prob` of 0.71.
+#
+# Asked of the real model, because there is nothing else to ask: the
+# hallucination is a property of the model, and a stand-in would only
+# repeat what the check's author already believes. On a machine where the
+# model is not downloaded the question is skipped, out loud — it is never
+# fetched from here, since a check that starts a hundred-megabyte
+# download is a check nobody runs twice.
+
+
+def whisper_at_hand(size="base"):
+    """The model if it is already on this machine, else None."""
+    try:
+        from faster_whisper import WhisperModel
+        WhisperModel(size, device="cpu", compute_type="int8",
+                     local_files_only=True)
+        return True
+    except Exception:
+        return False
+
+
+from core.settings_api import MemorySettings
+
+if not whisper_at_hand():
+    print("     пропущено: модели whisper на этой машине нет")
+else:
+    from core import speech as speech_mod
+
+    ear = speech_mod.whisper_for(
+        MemorySettings({"whisper_model": "base"}))
+    check("движок — тот, что едет в сборке",
+          type(ear).__name__ == "FasterWhisperRecogniser",
+          f"| {type(ear).__name__}")
+
+    # Two things stop it — the voice filter and the model's own opinion of
+    # whether that was speech — and this asks neither of them: it asks
+    # what came out. Taking the filter away leaves this green, and rightly
+    # so: the other gate still holds the outcome, and nothing a person
+    # would notice has changed. What is checked is silence in, silence
+    # out.
+    quiet = ear.recognise(silence(1.2))
+    check("на тишине не сочиняется ничего",
+          quiet.ok and not quiet.text, f"| {quiet.text!r}")
+
+    # And the other side, or the check would be green on a recogniser
+    # that had gone deaf: a gate that lets nothing through passes the
+    # question above perfectly.
+    fixture = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "fixtures", "said-rina.wav")
+    import wave as wave_mod
+
+    with wave_mod.open(fixture, "rb") as f:
+        said = f.readframes(f.getnframes())
+    heard_it = ear.recognise(said)
+    check("а речь проходит", "умеешь" in heard_it.text.lower(),
+          f"| {heard_it.text!r}")
+
+    # As the segmenter really hands it over: a phrase carries the silence
+    # that ended it, and most of what reaches the model is that silence.
+    # The first cut at this dropped the phrase along with the pause.
+    with_tail = ear.recognise(said + silence(1.0))
+    check("и проходит вместе с хвостом тишины",
+          "умеешь" in with_tail.text.lower(), f"| {with_tail.text!r}")
+
+print()
 print("=== предлагается только то, что можно построить ===")
 # A person chose `whisper` in the settings and heard "recognition is
 # unavailable": the list of choices came from the 3.1.0 engines, which open

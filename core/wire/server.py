@@ -1660,7 +1660,29 @@ class ProtocolServer:
             # arriving" and "sound is not arriving" were indistinguishable
             # from outside, and telling them apart splits this chain in two
             # at the joint where it actually broke twice.
-            log.info("Звук от оболочки пошёл: слушаю")
+            #
+            # **And in which mode.** Five minutes of a person's journal
+            # said the sound was flowing and not a word about whether the
+            # microphone was open by itself or because a button was
+            # pressed — and the two differ in everything that follows: the
+            # wake word, the search, the answer to a bare name. Reading
+            # the journal, one had to guess, and I did, wrongly.
+            log.info("Звук от оболочки пошёл: слушаю (%s)",
+                     "всегда слушать"
+                     if self.engine.is_always_listen()
+                     else "по нажатию")
+            # The model, before the first phrase needs it. In a person's
+            # journal the first phrase of a session waited **eighteen
+            # seconds** for the model to load, and eighteen seconds of
+            # nothing is indistinguishable from not being heard. Started
+            # here, the wait falls where a person has just done something
+            # and expects a moment.
+            #
+            # In a thread of its own: this one carries the sound, and a
+            # model loading on it would drop the phrase it was loaded for.
+            if hasattr(self.recogniser, "warm"):
+                threading.Thread(target=self.recogniser.warm,
+                                 name="rina-stt-warm", daemon=True).start()
 
         self.heard["bytes"] += len(pcm)
         self.heard["frames"] += 1

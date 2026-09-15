@@ -114,12 +114,12 @@
     {"id": "fallback.search.2", "say": "расскажи анекдот", "expect": {"intent": "fallback.search"}},
     {"id": "fallback.search.3", "say": "почему небо голубое", "expect": {"intent": "fallback.search"}},
 
-    {"id": "fallback.none.always.1", "say": "Рина столица австралии", "wake": true, "source": "always", "expect": {"intent": "fallback.none", "note": "в режиме «всегда слушать» веб-поиск не делается"}},
-    {"id": "fallback.none.always.2", "say": "Рина расскажи анекдот", "wake": true, "source": "always", "expect": {"intent": "fallback.none"}},
+    {"id": "fallback.none.always.1", "say": "Рина столица австралии", "wake": true, "unbidden": true, "expect": {"intent": "fallback.none", "note": "в режиме «всегда слушать» веб-поиск не делается"}},
+    {"id": "fallback.none.always.2", "say": "Рина расскажи анекдот", "wake": true, "unbidden": true, "expect": {"intent": "fallback.none"}},
 
     {"id": "wake.bare.1", "say": "Рина", "wake": true, "expect": {"intent": "ask.wake"}},
     {"id": "wake.bare.2", "say": "рина!", "wake": true, "expect": {"intent": "ask.wake"}},
-    {"id": "wake.bare.always", "say": "Рина", "wake": true, "source": "always", "expect": {"intent": "silence", "note": "в режиме «всегда слушать» на голое слово активации не отвечаем"}},
+    {"id": "wake.bare.always", "say": "Рина", "wake": true, "unbidden": true, "expect": {"intent": "silence", "note": "в режиме «всегда слушать» на голое слово активации не отвечаем"}},
     {"id": "wake.missing.1", "say": "просто разговор в комнате", "wake": true, "expect": {"intent": "silence"}},
     {"id": "wake.missing.2", "say": "выключи компьютер", "wake": true, "expect": {"intent": "silence", "note": "без слова активации опасное не выполняется"}},
     {"id": "wake.fuzzy.1", "say": "Рита запусти дискорд", "wake": true, "expect": {"intent": "silence", "note": "«Рита» похожа на «Рина» лишь на 0.75 при пороге 0.8 — активации нет"}},

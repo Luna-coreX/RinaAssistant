@@ -104,7 +104,8 @@ class Driver:
     def setup(self):
         pass
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
         """Returns an Intent."""
         raise NotImplementedError
 
@@ -213,7 +214,16 @@ class InProcessDriver(Driver):
             engine.bus.on(name, (lambda n: (lambda data: obs.events.append(
                 (n, data))))(name))
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
+        # Whether the microphone is open on her own initiative. Set on the
+        # engine, not passed alongside: that is where the rules read it
+        # from, and a suite that handed it in separately would be checking
+        # a path the program does not take. The suite used to say
+        # `source="always"` — a name the running program never passes —
+        # and every case about that mode was green while the rules behind
+        # them were dead.
+        self.engine._always_listen = bool(unbidden)
         if not keep_state:
             self.engine._dialog.dropped()
             self.settings.set("reminders", [])
@@ -252,7 +262,8 @@ class RouterDriver(Driver):
         self.pending = None
         self.ctx = RouterContext(apps=self.apps)
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
         from core.router import route
         from voice.textmatch import normalize
 
@@ -270,6 +281,7 @@ class RouterDriver(Driver):
         self.ctx.last_launch_query = self.last_launch_query
         self.ctx.pending = self.pending
         self.ctx.source = source
+        self.ctx.unbidden = bool(unbidden)
         self.ctx.require_wake = require_wake
         self.ctx.reminders_active = self.reminders_active
 
@@ -504,7 +516,8 @@ def run(path, groups=None, verbose=False, driver_name="in-process"):
     for case in cases:
         got = driver.send(case["say"], source=case.get("source", "typed"),
                           require_wake=case.get("wake", False),
-                          keep_state=case.get("keep_state", False))
+                          keep_state=case.get("keep_state", False),
+                          unbidden=case.get("unbidden", False))
         if matches(case["expect"], got):
             passed += 1
             if verbose:

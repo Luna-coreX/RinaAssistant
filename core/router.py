@@ -69,6 +69,21 @@ class RouterContext:
     require_wake: bool = False
     #: Where the phrase came from: typed | voice | always.
     source: str = "typed"
+    #: Whether the microphone was open on Rina's own initiative.
+    #:
+    #: **Three rules below used to ask `source == "always"`, and all three
+    #: were dead.** That name is passed by the 3.1.0 path, where the core
+    #: opened the microphone itself; since `4.0-G` the sound arrives from
+    #: the shell and calls itself `voice` whichever mode it is in. So the
+    #: rule "do not search the internet for chance speech" had never once
+    #: fired in the running program, and an assistant with an open
+    #: microphone answered a web search to every noise in the room —
+    #: which is exactly what a person met.
+    #:
+    #: A fact, not a label. The name of a source says where a phrase came
+    #: in, and these rules are about something else: whether anybody meant
+    #: to say it.
+    unbidden: bool = False
     #: How many reminders are active right now — for list/cancel.
     reminders_active: int = 0
     #: Whether answering with a language model is switched on.
@@ -109,7 +124,7 @@ def route(text, ctx=None):
     if not command:
         # The wake word sounded, there is no command. In "always listen"
         # mode we do not answer: Rina would hear her own answer and loop.
-        if ctx.source == "always":
+        if ctx.unbidden:
             return Intent("silence", stage="wake", text=text)
         return Intent("ask.wake", stage="wake", text=text)
 
@@ -517,9 +532,10 @@ def _tail(command, ctx):
         # seconds. It only names the intent; the executor asks.
         return Intent("llm.answer", stage="tail", confidence=0.5)
 
-    # In "always listen" mode we do not search: noise and chance speech land
-    # there, and a browser must not be opened on them.
-    if ctx.web_fallback and ctx.source != "always":
+    # With the microphone open on her own initiative we do not search:
+    # noise and chance speech land here, and a browser must not be opened
+    # on them.
+    if ctx.web_fallback and not ctx.unbidden:
         return Intent("fallback.search", {"query": command}, stage="tail")
 
     return None
