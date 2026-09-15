@@ -18,6 +18,8 @@ public partial class SheetWindow : Window
                        IEnumerable<UIElement> content)
     {
         InitializeComponent();
+        // It arrives rather than being simply there (`4.0b-E04`).
+        Arrival.Animate(this);
         Heading.Text = title;
         Note.Text = note;
         Note.Visibility = note.Length > 0

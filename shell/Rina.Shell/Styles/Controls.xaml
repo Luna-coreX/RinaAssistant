@@ -326,7 +326,26 @@
                  colour cannot be animated, it is frozen. -->
             <Border x:Name="Warm" Grid.ColumnSpan="2" Opacity="0"
                     Background="{DynamicResource C.FaceHigh}" />
-            <Rectangle x:Name="Mark" Grid.Column="0" Fill="Transparent" />
+            <!--
+              The accent stroke, and it grows rather than appears
+              (`4.0b-E04`). It is the system's only mark of where one is
+              standing, and it used to be switched on by a setter: the one
+              thing on the screen that answers "where am I" arrived
+              without saying that anything had changed.
+
+              Held out of sight by the scale rather than by the colour: a
+              brush in a setter goes back instantly when the section
+              changes, and the stroke would vanish from the old row before
+              it had finished growing on the new one — a blink where there
+              should be a hand-off.
+            -->
+            <Rectangle x:Name="Mark" Grid.Column="0"
+                       Fill="{DynamicResource C.Signal}"
+                       RenderTransformOrigin="0.5,0.5">
+              <Rectangle.RenderTransform>
+                <ScaleTransform x:Name="MarkGrow" ScaleY="0" />
+              </Rectangle.RenderTransform>
+            </Rectangle>
             <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
                               Margin="14,0,0,0" />
           </Grid>
@@ -372,9 +391,29 @@
                 the ink going from soft to full. Both hold over any colour
                 the flow can reach.
               -->
-              <Setter TargetName="Mark" Property="Fill"
-                      Value="{DynamicResource C.Signal}" />
               <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="MarkGrow"
+                                     Storyboard.TargetProperty="ScaleY"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="MarkGrow"
+                                     Storyboard.TargetProperty="ScaleY"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

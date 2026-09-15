@@ -41,6 +41,8 @@ public partial class SetupWindow : Window
     public SetupWindow(CoreLink link)
     {
         InitializeComponent();
+        // It arrives rather than being simply there (`4.0b-E04`).
+        Arrival.Animate(this);
         _link = link;
         _steps.Add(new Step(
             S("Здравствуйте"),

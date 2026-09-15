@@ -34,6 +34,8 @@ public partial class FloatingBar : Window
     public FloatingBar(CoreLink? link)
     {
         InitializeComponent();
+        // It arrives rather than being simply there (`4.0b-E04`).
+        Arrival.Animate(this);
         _link = link;
 
         // Bottom centre of the main screen: where the eyes expect it, and

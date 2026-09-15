@@ -2374,6 +2374,21 @@ public partial class App
         Shutdown();
     }
 
+    /// <summary>How far each section's accent stroke has grown, 0 to 1.</summary>
+    private static IEnumerable<double> Marks(DependencyObject root)
+    {
+        foreach (var child in Children(root))
+        {
+            if (child is System.Windows.Shapes.Rectangle bar
+                && bar.RenderTransform
+                    is System.Windows.Media.ScaleTransform grown
+                && bar.Width is 2 or double.NaN
+                && bar.ActualWidth <= 2.5)
+                yield return grown.ScaleY;
+            foreach (var deeper in Marks(child)) yield return deeper;
+        }
+    }
+
     /// <summary>The page's buttons in order of appearance.</summary>
     private static IEnumerable<System.Windows.Controls.Button> Buttons(
         DependencyObject root)
@@ -3427,12 +3442,82 @@ public partial class App
             Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
         }
 
-        Console.WriteLine("=== движение: переход между разделами ===");
+        Console.WriteLine("=== движение: окно приходит, а не оказывается ===");
+        // One of the four things the person named: "windows appearing".
+        // Every separate window used to be simply there. Measured
+        // mid-flight rather than after, for the same reason as the panel
+        // below: before the clock's first tick a property gives back its
+        // base value, and an instant reading would show the end state
+        // even with no animation at all.
+        var asking = new Pages.ConfirmWindow(
+            "Компьютер будет выключен немедленно.", "Сказано голосом", 60);
+        asking.Left = -4000;
+        asking.Top = -4000;
+        asking.Show();
+        await Task.Delay(80);
+
+        var arriving = asking.Content as UIElement;
+        var shown = arriving?.Opacity ?? 1;
+        Check("на середине появления окно ещё проявляется",
+              shown is > 0.01 and < 0.95, $"| прозрачность {shown:0.00}");
+        var lifted = (arriving?.RenderTransform
+                      as System.Windows.Media.TranslateTransform)?.Y ?? 0;
+        Check("и ещё не доехало", lifted > 0.5, $"| осталось {lifted:0.00}");
+
+        // The one that matters. An element at zero opacity is still
+        // hit-testable in WPF, so a window fading in can take a click
+        // meant for what was under it — and this is the window that asks
+        // about something irreversible.
+        Check("пока оно проявляется, нажать на него нельзя",
+              arriving?.IsHitTestVisible == false,
+              "| иначе щелчок мимо попадает в подтверждение");
+
+        await Task.Delay(400);
+        Check("через 400 мс окно на месте",
+              (arriving?.Opacity ?? 0) > 0.99 && Math.Abs(
+                  (arriving?.RenderTransform
+                   as System.Windows.Media.TranslateTransform)?.Y ?? 1) < 0.01,
+              $"| прозрачность {arriving?.Opacity:0.00}");
+        Check("и слушает нажатия", arriving?.IsHitTestVisible == true);
+        asking.Close();
+
+        Console.WriteLine();
+        Console.WriteLine("=== движение: отметка раздела вырастает ===");
         window.Left = -4000;
         window.Top = -4000;
         window.Show();
         await Task.Delay(400);
 
+        // The accent stroke is the system's only mark of where one is
+        // standing, and it used to be switched on by a setter: the one
+        // thing that answers "where am I" arrived without saying that
+        // anything had changed.
+        window.Show();
+        await Task.Delay(400);
+        var atRest = Marks(window).ToArray();
+        Check("отметок ровно по числу разделов", atRest.Length >= 5,
+              $"| {atRest.Length}");
+        Check("в покое видна ровно одна", atRest.Count(m => m > 0.5) == 1,
+              $"| {string.Join(", ", atRest.Select(m => m.ToString("0.0")))}");
+
+        window.ShowSectionFor("commands");
+        await Task.Delay(80);
+        var midway2 = Marks(window).ToArray();
+        Check("на середине перехода одна растёт, другая тает",
+              midway2.Any(m => m is > 0.01 and < 0.99)
+              && midway2.Count(m => m > 0.01) == 2,
+              $"| {string.Join(", ", midway2.Select(m => m.ToString("0.00")))}");
+
+        await Task.Delay(400);
+        var after2 = Marks(window).ToArray();
+        Check("доросла одна, погасла другая",
+              after2.Count(m => m > 0.99) == 1 && after2.Count(m => m > 0.01) == 1,
+              $"| {string.Join(", ", after2.Select(m => m.ToString("0.0")))}");
+
+        Console.WriteLine();
+        Console.WriteLine("=== движение: переход между разделами ===");
+        window.ShowSectionFor("home");
+        await Task.Delay(400);
         window.ShowSectionFor("commands");
 
         // We measure mid-flight rather than instantly. Before the

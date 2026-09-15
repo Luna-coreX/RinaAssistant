@@ -58,6 +58,8 @@ public partial class TrustWindow : Window
     public TrustWindow(string path, string source = "")
     {
         InitializeComponent();
+        // It arrives rather than being simply there (`4.0b-E04`).
+        Arrival.Animate(this);
 
         AppName.Text = Path.GetFileName(path);
         AppPath.Text = path;

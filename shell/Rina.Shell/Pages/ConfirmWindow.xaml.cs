@@ -78,6 +78,8 @@ public partial class ConfirmWindow : Window
     public ConfirmWindow(string preview, string reason, int ttlSeconds)
     {
         InitializeComponent();
+        // It arrives rather than being simply there (`4.0b-E04`).
+        Arrival.Animate(this);
         Preview.Text = preview;
         Reason.Text = reason;
 
