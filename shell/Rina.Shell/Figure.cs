@@ -501,12 +501,21 @@ public sealed class Figure
                 // belt round the body, and the two lights are supposed
                 // to meet, not blend into a third.
                 mix = mix * mix * (3f - 2f * mix);
-                // The warm end stops short of the accent itself: at
-                // full brightness the accent is orange, and orange next
-                // to nothing else reads as red. There is no red here —
+                // The cool end is four tenths of a turn from the accent,
+                // not half. At half it lands on blue, and on the light
+                // finish a blue body sits on a warm cream ground as a
+                // foreign object — noticed by the person using it. A
+                // third was too far the other way and gave a green
+                // apple. Four tenths is teal: cold enough to read as
+                // glass, near enough to belong to the colour the window
+                // is using.
+                //
+                // The warm end stops short of the accent itself: at full
+                // brightness the accent is orange, and orange next to
+                // nothing else reads as red. There is no red here —
                 // danger is drawn with hatching so that no colour has to
                 // carry it.
-                var shade = hue + Spectrum * (1.15f - 0.98f * mix)
+                var shade = hue + Spectrum * (0.87f - 0.79f * mix)
                             + slopeU * Fringe;
                 var sat = Math.Clamp(0.74f - sheen * 0.72f - mix * 0.16f
                                      - MathF.Abs(slopeV) * 0.06f, 0f, 1f);
