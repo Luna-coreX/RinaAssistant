@@ -639,6 +639,29 @@ class ProtocolServer:
                 # transaction, so that no other thread wedges itself between
                 # the change and the write.
                 store.save()
+
+            # A setting whose meaning is a mode that is running right now.
+            # Written here and applied nowhere, it moved the switch and
+            # changed nothing: the hotkey for "always listening" goes
+            # through `settings.set`, so pressing it stored a flag and the
+            # microphone stayed exactly as it was until the next start.
+            # The same lie as `4.0b-V02` through another door — the setting
+            # says one thing, the program does another — and the two doors
+            # together are how the flag came to say "on" while the mode had
+            # never run at all.
+            #
+            # Outside the transaction: the engine writes the setting down
+            # itself and saves, and it must not do that with the store's
+            # own write still open. It costs nothing when the mode is
+            # already in that state — it returns at the first line.
+            if "always_listen" in accepted:
+                # After the answer, like the restore at the handshake and
+                # for the same reason: applying it announces the mode, and
+                # an announcement that overtakes the reply it belongs to
+                # arrives before the caller knows its own call succeeded.
+                wanted = bool(accepted["always_listen"])
+                self._after_reply.append(
+                    lambda: self.engine.set_always_listen(wanted))
         return {"values": {k: store.get(k) for k in accepted},
                 "verdicts": verdicts}
 

@@ -898,6 +898,64 @@ silent.ask("core.shutdown")
 silent.read(1)
 silent.wait()
 
+print()
+print("=== E06c: настройка «всегда слушать» — это режим, а не флаг ===")
+
+# The second door into the same lie. The hotkey that toggles "always
+# listening" does not call `speech.set_always_listen` — it writes the
+# setting, like any other. Written and applied nowhere, it moved the
+# switch and changed nothing: the microphone stayed as it was until the
+# next start, and the stored flag and the running mode drifted apart.
+# That is how a person ended up with "on" in the settings and a mode that
+# had never run.
+#
+# Asked over the wire with the call the hotkey actually makes.
+
+toggler = Core()
+toggler.handshake()
+told, _ = answer_to(toggler, toggler.ask(
+    "settings.set", {"values": {"always_listen": True}}))
+check("настройка принята",
+      told is not None
+      and told.payload.get("verdicts", {}).get(
+          "always_listen", {}).get("accepted") is True,
+      f"| {told.payload if told else 'ответа нет'}")
+
+# The announcement is the observable: the core tells the shell it is
+# listening, and that is what opens the microphone. No announcement means
+# nothing listens, whatever the file says.
+#
+# Read up to a question that is certain to be answered. Waiting for an
+# event that may not come means waiting on a pipe that will never speak,
+# and this harness reads it blocking: the check would hang instead of
+# failing.
+beat = toggler.ask("ping")
+lit = []
+for _ in range(10):
+    step = toggler.read(1)
+    if not step or step[0].correlation_id == beat.id:
+        break
+    lit.append(step[0])
+check("записанная настройка включила режим",
+      any(m.method == "listening.always" and m.payload.get("enabled")
+          for m in lit),
+      f"| пришло: {[m.method for m in lit]}")
+
+toggler.ask("core.shutdown")
+toggler.read(1)
+toggler.wait()
+
+# Left as we found it, in the sandbox as on a person's machine: a check
+# that walks out leaving a mode switched on is a check that changed the
+# thing it measured.
+tidy = Core()
+tidy.handshake()
+tidy.ask("settings.set", {"values": {"always_listen": False}})
+tidy.read(1)
+tidy.ask("core.shutdown")
+tidy.read(1)
+tidy.wait()
+
 os.environ.pop("RINA_SANDBOX_DIR", None)
 shutil.rmtree(shared_dir, ignore_errors=True)
 
