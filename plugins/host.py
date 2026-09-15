@@ -260,6 +260,13 @@ class Host:
                 },
                 "has_page": (self.plugin is not None
                              and type(self.plugin).page is not Plugin.page),
+                # Whether it wants a tile on the home screen, said once at
+                # the introduction rather than asked for every draw. The
+                # home screen is redrawn often and most plugins have no
+                # tile: asking each of them every time would be a round
+                # trip to another process for the answer "no".
+                "has_home": (self.plugin is not None
+                             and type(self.plugin).home is not Plugin.home),
                 # What to call the plugin's section in the column. A plugin
                 # is entitled to call itself something other than its name
                 # in the installed list: "Notes" is shorter than "Quick
@@ -292,6 +299,8 @@ class Host:
             return {"ok": True}
         if method == "plugin.page":
             return {"elements": page_to_dict(self.plugin.page() or [])}
+        if method == "plugin.home":
+            return {"elements": page_to_dict(self.plugin.home() or [])}
         if method == "plugin.action":
             self.plugin.on_action(str(payload.get("action", "")),
                                   payload.get("value"))

@@ -157,10 +157,26 @@ class Core:
         return got
 
     def handshake(self):
-        self.ask("hello", self.session.hello_payload())
-        answer = self.read(1)[0]
-        self.session.accept_hello_result(answer.payload)
-        return answer
+        """
+        Say hello and take **the reply**, not the first thing that arrives.
+
+        The core speaks of its own accord right after answering — it
+        restores the listening mode there — and taking the first message
+        read that event as the reply. The failure said "the core did not
+        name a protocol version", which is true of an event and says
+        nothing about what went wrong. The same trap, and the same wording,
+        as in `coreproc.py`: these two drivers are copies of one another
+        and this one had not been given the fix.
+        """
+        sent = self.ask("hello", self.session.hello_payload())
+        for _ in range(8):
+            got = self.read(1)
+            if not got:
+                break
+            if got[0].correlation_id == sent.id:
+                self.session.accept_hello_result(got[0].payload)
+                return got[0]
+        raise RuntimeError("ядро не ответило на приветствие")
 
     def stderr_text(self):
         try:
@@ -781,6 +797,106 @@ check("соседние настройки пережили запись одн�
       f"| движок {after.get('tts_engine')!r}, скорость {after.get('speed')!r}")
 check("а записанное записалось", after.get("finish") == "black",
       f"| {after.get('finish')!r}")
+
+print()
+print("=== E06b: «всегда слушать» переживает перезапуск ===")
+
+# Reported by a person: the switch comes back on after a restart and
+# nothing listens. Both halves were true, and neither was a lie of the
+# switch — the mode really was restored, and the announcement of it really
+# was lost.
+#
+# The core restores the mode while answering `hello` and says so with an
+# event. Sent from inside the handler, that event left **before** the
+# reply; the shell has no agreed protocol version until the reply arrives,
+# so it subscribes to events after it and dropped the one that mattered.
+# Four days of "always listening" being on in the settings and off in fact.
+#
+# What is asked here is the order, because the order is the defect. The
+# handshake takes the reply and throws away everything that came before it
+# — exactly as a shell does — so an event seen **after** `handshake()` is
+# an event a shell would have heard.
+
+
+def answer_to(core, sent, tries=8):
+    """
+    The reply to **this** request, not the next message on the wire.
+
+    Written here after `read(1)` handed back a `listening.always` event
+    and the check read it as the answer to a call: the core now speaks of
+    its own accord right after the handshake, and "the next message" stopped
+    meaning "the answer".
+    """
+    for _ in range(tries):
+        got = core.read(1)
+        if not got:
+            return None, []
+        if got[0].correlation_id == sent.id:
+            return got[0], []
+    return None, []
+
+
+waker = Core()
+waker.handshake()
+told, _ = answer_to(waker, waker.ask("speech.set_always_listen",
+                                     {"enabled": True}))
+check("режим включён по проводу",
+      told is not None and told.payload.get("enabled") is True,
+      f"| {told.payload if told else 'ответа нет'}")
+waker.ask("core.shutdown")
+waker.read(1)
+waker.wait()
+
+woken = Core()
+check("оболочка объявляет уши снаружи",
+      "audio.input" in woken.session.capabilities,
+      "| иначе ядро решит, что микрофон его собственный")
+woken.handshake()
+after = woken.read_until("listening.always", timeout=8.0, limit=12)
+said = [m for m in after if m.method == "listening.always"]
+check("после перезапуска ядро объявляет режим", bool(said),
+      f"| пришло: {[m.method for m in after]}")
+check("и объявляет его включённым",
+      bool(said) and said[0].payload.get("enabled") is True,
+      f"| {said[0].payload if said else None}")
+woken.ask("core.shutdown")
+woken.read(1)
+woken.wait()
+
+# And the other way round, or the check above would pass on a core that
+# announces the mode to everybody always.
+quiet = Core()
+quiet.handshake()
+hushed, _ = answer_to(quiet, quiet.ask("speech.set_always_listen",
+                                       {"enabled": False}))
+check("и выключается по проводу",
+      hushed is not None and hushed.payload.get("enabled") is False,
+      f"| {hushed.payload if hushed else 'ответа нет'}")
+quiet.ask("core.shutdown")
+quiet.read(1)
+quiet.wait()
+
+silent = Core()
+silent.handshake()
+# Asked with a question that is certain to be answered. Waiting for an
+# event that must **not** come means waiting on a pipe that will never
+# speak, and this harness reads it blocking: the check would hang rather
+# than fail. Whatever the core says of its own accord it says before the
+# pong, so the pong is the line under the list.
+ping = silent.ask("ping")
+volunteered = []
+for _ in range(6):
+    heard_now = silent.read(1)
+    if not heard_now or heard_now[0].correlation_id == ping.id:
+        break
+    volunteered.append(heard_now[0])
+check("выключенный режим ядро не объявляет",
+      not [m for m in volunteered if m.method == "listening.always"
+           and m.payload.get("enabled")],
+      f"| до ответа пришло: {[m.method for m in volunteered]}")
+silent.ask("core.shutdown")
+silent.read(1)
+silent.wait()
 
 os.environ.pop("RINA_SANDBOX_DIR", None)
 shutil.rmtree(shared_dir, ignore_errors=True)

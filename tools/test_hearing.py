@@ -127,6 +127,163 @@ check("фраза дошла до распознавания", seen["phrases"] =
       f"| {seen['phrases']}")
 
 print()
+print("=== распознавание идёт по одному и по порядку ===")
+# Found in a person's journal, not by a check. Two phrases were heard and
+# one line of recognised text came out — with the words of both inside it
+# — ten seconds after the second one ended. Then "Failed to create a
+# model", once per phrase, for the rest of the session.
+#
+# The cause was a thread per phrase over one shared recogniser holding one
+# model loaded on first use. Two phrases close together loaded it twice at
+# once and read it at once. What it looked like from the chair was worse
+# than an error: Rina answered a second after you started speaking, and
+# answered the thing you had said before.
+#
+# Two things are asked here, and the second is the one that survives a
+# thread-safe engine: recognition happens **one at a time**, and results
+# reach the engine **in the order the phrases were spoken**. A short
+# phrase overtaking a long one is not a rare race — it is what always
+# happens when both run at once.
+import threading
+import time
+
+from core.speech import Heard
+
+
+class SlowEar:
+    """Recognises slowly and remembers whether it was ever asked twice."""
+
+    def __init__(self):
+        self.inside = 0
+        self.together = 0
+        self.order = []
+        self._guard = threading.Lock()
+
+    @staticmethod
+    def available():
+        return True
+
+    def recognise(self, pcm, language="ru"):
+        with self._guard:
+            self.inside += 1
+            self.together = max(self.together, self.inside)
+        # The longer phrase takes longer, so that "in order" and "in the
+        # order they happened to finish" give different answers.
+        # By the sound handed over, and the boundary is between the two:
+        # a phrase carries its trailing silence with it, so 0.4 s of voice
+        # arrives as 1.4 s of bytes, and a threshold set by the spoken
+        # length called both of them long.
+        long_one = len(pcm) > 60000
+        time.sleep(0.25 if long_one else 0.05)
+        with self._guard:
+            self.inside -= 1
+            self.order.append(len(pcm))
+        # Named after the sound it was handed, not after a counter. The
+        # first edition numbered them as they finished, so "in order" was
+        # true of any order at all — the check restated its own stand-in
+        # and agreed with itself.
+        return Heard(text="длинная" if long_one else "короткая")
+
+
+class Recorder:
+    """The engine, reduced to what this check asks of it."""
+
+    def __init__(self):
+        self.taken = []
+        self.bus = type("Bus", (), {"emit": lambda *a, **k: None})()
+
+    def is_always_listen(self):
+        return False
+
+    def handle_command_async(self, text, source="voice", require_wake=False):
+        self.taken.append(text)
+
+
+ear = SlowEar()
+taker = Recorder()
+listener = ProtocolServer.__new__(ProtocolServer)
+listener.engine = taker
+listener.segmenter = Segmenter()
+listener.recogniser = ear
+listener.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+                  "recognitions": 0, "texts": 0, "dropped": 0}
+listener._phrases = None
+listener._stt_thread = None
+
+# A long phrase, then a short one, with just enough silence between them to
+# be two phrases and not enough for the first to be finished with.
+listener._hear(sound(1.6))
+listener._hear(silence(1.0))
+listener._hear(sound(0.4))
+listener._hear(silence(1.0))
+check("обе фразы нарезаны", listener.hearing()["phrases"] == 2,
+      f"| {listener.hearing()['phrases']}")
+
+for _ in range(100):
+    if len(taker.taken) == 2:
+        break
+    time.sleep(0.05)
+
+check("распознаны обе", len(taker.taken) == 2, f"| {taker.taken}")
+check("одновременно — никогда", ear.together <= 1,
+      f"| разом доходило до {ear.together}")
+check("сказанное первым дошло до ядра первым",
+      taker.taken[:2] == ["длинная", "короткая"],
+      f"| {taker.taken}")
+check("и распознавались они в том же порядке",
+      len(ear.order) == 2 and ear.order[0] > ear.order[1],
+      f"| {ear.order} байт")
+
+print()
+print("=== что не поспели распознать — сказано вслух ===")
+# Dropping is lawful: recognition slower than speech has to lose
+# something. Falling a minute behind is not, and neither is losing it
+# quietly — a phrase that vanishes without a word is indistinguishable
+# from a microphone that stopped working.
+
+
+class Stuck:
+    """Never finishes the first phrase, so the queue fills up."""
+
+    def __init__(self):
+        self.go = threading.Event()
+
+    @staticmethod
+    def available():
+        return True
+
+    def recognise(self, pcm, language="ru"):
+        self.go.wait(5.0)
+        return Heard(text="наконец")
+
+
+jam = Stuck()
+piled = ProtocolServer.__new__(ProtocolServer)
+piled.engine = Recorder()
+piled.segmenter = Segmenter()
+piled.recogniser = jam
+piled.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+               "recognitions": 0, "texts": 0, "dropped": 0}
+piled._phrases = None
+piled._stt_thread = None
+
+for _ in range(ProtocolServer.PHRASE_QUEUE + 3):
+    piled._hear(sound(0.4))
+    piled._hear(silence(1.0))
+
+check("очередь не растёт без предела",
+      piled.hearing()["dropped"] > 0,
+      f"| отброшено {piled.hearing()['dropped']} из "
+      f"{piled.hearing()['phrases']}")
+check("и лишнее именно отброшено, а не потеряно молча",
+      piled.hearing()["dropped"]
+      == piled.hearing()["phrases"] - ProtocolServer.PHRASE_QUEUE - 1,
+      f"| фраз {piled.hearing()['phrases']}, очередь "
+      f"{ProtocolServer.PHRASE_QUEUE}, одна в работе, "
+      f"отброшено {piled.hearing()['dropped']}")
+jam.go.set()
+
+print()
 print("=== предлагается только то, что можно построить ===")
 # A person chose `whisper` in the settings and heard "recognition is
 # unavailable": the list of choices came from the 3.1.0 engines, which open

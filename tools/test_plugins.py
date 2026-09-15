@@ -406,16 +406,112 @@ hosted.stop_all()
 check("после остановки не осталось процессов",
       not any(h.alive for h in hosted.plugins.values()))
 
-check("поверхность совпадает с менеджером в процессе",
-      not [name for name in ("discover", "enable", "disable", "toggle",
-                             "dispatch_command", "broadcast_event",
-                             "page_plugins", "get_plugin_page_spec",
-                             "dispatch_action", "declared_tools",
-                             "tool_prefix", "get_plugin_setting",
-                             "set_plugin_setting")
-           if not (hasattr(HostedPlugins, name)
-                   and hasattr(PluginManager, name))],
-      "| ядро не должно знать, где живёт плагин")
+print()
+print("=== H07: плитка приезжает из чужого процесса ===")
+# The surface check above says the method is there; this one says it works.
+# Both are needed, and for the same reason: `home_tiles` existed all along
+# — on the class that does not run.
+#
+# A plugin written here rather than one of ours: the only shipped plugin
+# with a tile wants a city in its settings and the network, and a check
+# that needs the weather is a check that goes red on a train.
+import json
+import tempfile
+
+from core.plugin_host import HostedPlugin
+from plugins.manager import HOME_TILE_LIMIT
+
+probe = os.path.join(tempfile.mkdtemp(prefix="rina-tile-"), "tileprobe")
+os.makedirs(probe)
+io.open(os.path.join(probe, "plugin.json"), "w", encoding="utf-8").write(
+    json.dumps({"id": "tileprobe", "name": "Плитка", "version": "1.0.0",
+                "author": "проверка", "description": "плитка для проверки",
+                "icon": "🧪", "entry": "TileProbe", "api_version": 4},
+               ensure_ascii=False))
+io.open(os.path.join(probe, "main.py"), "w", encoding="utf-8").write(
+    "from plugins.api import Plugin\n"
+    "from plugins.page_spec import Note\n"
+    "\n"
+    "\n"
+    "class TileProbe(Plugin):\n"
+    "    def home(self):\n"
+    "        return [Note(f'строка {n}') for n in range(10)]\n")
+
+tile_host = HostedPlugins(settings=store)
+# The real plugins too, so that "the one without a tile does not appear"
+# has somebody to be true about. Without this the list held our probe
+# alone, and the assertion passed by having nothing to exclude.
+tile_host.discover()
+alone = HostedPlugin(probe, tile_host)
+tile_host.plugins["tileprobe"] = alone
+check("плагин с плиткой поднялся", alone.start(), f"| {alone.error}")
+alone.enabled = True
+check("и сказал при знакомстве, что плитка у него есть", alone.has_home,
+      "| иначе ядро не станет и спрашивать")
+
+tiles = tile_host.home_tiles()
+check("плитка доехала через провод", len(tiles) == 1, f"| {len(tiles)}")
+if tiles:
+    check("с именем плагина", tiles[0]["title"] == "Плитка",
+          f"| {tiles[0]['title']}")
+    check("элементы — описания, а не виджеты",
+          isinstance(tiles[0]["elements"][0], dict)
+          and "kind" in tiles[0]["elements"][0],
+          f"| {sorted(tiles[0]['elements'][0])[:4]}")
+    check("лишнее обрезано и об этом сказано",
+          len(tiles[0]["elements"]) == HOME_TILE_LIMIT
+          and tiles[0]["trimmed"] is True,
+          f"| {len(tiles[0]['elements'])} при пределе "
+          f"{HOME_TILE_LIMIT}")
+
+# And the one that wants nothing is not asked at all: `dice` has no `home`,
+# so it must not appear even while it is running.
+check("сосед без плитки тоже запущен", tile_host.enable("dice"),
+      "| иначе исключать некого")
+check("плагин без плитки в списке не появляется",
+      [t["id"] for t in tile_host.home_tiles()] == ["tileprobe"],
+      f"| {[t['id'] for t in tile_host.home_tiles()]}")
+tile_host.stop_all()
+alone.kill()
+
+print()
+# The surface, read out of the core rather than listed here.
+#
+# **The list used to be written out by hand, and that is how the home
+# screen lost its tiles.** `home_tiles` was added to `PluginManager` for
+# `4.0b-A07`, plugins live in processes of their own (ADR 0010), and the
+# core talks to `HostedPlugins` — which never grew the method. The core
+# logged `'HostedPlugins' object has no attribute 'home_tiles'` every few
+# seconds for four days while this check stayed green, because the name
+# was not in the list and nobody thought to put it there. A list kept by
+# hand records what somebody remembered, and the thing worth checking is
+# exactly what they forgot.
+#
+# So the names are taken from the core's own text: whatever it calls on
+# its manager has to exist on both. `plugins.get(...)` and friends are not
+# collected — that is the dictionary, not the manager.
+import re
+
+asked = set()
+for folder, _dirs, files in os.walk(
+        os.path.join(r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "core")):
+    if "__pycache__" in folder:
+        continue
+    for name in files:
+        if not name.endswith(".py"):
+            continue
+        text = io.open(os.path.join(folder, name), encoding="utf-8").read()
+        asked |= set(re.findall(r"(?:manager|self\._plugins)\.([a-z_]+)\(",
+                                text))
+
+check("ядро вообще что-то просит у менеджера", len(asked) >= 5,
+      f"| {sorted(asked)}")
+missing = sorted(name for name in asked
+                 if not (hasattr(HostedPlugins, name)
+                         and hasattr(PluginManager, name)))
+check("всё, что ядро просит, есть у обоих менеджеров", not missing,
+      f"| нет у одного из них: {missing}" if missing
+      else f"| проверено имён: {len(asked)}")
 
 
 print()

@@ -159,6 +159,16 @@ public sealed class CoreLink : IAsyncDisposable
             Level?.Invoke(level);
         });
         _ = ApplyAudioSettingsAsync();
+
+        // If the core already said it was listening — it restores the mode
+        // right after the handshake — the microphone opens now. See
+        // `FollowListening`: the two arrive in either order, and only this
+        // makes the order not matter.
+        if (Capturing)
+        {
+            CaptureStarts++;
+            _ = _voice.StartCaptureAsync();
+        }
     }
 
     /// <summary>The devices the person chose — from the core's settings.</summary>
@@ -683,14 +693,24 @@ public sealed class CoreLink : IAsyncDisposable
         // other way round. The core sends both, and the last one wins —
         // which is what a person means by whichever they did last.
         Capturing = wanted.Value;
+
+        // The sound link is built when the connection is established, and
+        // the core announces the restored listening mode at about the same
+        // moment. Whichever arrives first, the answer must be the same, so
+        // an announcement that finds no microphone is remembered rather
+        // than lost — `StartVoice` asks. Without this the state said
+        // "capturing" while nothing captured, and the correcting event
+        // never came: the core had already said its piece.
+        if (_voice is null) return;
+
         if (wanted.Value)
         {
             CaptureStarts++;
-            _ = _voice?.StartCaptureAsync();
+            _ = _voice.StartCaptureAsync();
         }
         else
         {
-            _ = _voice?.StopCaptureAsync();
+            _ = _voice.StopCaptureAsync();
         }
     }
 

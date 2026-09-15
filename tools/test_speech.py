@@ -14,6 +14,7 @@ To run:
     python tools/test_speech.py
 """
 
+import io
 import os
 import sys
 
@@ -101,6 +102,67 @@ check("недоступность объявлена", not quiet.available())
 heard = quiet.recognise(speech.tone(1.0))
 check("отказ, а не молчание", not heard.ok and heard.error == "stt.unavailable",
       f"| {heard}")
+
+
+# ---------------------------------------------------------------------------
+print()
+print("=== E03: чужая папка отвергается там, где её выбирают ===")
+
+# From a person's journal. They went to the Vosk download page and brought
+# back `vosk-recasepunc-ru-0.22`, which is on that page and is not a
+# recognition model but a restorer of case and punctuation. Everything
+# looked right — the folder was there, the package was there, the setting
+# pointed at it — and every phrase ended in `Failed to create a model`:
+# the library's words, in English, in the journal only, once per phrase.
+# Four days of "she cannot hear me".
+#
+# The verdict belongs where the choosing happens. The settings already
+# show why an engine cannot be picked; it simply had nothing to show,
+# because the folder was only ever opened at the first phrase.
+
+import tempfile
+
+sham = os.path.join(tempfile.mkdtemp(prefix="rina-model-"), "recasepunc")
+os.makedirs(sham)
+for near in ("checkpoint", "example.py", "README"):
+    io.open(os.path.join(sham, near), "w", encoding="utf-8").write("x")
+
+check("подделка не принимается за модель",
+      not speech.looks_like_vosk_model(sham), f"| {sorted(os.listdir(sham))}")
+
+real = os.path.join(tempfile.mkdtemp(prefix="rina-model-"), "vosk-ru")
+for part in ("am", "conf", "graph", "ivector"):
+    os.makedirs(os.path.join(real, part))
+check("настоящая — принимается", speech.looks_like_vosk_model(real),
+      f"| {sorted(os.listdir(real))}")
+
+# And one folder at a time is enough: small models, large ones and the ones
+# with a dynamic graph differ in what else they carry, and demanding all
+# four would turn away models that work.
+half = os.path.join(tempfile.mkdtemp(prefix="rina-model-"), "vosk-small")
+os.makedirs(os.path.join(half, "conf"))
+check("одной приметы довольно", speech.looks_like_vosk_model(half))
+
+wrong = speech.VoskRecogniser(sham)
+check("движок с такой папкой недоступен", not wrong.available())
+check("и причина названа человеческими словами",
+      "не модель распознавания" in getattr(wrong, "_error", ""),
+      f"| {getattr(wrong, '_error', '')!r}")
+
+# The reason has to reach the place a person is looking at, not stay in the
+# object. This is the list the settings page draws.
+from core import settings_schema
+from core.settings_api import MemorySettings
+
+listed = settings_schema.options_for(
+    "stt_engine", MemorySettings({"stt_engine": "vosk", "vosk_model": sham}))
+vosk_row = [row for row in listed if row["value"] == "vosk"]
+check("в настройках движок показан недоступным",
+      bool(vosk_row) and not vosk_row[0]["available"],
+      f"| {vosk_row}")
+check("и там же написано почему",
+      bool(vosk_row) and "модел" in (vosk_row[0].get("reason") or ""),
+      f"| {vosk_row[0].get('reason') if vosk_row else None!r}")
 
 
 # ---------------------------------------------------------------------------

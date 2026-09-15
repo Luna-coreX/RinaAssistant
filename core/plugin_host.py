@@ -103,6 +103,7 @@ class HostedPlugin:
         self.error = None
         self.logs = []
         self.has_page = False
+        self.has_home = False
         self.page_title = ""
         self.page_icon = "🧩"
         self.tools = []
@@ -150,6 +151,7 @@ class HostedPlugin:
         self.manifest = Manifest(answer.get("manifest") or {}, self.folder)
         self.manifest.api_version = int(answer.get("api_version", 0) or 0)
         self.has_page = bool(answer.get("has_page"))
+        self.has_home = bool(answer.get("has_home"))
         self.page_title = str(answer.get("page_title") or self.manifest.name)
         self.page_icon = str(answer.get("page_icon") or self.manifest.icon)
         self.tools = list(answer.get("tools") or [])
@@ -465,6 +467,54 @@ class HostedPlugins:
             return []
         answer = hosted.ask("plugin.page", {})
         return _as_elements((answer or {}).get("elements") or [])
+
+    def home_tiles(self):
+        """
+        The tiles switched-on plugins want on the home screen (`4.0b-A07`).
+
+        **This was missing, and the home screen has never shown a tile.**
+        The feature was written on `PluginManager`, which runs plugins in
+        our own process; plugins actually live in processes of their own
+        (ADR 0010), and it is this class the core talks to. Every draw of
+        the home screen ended in one line in the journal —
+        `'HostedPlugins' object has no attribute 'home_tiles'` — every few
+        seconds, for four days, while `test_home_tiles.py` stayed green:
+        it asked the other class. A check aimed at the object that is not
+        running agrees with whoever wrote it and with nobody else.
+
+        Only those that said at the introduction that they have a tile.
+        The home screen is redrawn often and most plugins have none:
+        asking each of them would be a round trip to another process for
+        the answer "no".
+
+        A plugin that falls over here loses its tile and nothing else —
+        the same rule as everywhere: it is somebody else's code (`T-04`)
+        and may not take the first screen down with it. `ask` returns
+        `None` when the process is silent, which is that case.
+        """
+        from plugins.manager import HOME_TILE_LIMIT
+
+        tiles = []
+        for plugin_id in sorted(self.plugins):
+            hosted = self.plugins[plugin_id]
+            if not hosted.enabled or not hosted.alive or not hosted.has_home:
+                continue
+            answer = hosted.ask("plugin.home", {})
+            elements = _as_elements((answer or {}).get("elements") or [])
+            if not elements:
+                continue
+            tiles.append({
+                "id": plugin_id,
+                "title": hosted.manifest.name or plugin_id,
+                # Trimmed here rather than by whoever draws: how much fits
+                # on the home screen is a decision about the home screen,
+                # and asking every plugin to behave would be asking
+                # politely.
+                "elements": [e.to_dict() if hasattr(e, "to_dict") else e
+                             for e in elements[:HOME_TILE_LIMIT]],
+                "trimmed": len(elements) > HOME_TILE_LIMIT,
+            })
+        return tiles
 
     def dispatch_action(self, plugin_id, action, value=None):
         hosted = self.plugins.get(plugin_id)

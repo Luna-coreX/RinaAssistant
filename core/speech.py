@@ -227,6 +227,22 @@ class VoskRecogniser:
         if not os.path.isdir(self.model_path):
             self._error = "папки с моделью Vosk нет"
             return False
+        if not looks_like_vosk_model(self.model_path):
+            # Met in real use. A person went to the Vosk download page and
+            # brought back `vosk-recasepunc-ru-0.22` — which is on that page
+            # and is not a recognition model but a restorer of case and
+            # punctuation. The folder existed, the package was there, the
+            # settings looked right, and every phrase ended in `Failed to
+            # create a model` — the library's words, in English, once per
+            # phrase, in the journal only. Four days of "she cannot hear
+            # me".
+            #
+            # Said here rather than at the first phrase because here is
+            # where a person is choosing: the settings show the reason an
+            # engine cannot be picked.
+            self._error = ("это не модель распознавания Vosk: "
+                           "в папке нет ни am, ни conf, ни graph")
+            return False
         if not installed("vosk"):
             self._error = "пакет vosk не установлен"
             return False
@@ -260,6 +276,24 @@ class VoskRecogniser:
             return Heard(text=said.strip())
         except Exception as exc:                        # noqa: BLE001
             return Heard(ok=False, error=str(exc))
+
+
+def looks_like_vosk_model(folder: str) -> bool:
+    """
+    Is this a folder a Vosk **recognition** model lives in.
+
+    Judged by what Kaldi needs rather than by the name: models are renamed
+    on the way to a person's disk, and a name is not a promise. Any one of
+    the three is enough — small and large models, and the ones with a
+    dynamic graph, differ in what else they carry, and a check that
+    demanded all of them would reject working models.
+
+    Asked because the download page offers more than recognition models,
+    and the one that is not one fails with a sentence from the library
+    rather than with anything a person can act on.
+    """
+    return any(os.path.isdir(os.path.join(folder, part))
+               for part in ("am", "conf", "graph"))
 
 
 class WhisperRecogniser:

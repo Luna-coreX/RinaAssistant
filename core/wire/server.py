@@ -29,6 +29,7 @@ process nobody will close.
 """
 
 import contextvars
+import queue
 import secrets
 import threading
 import time
@@ -144,6 +145,24 @@ class ProtocolServer:
         #: Our requests awaiting the shell's answer. Until now the server
         #: could only answer; to ask (§11) it has to be able to wait too.
         self._awaiting: dict[str, Callable[[Envelope], None]] = {}
+
+        #: What to do once the answer is on the wire — not a moment before.
+        #:
+        #: There is exactly one thing so far and it is worth the mechanism.
+        #: The listening mode is restored from the settings while `hello`
+        #: is being answered, and restoring it announces itself with an
+        #: event. Sent from inside the handler, that event leaves **before**
+        #: the reply — and until the reply arrives the other side has no
+        #: agreed protocol version, so it is not listening for events yet
+        #: and cannot be blamed for missing one. The setting said "always
+        #: listening", the core believed it, the shell never heard, and the
+        #: microphone stayed shut: the switch showed a mode that was not
+        #: running.
+        #:
+        #: Anything a handler wants to do after its own answer goes here
+        #: rather than on a timer. A delay chosen by hand is a race whose
+        #: losing side is somebody else's slow machine.
+        self._after_reply: list[Callable[[], None]] = []
 
         self._send_lock = threading.Lock()
         self._running = False
@@ -271,6 +290,17 @@ class ProtocolServer:
             if payload is not None:
                 out.append(self.send(
                     message.reply(payload, id=self.ids.next())))
+
+            # And only now — see `_after_reply`. One that throws loses
+            # itself and nothing else: the answer has already gone, and
+            # taking the session down after answering would be worse than
+            # the thing that failed.
+            while self._after_reply:
+                todo = self._after_reply.pop(0)
+                try:
+                    todo()
+                except Exception as exc:                # noqa: BLE001
+                    self._log_broken("после ответа", exc)
         return out
 
     # -- methods ------------------------------------------------------------------
@@ -359,9 +389,16 @@ class ProtocolServer:
         # "always listening" while nothing listens is the same lie as the
         # switch that showed "off" while it was on — merely the other way
         # round.
+        #
+        # **After the answer, not inside it** (see `_after_reply`). Done
+        # here, the event that announces the mode overtook the reply it was
+        # meant to follow, and the shell — which has no session until the
+        # reply arrives — dropped it. Four days of "always listening" being
+        # on in the settings and off in fact.
         store = self._settings()
         if store is not None and bool(store.get("always_listen", False)):
-            self.engine.set_always_listen(True)
+            self._after_reply.append(
+                lambda: self.engine.set_always_listen(True))
 
         return answer
 
@@ -1548,7 +1585,36 @@ class ProtocolServer:
     #: Counted, not logged per frame: sound arrives fifty times a second,
     #: and a line each would bury the journal it was meant to help.
     heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
-             "recognitions": 0, "texts": 0}
+             "recognitions": 0, "texts": 0, "dropped": 0}
+
+    #: Phrases waiting their turn, and the one thread that takes them.
+    #:
+    #: **One thread, not one per phrase.** A phrase used to get a thread of
+    #: its own, and the recogniser is a single object holding a single
+    #: model loaded on first use. Two phrases close together meant two
+    #: loads of the same model racing each other — "Failed to create a
+    #: model" in the journal, once per phrase from then on — and two
+    #: recognitions reading one model at once.
+    #:
+    #: What a person met was worse than an error. The words of one phrase
+    #: surfaced during the **next** one, so Rina answered a second after
+    #: they started speaking, and answered what they had said before. The
+    #: journal shows it plainly: two phrases heard, one line of recognised
+    #: text, and both phrases' words inside it.
+    #:
+    #: Order is the other half. Even with a thread-safe engine, results
+    #: from parallel threads arrive in whatever order they finish, and a
+    #: short phrase overtakes a long one. Commands are said in an order and
+    #: mean something in that order.
+    _phrases: "queue.Queue | None" = None
+    _stt_thread = None
+    _stt_guard = threading.Lock()
+
+    #: How many phrases may wait. Recognition slower than speech has to
+    #: lose something; what it must not do is fall further and further
+    #: behind, answering a minute late. The oldest goes, and it is said out
+    #: loud — silently dropping what a person said is the one thing worse.
+    PHRASE_QUEUE = 4
 
     def hearing(self) -> dict:
         """Where the sound got to. For the diagnostics and the checks."""
@@ -1593,8 +1659,45 @@ class ProtocolServer:
         for phrase in self.segmenter.feed(pcm):
             self.heard["phrases"] += 1
             log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
-            threading.Thread(target=self._recognise, args=(phrase,),
-                             name="rina-stt", daemon=True).start()
+            self._queue_phrase(phrase)
+
+    def _queue_phrase(self, phrase: bytes) -> None:
+        """Put a phrase in the queue; see `_phrases` for why there is one."""
+        with self._stt_guard:
+            if self._phrases is None:
+                self._phrases = queue.Queue(maxsize=self.PHRASE_QUEUE)
+            waiting = self._phrases
+            if self._stt_thread is None or not self._stt_thread.is_alive():
+                self._stt_thread = threading.Thread(
+                    target=self._recognise_forever, args=(waiting,),
+                    name="rina-stt", daemon=True)
+                self._stt_thread.start()
+
+        while True:
+            try:
+                waiting.put_nowait(phrase)
+                return
+            except queue.Full:
+                try:
+                    old_phrase = waiting.get_nowait()
+                except queue.Empty:
+                    continue        # the worker took one; there is room now
+                self.heard["dropped"] += 1
+                log.warning(
+                    "Распознавание не поспевает: фраза на %.1f с отброшена",
+                    len(old_phrase) / (16000 * 2))
+
+    def _recognise_forever(self, waiting: "queue.Queue") -> None:
+        """Take phrases one at a time, in the order they were said."""
+        while True:
+            phrase = waiting.get()
+            try:
+                self._recognise(phrase)
+            except Exception:                           # noqa: BLE001
+                # The thread is the only one there is: letting it die would
+                # mean silence for the rest of the session, and silence is
+                # how this whole chain fails invisibly.
+                log.exception("Распознавание сорвалось")
 
     def _recognise(self, phrase: bytes) -> None:
         with trace_scope():

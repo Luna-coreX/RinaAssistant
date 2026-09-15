@@ -630,20 +630,38 @@ public partial class App
             // no right to leave a plugin switched on behind it.
             var before = await plugins.EnabledAsync();
 
-            var drawn = await plugins.OpenFirstPageAsync();
+            // Kept open on purpose. Without `keepOpen` the plugin is
+            // switched off again before this returns, and the section
+            // question below was then asked about a plugin that was no
+            // longer on: it passed only on a machine where somebody had
+            // already switched one on by hand, and went red the day the
+            // developer switched them all off. A check that reads the
+            // profile it is run under measures the machine, not the
+            // program.
+            var drawn = await plugins.OpenFirstPageAsync(keepOpen: true);
             Check("плагин включился и отдал свою страницу", drawn > 0,
                   $"| элементов {drawn}");
 
-            var after = await plugins.EnabledAsync();
             // The plugin's section in the column (noted by a person): "I
             // use this" is a place on the left, not a card in a list of
             // what is installed.
             await link.RefreshPluginSectionsAsync();
             await Task.Delay(400);
-            Check("у плагина со страницей есть свой раздел",
+            Check("у включённого плагина есть свой раздел",
                   window.SectionNames().Any(n => n.StartsWith("plugin:")),
                   $"| {string.Join(", ", window.SectionNames())}");
 
+            // And it goes when the plugin does. Both halves are the rule:
+            // a section that stays behind says "I use this" about
+            // something nobody uses.
+            await plugins.RestoreAsync();
+            await link.RefreshPluginSectionsAsync();
+            await Task.Delay(400);
+            Check("выключили — раздел ушёл",
+                  !window.SectionNames().Any(n => n.StartsWith("plugin:")),
+                  $"| {string.Join(", ", window.SectionNames())}");
+
+            var after = await plugins.EnabledAsync();
             Check("проверка вернула плагины как было",
                   before.SequenceEqual(after),
                   $"| было [{string.Join(", ", before)}], "

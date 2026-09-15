@@ -129,10 +129,18 @@ public sealed class CoreSupervisor : IAsyncDisposable
             {
                 await connection.StartAsync(_launch, ConnectTimeout, token)
                                 .ConfigureAwait(false);
-                await connection.HandshakeAsync(token).ConfigureAwait(false);
 
+                // Subscribed **before** the handshake. The core may speak
+                // while it is answering — it restores the listening mode
+                // out of the settings there — and everything it said
+                // before this line used to fall on the floor. Between the
+                // reply arriving and a subscription made after it there is
+                // a gap of a few instructions, and "a few instructions" is
+                // a race, not a guarantee: it is another process.
                 connection.EventReceived += OnEvent;
                 connection.Broken += OnBroken;
+
+                await connection.HandshakeAsync(token).ConfigureAwait(false);
                 Connection = connection;
 
                 // The reason is the version, not a phrase about it:
