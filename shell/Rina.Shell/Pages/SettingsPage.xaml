@@ -1,6 +1,7 @@
 <UserControl x:Class="Rina.Shell.Pages.SettingsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
              xmlns:loc="clr-namespace:Rina.Shell.Strings">
   <!--
     One long panel that scrolls, not nested tabs (4.0-R04): an instrument is
@@ -21,7 +22,7 @@
     <ContentControl x:Name="Empty" Grid.Row="1" Visibility="Collapsed" />
 
     <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
-                  Padding="0,0,12,0">
+                  Padding="0,0,12,0" ui:Smooth.Scrolling="True">
       <StackPanel x:Name="Body" />
     </ScrollViewer>
 

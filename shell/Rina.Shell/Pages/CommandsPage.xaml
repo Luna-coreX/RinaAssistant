@@ -1,6 +1,7 @@
 <UserControl x:Class="Rina.Shell.Pages.CommandsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
              xmlns:loc="clr-namespace:Rina.Shell.Strings">
   <UserControl.Resources>
     <!-- One row of a command. A resource rather than an inline template:
@@ -69,7 +70,7 @@
                       Visibility="Collapsed" />
     </StackPanel>
 
-    <ScrollViewer Grid.Row="2" x:Name="Scroll" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="2" x:Name="Scroll" VerticalScrollBarVisibility="Auto" ui:Smooth.Scrolling="True">
       <StackPanel>
       <!--
         The lists, in groups that fold.

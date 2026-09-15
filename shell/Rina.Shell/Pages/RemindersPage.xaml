@@ -73,7 +73,8 @@
     <ContentControl x:Name="Empty" Grid.Row="2" Visibility="Collapsed" />
 
     <ScrollViewer x:Name="List" Grid.Row="2"
-                  VerticalScrollBarVisibility="Auto">
+                  VerticalScrollBarVisibility="Auto"
+                  ui:Smooth.Scrolling="True">
       <Border Style="{StaticResource Rows}">
       <ItemsControl x:Name="Items">
         <ItemsControl.ItemTemplate>

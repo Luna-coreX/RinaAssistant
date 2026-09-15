@@ -32,7 +32,7 @@
            happened yet is neither a breakage nor "loading". -->
       <ContentControl x:Name="Empty" Visibility="Collapsed" />
 
-      <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto">
+      <ScrollViewer x:Name="Scroll" VerticalScrollBarVisibility="Auto" ui:Smooth.Scrolling="True">
         <ItemsControl x:Name="Turns">
           <!--
             A conversation, not a list of lines (4.0b-A12).

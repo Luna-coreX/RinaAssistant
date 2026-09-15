@@ -147,6 +147,17 @@ public partial class App
             return;
         }
 
+        // A strip of frames through one section change, for the eye.
+        // "Jerky" is a judgement, and a judgement needs something to look
+        // at: numbers say when a thing moved, not whether it looked like
+        // one movement or three.
+        if (Value(args, "--shot-motion") is { } strip)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(ShotMotionAsync(window, strip), "motion-strip");
+            return;
+        }
+
         if (args.Contains("--check-listen"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -2989,6 +3000,47 @@ public partial class App
         return page;
     }
 
+    /// <summary>Frames through one section change, side by side.</summary>
+    private async Task ShotMotionAsync(MainWindow window, string into)
+    {
+        window.Width = 940;
+        window.Height = 620;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.ShowSectionFor("settings");
+        await Task.Delay(700);
+
+        var dpi = PresentationSource.FromVisual(window)
+                      ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+        var width = (int)(window.ActualWidth * dpi);
+        var height = (int)(window.ActualHeight * dpi);
+
+        Directory.CreateDirectory(Path.GetDirectoryName(
+            Path.GetFullPath(into))!);
+        window.ShowSectionFor("commands");
+        var began = DateTime.UtcNow;
+        var at = 0;
+        foreach (var when in new[] { 20, 60, 100, 150, 220, 320 })
+        {
+            var wait = when - (int)(DateTime.UtcNow - began).TotalMilliseconds;
+            if (wait > 0) await Task.Delay(wait);
+            var frame = new RenderTargetBitmap(width, height, 96 * dpi,
+                                               96 * dpi, PixelFormats.Pbgra32);
+            frame.Render(window);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(frame));
+            var name = Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(into))!,
+                Path.GetFileNameWithoutExtension(into) + $"-{at:00}-{when}ms.png");
+            using (var file = File.Create(name)) encoder.Save(file);
+            Console.WriteLine($"кадр {when} мс: {name}");
+            at++;
+        }
+        Shutdown();
+    }
+
     /// <summary>
     /// "Always listening" survives a restart, all the way to the microphone.
     /// </summary>
@@ -3594,7 +3646,21 @@ public partial class App
         // animation clock's first tick the property gives back its base
         // value, and an instant read would show one even with a working
         // animation — the check would lie in both directions.
-        await Task.Delay(80);
+        // Early, while the last parts have not set off yet. This is
+        // where the arrival used to break: `BeginTime` leaves a clock in
+        // its delay, and a delayed clock gives back the property's base
+        // value — one. The parts still waiting stood fully visible,
+        // blinked out and then faded in. At thirty milliseconds the four
+        // read 0.53, 0.20, 1.00, 1.00, and what a person saw was two
+        // parts arriving and two flashing.
+        await Task.Delay(30);
+        var early = window.PartsArriving;
+        Check("никто не вспыхивает раньше своей очереди",
+              early.Count < 2
+              || early.Zip(early.Skip(1)).All(pair => pair.First >= pair.Second),
+              $"| {string.Join(", ", early.Select(o => o.ToString("0.00")))}");
+
+        await Task.Delay(50);
         var rise = window.PaneRise;
 
         // **By parts, not as a plate** (`4.0b-E04`). The panel itself no
@@ -4370,15 +4436,87 @@ public partial class App
                   shown.FoldedForCheck("builtin"));
             var closed = shown.ListHeight;
             shown.FoldForCheck("builtin", false);
-            await Task.Delay(200);
+
+            // Mid-flight, because it unfolds rather than appearing
+            // (`4.0b-E04`). A group that is simply drawn in is the one
+            // thing on this page that did not move, and the person using
+            // it said so. Half open is a state that only exists if there
+            // is a movement at all.
+            await Task.Delay(90);
+            var halfway = shown.OpennessForCheck("builtin");
+            Check("на середине группа разворачивается, а не возникает",
+                  halfway is > 0.01 and < 0.99, $"| раскрыта на {halfway:0.00}");
+
+            await Task.Delay(400);
             var unfolded = shown.ListHeight;
             Check("развернулись — список стал выше", unfolded > closed + 40,
                   $"| было {closed:0}, стало {unfolded:0}");
+            Check("и раскрыта до конца",
+                  shown.OpennessForCheck("builtin") > 0.99,
+                  $"| {shown.OpennessForCheck("builtin"):0.00}");
+
             shown.FoldForCheck("builtin", true);
-            await Task.Delay(200);
+            await Task.Delay(400);
             Check("свернулись — снова прежней высоты",
                   Math.Abs(shown.ListHeight - closed) < 1,
                   $"| {shown.ListHeight:0} против {closed:0}");
+
+            // --- scrolling slides (`4.0b-E04`) -----------------------
+            //
+            // A wheel notch in WPF moves the view three lines at once
+            // with nothing in between: the page is in one place and then
+            // in another. Asked for by the person using it. Measured
+            // here on the real list, unfolded a moment ago so that there
+            // is somewhere to go.
+            shown.FoldForCheck("builtin", false);
+            await Task.Delay(500);
+
+            var scroller = shown.Scroll;
+            Check("списку есть куда прокручиваться",
+                  scroller.ScrollableHeight > 40,
+                  $"| {scroller.ScrollableHeight:0} точек");
+
+            void Notch()
+                => scroller.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(
+                    System.Windows.Input.Mouse.PrimaryDevice,
+                    Environment.TickCount, -120)
+                {
+                    RoutedEvent = UIElement.PreviewMouseWheelEvent,
+                    Source = scroller,
+                });
+
+            scroller.ScrollToVerticalOffset(0);
+            await Task.Delay(120);
+            Notch();
+            await Task.Delay(60);
+            var partway = scroller.VerticalOffset;
+            Check("сразу после щелчка колеса список уже едет",
+                  partway > 0.5, $"| {partway:0.0}");
+
+            await Task.Delay(400);
+            var landed = scroller.VerticalOffset;
+            Check("и приехал дальше, чем был на середине",
+                  landed > partway + 1,
+                  $"| на середине {partway:0.0}, доехал {landed:0.0}");
+
+            // Two notches in a row have to add up. Read back from the
+            // view instead of remembered, each would aim from wherever
+            // the slide had got to — four quick notches would move the
+            // page by barely more than one, and that feels like the
+            // wheel slipping.
+            scroller.ScrollToVerticalOffset(0);
+            await Task.Delay(400);
+            Notch();
+            await Task.Delay(20);
+            Notch();
+            await Task.Delay(500);
+            var twice = scroller.VerticalOffset;
+            Check("два щелчка подряд складываются",
+                  twice > landed * 1.5,
+                  $"| один {landed:0.0}, два {twice:0.0}");
+
+            shown.FoldForCheck("builtin", true);
+            await Task.Delay(400);
 
             // Groups at all: a page with one heading over everything is
             // the flat list this replaced.

@@ -542,6 +542,11 @@ public partial class MainWindow : Window
         _arrived = parts;
         if (parts.Count < 2) return false;
 
+        // A fade and nothing else. The panel itself already rises and
+        // sets its shadow down (`4.0b-A06`); giving every part a rise of
+        // its own on top of that meant each one travelled twice, and
+        // three things moving at once do not read as one arrival — they
+        // read as a jerk.
         var span = (Duration)FindResource("Motion.State");
         var ease = (System.Windows.Media.Animation.IEasingFunction)
             FindResource("Ease.In");
@@ -558,31 +563,35 @@ public partial class MainWindow : Window
             // by then a person has already read the top of the screen.
             var wait = TimeSpan.FromTicks(
                 step.TimeSpan.Ticks * Math.Min(at, 5));
-            parts[at].BeginAnimation(OpacityProperty,
-                new System.Windows.Media.Animation.DoubleAnimation
-                {
-                    From = 0, To = 1, Duration = span,
-                    BeginTime = wait, EasingFunction = ease,
-                    FillBehavior = System.Windows.Media.Animation
-                        .FillBehavior.Stop,
-                });
 
-            var lift = parts[at].RenderTransform
-                as System.Windows.Media.TranslateTransform;
-            if (lift is null)
+            // **Held at nothing until its turn.** `BeginTime` alone does
+            // not do that: while a clock is still in its delay WPF gives
+            // back the property's *base* value, which here is one. So a
+            // part that was to arrive third stood fully visible for its
+            // first fifty milliseconds, blinked out, and only then faded
+            // in. Measured: at thirty milliseconds the four parts read
+            // 0.53, 0.20, 1.00, 1.00 — the stagger a person saw was two
+            // parts fading and two flashing.
+            //
+            // Key frames say the wait out loud instead: nothing, nothing
+            // still, then the fade. `Stop` at the end so the property
+            // goes back to belonging to the page.
+            var fade = new System.Windows.Media.Animation
+                .DoubleAnimationUsingKeyFrames
             {
-                lift = new System.Windows.Media.TranslateTransform();
-                parts[at].RenderTransform = lift;
-            }
-            lift.BeginAnimation(
-                System.Windows.Media.TranslateTransform.YProperty,
-                new System.Windows.Media.Animation.DoubleAnimation
-                {
-                    From = 8, To = 0, Duration = span,
-                    BeginTime = wait, EasingFunction = ease,
-                    FillBehavior = System.Windows.Media.Animation
-                        .FillBehavior.Stop,
-                });
+                Duration = new Duration(wait + span.TimeSpan),
+                FillBehavior = System.Windows.Media.Animation
+                    .FillBehavior.Stop,
+            };
+            fade.KeyFrames.Add(new System.Windows.Media.Animation
+                .DiscreteDoubleKeyFrame(0, System.Windows.Media.Animation.KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            fade.KeyFrames.Add(new System.Windows.Media.Animation
+                .DiscreteDoubleKeyFrame(0, System.Windows.Media.Animation.KeyTime.FromTimeSpan(wait)));
+            fade.KeyFrames.Add(new System.Windows.Media.Animation
+                .EasingDoubleKeyFrame(1,
+                    System.Windows.Media.Animation.KeyTime.FromTimeSpan(wait + span.TimeSpan))
+                { EasingFunction = ease });
+            parts[at].BeginAnimation(OpacityProperty, fade);
         }
         return true;
     }

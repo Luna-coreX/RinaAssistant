@@ -1,6 +1,7 @@
 <UserControl x:Class="Rina.Shell.Pages.PluginsPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
              xmlns:loc="clr-namespace:Rina.Shell.Strings">
   <Grid>
     <Grid.RowDefinitions>
@@ -12,7 +13,7 @@
     <TextBlock Grid.Row="0" Text="{loc:S 'Плагины'}" Style="{StaticResource Text.Title}"
                Margin="0,0,0,16" />
 
-    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" ui:Smooth.Scrolling="True">
       <StackPanel>
         <TextBlock x:Name="Legend" Text="{loc:S 'УСТАНОВЛЕННЫЕ'}"
                    Style="{StaticResource Text.Section}" Margin="0,0,0,12" />

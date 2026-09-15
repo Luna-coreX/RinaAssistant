@@ -301,6 +301,8 @@ public partial class CommandsPage : UserControl
     {
         Groups.Children.Clear();
         _drawn.Clear();
+        _rooms.Clear();
+        _turns.Clear();
 
         var order = _kindOrder.ToList();
         var mine = _items
@@ -340,14 +342,21 @@ public partial class CommandsPage : UserControl
         head.ColumnDefinitions.Add(new ColumnDefinition());
 
         // The chevron points the way it will go, which is the convention
-        // every list of this shape already uses.
+        // every list of this shape already uses. It **turns** rather than
+        // being swapped for another glyph (`4.0b-E04`): a character
+        // replaced in place is a change with no act in it, and the turn
+        // is the same movement the list under it is about to make.
+        var turn = new System.Windows.Media.RotateTransform(open ? 90 : 0);
         head.Children.Add(new TextBlock
         {
-            Text = open ? "⌄" : "›",
+            Text = "›",
             Style = (Style)FindResource("Text.Meta"),
             Width = 16,
             VerticalAlignment = VerticalAlignment.Center,
+            RenderTransformOrigin = new Point(0.5, 0.5),
+            RenderTransform = turn,
         });
+        _turns[id] = turn;
         var words = new TextBlock
         {
             Text = $"{title} · {count}",
@@ -373,17 +382,102 @@ public partial class CommandsPage : UserControl
         };
         press.MouseLeftButtonDown += (_, _) =>
         {
-            if (!_folded.Remove(id)) _folded.Add(id);
-            DrawGroups();
+            // Folded here and animated, not redrawn. Redrawing built the
+            // list afresh, and a list built afresh has nothing to move
+            // from: the group appeared and disappeared, which is the one
+            // thing in the section that did not move at all.
+            var folding = _folded.Remove(id) is false;
+            if (folding) _folded.Add(id);
+            Fold(id, folding);
         };
         press.MouseEnter += (_, _) => head.Opacity = 0.75;
         press.MouseLeave += (_, _) => head.Opacity = 1;
 
+        // The body is always here, and folding gives it no height. Kept
+        // rather than removed so there is something to animate, and
+        // clipped so that what does not fit is cut instead of spilling
+        // over the group below.
+        var room = new Border
+        {
+            Child = body,
+            ClipToBounds = true,
+            Height = open ? double.NaN : 0,
+            Opacity = open ? 1 : 0,
+        };
+        _rooms[id] = room;
+
         var column = new StackPanel { Margin = new Thickness(0, 0, 0, 12) };
         column.Children.Add(press);
-        if (open) column.Children.Add(body);
+        column.Children.Add(room);
         return column;
     }
+
+    //: What folds, per group, and the chevron over it.
+    private readonly Dictionary<string, Border> _rooms = [];
+    private readonly Dictionary<string, System.Windows.Media.RotateTransform>
+        _turns = [];
+
+    /// <summary>Fold a group away or open it, with the movement (<c>4.0b-E04</c>).</summary>
+    /// <remarks>
+    /// The height is animated, and that is the awkward part: a folded
+    /// group has a height of zero, an open one has whatever its rows come
+    /// to, and "whatever its rows come to" is not a number until it has
+    /// been measured. So it is measured, animated to, and then handed back
+    /// to the layout — otherwise a group opened once would keep the height
+    /// it had when it was opened, and a row added later would be cut off.
+    /// </remarks>
+    private void Fold(string id, bool folding)
+    {
+        if (!_rooms.TryGetValue(id, out var room)) return;
+
+        var span = (Duration)FindResource("Motion.Panel");
+        var ease = (System.Windows.Media.Animation.IEasingFunction)
+            FindResource("Ease.In");
+
+        if (_turns.TryGetValue(id, out var turn))
+            turn.BeginAnimation(
+                System.Windows.Media.RotateTransform.AngleProperty,
+                new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    To = folding ? 0 : 90, Duration = span,
+                    EasingFunction = ease,
+                });
+
+        room.Child?.Measure(new Size(room.ActualWidth > 0
+                                     ? room.ActualWidth
+                                     : double.PositiveInfinity,
+                                     double.PositiveInfinity));
+        var full = room.Child?.DesiredSize.Height ?? 0;
+        var from = room.ActualHeight;
+
+        var move = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = from,
+            To = folding ? 0 : full,
+            Duration = span,
+            EasingFunction = ease,
+        };
+        // Handed back to the layout at the end, but only when opening: a
+        // folded group must stay at zero, and `Auto` would let it spring
+        // back open the moment anything inside it changed.
+        if (!folding)
+            move.Completed += (_, _) =>
+            {
+                room.BeginAnimation(HeightProperty, null);
+                room.Height = double.NaN;
+            };
+        room.BeginAnimation(HeightProperty, move);
+
+        room.BeginAnimation(OpacityProperty,
+            new System.Windows.Media.Animation.DoubleAnimation
+            {
+                To = folding ? 0 : 1, Duration = span, EasingFunction = ease,
+            });
+    }
+
+    /// <summary>How far a group is open, 0 to 1 — for the check.</summary>
+    public double OpennessForCheck(string id)
+        => _rooms.TryGetValue(id, out var room) ? room.Opacity : -1;
 
     private UIElement Rows(IEnumerable<UserCommand> commands)
     {
@@ -466,7 +560,10 @@ public partial class CommandsPage : UserControl
     {
         if (folded) _folded.Add(id);
         else _folded.Remove(id);
-        DrawGroups();
+        // The same road a click takes. It used to redraw instead, which
+        // is a different road: the check would have gone on passing with
+        // the folding animation deleted, because a redraw needs none.
+        Fold(id, folded);
     }
 
     /// <summary>How tall the lists stand — for the check.</summary>
