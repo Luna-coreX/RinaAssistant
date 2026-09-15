@@ -93,7 +93,7 @@ public sealed class Figure
     private double _shown;
     private double _gloss = 70;
     private double _lamp = 0.42;
-    private double _spray = 0.10;
+    private double _spray;
 
     public Figure(Image view)
     {
@@ -191,12 +191,12 @@ public sealed class Figure
         {
             Doing.Listening => (0.5, 0.09 + _loud * 0.20, 1.1, 1.3,
                                 _loud * 0.30, 95.0, 0.74,
-                                0.30 + _loud * 0.45),
-            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16, 240.0, 0.26, 0.22),
+                                0.14 + _loud * 0.25),
+            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16, 240.0, 0.26, 0.06),
             Doing.Talking => (0.9, 0.05 + _loud * 0.16, 1.4, 1.6,
                               0.10 + _loud * 0.55, 70.0 + _loud * 120.0,
-                              0.48 + _loud * 0.22, 0.40 + _loud * 0.55),
-            _ => (0.35, 0.0, 0.9, 0.8, 0.0, 70.0, 0.42, 0.10),
+                              0.48 + _loud * 0.22, 0.16 + _loud * 0.30),
+            _ => (0.35, 0.0, 0.9, 0.8, 0.0, 70.0, 0.42, 0.0),
         };
 
         // **Everything is followed, not assigned.** The first edition eased
@@ -295,33 +295,69 @@ public sealed class Figure
     /// how far it travels is one number. A free rainbow belongs to nobody.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// One frame of the body (<c>4.0b-E05</c>, fourth edition).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The surface is bent, not painted.</b> Every edition before this
+    /// one lit the <i>ideal</i> sphere — the normal at each point was the
+    /// normal of a perfect ball — and everything else was colour laid on
+    /// top. That is why it kept reading as a circle with shadows thrown
+    /// over it, which is exactly what it was. Here a height field is
+    /// carried on the surface and the normal is bent by its slope, so the
+    /// light itself finds the ridges: the highlight breaks into streaks
+    /// that run along them, the hollows go dark of their own accord, and
+    /// nothing about that is drawn.
+    /// </para>
+    /// <para>
+    /// <b>The slope is measured, not guessed.</b> The field is sampled
+    /// three times — here, a step one way across the surface, a step the
+    /// other — and the two differences are the gradient. That is the cost
+    /// of the whole thing: three readings of the noise instead of one,
+    /// and it is what buys a surface instead of a texture.
+    /// </para>
+    /// <para>
+    /// <b>It reflects something.</b> A body this glossy is mostly what is
+    /// around it, so there is a room: a cool light above and behind, a
+    /// warm one low and to the side, darkness elsewhere. The reflected
+    /// direction picks between them. Both lights are the accent's own
+    /// colour moved along the spectrum, one up and one down, so the room
+    /// belongs to the window it stands in.
+    /// </para>
+    /// <para>
+    /// <b>And the colour splits.</b> The three channels reflect at
+    /// slightly different bends, the way glass disperses, which is what
+    /// puts the thin coloured fringes on the ridges. One number controls
+    /// how far apart they are.
+    /// </para>
+    /// <para>
+    /// The silhouette is displaced too. A perfect circle gives it away
+    /// whatever happens inside: the outline is pushed in and out by the
+    /// same flow that raises the ridges.
+    /// </para>
+    /// </remarks>
     private void Paint(float z, float turn, float twist, float burst,
                        float gloss, float lamp, float spray)
     {
         var pixels = _pixels;
         var half = Side / 2f;
-        var radius = half * (float)(0.78 + Swell);
+        var radius = half * (float)(0.80 + Swell);
         var hue = (float)_hue;
 
-        // Upper left, and as far towards the eye as the state asks. One
-        // light: a body lit from everywhere is a ring. It does not follow
-        // the surface — that would be a headlamp, and a headlamp shows
-        // nothing about shape.
+        var spinCos = MathF.Cos(turn);
+        var spinSin = MathF.Sin(turn);
+
+        // The room. Cool from above and behind, warm from below and to
+        // the side — the two lights a body like this is nearly made of.
         var depth = Math.Clamp(lamp, 0.05f, 0.95f);
         var across = MathF.Sqrt(1f - depth * depth);
-        var lightX = -0.68f * across;
-        var lightY = -0.73f * across;
-        var lightZ = depth;
+        var keyX = -0.62f * across;
+        var keyY = -0.74f * across;
+        var keyZ = depth;
 
-        var halfLen = MathF.Sqrt(lightX * lightX + lightY * lightY
-                                 + (lightZ + 1f) * (lightZ + 1f));
-        var hx = lightX / halfLen;
-        var hy = lightY / halfLen;
-        var hz = (lightZ + 1f) / halfLen;
-
-        // Where the motes are thrown this second. It wanders rather than
-        // standing: dust thrown always to the same side is a picture of
-        // dust.
+        // Where the motes are thrown this second, wandering rather than
+        // standing still.
         var throwAt = z * 0.31f;
 
         Parallel.For(0, Side, y =>
@@ -335,134 +371,144 @@ public sealed class Figure
                 var at = row + x * 4;
                 var about = MathF.Atan2(dy, dx);
 
-                // **The rim is thrown outward unevenly.** Growing and
-                // shrinking is a balloon; what was asked for is the thing
-                // scattering. So the radius is a number per direction,
-                // pushed out by the flow at the angle being looked at.
-                var scatter = burst <= 0.001f ? 0f
-                    : Flow.Fbm(MathF.Cos(about) * 1.7f,
-                               MathF.Sin(about) * 1.7f, z * 1.6f) * burst;
-                var edge = radius * (1f + scatter);
+                // The outline is pushed in and out by the flow. A perfect
+                // circle gives the whole thing away however well the
+                // inside is lit.
+                var swellAt = Flow.Fbm(MathF.Cos(about) * 1.6f,
+                                       MathF.Sin(about) * 1.6f,
+                                       z * 0.9f, 3);
+                var edge = radius * (1f + swellAt * (0.055f + burst));
                 var far = reachOut / edge;
 
-                if (far >= 1.02f)
+                if (far >= 1.0f)
                 {
                     Spark(pixels, at, x, y, far, about, hue, spray,
                           throwAt, z);
                     continue;
                 }
 
-                // The normal: a ball, not a coin. `face` is the part of it
-                // pointing at the eye — one in the middle, nothing at the
-                // rim — and the two across are what is left.
-                var inside = MathF.Min(far, 1f);
-                var face = MathF.Sqrt(MathF.Max(0f, 1f - inside * inside));
-                var graze = 1f - face;
+                // The ideal normal of the ball, before anything is done
+                // to it.
                 var nx = dx / edge;
                 var ny = dy / edge;
+                var nz = MathF.Sqrt(MathF.Max(0f, 1f - nx * nx - ny * ny));
 
-                // The surface point, wound about the axis pointing at you.
-                var wind = turn + twist * face;
-                var cw = MathF.Cos(wind);
-                var sw = MathF.Sin(wind);
-                var sx = nx * cw - ny * sw;
-                var sy = nx * sw + ny * cw;
+                // Into the body's own frame, which turns under the light.
+                var px = nx * spinCos + nz * spinSin;
+                var pz = -nx * spinSin + nz * spinCos;
+                var py = ny;
 
-                // The phase the ribbons run along. Its level lines are
-                // spirals: the angle carries it round, the radius carries
-                // it outward, and the twist drags the inner turns further
-                // than the outer ones.
-                var warp = Flow.Fbm(sx * 1.25f, sy * 1.25f,
-                                    face * 1.0f + z * 0.9f) * 2.3f;
-                var phase = about * 2f + inside * 9.4f + turn * 1.6f
-                            + twist / (inside + 0.42f) + warp;
+                // A pair of directions across the surface at this point,
+                // to step along when measuring the slope.
+                var tLen = MathF.Sqrt(pz * pz + px * px) + 1e-4f;
+                var tux = pz / tLen;
+                var tuz = -px / tLen;
+                var tvx = -px * py / tLen;
+                var tvy = (pz * pz + px * px) / tLen;
+                var tvz = -py * pz / tLen;
 
-                // Smooth arcs with dark water between them. `sin` rather
-                // than the noise itself: noise gives blotches, and what
-                // was asked for is bands.
-                // Two sets of bands over one another — broad arcs with
-                // finer striations inside them. One frequency alone gives
-                // corduroy; a real film has structure at more than one
-                // size, and that is most of what separates it from a
-                // striped ball.
-                var wave = MathF.Sin(phase) * 0.5f + 0.5f;
-                // A whole multiple, and that is not a taste. The phase
-                // carries the angle, which jumps by two full turns where
-                // `atan2` wraps; a sine of it comes back to itself across
-                // that jump only if its multiplier is a whole number.
-                // At 2.7 the finer bands tore a notch down one side of
-                // the body — a join in a sphere.
-                var fine = MathF.Sin(phase * 3f + 1.1f) * 0.5f + 0.5f;
-                var mixed = wave * 0.74f + fine * 0.26f;
-                var crest = Math.Clamp((mixed - 0.40f) / 0.30f, 0f, 1f);
-                crest *= crest * (3f - 2f * crest);
+                // The height field, and its slope by two more readings.
+                // The twist drags the field round more the deeper into
+                // the body you look, so the ridges wind instead of lying
+                // in stripes.
+                // Coarse and few. Fine noise gives a crust — the first
+                // reading of this looked like wet stone — and what is
+                // wanted is a handful of large, smooth folds. Two
+                // octaves, not four: the detail a height field does not
+                // have is detail the light cannot find.
+                const float grain = 1.45f;
+                const float step = 0.14f;
+                float High(float ax, float ay, float az)
+                {
+                    var wind = twist * 0.5f;
+                    var cw = MathF.Cos(wind * az);
+                    var sw = MathF.Sin(wind * az);
+                    return Flow.Fbm((ax * cw - ay * sw) * grain,
+                                    (ax * sw + ay * cw) * grain,
+                                    az * grain + z, 2);
+                }
 
-                // Thin-film colour. **Every term of it has to come back
-                // to where it started**, and the first version of this
-                // did not: the hue ran along the raw phase, and the phase
-                // carries the angle, which jumps by a full turn where
-                // `atan2` wraps. The result was a clean coloured seam
-                // straight across the body — a join in a sphere, which is
-                // the one thing a sphere does not have.
-                //
-                // So the sweep is carried by the radius, which has no
-                // wrap, and the ribbon-to-ribbon difference by the sine
-                // of the phase, which is periodic by construction.
-                // **A quarter turn out of step with the brightness.**
-                // Both used to run off the same sine, so only the half
-                // of the spectrum that coincided with a crest was ever
-                // lit: the body had a cool half of its range and no warm
-                // one, whatever the numbers said it should have. With
-                // the cosine, a ribbon passes through the middle of the
-                // range at its brightest and takes its two edges with
-                // it — which is how a film changes colour across a band
-                // rather than between bands.
-                // **One-sided, and that is the design speaking.** A
-                // symmetric sweep puts a stretch of red a third of the
-                // way round from amber, and there is no red in this
-                // system — danger is drawn with hatching precisely so
-                // that no colour has to mean it. So the film travels
-                // from the accent **upward** only: amber into yellow,
-                // green, cyan, the near edge of blue. Half a turn of
-                // range, and none of it borrowed from a meaning.
-                var sweep = MathF.Cos(phase) * 0.5f + 0.5f;
-                var shade = hue + inside * Spectrum * 0.40f
-                            + sweep * Spectrum * 0.92f
-                            + fine * 0.04f + graze * 0.14f + z * 0.01f;
+                var here = High(px, py, pz);
+                var alongU = High(px + tux * step, py, pz + tuz * step);
+                var alongV = High(px + tvx * step, py + tvy * step,
+                                  pz + tvz * step);
+                var slopeU = (alongU - here) / step;
+                var slopeV = (alongV - here) / step;
 
-                // Three terms of light over a nearly black core.
-                var diffuse = MathF.Max(0f, nx * lightX + ny * lightY
-                                            + face * lightZ);
-                var spec = MathF.Pow(
-                    MathF.Max(0f, nx * hx + ny * hy + face * hz), gloss);
+                // The normal, bent by the slope. This is the whole of it:
+                // everything below is ordinary lighting of a surface that
+                // is genuinely not a sphere any more.
+                const float relief = 0.62f;
+                var bx = px - relief * (slopeU * tux + slopeV * tvx);
+                var by = py - relief * (slopeV * tvy);
+                var bz = pz - relief * (slopeU * tuz + slopeV * tvz);
+                var bLen = MathF.Sqrt(bx * bx + by * by + bz * bz) + 1e-5f;
+                bx /= bLen; by /= bLen; bz /= bLen;
+
+                // Back into view space, where the lights are.
+                var mx = bx * spinCos - bz * spinSin;
+                var mz = bx * spinSin + bz * spinCos;
+                var my = by;
+
+                // Reflected direction, eye straight ahead.
+                var dot = mz;                      // m · (0,0,1)
+                var rx = 2f * dot * mx;
+                var ry = 2f * dot * my;
+                var rz = 2f * dot * mz - 1f;
+
+                // Two lights and darkness between them.
+                // The cool light is broad — it is most of what the body
+                // is made of. The warm one is narrow on purpose: a wide
+                // warm light painted the whole lower half of the body
+                // brown, which is a globe with two hemispheres, not a
+                // thing with gold caught on its ridges.
+                var cool = MathF.Max(0f, -ry * 0.62f - rz * 0.30f + 0.52f);
+                cool *= cool;
+                var glint = MathF.Max(0f, ry * 0.70f + rx * 0.32f + 0.06f);
+                var warm = glint * glint;
+                warm *= warm * warm * 2.4f;
+
+                var toKey = MathF.Max(0f, mx * keyX + my * keyY + mz * keyZ);
+                var sheen = MathF.Pow(toKey, gloss);
+                var graze = 1f - MathF.Max(0f, mz);
                 var rim = graze * graze * graze;
 
-                // The colour lives in a band around the dark middle: a
-                // vortex is a hole with light around it, and lighting the
-                // whole disc gives a bead.
-                // Tight, because a vortex is a hole with light around
-                // it. Wide, the colour reaches the middle and the body
-                // becomes a bead.
-                var band = MathF.Exp(-(inside - 0.74f) * (inside - 0.74f) * 11f);
+                var value = 0.018f
+                            + cool * 0.78f
+                            + warm * 0.70f
+                            + toKey * toKey * 0.08f
+                            + rim * 0.26f
+                            + sheen * 0.50f;
 
-                var lit = 0.012f
-                          + crest * band * (0.14f + 0.90f * diffuse) * 0.98f
-                          + diffuse * diffuse * 0.07f
-                          + rim * 0.24f
-                          + spec * 0.30f;
-
-                // The highlight washes towards white, the way a highlight
-                // does: colour belongs to the film, the spot is the light.
-                var sat = Math.Clamp(0.58f + 0.20f * crest - spec * 0.50f,
-                                     0f, 1f);
+                // The colour of the room, and the fringing. The three
+                // channels take slightly different bends, the way glass
+                // disperses: that is what draws the thin coloured lines
+                // along the ridges.
+                // Warm only where it is actually caught: on the narrow
+                // light and in the sheen. Everywhere else the body is
+                // the cool colour, which is what a glass thing in a dark
+                // room looks like.
+                var mix = Math.Clamp(warm * 1.5f + sheen * 1.4f, 0f, 1f);
+                // Through a curve, so the colour spends little time in
+                // the middle of the sweep: a slow crossing puts a green
+                // belt round the body, and the two lights are supposed
+                // to meet, not blend into a third.
+                mix = mix * mix * (3f - 2f * mix);
+                // The warm end stops short of the accent itself: at
+                // full brightness the accent is orange, and orange next
+                // to nothing else reads as red. There is no red here —
+                // danger is drawn with hatching so that no colour has to
+                // carry it.
+                var shade = hue + Spectrum * (1.15f - 0.98f * mix)
+                            + slopeU * Fringe;
+                var sat = Math.Clamp(0.74f - sheen * 0.72f - mix * 0.16f
+                                     - MathF.Abs(slopeV) * 0.06f, 0f, 1f);
 
                 var (red, green, blue) = FromHue(shade, sat,
-                                                 Math.Clamp(lit, 0f, 1f));
+                                                 Math.Clamp(value, 0f, 1f));
 
-                // The rim fades, and a little of the body spills past the
-                // radius — a hard circle would read as a sticker.
-                var alpha = inside < 0.88f ? 1f
-                          : Math.Clamp((1.02f - far) / 0.14f, 0f, 1f);
+                var alpha = far < 0.93f ? 1f
+                          : Math.Clamp((1.0f - far) / 0.07f, 0f, 1f);
 
                 pixels[at] = blue;
                 pixels[at + 1] = green;
@@ -482,6 +528,13 @@ public sealed class Figure
     //: nobody; smaller and the iridescence goes, and with it the only
     //: reason the body reads as a film at all.
     private const float Spectrum = 0.46f;
+
+    //: How far the three channels part company on a ridge.
+    //:
+    //: Glass disperses, and the thin coloured lines along the crests are
+    //: that and nothing else. Larger and the body turns to oil; at zero it
+    //: is a grey sculpture with a tinted light on it.
+    private const float Fringe = 0.055f;
 
     /// <summary>
     /// A mote of the body, thrown clear of it.
