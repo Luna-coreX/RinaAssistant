@@ -101,10 +101,17 @@
 
   <!-- Движение (§7): длительности в миллисекундах -->
   <Duration x:Key="Motion.Instant">0:0:0.000</Duration>
+  <sys:TimeSpan x:Key="Beat.Instant">0:0:0.000</sys:TimeSpan>
+  <Duration x:Key="Motion.Stagger">0:0:0.024</Duration>
+  <sys:TimeSpan x:Key="Beat.Stagger">0:0:0.024</sys:TimeSpan>
   <Duration x:Key="Motion.Press">0:0:0.090</Duration>
+  <sys:TimeSpan x:Key="Beat.Press">0:0:0.090</sys:TimeSpan>
   <Duration x:Key="Motion.State">0:0:0.160</Duration>
+  <sys:TimeSpan x:Key="Beat.State">0:0:0.160</sys:TimeSpan>
   <Duration x:Key="Motion.Panel">0:0:0.220</Duration>
+  <sys:TimeSpan x:Key="Beat.Panel">0:0:0.220</sys:TimeSpan>
   <Duration x:Key="Motion.Afterglow">0:0:1.000</Duration>
+  <sys:TimeSpan x:Key="Beat.Afterglow">0:0:1.000</sys:TimeSpan>
 
   <!-- Смягчение: cubic-bezier(0.2, 0, 0, 1) для появления, cubic-bezier(0.4, 0, 1, 1) для затухания -->
   <CubicEase x:Key="Ease.In" EasingMode="EaseOut" />

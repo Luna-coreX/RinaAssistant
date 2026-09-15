@@ -36,8 +36,18 @@ internal static class Arrival
     {
         if (window.Content is not UIElement content) return;
 
+        // A rise and a breath of scale together. Opacity alone reads as a
+        // picture being turned up; opacity with a rise reads as arriving;
+        // the two hundredths of scale are what make it read as a thing
+        // with a size rather than an image. More than that and the text
+        // inside is visibly resampled, which reads as cheap.
         var rise = new TranslateTransform();
-        content.RenderTransform = rise;
+        var grow = new ScaleTransform(0.98, 0.98);
+        content.RenderTransformOrigin = new Point(0.5, 0.35);
+        var both = new TransformGroup();
+        both.Children.Add(grow);
+        both.Children.Add(rise);
+        content.RenderTransform = both;
         content.Opacity = 0;
         content.IsHitTestVisible = false;
 
@@ -55,6 +65,14 @@ internal static class Arrival
                 new DoubleAnimation
                 {
                     From = from, To = 0, Duration = span,
+                    EasingFunction = ease,
+                });
+
+            foreach (var which in new[] { ScaleTransform.ScaleXProperty,
+                                          ScaleTransform.ScaleYProperty })
+                grow.BeginAnimation(which, new DoubleAnimation
+                {
+                    From = 0.98, To = 1, Duration = span,
                     EasingFunction = ease,
                 });
 

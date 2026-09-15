@@ -738,14 +738,38 @@
                 <Border.RenderTransform>
                   <TranslateTransform x:Name="Shift" X="0" />
                 </Border.RenderTransform>
+                <!-- The bright face of the knob, as a layer of its own and
+                     for the same reason as the track's: a shared brush is
+                     frozen and its colour cannot be animated. It used to
+                     be a setter, which meant the knob changed colour in
+                     the same instant it started moving — the two halves
+                     of one action happening at once, which reads as
+                     neither. -->
+                <Border x:Name="KnobOn" Opacity="0"
+                        CornerRadius="{StaticResource Radius.Tight}"
+                        Background="{DynamicResource C.FaceHigh}" />
               </Border>
             </Grid>
             <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
           </StackPanel>
           <ControlTemplate.Triggers>
+            <!--
+              **Two stages inside one state change** (`4.0b-E04`). The
+              knob sets off, and the circuit closes behind it: the track
+              lights and the knob's face brightens a fraction later, over
+              a shorter span, so both finish together at the system's 160
+              ms. Before this all three ran on the same clock with the
+              same curve, which is one flat change wearing three
+              costumes — the switch said "now it is on" and nothing about
+              the act of switching.
+
+              Two presses, one after the other, rather than a new
+              duration: the throw is `press`, and the circuit closes over
+              another `press` once the knob has landed. A switch whose
+              contact is made before the lever arrives is a switch drawn
+              by somebody who has not held one.
+            -->
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Knob" Property="Background"
-                      Value="{DynamicResource C.FaceHigh}" />
               <Trigger.EnterActions>
                 <BeginStoryboard>
                   <Storyboard>
@@ -754,12 +778,19 @@
                     <DoubleAnimation Storyboard.TargetName="Shift"
                                      Storyboard.TargetProperty="X"
                                      To="18"
-                                     Duration="{StaticResource Motion.State}"
+                                     Duration="{StaticResource Motion.Press}"
                                      EasingFunction="{StaticResource Ease.In}" />
                     <DoubleAnimation Storyboard.TargetName="On"
                                      Storyboard.TargetProperty="Opacity"
                                      To="1"
-                                     Duration="{StaticResource Motion.State}"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                    <DoubleAnimation Storyboard.TargetName="KnobOn"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
                                      EasingFunction="{StaticResource Ease.In}" />
                   </Storyboard>
                 </BeginStoryboard>
@@ -767,15 +798,25 @@
               <Trigger.ExitActions>
                 <BeginStoryboard>
                   <Storyboard>
-                    <DoubleAnimation Storyboard.TargetName="Shift"
-                                     Storyboard.TargetProperty="X"
-                                     To="0"
-                                     Duration="{StaticResource Motion.State}"
-                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <!-- Going back, the circuit opens first and the knob
+                         follows: an order reversed, not repeated. A
+                         switch that turns off the same way it turned on
+                         is a picture of a switch. -->
                     <DoubleAnimation Storyboard.TargetName="On"
                                      Storyboard.TargetProperty="Opacity"
                                      To="0"
-                                     Duration="{StaticResource Motion.State}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <DoubleAnimation Storyboard.TargetName="KnobOn"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <DoubleAnimation Storyboard.TargetName="Shift"
+                                     Storyboard.TargetProperty="X"
+                                     To="0"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
                                      EasingFunction="{StaticResource Ease.Out}" />
                   </Storyboard>
                 </BeginStoryboard>

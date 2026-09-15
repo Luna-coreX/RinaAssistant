@@ -378,14 +378,26 @@ public partial class MainWindow : Window
         var ease = (System.Windows.Media.Animation.IEasingFunction)
             FindResource("Ease.In");
 
-        Pane.BeginAnimation(OpacityProperty,
-            new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = 0,
-                To = 1,
-                Duration = span,
-                EasingFunction = ease,
-            });
+        // The section arrives in parts, not as a plate (`4.0b-E04`). When
+        // it has parts they do the fading and the panel does not: two
+        // fades over one another give a soft grey smear instead of an
+        // arrival, and the second one is invisible anyway.
+        if (Arrive(Pane.Content as UIElement))
+        {
+            Pane.BeginAnimation(OpacityProperty, null);
+            Pane.Opacity = 1;
+        }
+        else
+        {
+            Pane.BeginAnimation(OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 0,
+                    To = 1,
+                    Duration = span,
+                    EasingFunction = ease,
+                });
+        }
 
         // Opacity alone is not enough for the transition to **read**. The
         // system's curve (`0.2, 0, 0, 1`) starts sharply: by a third of the
@@ -490,6 +502,115 @@ public partial class MainWindow : Window
     /// <summary>Which flow the bar is glass over — for the check.</summary>
     public bool BarOnCalm => ReferenceEquals(BarGlass.Source,
                                              BackdropCalm.Source);
+
+    //: The parts of the section that arrived last — for the check.
+    private IReadOnlyList<UIElement> _arrived = [];
+
+    /// <summary>How far each part of the section has arrived — for the check.</summary>
+    public IReadOnlyList<double> PartsArriving
+        => _arrived.Select(part => part.Opacity).ToList();
+
+    /// <summary>
+    /// The section's parts arrive one after another (<c>4.0b-E04</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A section used to arrive as one plate: the whole panel faded and
+    /// rose together. That says "something appeared" and nothing else. A
+    /// screen has parts — a title, a list, the row of buttons under it —
+    /// and they are what a person looks for. Arriving in that order, they
+    /// say what the screen is made of while it is being made.
+    /// </para>
+    /// <para>
+    /// The step is small and the count is capped, so the whole arrival
+    /// still fits inside the section change it belongs to: five steps of
+    /// twenty-four milliseconds and a state's worth of fade at the end is
+    /// two hundred and eighty, against the panel's two hundred and
+    /// twenty. A stagger that outlasts the transition stops being a
+    /// transition and becomes a loading screen.
+    /// </para>
+    /// <para>
+    /// Only where a page really has parts. A page whose root holds one
+    /// thing is left to the panel's own arrival — inventing divisions in
+    /// it would be movement that reports a structure the page does not
+    /// have.
+    /// </para>
+    /// </remarks>
+    private bool Arrive(UIElement? page)
+    {
+        var parts = Parts(page);
+        _arrived = parts;
+        if (parts.Count < 2) return false;
+
+        var span = (Duration)FindResource("Motion.State");
+        var ease = (System.Windows.Media.Animation.IEasingFunction)
+            FindResource("Ease.In");
+        // A duration in the dictionary, like every other span: the step
+        // between parts is a length of time, and keeping it as a bare
+        // number here would be a second way of saying what `tokens.json`
+        // already says.
+        var step = (Duration)FindResource("Motion.Stagger");
+
+        for (var at = 0; at < parts.Count; at++)
+        {
+            // Capped rather than spread: on a page of ten rows the last
+            // one would arrive a quarter of a second after the first, and
+            // by then a person has already read the top of the screen.
+            var wait = TimeSpan.FromTicks(
+                step.TimeSpan.Ticks * Math.Min(at, 5));
+            parts[at].BeginAnimation(OpacityProperty,
+                new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 0, To = 1, Duration = span,
+                    BeginTime = wait, EasingFunction = ease,
+                    FillBehavior = System.Windows.Media.Animation
+                        .FillBehavior.Stop,
+                });
+
+            var lift = parts[at].RenderTransform
+                as System.Windows.Media.TranslateTransform;
+            if (lift is null)
+            {
+                lift = new System.Windows.Media.TranslateTransform();
+                parts[at].RenderTransform = lift;
+            }
+            lift.BeginAnimation(
+                System.Windows.Media.TranslateTransform.YProperty,
+                new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 8, To = 0, Duration = span,
+                    BeginTime = wait, EasingFunction = ease,
+                    FillBehavior = System.Windows.Media.Animation
+                        .FillBehavior.Stop,
+                });
+        }
+        return true;
+    }
+
+    /// <summary>The first place where a page really has more than one thing.</summary>
+    private static IReadOnlyList<UIElement> Parts(UIElement? page)
+    {
+        var at = page;
+        for (var deep = 0; deep < 4 && at is not null; deep++)
+        {
+            if (at is Panel holder)
+            {
+                var seen = holder.Children.OfType<UIElement>()
+                    .Where(child => child.Visibility == Visibility.Visible)
+                    .ToList();
+                if (seen.Count >= 2) return seen;
+                at = seen.FirstOrDefault();
+                continue;
+            }
+            at = at switch
+            {
+                ContentControl one => one.Content as UIElement,
+                Border edge => edge.Child,
+                _ => null,
+            };
+        }
+        return [];
+    }
 
     /// <summary>Freeze the background on a picture the check drew — for the check.</summary>
     public void PaintBackdropForCheck(

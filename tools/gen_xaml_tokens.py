@@ -269,6 +269,14 @@ def common_xaml(tokens: dict) -> str:
             continue
         lines.append(f'  <Duration x:Key="Motion.{key(name)}">'
                      f'0:0:{value / 1000:.3f}</Duration>')
+        # And the same span as a plain interval. `BeginTime` wants a
+        # `TimeSpan`, not a `Duration`, and the two are different types in
+        # WPF: a storyboard that waits a beat before starting cannot use
+        # the duration key next to it. Written by the generator rather
+        # than typed into the style, or the beat would be a number in one
+        # place and a token in the other.
+        lines.append(f'  <sys:TimeSpan x:Key="Beat.{key(name)}">'
+                     f'0:0:{value / 1000:.3f}</sys:TimeSpan>')
 
     # The easings are a token too, not a number typed into every style. WPF
     # cannot do cubic-bezier, so the curves from the tokens are expressed by

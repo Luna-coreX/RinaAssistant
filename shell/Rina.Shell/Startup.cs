@@ -3460,8 +3460,19 @@ public partial class App
         var shown = arriving?.Opacity ?? 1;
         Check("на середине появления окно ещё проявляется",
               shown is > 0.01 and < 0.95, $"| прозрачность {shown:0.00}");
-        var lifted = (arriving?.RenderTransform
-                      as System.Windows.Media.TranslateTransform)?.Y ?? 0;
+        // The transform is a group now — a rise and a breath of scale
+        // together — so the offset is looked for inside it rather than
+        // assumed to be the whole of it.
+        static double Lifted(UIElement? what) => what?.RenderTransform switch
+        {
+            System.Windows.Media.TranslateTransform one => one.Y,
+            System.Windows.Media.TransformGroup many => many.Children
+                .OfType<System.Windows.Media.TranslateTransform>()
+                .Select(t => t.Y).FirstOrDefault(),
+            _ => 0,
+        };
+
+        var lifted = Lifted(arriving);
         Check("и ещё не доехало", lifted > 0.5, $"| осталось {lifted:0.00}");
 
         // The one that matters. An element at zero opacity is still
@@ -3474,12 +3485,71 @@ public partial class App
 
         await Task.Delay(400);
         Check("через 400 мс окно на месте",
-              (arriving?.Opacity ?? 0) > 0.99 && Math.Abs(
-                  (arriving?.RenderTransform
-                   as System.Windows.Media.TranslateTransform)?.Y ?? 1) < 0.01,
-              $"| прозрачность {arriving?.Opacity:0.00}");
+              (arriving?.Opacity ?? 0) > 0.99 && Math.Abs(Lifted(arriving)) < 0.01,
+              $"| прозрачность {arriving?.Opacity:0.00}, "
+              + $"смещение {Lifted(arriving):0.00}");
         Check("и слушает нажатия", arriving?.IsHitTestVisible == true);
         asking.Close();
+
+        Console.WriteLine();
+        Console.WriteLine("=== движение: переключатель в два приёма ===");
+        // Named by the person among the things that should move better.
+        // It did move — and all three parts of it moved on one clock with
+        // one curve, which is a single flat change wearing three
+        // costumes. A switch has an order to it: the knob is thrown, and
+        // the circuit closes after it lands.
+        var bench = new Window
+        {
+            Width = 200, Height = 80, Left = -4000, Top = -4000,
+            WindowStyle = WindowStyle.None, ShowInTaskbar = false,
+        };
+        var flip = new System.Windows.Controls.CheckBox
+        {
+            Style = (Style)Application.Current.FindResource("Toggle"),
+            Content = "проба",
+        };
+        bench.Content = flip;
+        bench.Show();
+        flip.ApplyTemplate();
+        await Task.Delay(200);
+
+        double Knob() => ((System.Windows.Media.TranslateTransform)
+            flip.Template.FindName("Shift", flip)).X;
+        double Circuit() => ((FrameworkElement)
+            flip.Template.FindName("On", flip)).Opacity;
+
+        Check("в покое клавиша слева и цепь разомкнута",
+              Math.Abs(Knob()) < 0.01 && Circuit() < 0.01,
+              $"| клавиша {Knob():0.0}, цепь {Circuit():0.00}");
+
+        flip.IsChecked = true;
+        await Task.Delay(55);
+        var thrownAt = Knob();
+        var closedAt = Circuit();
+        Check("клавиша пошла первой", thrownAt > 0.5,
+              $"| прошла {thrownAt:0.0} из 18");
+        Check("а цепь ещё не замкнулась", closedAt < 0.01,
+              $"| {closedAt:0.00} — иначе это одно движение, а не два");
+
+        await Task.Delay(300);
+        Check("в конце клавиша дошла и цепь замкнута",
+              Math.Abs(Knob() - 18) < 0.01 && Circuit() > 0.99,
+              $"| клавиша {Knob():0.0}, цепь {Circuit():0.00}");
+
+        // And back the other way round: the circuit opens, then the knob
+        // returns. A switch that goes off the way it went on is a picture
+        // of a switch.
+        flip.IsChecked = false;
+        await Task.Delay(55);
+        Check("обратно первой размыкается цепь", Circuit() < 0.99,
+              $"| {Circuit():0.00}");
+        Check("а клавиша ещё на месте", Knob() > 17.5,
+              $"| {Knob():0.0} из 18");
+
+        await Task.Delay(300);
+        Check("и вернулась", Math.Abs(Knob()) < 0.01 && Circuit() < 0.01,
+              $"| клавиша {Knob():0.0}, цепь {Circuit():0.00}");
+        bench.Close();
 
         Console.WriteLine();
         Console.WriteLine("=== движение: отметка раздела вырастает ===");
@@ -3525,11 +3595,25 @@ public partial class App
         // value, and an instant read would show one even with a working
         // animation — the check would lie in both directions.
         await Task.Delay(80);
-        var midway = window.PaneOpacity;
         var rise = window.PaneRise;
-        Check("на середине перехода панель ещё проявляется",
-              midway is > 0.01 and < 0.95,
-              $"| прозрачность {midway:0.00}");
+
+        // **By parts, not as a plate** (`4.0b-E04`). The panel itself no
+        // longer fades — its parts do, one behind another — so what is
+        // asked is not "is something fading" but "are they at different
+        // stages". A single block fading answers the first and fails the
+        // second, which is the whole difference between the two.
+        string Shown(IReadOnlyList<double> parts)
+            => string.Join(", ", parts.Select(o => o.ToString("0.00")));
+
+        var coming = window.PartsArriving;
+        Check("у раздела есть части", coming.Count >= 2,
+              $"| {coming.Count}");
+        Check("на середине перехода они ещё прибывают",
+              coming.Any(o => o is > 0.01 and < 0.99),
+              $"| {Shown(coming)}");
+        Check("и прибывают по очереди, а не разом",
+              coming.Count >= 2 && coming[0] - coming[^1] > 0.05,
+              $"| {Shown(coming)}");
         Check("и ещё не доехала", rise > 0.05, $"| осталось {rise:0.00} точек");
 
         // Depth settles together with the rise (4.0b-A06). Halfway through
@@ -3553,24 +3637,25 @@ public partial class App
               $"| плотность {window.PaneShadow:0.00}");
 
         // The second transition is a separate check, and not for
-        // completeness. The animation finishes with `HoldEnd`, that is, it
-        // goes on holding one after the end. Without an explicit `From` the
-        // next one would start from the held value and there would be no
-        // dip: the first transition after startup is visible, every later
-        // one is not.
+        // completeness. An animation that finishes with `HoldEnd` goes on
+        // holding one after the end; without an explicit `From` the next
+        // one would start from the held value and there would be no dip —
+        // the first transition after startup visible, every later one not.
+        // The parts fade with `FillBehavior.Stop`, which returns them to
+        // their base value, and this is the question that says so.
         window.ShowSectionFor("reminders");
         await Task.Delay(80);
-        var second = window.PaneOpacity;
-        Check("второй переход тоже проявляется",
-              second is > 0.01 and < 0.95,
-              $"| прозрачность {second:0.00}");
+        var second = window.PartsArriving;
+        Check("второй переход тоже собирается по частям",
+              second.Count >= 2 && second[0] - second[^1] > 0.05,
+              $"| {Shown(second)}");
 
         await Task.Delay(400);
         window.ShowSectionFor("settings");
         await Task.Delay(80);
-        var third = window.PaneOpacity;
-        Check("и третий", third is > 0.01 and < 0.95,
-              $"| прозрачность {third:0.00}");
+        var third = window.PartsArriving;
+        Check("и третий", third.Count >= 2 && third[0] - third[^1] > 0.05,
+              $"| {Shown(third)}");
 
         // --- the living background, and above all its stopping ---
         //
