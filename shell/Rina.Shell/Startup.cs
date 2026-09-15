@@ -147,6 +147,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-listen"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckListenAsync(), "listen");
+            return;
+        }
+
         if (args.Contains("--check-glass"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -2965,6 +2972,130 @@ public partial class App
             }
         }
         return page;
+    }
+
+    /// <summary>
+    /// "Always listening" survives a restart, all the way to the microphone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported by a person: the switch comes back on after a restart and
+    /// nothing listens. The core half is checked in
+    /// <c>test_service.py</c> — that the announcement is made, and made
+    /// after the reply. This is the other half, and it is the half that
+    /// broke: the shell subscribed to events only once the handshake had
+    /// returned, so the announcement fell into the gap and the microphone
+    /// stayed shut. Each side was right on its own; nothing asked about
+    /// the join.
+    /// </para>
+    /// <para>
+    /// <b>The mode is switched on the way a person switches it</b> — over
+    /// the wire, by the core — and then the core is restarted into the
+    /// same profile. Writing the file here would be quicker and would
+    /// check something else: the shell does not know where the settings
+    /// live and must not (ADR 0006), and a check that knows is a check
+    /// that has already crossed the line it is meant to watch.
+    /// </para>
+    /// <para>
+    /// With a profile of its own, thrown away after. The setting lives in
+    /// the person\'s store, and a check that reads the developer\'s answers
+    /// a question about that machine — which is how three other checks in
+    /// this file came to be green for the wrong reason.
+    /// </para>
+    /// </remarks>
+    private async Task CheckListenAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== «всегда слушать» после перезапуска ===");
+
+        var real = CoreLink.FindCore();
+        var sandboxed = Path.Combine(real.WorkingDirectory, "tools",
+                                     "_core_sandboxed.py");
+
+        async Task<CoreLink> RaiseAsync()
+        {
+            var link = new CoreLink(new MainWindow(),
+                new Rina.Protocol.CoreLaunch(real.Python, sandboxed,
+                                             real.WorkingDirectory));
+            await link.StartAsync();
+            for (var i = 0; i < 400
+                 && link.State != Rina.Protocol.CoreState.Ready; i++)
+                await Task.Delay(100);
+            return link;
+        }
+
+        // Waited on the **start**, not on the state. The event sets the
+        // state and the sound link is built by a later turn of the
+        // window's queue: a check that stopped at the state read the
+        // counter one turn too early and went red at a working program
+        // four times out of five. A wait that ends before the thing it
+        // waits for has happened measures the scheduler.
+        async Task SettleAsync(CoreLink link)
+        {
+            for (var i = 0; i < 60 && link.CaptureStarts == 0; i++)
+                await Task.Delay(100);
+        }
+
+        var home = Path.Combine(Path.GetTempPath(),
+                                "rina-listen-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(home);
+        Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", home);
+        try
+        {
+            var first = await RaiseAsync();
+            Check("ядро поднялось", first.State == Rina.Protocol.CoreState.Ready,
+                  $"| {first.State}");
+            await SettleAsync(first);
+            Check("до включения микрофон молчит",
+                  !first.Capturing && first.CaptureStarts == 0,
+                  $"| запусков {first.CaptureStarts}");
+
+            var told = false;
+            if (first.Connection is { Ready: true } connection)
+            {
+                var answer = await connection.CallAsync(
+                    Rina.Protocol.Methods.SpeechSetAlwaysListen,
+                    new JsonObject { ["enabled"] = true },
+                    TimeSpan.FromSeconds(10));
+                told = !answer.IsError
+                       && answer.Payload["enabled"]?.GetValue<bool>() == true;
+            }
+            Check("режим включён — как его включает человек", told);
+            await first.DisposeAsync();
+
+            // The restart. The same folder, a new core, and nobody
+            // pressing anything.
+            var again = await RaiseAsync();
+            Check("ядро поднялось после перезапуска",
+                  again.State == Rina.Protocol.CoreState.Ready,
+                  $"| {again.State}");
+            await SettleAsync(again);
+            Check("микрофон открылся, хотя никто не просил",
+                  again.Capturing && again.CaptureStarts > 0,
+                  $"| запусков {again.CaptureStarts}");
+            await again.DisposeAsync();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", null);
+            try { Directory.Delete(home, recursive: true); }
+            catch { /* уйдёт со временным каталогом */ }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
     }
 
     /// <summary>
