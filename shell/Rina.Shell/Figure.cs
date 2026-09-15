@@ -91,6 +91,8 @@ public sealed class Figure
     private double _hue;
     private double _loud;
     private double _shown;
+    private double _gloss = 70;
+    private double _lamp = 0.42;
 
     public Figure(Image view)
     {
@@ -106,6 +108,17 @@ public sealed class Figure
 
     /// <summary>How loud it is — a voice heard, or her own. From 0 to 1.</summary>
     public double Loud => _loud;
+
+    /// <summary>The cheapest frame the figure has painted, in milliseconds.</summary>
+    /// <remarks>
+    /// The figure is the most expensive thing on the home screen, and
+    /// until now nothing watched it. The cheapest rather than the last:
+    /// a single frame can be interrupted by anything at all, and what is
+    /// being asked is what the work costs, not what the machine was doing
+    /// at the time. The same measure and the same reasoning as the
+    /// background's.
+    /// </remarks>
+    public double BestFrameMs { get; private set; }
 
     /// <summary>How far the sphere has swelled beyond its resting size.</summary>
     /// <remarks>
@@ -150,14 +163,31 @@ public sealed class Figure
         //               what it has to show is effort;
         //   talking   — pulses with her own voice, which is the only thing
         //               here that has a rhythm of its own.
-        var (spin, swell, twist, churn, burst) = State switch
+        //
+        // **And how hard the light sits on it** (`4.0b-E05`). The
+        // highlight is the one thing on a round body that says outright
+        // how hard its surface is, and a state is a hardness as much as a
+        // pace: waiting is soft, effort is tight and glassy, a voice
+        // flickers with what is being said.
+        //
+        // **And where the light sits on it** (`4.0b-E05`). The last
+        // number is how far towards the eye the lamp stands: at nothing
+        // it grazes the body from the side and the highlight lies out by
+        // the rim; nearer one it comes round to the front and the
+        // highlight walks in towards the middle. That walk is what makes
+        // a change of state read as the body turning rather than as the
+        // picture being swapped — waiting looks away, hearing turns
+        // towards you, effort is lit from the side because a long shadow
+        // is what effort looks like.
+        var (spin, swell, twist, churn, burst, gloss, lamp) = State switch
         {
             Doing.Listening => (0.5, 0.09 + _loud * 0.20, 1.1, 1.3,
-                                _loud * 0.30),
-            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16),
+                                _loud * 0.30, 95.0, 0.74),
+            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16, 240.0, 0.26),
             Doing.Talking => (0.9, 0.05 + _loud * 0.16, 1.4, 1.6,
-                              0.10 + _loud * 0.55),
-            _ => (0.35, 0.0, 0.9, 0.8, 0.0),
+                              0.10 + _loud * 0.55, 70.0 + _loud * 120.0,
+                              0.48 + _loud * 0.22),
+            _ => (0.35, 0.0, 0.9, 0.8, 0.0, 70.0, 0.42),
         };
 
         // **Everything is followed, not assigned.** The first edition eased
@@ -171,25 +201,82 @@ public sealed class Figure
         _twist = Follow(_twist, twist, 0.06);
         _churn = Follow(_churn, churn, 0.06);
         _burst = Follow(_burst, burst, burst > _burst ? 0.22 : 0.06);
+        _gloss = Follow(_gloss, gloss, 0.06);
+        _lamp = Follow(_lamp, lamp, 0.06);
 
         _turn += step * _spin;
         _breath += step * (State is Doing.Idle ? 0.5 : 1.2);
         _churned += step * _churn;
 
         Swell = _shown + Math.Sin(_breath * 2 * Math.PI) * 0.028;
-        Paint((float)_churned, (float)_turn, (float)_twist, (float)_burst);
+
+        var began = System.Diagnostics.Stopwatch.GetTimestamp();
+        Paint((float)_churned, (float)_turn, (float)_twist, (float)_burst,
+              (float)_gloss, (float)_lamp);
+        var spent = (System.Diagnostics.Stopwatch.GetTimestamp() - began)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        BestFrameMs = BestFrameMs is 0 ? spent : Math.Min(BestFrameMs, spent);
     }
 
     /// <summary>One value moving towards another. Nothing here jumps.</summary>
     private static double Follow(double have, double want, double pace) =>
         have + (want - have) * pace;
 
-    private void Paint(float z, float turn, float twist, float burst)
+    /// <summary>
+    /// One frame of the sphere (<c>4.0b-E05</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The pattern lives on the ball, not on the disc.</b> This is the
+    /// whole of the second edition. The flow used to be sampled by the
+    /// angle and the distance from the middle — a flat mapping, which
+    /// carries no depth however it is shaded: the bands ran across the rim
+    /// at the same size they had in the centre, and a texture that does not
+    /// foreshorten reads as painted on glass in front of a ball. Now the
+    /// sample point is the surface normal itself, turned about the
+    /// vertical. Near the rim the normal barely moves as the eye travels,
+    /// so the pattern crowds together there by itself — which is what
+    /// makes a sphere look like one.
+    /// </para>
+    /// <para>
+    /// <b>The light is fixed and the surface turns under it.</b> The
+    /// highlight and the shadowed side therefore stay where they are while
+    /// the pattern travels through them, and that is the difference
+    /// between a rotating body and a rotating picture.
+    /// </para>
+    /// <para>
+    /// Three terms of light, and each says something different: the
+    /// diffuse says which way the surface faces, the specular says how
+    /// hard it is, the rim says where it ends. The dark core is left
+    /// almost black — a film is a film because what is under it is not.
+    /// </para>
+    /// </remarks>
+    private void Paint(float z, float turn, float twist, float burst,
+                       float gloss, float lamp)
     {
         var pixels = _pixels;
         var half = Side / 2f;
         var radius = half * (float)(0.86 + Swell);
         var hue = (float)_hue;
+
+        // Upper left, and as far towards the eye as the state asks. One
+        // light: a body lit from everywhere is a ring. It does not follow
+        // the surface — that would be a headlamp, and a headlamp shows
+        // nothing about shape — it only comes round from the side to the
+        // front and back as the state changes, and slowly.
+        var depth = Math.Clamp(lamp, 0.05f, 0.95f);
+        var across = MathF.Sqrt(1f - depth * depth);
+        var lightX = -0.68f * across;
+        var lightY = -0.73f * across;
+        var lightZ = depth;
+
+        // The half vector for a viewer straight ahead: the eye is at
+        // (0, 0, 1), so it is the light plus that, over its own length.
+        var halfLen = MathF.Sqrt(lightX * lightX + lightY * lightY
+                                 + (lightZ + 1f) * (lightZ + 1f));
+        var hx = lightX / halfLen;
+        var hy = lightY / halfLen;
+        var hz = (lightZ + 1f) / halfLen;
 
         Parallel.For(0, Side, y =>
         {
@@ -220,57 +307,77 @@ public sealed class Figure
                     continue;
                 }
 
-                // The sphere's normal, and with it the grazing angle. This
-                // is the whole difference between a ball and a coin: `face`
-                // is one looking straight at you and nothing at the rim.
+                // The normal: a ball, not a coin. `face` is the part of it
+                // pointing at the eye — one in the middle, nothing at the
+                // rim — and the two across are what is left.
                 var inside = MathF.Min(far, 1f);
                 var face = MathF.Sqrt(MathF.Max(0f, 1f - inside * inside));
                 var graze = 1f - face;
+                var nx = dx / (radius * (1f + scatter));
+                var ny = dy / (radius * (1f + scatter));
+                if (inside >= 1f)
+                {
+                    var back = 1f / MathF.Max(inside, 0.0001f);
+                    nx *= back;
+                    ny *= back;
+                }
 
-                // The vortex. The angle is twisted by an amount that grows
-                // towards the middle, so what would have been rings becomes
-                // a spiral being drawn in.
-                var angle = MathF.Atan2(dy, dx) + turn + twist / (inside + 0.35f);
-                var reach = inside * 2.1f;
-                var u = MathF.Cos(angle) * reach;
-                var v = MathF.Sin(angle) * reach;
+                // The surface point, wound about the axis that points at
+                // you: the nearer the middle, the further it has been
+                // turned, so the bands spiral inward instead of lying in
+                // rings. Sampled in three dimensions, which is what makes
+                // the pattern crowd towards the rim on its own.
+                var wind = turn + twist * face;
+                var cw = MathF.Cos(wind);
+                var sw = MathF.Sin(wind);
+                var sx = nx * cw - ny * sw;
+                var sy = nx * sw + ny * cw;
 
-                var qx = Flow.Fbm(u, v, z);
-                var qy = Flow.Fbm(u + 5.2f, v + 1.3f, z);
-                var field = Flow.Fbm(u + qx, v + qy, z);
+                const float grain = 2.3f;
+                var qx = Flow.Fbm(sx * grain, sy * grain, face * grain + z);
+                var field = Flow.Fbm(sx * grain + qx, sy * grain,
+                                     face * grain + z);
 
                 // Thin-film colour. The hue runs mostly with the flow and
                 // only a little with the grazing angle — that order matters
                 // and the first attempt had it the other way round, which
                 // gave concentric rings of rainbow: a hue driven by the
                 // radius can only make rings, because the radius is a
-                // circle. Driven by the flow, it follows the vortex, and
-                // the bands wind.
-                var shade = hue + field * 1.05f + graze * 0.46f
-                            + inside * 0.28f + z * 0.02f;
+                // circle.
+                var shade = hue + field * 1.05f + graze * 0.46f + z * 0.02f;
 
-                // **The sphere is dark, and the colour lives in arcs.** Only
-                // the crests of the flow light up, and only inside a band
-                // near the rim where a real film is brightest. The first
-                // attempt lit the whole disc and came out a rainbow
-                // doughnut — bright everywhere is the same as nowhere.
+                // Three terms of light over a nearly black core.
+                var diffuse = MathF.Max(0f, nx * lightX + ny * lightY
+                                            + face * lightZ);
+                var spec = MathF.Pow(
+                    MathF.Max(0f, nx * hx + ny * hy + face * hz), gloss);
+                var rim = graze * graze * graze;
+
+                // Only the crests of the flow light up, and only where the
+                // light falls on them: bright everywhere is the same as
+                // nowhere, and a film lit on its dark side is a sticker.
                 var wave = field * 0.5f + 0.5f;
                 var crest = Math.Clamp((wave - 0.42f) / 0.34f, 0f, 1f);
                 crest *= crest * (3f - 2f * crest);
+                var band = MathF.Exp(-(inside - 0.72f) * (inside - 0.72f) * 6f);
 
-                var band = MathF.Exp(-(inside - 0.74f) * (inside - 0.74f) * 7f);
+                var lit = 0.02f
+                          + crest * band * (0.18f + 0.92f * diffuse) * 1.05f
+                          // A faint glow of the body itself where the
+                          // light falls, crest or no crest. Without it
+                          // the shape is legible only where the flow
+                          // happens to be bright, and the ball reads as
+                          // patches rather than as a thing with a near
+                          // side and a far one.
+                          + diffuse * diffuse * 0.13f
+                          + rim * 0.26f
+                          + spec * 0.32f;
 
-                // Light from one side, so the colour gathers into a
-                // crescent instead of ringing the sphere evenly. A film lit
-                // from everywhere is a ring; a film lit from somewhere is a
-                // sphere, and the difference is the only thing separating
-                // this from a doughnut.
-                var side = (dx * 0.72f - dy * 0.69f) / radius;
-                var lamp = 0.34f + 0.66f * Math.Clamp(side * 0.5f + 0.5f, 0f, 1f);
-
-                var lit = 0.03f + crest * band * lamp * 1.05f
-                          + graze * graze * 0.12f;
-                var sat = 0.54f + 0.32f * crest;
+                // The highlight washes towards white, the way a highlight
+                // does: colour is a property of the film, and the spot is
+                // the light itself.
+                var sat = Math.Clamp(0.60f + 0.28f * crest - spec * 0.30f,
+                                     0f, 1f);
 
                 var (red, green, blue) = FromHue(shade, sat,
                                                  Math.Clamp(lit, 0f, 1f));

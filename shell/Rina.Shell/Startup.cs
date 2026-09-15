@@ -147,6 +147,18 @@ public partial class App
             return;
         }
 
+        // The figure in each of its four states, for the eye. What the
+        // states look like is the one thing about them a number cannot
+        // settle, and they cannot be caught in an ordinary screenshot:
+        // only one of them is on at a time and it lasts as long as she is
+        // doing that thing.
+        if (Value(args, "--shot-figure") is { } faces)
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(ShotFigureAsync(window, faces), "figure");
+            return;
+        }
+
         // A strip of frames through one section change, for the eye.
         // "Jerky" is a judgement, and a judgement needs something to look
         // at: numbers say when a thing moved, not whether it looked like
@@ -2811,6 +2823,68 @@ public partial class App
                 seen.Add((doing, home.Swell));
             }
 
+            // --- it is a body, not a disc (`4.0b-E05`) ---------------
+            //
+            // Asked of the painted figure rather than of the code that
+            // paints it. "It has volume" is otherwise a matter of
+            // opinion, and the first edition of this figure was a flat
+            // dark circle with a few coloured wisps at its edge — which
+            // every line of its own source described as a sphere.
+            //
+            // One light, fixed, from the upper left. So the half of the
+            // ball facing it is lit and the other half falls away, and
+            // the difference between those two halves is the whole of
+            // what "round" means to an eye. A disc lit evenly has none.
+            if (home.Face.Source is System.Windows.Media.Imaging
+                    .WriteableBitmap film)
+            {
+                var wide = film.PixelWidth;
+                var tall = film.PixelHeight;
+                var paint = new byte[wide * tall * 4];
+                film.CopyPixels(paint, wide * 4, 0);
+
+                double Quadrant(int towards)
+                {
+                    double sum = 0, seen = 0;
+                    for (var y = 0; y < tall; y++)
+                        for (var x = 0; x < wide; x++)
+                        {
+                            var at = (y * wide + x) * 4;
+                            if (paint[at + 3] < 200) continue;
+                            var dx = x - wide / 2.0;
+                            var dy = y - tall / 2.0;
+                            // The middle is left out: the two halves are
+                            // told apart at the sides, and a body's
+                            // middle belongs to neither.
+                            if (dx * dx + dy * dy < (wide * 0.22) * (wide * 0.22))
+                                continue;
+                            var side = -dx - dy;          // towards the light
+                            if (towards * side <= 0) continue;
+                            sum += (paint[at] + paint[at + 1] + paint[at + 2]) / 3.0;
+                            seen++;
+                        }
+                    return seen > 0 ? sum / seen : 0;
+                }
+
+                var toward = Quadrant(1);
+                var away = Quadrant(-1);
+                Check("фигура — тело: сторона к свету светлее дальней",
+                      toward > away * 1.35,
+                      $"| к свету {toward:0.0}, от света {away:0.0}, "
+                      + $"отношение {(away > 0 ? toward / away : 0):0.00}");
+            }
+            else Check("картинка фигуры доступна", false);
+
+            // And what the volume costs. The figure is the most
+            // expensive thing on the home screen and nothing watched it;
+            // a third of a frame is the same share the background is
+            // held to, and the two of them run on the one clock.
+            var figureFrame = home.FigureFrameMs;
+            var figureBudget = 1000.0 / (double)Application.Current
+                .FindResource("Background.Fps") / 3;
+            Check("и стоит не дороже трети кадра", figureFrame <= figureBudget,
+                  $"| {figureFrame:0.0} мс, потолок {figureBudget:0.0}");
+
             Check("состояние читается вслух, хоть подписи и нет",
                   said.All(word => !string.IsNullOrWhiteSpace(word))
                   && said.Distinct().Count() == said.Count,
@@ -2998,6 +3072,50 @@ public partial class App
             }
         }
         return page;
+    }
+
+    /// <summary>The figure in each of its four states, one file each.</summary>
+    private async Task ShotFigureAsync(MainWindow window, string into)
+    {
+        window.Width = 940;
+        window.Height = 620;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        window.ShowSectionFor("home");
+        window.RunBackdropForShot();
+        await Task.Delay(900);
+
+        if (window.CurrentPage is not Pages.HomePage home)
+        {
+            Console.WriteLine("главной нет — снимать нечего");
+            Shutdown();
+            return;
+        }
+
+        var folder = Path.GetDirectoryName(Path.GetFullPath(into))!;
+        Directory.CreateDirectory(folder);
+        foreach (var doing in new[] { Doing.Idle, Doing.Listening,
+                                      Doing.Thinking, Doing.Talking })
+        {
+            home.ShowDoingFor(doing, doing is Doing.Idle ? 0 : 0.8);
+            // Long enough for everything that is followed to arrive: the
+            // light walks round the body at the same pace as the rest,
+            // and a shot taken early is a shot of the way there.
+            await Task.Delay(1800);
+
+            if (home.Face.Source is not System.Windows.Media.Imaging
+                    .WriteableBitmap film) continue;
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(film.Clone()));
+            var name = Path.Combine(
+                folder,
+                Path.GetFileNameWithoutExtension(into) + $"-{doing}.png");
+            using (var file = File.Create(name)) encoder.Save(file);
+            Console.WriteLine($"{doing}: {name}");
+        }
+        Shutdown();
     }
 
     /// <summary>Frames through one section change, side by side.</summary>

@@ -132,6 +132,9 @@ public partial class HomePage : UserControl
     /// <summary>How far the figure has swelled — for the check.</summary>
     public double Swell => _figure.Swell;
 
+    /// <summary>The figure's cheapest frame, in milliseconds — for the check.</summary>
+    public double FigureFrameMs => _figure.BestFrameMs;
+
     /// <summary>Say what is happening, without waiting for an event.</summary>
     /// <remarks>
     /// <para>
