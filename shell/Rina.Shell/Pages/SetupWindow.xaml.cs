@@ -52,7 +52,7 @@ public partial class SetupWindow : Window
             BuildWake, KeepWake));
         _steps.Add(new Step(
             S("Что доустановить"),
-            S("Распознавание работает по пакету и модели — их размер в установщик не помещается."),
+            S("И слух, и голос работают по пакету и модели — их размер в установщик не помещается."),
             BuildModels));
         _steps.Add(new Step(
             S("Готово"),
@@ -138,7 +138,35 @@ public partial class SetupWindow : Window
             return stack;
         }
 
-        foreach (var model in _models)
+        foreach (var purpose in new[] { "stt", "tts" })
+        {
+            var group = _models
+                .Where(m => (m["purpose"]?.GetValue<string>() ?? "stt")
+                            == purpose)
+                .ToArray();
+            if (group.Length == 0) continue;
+
+            // Headed, because the list has two halves and they answer
+            // different questions. Until the voice was added there was
+            // only one, and a flat list of five things with no telling
+            // which was which is what the second half would have made of
+            // it.
+            stack.Children.Add(new TextBlock
+            {
+                Text = purpose == "stt" ? S("Чтобы слышать")
+                                        : S("Чтобы говорить"),
+                Style = (Style)FindResource("Text.Section"),
+                Margin = new Thickness(0, stack.Children.Count == 0 ? 0 : 18,
+                                       0, 10),
+            });
+            BuildGroup(stack, group);
+        }
+        return stack;
+    }
+
+    private void BuildGroup(StackPanel stack, JsonObject[] group)
+    {
+        foreach (var model in group)
         {
             var id = model["id"]?.GetValue<string>() ?? "";
             var size = model["size"]?.GetValue<long>() ?? 0;
@@ -181,7 +209,6 @@ public partial class SetupWindow : Window
                     Margin = new Thickness(28, 0, 0, 14),
                 });
         }
-        return stack;
     }
 
     private FrameworkElement BuildDone()
@@ -196,6 +223,20 @@ public partial class SetupWindow : Window
             Style = (Style)FindResource("Text.Body"),
             TextWrapping = TextWrapping.Wrap,
         });
+
+        // Said here rather than found out later. On a second computer it
+        // turned out that nothing at all gives Rina a voice out of the
+        // box: the runtime carries what decodes sound and nothing that
+        // makes it. She heard, understood, answered in text, and a person
+        // spent an evening deciding the sound was broken.
+        if (!Speaks())
+            stack.Children.Add(new TextBlock
+            {
+                Text = S("Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках»."),
+                Style = (Style)FindResource("Text.Meta"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 0),
+            });
         stack.Children.Add(new TextBlock
         {
             Text = S("Ход скачивания виден в настройках, там же его можно остановить."),
@@ -224,6 +265,19 @@ public partial class SetupWindow : Window
         if (said.Length > 0)
             await _link.SetAsync("wake_words", new JsonArray(said));
     }
+
+    /// <summary>Will she have anything to speak with when this is done.</summary>
+    /// <remarks>
+    /// Counted from what is on the machine plus what was just ticked. A
+    /// package already installed is as good as one chosen, and the
+    /// question a person has is about the end state, not about this
+    /// evening's downloads.
+    /// </remarks>
+    public bool Speaks()
+        => _models.Any(m => (m["purpose"]?.GetValue<string>() ?? "stt") == "tts"
+                            && (m["installed"]?.GetValue<bool>() == true
+                                || _chosen.Contains(
+                                    m["id"]?.GetValue<string>() ?? "")));
 
     private Task KeepAll()
     {

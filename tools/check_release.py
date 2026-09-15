@@ -153,6 +153,24 @@ ready = heard.stdout.strip()
 check("распознавание в сборке доступно", bool(ready),
       f"| {ready or heard.stderr.strip()[:120] or 'ни одного движка'}")
 
+# And speech, which had no check at all and was missing for exactly as
+# long as it went unasked. The comment above says "a person meets that as
+# silence"; for synthesis that is not a figure of speech.
+#
+# `silent` does not count: it is the lawful choice of having no voice, and
+# counting it would make this question answer itself.
+spoke = subprocess.run(
+    [python, "-c",
+     "import sys; sys.path.insert(0, r'" + where + "');"
+     "from voice import tts;"
+     "print(','.join(e.id for e in tts.available_engines()"
+     " if e.id != 'silent'))"],
+    capture_output=True, text=True, encoding="utf-8", errors="replace",
+    env=child_env())
+speaks = spoke.stdout.strip()
+check("озвучка в сборке доступна", bool(speaks),
+      f"| {speaks or spoke.stderr.strip()[:160] or 'ни одного движка'}")
+
 print()
 print("=== в рантайм можно доставить пакет ===")
 

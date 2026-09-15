@@ -434,6 +434,11 @@ public static partial class Loc
                 {
                     ["English"] = "Voices depend on the chosen synthesis engine",
                 },
+            ["Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No voice yet: Rina will hear you and answer in text. You can fix that in Settings.",
+                },
             ["Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает."] =
                 new Dictionary<string, string>
                 {
@@ -762,6 +767,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "value",
+                },
+            ["И слух, и голос работают по пакету и модели — их размер в установщик не помещается."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Hearing and speaking each need a package and a model — too large to put in the installer.",
                 },
             ["Из архива"] =
                 new Dictionary<string, string>
@@ -1751,11 +1761,6 @@ public static partial class Loc
                 {
                     ["English"] = "Recognition",
                 },
-            ["Распознавание работает по пакету и модели — их размер в установщик не помещается."] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "Recognition needs a package and a model — too large to put in the installer.",
-                },
             ["Рина"] =
                 new Dictionary<string, string>
                 {
@@ -2360,6 +2365,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What is downloaded and where it lies",
+                },
+            ["Чтобы говорить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To speak",
+                },
+            ["Чтобы слышать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To hear",
                 },
             ["Чувствительность активации"] =
                 new Dictionary<string, string>

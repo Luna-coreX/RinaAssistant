@@ -268,10 +268,29 @@ about("T-19", "о том, что было открыто, не остаётся 
 from core import models
 
 # T-20 · the installation brings the wrong code.
+#
+# Written as an equality on purpose: the list of what Rina may install on
+# somebody's machine grows only deliberately, and a check that merely
+# counted them would let a name in quietly. When this goes red, the
+# question is not "update the check" but "was this package meant to be
+# here" — and then both lines change together.
 named_packages = {p.pip for p in models.PACKAGES}
 about("T-20", "устанавливаемое перечислено таблицей ядра",
-      named_packages == {"vosk", "faster-whisper"},
+      named_packages == {"vosk", "faster-whisper", "piper-tts", "edge-tts"},
       f"| {sorted(named_packages)}")
+
+# And each name is a name. `pip install` takes a URL, a path, a local
+# archive and options in the same argument it takes a package name in, so
+# "the list is in code" is only half the promise: an entry reading
+# `--index-url http://…` would be in the table and would still bring the
+# wrong code.
+import re as _re
+
+ILL_NAMED = [p.pip for p in models.PACKAGES
+             if not _re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?",
+                                  p.pip)]
+about("T-20", "и каждое имя — имя, а не ссылка, путь или ключ",
+      not ILL_NAMED, f"| {ILL_NAMED}")
 
 # That an identifier arriving from outside cannot become a package name is
 # checked end to end in its own file; the sweep says where, and insists the

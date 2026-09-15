@@ -24,6 +24,7 @@ There is no Qt here: the module lies in the core.
 """
 
 import os
+import shutil
 import sys
 import threading
 import urllib.request
@@ -39,19 +40,31 @@ log = get_logger("models")
 class Model:
     """One downloadable thing and what it is for."""
 
-    __slots__ = ("id", "title", "url", "size", "engine", "setting", "note",
-                 "wanted")
+    __slots__ = ("id", "title", "url", "files", "size", "engine", "setting",
+                 "note", "wanted", "purpose")
 
     def __init__(self, id, title, engine, size, url="", setting="", note="",
-                 wanted=False):
+                 wanted=False, purpose="stt", files=()):
         self.id = id
         self.title = title
-        #: Which engine setting this model belongs to (`stt_engine` value).
+        #: Hearing or speaking. Both are downloads and both were missing
+        #: from a fresh machine; only one of them was ever offered. Kept as
+        #: a field rather than guessed from the engine's name so that the
+        #: wizard can say "to hear" and "to speak" instead of listing five
+        #: things with no telling which is which.
+        self.purpose = purpose
+        #: Which engine setting this model belongs to (`stt_engine` or
+        #: `tts_engine` value).
         self.engine = engine
         #: Bytes. Real, and checked against the server when we fetch.
         self.size = size
         #: Empty means the engine fetches it itself on first use.
         self.url = url
+        #: Loose files instead of one archive, when that is what the model
+        #: is. Piper's voice is an `.onnx` and the `.onnx.json` beside it,
+        #: and packing them into a zip that does not exist was not an
+        #: option. The setting is pointed at the first of them.
+        self.files = tuple(files)
         #: The settings key that must point at the unpacked model, if any.
         self.setting = setting
         self.note = note
@@ -67,7 +80,7 @@ class Model:
     @property
     def ours(self) -> bool:
         """Do we fetch this one, or does the engine."""
-        return bool(self.url)
+        return bool(self.url or self.files)
 
 
 #: What can be had, and what it costs.
@@ -90,6 +103,25 @@ CATALOGUE = (
     Model("whisper-base", "Whisper: base", "whisper",
           size=145 * 1024 * 1024,
           note="Скачается сам при первом распознавании."),
+
+    # And a voice. There was none here at all, and that is how a fresh
+    # machine turned out: `faster-whisper` comes with the runtime, so Rina
+    # could hear out of the box and had no way whatever to answer aloud.
+    # Neither the package nor the model for any speaking engine was
+    # offered anywhere — found by a person installing on a second
+    # computer.
+    Model("piper-ru-irina", "Голос Piper: русский (Ирина)", "piper",
+          # Measured against the server, not remembered: 63 201 294 for
+          # the voice and 4 765 for the settings beside it.
+          size=63_206_059,
+          files=("https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+                 "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx",
+                 "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
+                 "ru/ru_RU/irina/medium/ru_RU-irina-medium.onnx.json"),
+          setting="piper_model",
+          purpose="tts",
+          note="Голос на этом компьютере, без интернета. "
+               "Нужен пакет Piper."),
 )
 
 
@@ -97,12 +129,14 @@ class Package:
     """A package the assistant can install for itself."""
 
     __slots__ = ("id", "title", "pip", "module", "engine", "size", "note",
-                 "wanted")
+                 "wanted", "purpose")
 
     def __init__(self, id, title, pip, module, engine, size, note="",
-                 wanted=False):
+                 wanted=False, purpose="stt"):
         self.id = id
         self.title = title
+        #: Hearing or speaking — see `Model.purpose`.
+        self.purpose = purpose
         #: What to hand to `pip`. **Taken from here and nowhere else.**
         self.pip = pip
         #: What to import to find out whether it is already there.
@@ -133,6 +167,24 @@ PACKAGES = (
             "faster_whisper", "whisper",
             size=60 * 1024 * 1024,
             note="Лёгкая сборка Whisper: те же модели, без torch."),
+
+    # Speaking. Neither of these was here, and without them Rina has no
+    # voice at all: the runtime carries `soundfile` and nothing that makes
+    # sound to decode.
+    Package("pkg-piper", "Пакет Piper", "piper-tts", "piper", "piper",
+            # The wheel and `onnxruntime` under it.
+            size=56 * 1024 * 1024,
+            purpose="tts",
+            note="Речь на этом компьютере. К нему нужен голос."),
+    # Not ticked in advance, and the reason is not its size. It speaks by
+    # sending the text to Microsoft, and a box ticked for somebody is a box
+    # they do not read: they would agree to that by not noticing it. The
+    # note says so where the choice is made.
+    Package("pkg-edge", "Пакет Edge (онлайн)", "edge-tts", "edge_tts",
+            "edge", size=4 * 1024 * 1024,
+            purpose="tts",
+            note="Голоса Microsoft. Текст реплики уходит к ним по сети; "
+                 "модель скачивать не нужно."),
 )
 
 
@@ -185,6 +237,7 @@ def catalogue(settings=None, running=None) -> list[dict]:
             "id": p.id,
             "kind": "package",
             "title": p.title,
+            "purpose": p.purpose,
             "engine": p.engine,
             "size": p.size,
             "note": p.note,
@@ -205,6 +258,7 @@ def catalogue(settings=None, running=None) -> list[dict]:
             "id": m.id,
             "kind": "model",
             "title": m.title,
+            "purpose": m.purpose,
             "engine": m.engine,
             "size": m.size,
             "note": m.note,
@@ -414,6 +468,10 @@ class Fetch:
             log.exception("Слушатель прогресса %s упал", self.model.id)
 
     def _run(self) -> None:
+        if self.model.files:
+            self._run_files()
+            return
+
         archive = os.path.join(models_dir(), self.model.id + ".part")
         target = os.path.join(models_dir(), self.model.id)
         try:
@@ -464,10 +522,79 @@ class Fetch:
             log.warning("Модель %s не скачалась: %s", self.model.id, exc)
             self._say("failed")
 
+    def _run_files(self) -> None:
+        """
+        A model that is loose files rather than an archive.
+
+        Piper's voice is an `.onnx` and the `.onnx.json` beside it, and
+        there is no zip to unpack. The setting is pointed at the first file,
+        because that is what the engine is given; the second has to lie next
+        to it under the name the first has plus `.json`, which is what the
+        server already calls it.
+
+        Everything is downloaded into a folder of its own and only then
+        counted as ready. A half-written voice next to a whole settings file
+        looks exactly like a finished pair, and the failure surfaces at the
+        first word spoken rather than here.
+        """
+        target = os.path.join(models_dir(), self.model.id)
+        holding = target + ".part"
+        try:
+            self._tidy(holding)
+            os.makedirs(holding, exist_ok=True)
+            self._say("downloading")
+
+            # The total is the catalogue's until the servers say otherwise,
+            # and they are asked one at a time — so the sum is corrected as
+            # we go rather than promised up front and then broken.
+            got_before = 0
+            for url in self.model.files:
+                name = url.rsplit("/", 1)[-1]
+                with urllib.request.urlopen(url, timeout=60) as answer:
+                    with open(os.path.join(holding, name), "wb") as file:
+                        while not self._stop.is_set():
+                            block = answer.read(self.BLOCK)
+                            if not block:
+                                break
+                            file.write(block)
+                            self.done = got_before + (
+                                file.tell())
+                            self._say("downloading")
+                got_before = self.done
+                if self._stop.is_set():
+                    break
+
+            if self._stop.is_set():
+                self._tidy(holding)
+                self._say("cancelled")
+                return
+
+            self._tidy(target)
+            os.rename(holding, target)
+
+            if self.model.setting and self.settings is not None:
+                first = self.model.files[0].rsplit("/", 1)[-1]
+                self.settings.set(self.model.setting,
+                                  os.path.join(target, first))
+                self.settings.save()
+
+            log.info("Модель %s готова: %s", self.model.id, target)
+            self._say("ready")
+        except Exception as exc:                        # noqa: BLE001
+            self.error = str(exc)
+            self._tidy(holding)
+            log.warning("Модель %s не скачалась: %s", self.model.id, exc)
+            self._say("failed")
+
     @staticmethod
     def _tidy(path: str) -> None:
+        # A folder as well as a file: a model that is loose files is
+        # gathered in a folder of its own, and a half-gathered one has to
+        # go the same way a half-written archive does.
         try:
-            if os.path.exists(path):
+            if os.path.isdir(path):
+                shutil.rmtree(path, ignore_errors=True)
+            elif os.path.exists(path):
                 os.remove(path)
         except OSError:
             pass

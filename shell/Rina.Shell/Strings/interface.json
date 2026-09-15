@@ -773,8 +773,8 @@
   "Распознавание": {
     "English": "Recognition"
   },
-  "Распознавание работает по пакету и модели — их размер в установщик не помещается.": {
-    "English": "Recognition needs a package and a model — too large to put in the installer."
+  "И слух, и голос работают по пакету и модели — их размер в установщик не помещается.": {
+    "English": "Hearing and speaking each need a package and a model — too large to put in the installer."
   },
   "Рина": {
     "English": "Rina"
@@ -1519,5 +1519,14 @@
   },
   "Потяните, чтобы переставить": {
     "English": "Drag to move it"
+  },
+  "Чтобы слышать": {
+    "English": "To hear"
+  },
+  "Чтобы говорить": {
+    "English": "To speak"
+  },
+  "Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках».": {
+    "English": "No voice yet: Rina will hear you and answer in text. You can fix that in Settings."
   }
 }

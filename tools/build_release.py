@@ -81,6 +81,18 @@ CORE_REQUIREMENTS = [
     # megabyte and pulls in torch, whose wheel is over five hundred and
     # bundles CUDA. Same models, no torch, and quicker on a processor.
     "faster-whisper>=1.0",
+    # And a voice, by the same argument as the line above — which was
+    # written about recognition and turned out to be true, word for word,
+    # about speech. Until this line every copy anybody assembled was
+    # **mute**: the runtime carried what decodes sound and nothing that
+    # makes it. Found by a person installing on a second computer.
+    #
+    # `edge-tts` and not Piper: four megabytes against a hundred and
+    # twenty, and no model to fetch. It is not switched on by it being
+    # here — `tts_engine` starts at `silent`, and choosing Edge is
+    # choosing to send the words of a reply to Microsoft. What ships is
+    # the ability, not the decision.
+    "edge-tts>=6.1",
 ]
 
 #: What travels from the project tree into the release.

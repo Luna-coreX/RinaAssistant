@@ -50,6 +50,10 @@ def make_archive(inner_name="the-model", padding=2_000_000):
 
 ARCHIVE = make_archive()
 
+#: A voice and the settings beside it, as the server hands them over.
+LOOSE = {"voice.onnx": b"\0" * 300_000,
+         "voice.onnx.json": b'{"sample_rate": 22050}'}
+
 
 class Slowly(http.server.BaseHTTPRequestHandler):
     """Serves the archive in dribs, so a cancel has something to stop."""
@@ -57,6 +61,15 @@ class Slowly(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/missing.zip":
             self.send_error(404)
+            return
+        # Loose files, for a model that is not an archive: Piper's voice is
+        # an `.onnx` and the `.onnx.json` beside it.
+        if self.path.startswith("/loose/"):
+            body = LOOSE.get(self.path.rsplit("/", 1)[-1], b"")
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         self.send_response(200)
         self.send_header("Content-Length", str(len(ARCHIVE)))
@@ -106,6 +119,26 @@ packages_only = [m for m in listed if m["kind"] == "package"]
 check("в каталоге есть и модели, и пакеты",
       bool(models_only) and bool(packages_only),
       f"| моделей {len(models_only)}, пакетов {len(packages_only)}")
+# Hearing and speaking are both downloads, and only one of them was ever
+# offered. Found by a person installing on a second computer: Rina heard,
+# understood, and had no way whatever to answer aloud — no package and no
+# model for any speaking engine existed in the catalogue at all.
+check("у каждой записи сказано, для слуха она или для голоса",
+      all(m.get("purpose") in ("stt", "tts") for m in listed),
+      f"| {sorted({m.get('purpose') for m in listed})}")
+check("в каталоге есть чем говорить",
+      any(m["purpose"] == "tts" for m in listed),
+      "| " + ", ".join(m["id"] for m in listed if m["purpose"] == "tts"))
+check("и чем слышать",
+      any(m["purpose"] == "stt" for m in listed))
+# Online speech is not ticked in advance, and the reason is not its size:
+# the words of a reply would leave the computer, and a box ticked for
+# somebody is a box they do not read.
+online = [m for m in listed if m["id"] == "pkg-edge"]
+check("онлайновая озвучка заранее не отмечена",
+      bool(online) and not online[0]["wanted"],
+      f"| {online}")
+
 check("модель находится по имени",
       models.find(models_only[0]["id"]) is not None
       and models.find("нет") is None)
@@ -233,6 +266,47 @@ check("о неудаче сообщено, а не проглочено",
 check("и причина названа", seen3 and seen3[-1]["error"] != "")
 
 clean("probe")
+
+print()
+print("=== модель из отдельных файлов ===")
+# Not every model is an archive. Piper's voice is an `.onnx` and the
+# `.onnx.json` beside it, and the downloader knew only how to unpack a zip
+# — so the catalogue had nothing that gives Rina a voice, and a fresh
+# machine was mute.
+clean("pair")
+pair = models.Model("pair", "Голос", "piper", size=sum(
+                        len(v) for v in LOOSE.values()),
+                    files=(f"{BASE}/loose/voice.onnx",
+                           f"{BASE}/loose/voice.onnx.json"),
+                    setting="piper_model", purpose="tts")
+check("такая модель считается нашей", pair.ours,
+      "| иначе её никто не скачает")
+store = MemorySettings({})
+seen4 = []
+models.Fetch(pair, on_progress=seen4.append, settings=store).start()
+for _ in range(300):
+    if seen4 and seen4[-1]["state"] in ("ready", "failed"):
+        break
+    time.sleep(0.05)
+check("скачалась", seen4 and seen4[-1]["state"] == "ready",
+      f"| {seen4[-1] if seen4 else '—'}")
+
+folder = os.path.join(models.models_dir(), "pair")
+check("оба файла на месте",
+      os.path.isfile(os.path.join(folder, "voice.onnx"))
+      and os.path.isfile(os.path.join(folder, "voice.onnx.json")),
+      f"| {sorted(os.listdir(folder)) if os.path.isdir(folder) else 'папки нет'}")
+# The setting points at the voice, not at the folder and not at the
+# settings file: that is what the engine is handed, and the second file
+# has to lie beside it under the name the first has plus `.json`.
+check("настройка указывает на сам голос",
+      store.get("piper_model", "") == os.path.join(folder, "voice.onnx"),
+      f"| {store.get('piper_model', '')!r}")
+check("недособранного рядом не осталось",
+      not os.path.exists(folder + ".part"),
+      "| половина голоса выглядит как целый и падает при первом слове")
+clean("pair")
+
 server.shutdown()
 
 print()
