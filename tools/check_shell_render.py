@@ -323,24 +323,67 @@ def main(argv) -> int:
     # **no** step. That is not a weaker statement, it is the opposite one,
     # and it catches the thing worth catching — a scrim left on a surface
     # declared to have none.
-    column_pixel = average(image, inside, height * 0.55)
-    gap = abs(brightness(pane) - brightness(column_pixel))
+    #
+    # **A break, not a difference.** It used to compare a point in the
+    # column with a point in the panel — different x, and different y as
+    # well — and demand they be within three. Two points twenty-eight
+    # apart on a flowing field differ by however much the field flows
+    # between them: measured here, five values, with the profile a clean
+    # ramp and no step anywhere in it. The check was reading the
+    # background's own gradient and calling it a seam, and it only ever
+    # passed because the flow happened to be flat at those two points.
+    #
+    # A scrim on a transparent surface is a **discontinuity**: one jump at
+    # the line. So the largest step between neighbouring points across the
+    # edge is compared with the largest a little way off, where there is
+    # no edge — the flow answers for itself.
+    def worst_step(from_x, to_x, y):
+        values = [brightness(average(image, x, y, reach=10))
+                  for x in range(int(from_x), int(to_x))]
+        return max(abs(b - a) for a, b in zip(values, values[1:]))
+
+    edge_step = worst_step(column - 12, column + 12, height * 0.55)
+    flow_step = worst_step(column + 40, column + 76, height * 0.55)
+    room = max(1.0, flow_step * 2)
     if glass.get("column", 1.0) <= 0.001:
-        check("колонка прозрачна насквозь — течение идёт без шва", gap <= 3,
-              f"| панель {brightness(pane):.0f}, колонка "
-              f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
+        check("колонка прозрачна насквозь — течение идёт без шва",
+              edge_step <= room,
+              f"| на кромке {edge_step:.2f}, в стороне {flow_step:.2f}, "
+              f"позволено {room:.2f}")
     else:
-        check("колонка и панель разделены — разрыв на границе", gap >= 4,
-              f"| панель {brightness(pane):.0f}, колонка "
-              f"{brightness(column_pixel):.0f}, разрыв {gap:.0f}")
-    # The title bar lies over the vivid layer: the calm one covers only the
-    # working area, and the bar is above it.
+        check("колонка и панель разделены — разрыв на границе",
+              edge_step > room,
+              f"| на кромке {edge_step:.2f}, в стороне {flow_step:.2f}, "
+              f"нужно больше {room:.2f}")
+
+    # The title bar is glass over **the same layer as the page below it**
+    # (`4.0b-E01`). It used to be over the vivid one always, while every
+    # tab but the home screen sits on the calm one — so the bar was a
+    # window onto a different background, and the line where it ended was
+    # the edge of a plate. A person pointed at that line in a screenshot.
+    #
+    # The shot is of a section, so the layer is the calm one. Asked
+    # against the same ramp as the panel three lines above: the rule is
+    # not "the bar is calm", it is "the bar is whatever the page is", and
+    # comparing it with the page is how that is said.
     bar_glass = glass_over(colors["FACE_LOW"], glass.get("bar", 1.0),
-                           vivid_ramp)
+                           calm_ramp)
     bar_at = at(width * 0.5, size["row"] / 2)
     check("полоса заголовка — FACE_LOW сквозь стекло",
           off_ramp(bar_at, bar_glass) <= 10,
           f"| {bar_at}, расходится на {off_ramp(bar_at, bar_glass):.0f}")
+
+    # And the same picture, not merely the same palette: no step where the
+    # bar ends. This is the thing a person saw — eight units of brightness
+    # across one point — and the palette check above cannot see it, since
+    # both layers are built from ramps that overlap.
+    row_h = size["row"]
+    above_bar = average(image, width * 0.5, row_h - 3)
+    below_bar = average(image, width * 0.5, row_h + 3)
+    seam = abs(brightness(above_bar) - brightness(below_bar))
+    check("под полосой нет шва — это одна картина", seam <= 3,
+          f"| над кромкой {brightness(above_bar):.0f}, под ней "
+          f"{brightness(below_bar):.0f}, разрыв {seam:.0f}")
 
     # The mark of the active section is the system's only accent. Which
     # section is open the check does not know and must not know: it finds the

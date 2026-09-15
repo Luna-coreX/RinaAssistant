@@ -35,6 +35,25 @@
            IsHitTestVisible="False" />
 
     <!--
+      The same flow, calmed and softened, over the part one reads
+      (4.0b-A06). Not a second field: the same one, painted in the calm
+      palette and blurred a little. A person reading settings should have
+      the background stay behind the words, and the vivid layer is for the
+      screen one looks at rather than reads.
+
+      **Across all three rows, like the vivid one** (`4.0b-E01`). It used
+      to live inside the working row alone, stretched to that row's
+      height — so on every tab but the home screen the top bar showed one
+      picture and everything under it another, at another scale, and the
+      line between them was the edge of a plate. Measured: eight units of
+      brightness across a single point. A person met it as "the bar does
+      not belong to the tab", and they were right — it belonged to a
+      different background.
+    -->
+    <Image x:Name="BackdropCalm" Grid.RowSpan="3" Stretch="Fill"
+           IsHitTestVisible="False" Visibility="Collapsed" />
+
+    <!--
       The title bar: our own, because the typography is our own.
 
       **Blurred, and still not a surface** (4.0b-E01). The glasswork keeps
@@ -99,16 +118,6 @@
         <ColumnDefinition x:Name="MenuColumn" Width="0" />
         <ColumnDefinition Width="*" />
       </Grid.ColumnDefinitions>
-
-      <!--
-        The same flow, calmed and softened, under the part one reads
-        (4.0b-A06). Not a second field: the same one, painted in the calm
-        palette and blurred a little. A person reading settings should have
-        the background stay behind the words, and the vivid layer is for the
-        screen one looks at rather than reads.
-      -->
-      <Image x:Name="BackdropCalm" Grid.ColumnSpan="2" Stretch="Fill"
-             IsHitTestVisible="False" />
 
       <!-- The column of sections: five, in ordinary case, without icons (4.0-R09) -->
       <Grid Grid.Column="0" Background="{DynamicResource C.Glass.Column}">

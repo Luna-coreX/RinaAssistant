@@ -3135,7 +3135,7 @@ public partial class App
             Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
         }
 
-        Console.WriteLine("=== стекло: размытие под верхней полосой ===");
+        Console.WriteLine("=== стекло: полоса и вкладка — одна картина ===");
 
         window.Width = 940;
         window.Height = 620;
@@ -3144,6 +3144,68 @@ public partial class App
         window.Top = -4000;
         window.Show();
         await Task.Delay(500);
+
+        var dpi0 = PresentationSource.FromVisual(window)
+                       ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+        var row0 = (int)((double)window.FindResource("Size.Row") * dpi0);
+
+        // The flow as it really runs, on a tab that reads rather than
+        // looks. The striped picture below cannot answer this one: the
+        // calm layer is not painted while nothing shows it, and the
+        // question here is precisely whether the two layers are one
+        // picture.
+        window.ShowSectionFor("dialog");
+        window.RunBackdropForShot();
+        await Task.Delay(900);
+
+        Check("на вкладке полоса — стекло над спокойным слоем",
+              window.BarOnCalm,
+              "| иначе она окно в другой фон, а не в тот же");
+
+        // Brightness across the bar's lower edge, against the ordinary
+        // change a few points above it. A person pointed at this with one
+        // screenshot: the bar ended in a line, and a line reads as the
+        // edge of a plate. It was not the blur — the calm layer lived
+        // inside the working row alone and was a different picture at a
+        // different scale, so above the line one flow, below it another.
+        double Seam(int from, int to)
+        {
+            var (pixels, width, height) = Drawn(window, dpi0);
+            double At(int y)
+            {
+                double sum = 0;
+                for (var x = from; x < to; x++)
+                {
+                    var at = (y * width + x) * 4;
+                    sum += pixels[at] + pixels[at + 1] + pixels[at + 2];
+                }
+                return sum / ((to - from) * 3);
+            }
+            var step = Math.Abs(At(row0) - At(row0 - 1));
+            var near = 0.0;
+            for (var y = row0 - 14; y < row0 - 1; y++)
+                near = Math.Max(near, Math.Abs(At(y + 1) - At(y)));
+            // Allowed as much as the picture moves by itself a few points
+            // higher up, and never less than one value: a flow this smooth
+            // can be almost flat, and then any honest reading is "nothing
+            // happens here".
+            var room = Math.Max(1.0, near * 2);
+            Console.WriteLine($"     x {from}..{to}: на кромке {step:0.00}, "
+                              + $"рядом {near:0.00}, позволено {room:0.00}");
+            return step - room;
+        }
+
+        var over = Math.Max(
+            Math.Max(Seam((int)(940 * dpi0 * 0.13), (int)(940 * dpi0 * 0.17)),
+                     Seam((int)(940 * dpi0 * 0.46), (int)(940 * dpi0 * 0.55))),
+            Seam((int)(940 * dpi0 * 0.74), (int)(940 * dpi0 * 0.85)));
+        Check("шва под полосой не видно", over <= 0,
+              $"| перебор {over:0.00}");
+
+        Console.WriteLine();
+        Console.WriteLine("=== стекло: размытие под верхней полосой ===");
+        window.ShowSectionFor("home");
+        await Task.Delay(400);
 
         // Stripes above, one plain colour below. Two questions in one
         // picture: the stripes are the detail the bar is meant to lose, and
@@ -3166,11 +3228,14 @@ public partial class App
         var dpi = PresentationSource.FromVisual(window)
                       ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
 
-        // Below the layer's own top edge. A blur samples nothing outside
-        // the picture, so its first points fade towards transparency, and a
-        // reading taken there would be of the fade rather than of the bar.
-        var top = (int)(22 * dpi);
-        var bottom = (int)(38 * dpi);
+        // Between the layer's two fades. A blur samples nothing outside
+        // the picture, so its first points fade towards transparency; and
+        // the last ones are faded on purpose, so the bar dissolves into
+        // the page instead of ending in a line. What is left between them
+        // is the glass at full strength, and that is where the question
+        // "is it soft" has an answer.
+        var top = (int)(19 * dpi);
+        var bottom = (int)(26 * dpi);
 
         (double Red, double Blue, double Detail) Read()
         {

@@ -68,7 +68,9 @@ public partial class MainWindow : Window
         // bitmap rather than a second one: two pictures of one flow would
         // drift apart by a frame and the seam would show exactly where the
         // bar ends.
-        BarGlass.Source = Backdrop.Source;
+        //
+        // *Which* picture is decided by `FollowGlass`: there are two
+        // layers and the bar must be on the one the page is on.
         BarGlass.Effect = new System.Windows.Media.Effects.BlurEffect
         {
             Radius = (double)FindResource("Glass.Blur"),
@@ -79,8 +81,44 @@ public partial class MainWindow : Window
         // Laid out over the whole window and cut to the bar by the row's
         // clip: that is what makes it show what is behind the bar rather
         // than the whole flow squeezed into forty points.
-        SizeChanged += (_, _) => BarGlass.Height = ActualHeight;
+        //
+        // **And it dissolves rather than ends.** Cut off, the blurred
+        // picture meets the sharp one along a line, and a line is read as
+        // the edge of a thing: measured across it, the brightness jumped
+        // by five units, and the bar became a plate with a rim — which is
+        // the very thing the blur was added to avoid. Noticed by the
+        // person using it, in one screenshot.
+        //
+        // The fade is in the picture's own coordinates, so it moves with
+        // the window: the mask is relative, the row is not.
+        var fade = new System.Windows.Media.LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(0, 1),
+        };
+        BarGlass.OpacityMask = fade;
+        void Dissolve()
+        {
+            var tall = Math.Max(ActualHeight > 0 ? ActualHeight : Height, 1);
+            var row = (double)FindResource("Size.Row");
+            var soft = (double)FindResource("Glass.Fade");
+            fade.GradientStops.Clear();
+            fade.GradientStops.Add(new System.Windows.Media.GradientStop(
+                System.Windows.Media.Colors.Black, 0));
+            fade.GradientStops.Add(new System.Windows.Media.GradientStop(
+                System.Windows.Media.Colors.Black,
+                Math.Max(0, (row - soft) / tall)));
+            fade.GradientStops.Add(new System.Windows.Media.GradientStop(
+                System.Windows.Media.Colors.Transparent, row / tall));
+        }
+
+        SizeChanged += (_, _) =>
+        {
+            BarGlass.Height = ActualHeight;
+            Dissolve();
+        };
         BarGlass.Height = Height;
+        Dissolve();
         // The flow takes its colour from the accent, so it has to be told
         // when the accent changes — and it is changed from two places, the
         // settings page and the link's first hello, neither of which should
@@ -117,6 +155,7 @@ public partial class MainWindow : Window
 
         BuildSections();
         ShowSection("home");
+        FollowGlass();
 
         Strings.Loc.Changed += OnLanguageChanged;
         Closed += (_, _) => Strings.Loc.Changed -= OnLanguageChanged;
@@ -323,6 +362,7 @@ public partial class MainWindow : Window
         // difference between screens.
         BackdropCalm.Visibility = section is "home"
             ? Visibility.Collapsed : Visibility.Visible;
+        FollowGlass();
 
         // A transition between sections is 220 ms (SYSTEM §7). An
         // appearance, not a "slide-in": movement is obliged to answer the
@@ -430,6 +470,26 @@ public partial class MainWindow : Window
     /// do with the field.
     /// </remarks>
     public void RunBackdropForShot() => _backdrop.Follow(true);
+
+    /// <summary>
+    /// The bar is glass over whichever layer the page is on.
+    /// </summary>
+    /// <remarks>
+    /// There are two flows — the vivid one and the calm one — and the
+    /// page shows one of them. The bar used to blur the vivid one always,
+    /// so on every tab but the home screen it was a window onto a
+    /// different background from the one beneath it. That is what "the
+    /// bar does not blend with the tab" meant, and no amount of softening
+    /// the edge would have fixed it: the two pictures were different
+    /// pictures.
+    /// </remarks>
+    private void FollowGlass()
+        => BarGlass.Source = BackdropCalm.Visibility == Visibility.Visible
+            ? BackdropCalm.Source : Backdrop.Source;
+
+    /// <summary>Which flow the bar is glass over — for the check.</summary>
+    public bool BarOnCalm => ReferenceEquals(BarGlass.Source,
+                                             BackdropCalm.Source);
 
     /// <summary>Freeze the background on a picture the check drew — for the check.</summary>
     public void PaintBackdropForCheck(

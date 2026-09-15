@@ -132,6 +132,7 @@
   <sys:Double x:Key="Glass.Popup">0.9</sys:Double>
   <sys:Double x:Key="Glass.Overlay">0.5</sys:Double>
   <sys:Double x:Key="Glass.Blur">18.0</sys:Double>
+  <sys:Double x:Key="Glass.Fade">14.0</sys:Double>
 
   <!-- Дыхание фона (4.0b-A06). Когда фон замирает, решает оболочка, а не эти числа -->
   <sys:Double x:Key="Background.Period">9</sys:Double>
