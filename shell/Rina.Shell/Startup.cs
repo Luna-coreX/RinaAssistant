@@ -22,6 +22,10 @@ public partial class App
     private CoreLink? _link;
     private Tray? _tray;
     private Hotkeys? _hotkeys;
+    //: Which finish the run was started with — to put back after a
+    //: check that swaps it to ask a question of another one.
+    private string _finishAtStart = "silver";
+
     private string? _shotPath;
     //: Whether a screenshot of the commands page should open the editor.
     private bool _shotEditor;
@@ -53,6 +57,7 @@ public partial class App
             Strings.Loc.Use(language);
 
         var finish = Value(args, "--finish") ?? "silver";
+        _finishAtStart = finish;
         ApplyFinish(finish);
 
         // The media register is asked once, at start: it is the system's,
@@ -2874,6 +2879,108 @@ public partial class App
                       + $"отношение {(away > 0 ? toward / away : 0):0.00}");
             }
             else Check("картинка фигуры доступна", false);
+
+            // --- and it does not outshine the window it stands in ----
+            //
+            // Said by a person after the fourth edition: "it has become
+            // much brighter than the background and stands out more than
+            // it should". Measured then: thirty values above a flow of
+            // thirty-two, which is nearly twice — a lamp on the screen
+            // rather than a thing on it.
+            //
+            // **On the darkest finish**, because that is where it can
+            // go wrong. The figure takes only the accent's hue and its
+            // brightness is the same in every finish; what changes is
+            // what it stands on, and the black finish is the dimmest
+            // ground the window can show. Measured under silver the
+            // question answers itself — the flow there is lighter than
+            // any figure — and a check that always passes is not one.
+            // Put back afterwards: a check that walks out having
+            // changed the look is a check that changed what it
+            // measured for everything after it.
+            var wasFinish = _finishAtStart;
+            var beforeSwap = Lit(window, home);
+            App.ApplyFinish("black");
+            window.RunBackdropForShot();
+            await Task.Delay(700);
+
+            // **And the flow followed the finish.** It did not: swapping
+            // the dictionary changed the window's chrome and left the
+            // background and the figure painted in the palette of the
+            // finish before — they hold theirs as numbers worked out when
+            // they were last built, and nothing told them. The path at
+            // start-up happened to set the accent straight afterwards,
+            // which does tell them, so the only way in was the finish
+            // button, and nothing asked it anything.
+            var afterSwap = Lit(window, home);
+            Check("сменили отделку — течение перекрасилось",
+                  Math.Abs(beforeSwap - afterSwap) > 20,
+                  $"| было {beforeSwap:0}, стало {afterSwap:0}");
+
+            var homeDpi = PresentationSource.FromVisual(window)
+                              ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+            var faceAt = home.Face.TransformToVisual(window)
+                             .Transform(new Point(home.Face.ActualWidth / 2,
+                                                  home.Face.ActualHeight / 2));
+            var span = home.Face.ActualWidth / 2;
+
+            // The flow beside the figure, whatever finish is on.
+            double Lit(MainWindow at, Pages.HomePage page)
+            {
+                var scale = PresentationSource.FromVisual(at)
+                                ?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                var middle = page.Face.TransformToVisual(at)
+                                 .Transform(new Point(page.Face.ActualWidth / 2,
+                                                      page.Face.ActualHeight / 2));
+                var reach = page.Face.ActualWidth / 2;
+                var (paint, wide, tall) = Drawn(at, scale);
+                double sum = 0, seen = 0;
+                for (var yy = 0; yy < tall; yy++)
+                    for (var xx = 0; xx < wide; xx++)
+                    {
+                        var ax = xx / scale - middle.X;
+                        var ay = yy / scale - middle.Y;
+                        var away = Math.Sqrt(ax * ax + ay * ay);
+                        if (away < reach * 1.3 || away >= reach * 1.9) continue;
+                        var spot = (yy * wide + xx) * 4;
+                        sum += (paint[spot] + paint[spot + 1]
+                                + paint[spot + 2]) / 3.0;
+                        seen++;
+                    }
+                return seen > 0 ? sum / seen : 0;
+            }
+
+            double Ring(double from, double to)
+            {
+                var (paint, wide, tall) = Drawn(window, homeDpi);
+                double sum = 0, seen = 0;
+                for (var yy = 0; yy < tall; yy++)
+                    for (var xx = 0; xx < wide; xx++)
+                    {
+                        var ax = xx / homeDpi - faceAt.X;
+                        var ay = yy / homeDpi - faceAt.Y;
+                        var away = Math.Sqrt(ax * ax + ay * ay);
+                        if (away < from || away >= to) continue;
+                        var spot = (yy * wide + xx) * 4;
+                        sum += (paint[spot] + paint[spot + 1]
+                                + paint[spot + 2]) / 3.0;
+                        seen++;
+                    }
+                return seen > 0 ? sum / seen : 0;
+            }
+
+            var itself = Ring(0, span * 0.86);
+            var beside = Ring(span * 1.3, span * 1.9);
+            App.ApplyFinish(wasFinish);
+            await Task.Delay(300);
+
+            // Darker than its surroundings is ordinary — a dark thing on
+            // a light ground is how most things look. Much brighter is
+            // the failure, so the bound is one-sided.
+            Check("фигура не спорит яркостью с окном",
+                  itself - beside <= 18,
+                  $"| фигура {itself:0}, фон рядом {beside:0}, "
+                  + $"разница {itself - beside:+0;-0}");
 
             // And what the volume costs. The figure is the most
             // expensive thing on the home screen and nothing watched it;

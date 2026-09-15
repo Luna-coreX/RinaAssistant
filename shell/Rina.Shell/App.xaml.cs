@@ -154,6 +154,15 @@ public partial class App : Application
             if (dictionaries[i].Source?.OriginalString.Contains("Finish.") == true)
             {
                 dictionaries[i] = new ResourceDictionary { Source = wanted };
+                // The painted things are told, and they have to be: a
+                // finish carries its own palette of the flow, and the
+                // background and the figure hold theirs as numbers
+                // worked out when they were last built. Without this the
+                // window changed colour and the two pictures inside it
+                // did not — which is what happened, and was only noticed
+                // because a check asked one of them what it was standing
+                // on.
+                AccentChanged?.Invoke();
                 return;
             }
         }

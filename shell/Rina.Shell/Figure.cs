@@ -473,12 +473,19 @@ public sealed class Figure
                 var graze = 1f - MathF.Max(0f, mz);
                 var rim = graze * graze * graze;
 
-                var value = 0.018f
-                            + cool * 0.78f
-                            + warm * 0.70f
-                            + toKey * toKey * 0.08f
-                            + rim * 0.26f
-                            + sheen * 0.50f;
+                // **Turned down to sit in the window.** Tuned against
+                // black, the body came out nearly twice as bright as the
+                // flow around it — measured, thirty values above a
+                // background of thirty-two — and a thing that bright
+                // stops being part of the screen and becomes a lamp on
+                // it. The figure is what a person looks at, not what
+                // they are dazzled by.
+                var value = 0.014f
+                            + cool * 0.36f
+                            + warm * 0.33f
+                            + toKey * toKey * 0.04f
+                            + rim * 0.13f
+                            + sheen * 0.24f;
 
                 // The colour of the room, and the fringing. The three
                 // channels take slightly different bends, the way glass
