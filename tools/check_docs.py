@@ -154,7 +154,7 @@ for base, dirs, files in os.walk("."):
             os.path.join(base, name).replace("\\", "/")[2:])
 
 roadmap = io.open(os.path.join("docs", "ROADMAP.md"), encoding="utf-8").read()
-chunks = re.split(r"^\*\*((?:4\.0|4\.0b|5\.0|N|V)-[A-Za-z0-9]+)\s*·\s*([^*]+)\*\*",
+chunks = re.split(r"^\*\*((?:4\.0|4\.0b|4\.0s|5\.0|N|V)-[A-Za-z0-9]+)\s*·\s*([^*]+)\*\*",
                   roadmap, flags=re.M)
 
 #: Paths that do not exist and should not. By name and with a reason.
