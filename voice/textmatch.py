@@ -90,6 +90,53 @@ def contains_phrase(haystack, needle, threshold=THRESHOLD):
     return False
 
 
+#: "the second one", "two", "2" — how a person points at an option by its
+#: place in a list.
+#:
+#: Here rather than next to the programs, because this is language and not
+#: launching: the same words pick a thing off the list of things to do. Two
+#: copies of a table like this part company on the first word added to one
+#: of them.
+ORDINALS = {
+    "первый": 0, "первое": 0, "первая": 0, "первую": 0, "1": 0, "один": 0,
+    "второй": 1, "второе": 1, "вторая": 1, "вторую": 1, "2": 1, "два": 1,
+    "третий": 2, "третье": 2, "третья": 2, "третью": 2, "3": 2, "три": 2,
+    "first": 0, "second": 1, "third": 2,
+}
+
+CANCEL_WORDS = ("отмена", "отмени", "неважно", "ничего", "забудь", "никакое",
+                "cancel", "never mind", "nothing")
+
+
+def pick(said, titles):
+    """
+    Which of the offered lines the person named. `(index | None, cancelled)`.
+
+    By place ("the second"), by the whole name, or by a part of it — a
+    person answering about "buy milk and bread" says "milk". The part only
+    counts when exactly one line contains it: if two do, we are back where
+    the question started and guessing would defeat the point of asking.
+    """
+    low = normalize(said)
+    if not low:
+        return None, False
+    if any(word in low for word in CANCEL_WORDS):
+        return None, True
+
+    for word in low.split():
+        if word in ORDINALS and ORDINALS[word] < len(titles):
+            return ORDINALS[word], False
+
+    index, _ = best_match(low, titles)
+    if index is not None:
+        return index, False
+
+    inside = [i for i, title in enumerate(titles) if low in normalize(title)]
+    if len(inside) == 1:
+        return inside[0], False
+    return None, False
+
+
 def best_match(text, candidates, threshold=THRESHOLD):
     """
     Returns (index, coefficient) of the most similar candidate, or (None, 0).

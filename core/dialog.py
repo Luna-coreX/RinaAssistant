@@ -11,6 +11,8 @@ asked, we are waiting for an answer, and after a minute the question goes
 stale.
 
     choose_app       which of several programs to launch
+    choose_todo      which of several things on the list was meant
+    offer_setting    Rina offered to switch something on; yes or no
     confirm_action   confirm a dangerous system action
     confirm_command  confirm a dangerous user command
 
@@ -33,10 +35,24 @@ from dataclasses import dataclass, field, replace
 TTL_SECONDS = 60
 
 CHOOSE_APP = "choose_app"
+#: Which of several things on the list was meant (`4.0b-E06`). A kind of
+#: its own rather than a general "choose one of these": the answer has to
+#: turn into an action, and what that action is differs — a program is
+#: launched, a thing is closed. A general kind would have to carry the
+#: action around with it, which is a way of saying the same thing with
+#: more moving parts.
+CHOOSE_TODO = "choose_todo"
+#: Rina offered something of her own accord and is waiting for yes or no
+#: (`4.0b-E06`). The only thing she offers is switching on what has just
+#: become possible, so the question carries one settings key and one
+#: value and nothing else: an offer that could do anything would be a
+#: way of asking a person to approve something they were never told.
+OFFER_SETTING = "offer_setting"
 CONFIRM_ACTION = "confirm_action"
 CONFIRM_COMMAND = "confirm_command"
 
-KINDS = (CHOOSE_APP, CONFIRM_ACTION, CONFIRM_COMMAND)
+KINDS = (CHOOSE_APP, CHOOSE_TODO, OFFER_SETTING,
+         CONFIRM_ACTION, CONFIRM_COMMAND)
 
 
 @dataclass(frozen=True)
@@ -60,6 +76,9 @@ class Question:
     options: tuple = ()
     #: what was being looked for when the question arose
     query: str = ""
+    #: for offer_setting — which setting is offered, and what it becomes
+    setting_key: str = ""
+    setting_value: str = ""
     #: the confirmation issued for a dangerous action (4.0-C05).
     #: Kept in the question, because a person's consent applies to a
     #: particular call rather than to the fact that a question was once asked.
@@ -84,6 +103,8 @@ class Question:
                 "action": self.action, "command_id": self.command_id,
                 "options": [dict(o) for o in self.options],
                 "query": self.query,
+                "setting_key": self.setting_key,
+                "setting_value": self.setting_value,
                 "confirmation_id": self.confirmation_id}
 
     @classmethod
@@ -94,6 +115,8 @@ class Question:
                    command_id=str(data.get("command_id", "")),
                    options=tuple(data.get("options") or ()),
                    query=str(data.get("query", "")),
+                   setting_key=str(data.get("setting_key", "")),
+                   setting_value=str(data.get("setting_value", "")),
                    confirmation_id=str(data.get("confirmation_id", "")))
 
     @classmethod
@@ -101,6 +124,19 @@ class Question:
         """options is a list of AppEntry."""
         return cls(kind=CHOOSE_APP, query=query,
                    options=tuple(e.to_dict() for e in options))
+
+    @classmethod
+    def choose_todo(cls, items, query=""):
+        """items is a list of dicts from the list of things to do."""
+        return cls(kind=CHOOSE_TODO, query=query,
+                   options=tuple({"id": i["id"], "text": i["text"]}
+                                 for i in items))
+
+    @classmethod
+    def offer_setting(cls, key, value, about=""):
+        """`about` is what the offer is called when spoken about."""
+        return cls(kind=OFFER_SETTING, setting_key=str(key),
+                   setting_value=str(value), query=str(about))
 
     @classmethod
     def confirm_action(cls, action, confirmation_id=""):

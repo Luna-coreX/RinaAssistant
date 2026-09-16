@@ -215,6 +215,19 @@ class Executor:
         return self._run("close_todo", {"todo_id": intent.arg("todo_id")},
                          source=source)
 
+    def _do_todo_ambiguous(self, intent, source):
+        """
+        Several things fit — so ask, rather than close one of them.
+
+        Closing the wrong thing is the mistake a person does not catch:
+        a closed thing simply leaves the list, and nothing says which one
+        went. Asking costs a sentence.
+        """
+        names = "; ".join(o.get("text", "") for o in
+                          (intent.arg("options") or []))
+        return self._ok(tr("Таких дел несколько: {names}. Какое закрыть?",
+                           names=names))
+
     def _do_todo_not_found(self, intent, source):
         """
         There is no such thing on the list.

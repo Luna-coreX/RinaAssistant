@@ -174,26 +174,32 @@ class TodoStore:
         """
         return self._change(todo_id, reminder_id=str(reminder_id))
 
-    def find(self, said):
+    def matches(self, said):
         """
-        The thing the person named in words.
+        Every open thing the words could mean — exact ones, or parts.
 
-        An exact match, then a substring. Nothing cleverer: the list is
-        short, and being wrong here means closing the wrong thing — which
-        the person will not notice, because a closed thing simply leaves the
-        list.
+        **All of them, not the first.** Being wrong here means closing the
+        wrong thing, and the person does not notice: a closed thing simply
+        leaves the list. Choosing between them is not ours to do when there
+        is more than one, so the caller is handed the whole set and asks
+        (`4.0b-E06`).
+
+        Exact wins outright: "milk" must close "milk" and not ask about
+        "buy milk and bread" standing beside it.
         """
         said = normalize(said or "")
         if not said:
-            return None
+            return []
         open_ones = self.all(done=False)
-        for item in open_ones:
-            if normalize(item["text"]) == said:
-                return item
-        for item in open_ones:
-            if said in normalize(item["text"]):
-                return item
-        return None
+        exact = [i for i in open_ones if normalize(i["text"]) == said]
+        if exact:
+            return exact
+        return [i for i in open_ones if said in normalize(i["text"])]
+
+    def find(self, said):
+        """The first thing the words could mean, or `None`."""
+        found = self.matches(said)
+        return found[0] if found else None
 
     def _change(self, todo_id, **fields):
         with self._settings.transaction():

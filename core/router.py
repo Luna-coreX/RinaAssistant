@@ -105,9 +105,13 @@ class RouterContext:
     #: time.
     last_launch_query: str = ""
 
-    #: Find a thing to do by what was said. The list lives in the core and
-    #: the router is obliged to work without it — hence a way to ask rather
-    #: than the list itself.
+    #: Everything on the list the words could mean — a list, not one.
+    #: The list lives in the core and the router is obliged to work
+    #: without it, hence a way to ask rather than the list itself.
+    #:
+    #: A list and not one thing: which of several is meant is the
+    #: person's to say (`4.0b-E06`), and a finder that returns the first
+    #: takes that decision quietly.
     todo_find: object = None
 
 
@@ -197,6 +201,38 @@ def _answer_to_question(command, ctx):
                            "confirmation_id": confirmation_id},
                           stage="pending")
         return None            # an unclear answer: the question is withdrawn, see the core
+
+    if kind == "offer_setting":
+        from voice.textmatch import normalize
+
+        words = normalize(command).split()
+        # Refusal before consent, as everywhere here: "нет, не надо" reads
+        # as a refusal (inventory, §2).
+        if any(w in words for w in ctx.no_words):
+            return Intent("cancelled", {"was": kind}, stage="pending")
+        if any(w in words for w in ctx.yes_words):
+            return Intent("offer.accepted",
+                          {"key": pending.get("setting_key", ""),
+                           "value": pending.get("setting_value", ""),
+                           "about": pending.get("query", "")},
+                          stage="pending")
+        return None            # an unclear answer withdraws the question
+
+    if kind == "choose_todo":
+        from voice.textmatch import pick
+
+        options = list(pending.get("options") or [])
+        if not options:
+            return None
+        index, cancelled = pick(command, [o.get("text", "") for o in options])
+        if cancelled:
+            return Intent("cancelled", {"was": kind}, stage="pending")
+        if index is None:
+            return None
+        return Intent("todo.done",
+                      {"todo_id": options[index].get("id", ""),
+                       "text": options[index].get("text", "")},
+                      stage="pending")
 
     if kind == "choose_app":
         from voice import app_index, app_launcher
@@ -382,10 +418,16 @@ def _todo(command, ctx):
 
     # `done`: which one it is, the store knows, and the store answers if
     # there is none. The router decides nothing here — it has no list.
-    found = ctx.todo_find(rest) if ctx.todo_find else None
-    if found is None:
+    found = list(ctx.todo_find(rest) or []) if ctx.todo_find else []
+    if not found:
         return Intent("todo.not_found", {"query": rest}, stage="todo")
-    return Intent("todo.done", {"todo_id": found["id"], "text": found["text"]},
+    if len(found) > 1:
+        return Intent("todo.ambiguous",
+                      {"options": [{"id": i["id"], "text": i["text"]}
+                                   for i in found],
+                       "query": rest}, stage="todo")
+    return Intent("todo.done",
+                  {"todo_id": found[0]["id"], "text": found[0]["text"]},
                   stage="todo")
 
 

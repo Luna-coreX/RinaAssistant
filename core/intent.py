@@ -59,6 +59,9 @@ INTENTS = {
     # different news, and a person who hears the second instead of the first
     # will decide the list has gone.
     "todo.not_found":     "Такого дела нет. Аргументы: query",
+    # Several fit, and which one is the person's to say. Closing the wrong
+    # thing is not noticed: a closed thing simply leaves the list.
+    "todo.ambiguous":     "Дел с такими словами несколько. Аргументы: options, query",
 
     "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app, said",
     "reminder.ambiguous": "Напоминание к программе: кандидатов несколько. Аргументы: options, query",
@@ -86,6 +89,8 @@ INTENTS = {
     # the dialogue
     "ask.wake":           "Прозвучало слово активации без команды",
     "cancelled":          "Пользователь отказался от предложенного",
+    # Rina offered something herself and the person agreed (`4.0b-E06`).
+    "offer.accepted":     "Человек согласился на предложенное. Аргументы: key, value, about",
     "silence":            "Ничего не делаем и молчим",
 
     # the pipeline's tail
@@ -100,8 +105,8 @@ INTENTS = {
 }
 
 #: Intents after which the core waits for the user's answer.
-PENDING_INTENTS = frozenset({"app.ambiguous", "system.confirm",
-                             "command.confirm"})
+PENDING_INTENTS = frozenset({"app.ambiguous", "todo.ambiguous",
+                             "system.confirm", "command.confirm"})
 
 
 def _frozen(mapping):

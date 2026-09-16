@@ -104,6 +104,58 @@ check("а не сообщением о пустом списке", "дел не�
       f"| {answer}")
 
 print()
+print("=== когда подходит несколько — спрашивает, а не выбирает ===")
+# `4.0b-E06`. Closing the wrong thing is the mistake a person does not
+# catch: a closed thing simply leaves the list, and nothing says which one
+# went. So when the words fit more than one, the choice goes back to
+# whoever owns it.
+many = Session()
+many.say("запиши купить молоко и хлеб")
+many.say("запиши вернуть молоко соседу")
+answer = many.say("сделал молоко")
+check("не закрыла ничего сама",
+      [i["done"] for i in many.todo] == [False, False], f"| {many.todo}")
+check("а перечислила и спросила",
+      "молоко и хлеб" in answer and "вернуть молоко" in answer
+      and "?" in answer, f"| {answer}")
+check("и ждёт ответа", many.engine._dialog.pending)
+
+answer = many.say("второе")
+check("ответ по месту в списке закрыл нужное",
+      [i["done"] for i in many.todo] == [False, True], f"| {many.todo}")
+check("и сказано, какое именно", "соседу" in answer, f"| {answer}")
+check("вопрос снят", not many.engine._dialog.pending)
+
+# By words as well as by place: a person answers with the part that tells
+# the two apart, not with the whole line they never said in the first place.
+words = Session()
+words.say("запиши купить молоко и хлеб")
+words.say("запиши вернуть молоко соседу")
+words.say("сделал молоко")
+words.say("купить")
+check("ответ словами тоже понят",
+      [i["done"] for i in words.todo] == [True, False], f"| {words.todo}")
+
+# And a refusal closes nothing at all.
+nope = Session()
+nope.say("запиши купить молоко и хлеб")
+nope.say("запиши вернуть молоко соседу")
+nope.say("сделал молоко")
+nope.say("неважно")
+check("отказ не закрывает ничего",
+      [i["done"] for i in nope.todo] == [False, False], f"| {nope.todo}")
+check("и вопрос снят", not nope.engine._dialog.pending)
+
+# The exact word still wins outright: "молоко" must close the thing called
+# exactly that, not ask about the longer line standing beside it.
+exact = Session()
+exact.say("запиши молоко")
+exact.say("запиши купить молоко и хлеб")
+answer = exact.say("сделал молоко")
+check("точное совпадение закрывается без вопросов",
+      [i["done"] for i in exact.todo] == [True, False], f"| {exact.todo}")
+
+print()
 print("=== граница с напоминаниями держится ===")
 s2 = Session()
 s2.say("напомни через 5 минут позвонить маме")

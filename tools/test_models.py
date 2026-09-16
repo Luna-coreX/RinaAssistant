@@ -310,5 +310,70 @@ clean("pair")
 server.shutdown()
 
 print()
+print("=== законченное длинное дело — доложено ===")
+# `4.0b-E06`. An event on the wire is not a report: it draws a bar in a
+# window nobody is necessarily looking at. Somebody who started two
+# hundred megabytes and went off to do something else finds out by going
+# back and checking, which is the opposite of being told.
+from core.wire.server import ProtocolServer
+
+
+class Mouth:
+    """The engine, reduced to what a report needs of it."""
+
+    def __init__(self):
+        self.said = []
+        self.offers = []
+
+    def say(self, text, sound="response"):
+        self.said.append(text)
+
+    def offer(self, key, value, about, sentence):
+        self.offers.append((key, value, about))
+        self.said.append(sentence)
+
+
+def reporter(settings):
+    told = ProtocolServer.__new__(ProtocolServer)
+    told.engine = Mouth()
+    told._settings = lambda: settings
+    return told
+
+
+quick = reporter(MemorySettings({"tts_engine": "silent"}))
+quick._tell_it_finished("piper-ru-irina", "Голос Piper", seconds=2.0)
+check("о двухсекундном деле не докладывает", quick.engine.said == [],
+      f"| {quick.engine.said}")
+
+long_one = reporter(MemorySettings({"stt_engine": "whisper"}))
+long_one._tell_it_finished("vosk-ru-small", "Vosk малый", seconds=40.0)
+check("о долгом — докладывает", long_one.engine.said,
+      f"| {long_one.engine.said}")
+check("и ничего не предлагает, раз движок уже выбран",
+      long_one.engine.offers == [], f"| {long_one.engine.offers}")
+
+print()
+print("=== и предлагает ровно то, что иначе не заработает ===")
+# Downloading a voice leaves `piper_model` pointing at it and
+# `tts_engine` still `silent` — the person waits out sixty megabytes and
+# Rina goes on answering in text. What is offered is only ever the thing
+# that would otherwise do nothing; where a choice has already been made,
+# it was somebody's and is not ours to second-guess.
+mute = reporter(MemorySettings({"tts_engine": "silent"}))
+mute._tell_it_finished("piper-ru-irina", "Голос Piper", seconds=90.0)
+check("голос скачан при молчащем синтезе — предложено",
+      mute.engine.offers == [("tts_engine", "piper", "Голос Piper")],
+      f"| {mute.engine.offers}")
+check("и сказано одним предложением, а не двумя",
+      len(mute.engine.said) == 1 and "?" in mute.engine.said[0],
+      f"| {mute.engine.said}")
+
+chosen = reporter(MemorySettings({"tts_engine": "edge"}))
+chosen._tell_it_finished("piper-ru-irina", "Голос Piper", seconds=90.0)
+check("а при уже выбранном движке — только доклад",
+      chosen.engine.offers == [] and chosen.engine.said,
+      f"| {chosen.engine.offers}, {chosen.engine.said}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

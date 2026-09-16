@@ -140,6 +140,10 @@ class ProtocolServer:
         # The program index is operating-system data, and it lives in the
         # shell (ADR 0009). The core asks and matches.
         engine.apps_source = self.fetch_apps
+        # A setting the engine writes itself — accepting an offer, or
+        # switching the listening mode — takes a different road from
+        # `settings.set`, and the voice is rebuilt on that road only.
+        engine.settings_changed = self._voice_follows_settings
         engine.launch_out = self.launch_app
         # What is going on outside the command (`4.0b-A09`): which program
         # is in front, whether one is running. The shell has the machine
@@ -523,6 +527,7 @@ class ProtocolServer:
         """
         task = self.tasks.create()
         task.start()
+        began = time.monotonic()
 
         def told(state: dict) -> None:
             # Cancellation is noticed rather than pushed, because that is
@@ -552,6 +557,8 @@ class ProtocolServer:
                 self._fetching.pop(what_id, None)
                 if name == "ready":
                     self.send(task.done({"id": what_id}))
+                    self._tell_it_finished(what_id, title,
+                                           time.monotonic() - began)
                 elif name == "cancelled":
                     self.send(task.cancelled())
                 else:
@@ -564,6 +571,56 @@ class ProtocolServer:
         self._fetching[what_id] = work
         work.start()
         return {"id": what_id, "task_id": task.id}
+
+    #: Below this a finished job is not news. A download of two seconds
+    #: needs no announcement; one of two minutes does, because by then
+    #: the person has gone off to do something else and the window that
+    #: was showing the bar may not even be open.
+    TELL_AFTER = 10.0
+
+    def _tell_it_finished(self, what_id: str, title: str,
+                          seconds: float) -> None:
+        """
+        Say that a long job is done — and offer what has become possible.
+
+        `4.0b-E06`, the two halves that belong together. An event on the
+        wire is not a report: it draws a bar in a window nobody is
+        necessarily looking at. A person who started a two-hundred-
+        megabyte download and walked away learns it finished by going
+        back and checking, which is the opposite of being told.
+
+        And the offer. Downloading a voice leaves `piper_model` pointing
+        at it and `tts_engine` still `silent` — that is, the person waits
+        out sixty megabytes and Rina goes on answering in text. What is
+        offered is only ever the thing that would otherwise do nothing:
+        if an engine of that kind is already chosen, the choice was
+        somebody's and is not ours to second-guess.
+        """
+        if seconds < self.TELL_AFTER:
+            return
+        from core import models
+
+        store = self._settings()
+        model = models.find(what_id)
+        offer = self._worth_offering(model, store) if store else None
+        if offer is None:
+            self.engine.say(tr("{name} — готово.", name=title))
+            return
+        key, value = offer
+        self.engine.offer(
+            key, value, title,
+            tr("{name} — готово. Включить?", name=title))
+
+    @staticmethod
+    def _worth_offering(model, store):
+        """Which setting the finished download makes possible, if any."""
+        if model is None or not getattr(model, "engine", ""):
+            return None
+        key = "tts_engine" if model.purpose == "tts" else "stt_engine"
+        off = ("", "silent") if model.purpose == "tts" else ("", "disabled")
+        if str(store.get(key, "") or "") not in off:
+            return None            # already chosen, and not by us
+        return key, model.engine
 
     def _listen_once(self, message: Envelope) -> dict:
         # The context is copied so that listening events land in the same

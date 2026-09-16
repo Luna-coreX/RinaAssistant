@@ -311,15 +311,10 @@ def _candidate_score(target, entry):
 # ---------------------------------------------------------------------------
 # The answer to a clarifying question
 # ---------------------------------------------------------------------------
-ORDINALS = {
-    "первый": 0, "первое": 0, "первая": 0, "первую": 0, "1": 0, "один": 0,
-    "второй": 1, "второе": 1, "вторая": 1, "вторую": 1, "2": 1, "два": 1,
-    "третий": 2, "третье": 2, "третья": 2, "третью": 2, "3": 2, "три": 2,
-    "first": 0, "second": 1, "third": 2,
-}
-
-CANCEL_WORDS = ("отмена", "отмени", "неважно", "ничего", "забудь", "никакое",
-                "cancel", "never mind", "nothing")
+#: The words for pointing at an option live in `voice.textmatch`: the same
+#: ones pick a thing off the list of things to do (`4.0b-E06`), and one
+#: table cannot be in two places without the two parting company.
+from voice.textmatch import CANCEL_WORDS, ORDINALS       # noqa: E402
 
 
 def choose(text, options):

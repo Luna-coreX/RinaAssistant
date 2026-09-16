@@ -94,6 +94,9 @@ class RinaEngine:
         #: reading them from a process that is obliged to work without
         #: Windows means settling half of win32 inside the core.
         self.apps_source = None
+        #: Called when the engine writes a setting itself — see
+        #: `_settings_changed`. Set from outside, like `voice_out`.
+        self.settings_changed = None
         self._apps_cache = None
         #: Who opens a page in a browser. The same place as the rest of what
         #: touches the machine; until it is set, the core opens it itself,
@@ -771,7 +774,7 @@ class RinaEngine:
             llm_enabled=llm.is_enabled(),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
             last_launch_query=self._last_launch_query,
-            todo_find=self._todo.find,
+            todo_find=self._todo.matches,
         )
 
     @property
@@ -784,6 +787,48 @@ class RinaEngine:
 
         app_launcher.remember(query, entry.launch, entry.kind, entry.name,
                               settings=self._settings)
+
+    def offer(self, key, value, about, sentence):
+        """
+        Say something is now possible, and offer to switch it on.
+
+        Rina's own initiative (`4.0b-E06`), and deliberately the narrowest
+        kind of it: what she offers is always one setting taking one
+        value, and always something the person has just brought about
+        themselves. Nothing new is learned about anybody to make the
+        offer — the boundary the plan draws around initiative.
+        """
+        self.say(sentence)
+        self._ask(dialog_mod.Question.offer_setting(key, value, about))
+
+    def _take_offer(self, intent):
+        """The person agreed: switch it on and say so."""
+        key = str(intent.arg("key") or "")
+        value = str(intent.arg("value") or "")
+        if not key:
+            return
+        self._dialog.answered()
+        self._settings.set(key, value)
+        self._settings.save()
+        self._settings_changed()
+        self.say(tr("Включила: {about}.", about=intent.arg("about") or key))
+
+    def _settings_changed(self):
+        """
+        The engine has written a setting itself — tell whoever must rebuild.
+
+        The core's voice is rebuilt from the settings, and it is rebuilt
+        by whoever serves `settings.set` over the wire. A setting written
+        from in here takes a different road and would otherwise apply
+        only after the next restart — the very defect `4.0b-V05` was
+        about, met through another door.
+        """
+        if self.settings_changed is None:
+            return
+        try:
+            self.settings_changed()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось применить изменённую настройку")
 
     def _ask(self, question):
         """Ask a question and say it out loud."""
@@ -944,6 +989,15 @@ class RinaEngine:
         if source in ("voice", "always"):
             self._open_talk()
 
+        if intent.name == "offer.accepted":
+            # The "yes" goes into the conversation like any other word.
+            # Without it the record reads "Switch it on?" — "Switched
+            # on", with nobody having agreed to anything in between.
+            self._history.add("user", text, source=source)
+            self._emit(Events.HISTORY_CHANGED)
+            self._take_offer(intent)
+            return
+
         if intent.name == "ask.wake":
             self._history.add("user", "Рина", source=source)
             self._emit(Events.HISTORY_CHANGED)
@@ -1028,6 +1082,10 @@ class RinaEngine:
 
         if intent.name == "app.ambiguous":
             return Question(kind=dialog_mod.CHOOSE_APP,
+                            options=tuple(intent.arg("options") or ()),
+                            query=intent.arg("query") or "")
+        if intent.name == "todo.ambiguous":
+            return Question(kind=dialog_mod.CHOOSE_TODO,
                             options=tuple(intent.arg("options") or ()),
                             query=intent.arg("query") or "")
         if intent.name == "system.confirm":

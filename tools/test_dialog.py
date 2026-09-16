@@ -102,5 +102,65 @@ except ValueError as e:
     check("неизвестный вид отклонён", True, f"| {e}")
 
 print()
+print("=== предложенное Риной принимается или отклоняется ===")
+# `4.0b-E06`. Rina offers of her own accord — always one setting taking
+# one value, and always something the person has just brought about.
+# Agreement has to travel the same road as every other "yes": through
+# parsing. A second implementation of consent is a second place where
+# something can be switched on that nobody asked for.
+from core.engine import RinaEngine
+from core.settings_api import MemorySettings
+
+
+def someone(**values):
+    store = MemorySettings(dict(
+        {"custom_commands": [], "reminders": [], "history": [], "todo": []},
+        **values))
+    engine = RinaEngine(settings=store)
+    spoken = []
+    engine.voice_out = lambda text, **rest: spoken.append(text)
+    applied = []
+    engine.settings_changed = lambda: applied.append(True)
+    return engine, store, spoken, applied
+
+
+engine, store, spoken, applied = someone(tts_engine="silent")
+engine.offer("tts_engine", "piper", "Голос Piper",
+             "Голос Piper — готово. Включить?")
+check("предложение прозвучало", spoken == ["Голос Piper — готово. Включить?"],
+      f"| {spoken}")
+check("и Рина ждёт ответа", engine._dialog.pending)
+
+engine.handle_command("да", source="voice")
+check("согласие включило ровно то, что предлагали",
+      store.get("tts_engine") == "piper", f"| {store.get('tts_engine')}")
+check("о включении сказано", any("Включила" in line for line in spoken),
+      f"| {spoken}")
+check("вопрос снят", not engine._dialog.pending)
+# A setting written from inside the engine takes a different road from
+# `settings.set`, and the voice is rebuilt on that road only: without
+# this the person agrees, hears "switched on", and is answered in text
+# until the next restart.
+check("и тому, кто пересобирает голос, сказано", applied == [True],
+      f"| {applied}")
+
+refused, store2, spoken2, _ = someone(tts_engine="silent")
+refused.offer("tts_engine", "piper", "Голос Piper", "Включить?")
+refused.handle_command("нет", source="voice")
+check("отказ ничего не включает",
+      store2.get("tts_engine") == "silent", f"| {store2.get('tts_engine')}")
+check("и вопрос снят", not refused._dialog.pending)
+
+# The offer goes stale like any other question: agreeing to something
+# said a quarter of an hour ago is agreeing to something forgotten.
+stale, store3, _, _ = someone(tts_engine="silent")
+stale.offer("tts_engine", "piper", "Голос Piper", "Включить?")
+stale._dialog._question = stale._dialog._question.__class__(
+    **dict(stale._dialog._question.to_dict(), asked_at=time.time() - 3600))
+stale.handle_command("да", source="voice")
+check("протухшее предложение не срабатывает",
+      store3.get("tts_engine") == "silent", f"| {store3.get('tts_engine')}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
