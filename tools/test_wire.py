@@ -6,6 +6,7 @@ ADR 0002 requires the specification not to depend on the channel, so that
 the conformance tests (`4.0-D16`) can drive it over an in-process transport.
 If this file needed a named pipe, the requirement would be broken.
 """
+import io
 import os
 import sys
 
@@ -474,6 +475,32 @@ check("таблица §6 = события 3.1.0", spec_events == set(EVENTS_310
 undocumented = sorted(n for n in EVENTS if n not in spec_text)
 check("каждое событие каталога описано в спецификации", not undocumented,
       f"| нет в документе: {undocumented}")
+
+# And the other direction: an event the core **sends** and the catalogue
+# does not know.
+#
+# **This is the one that cost the voice its hearing.** `stream.credit` was
+# sent from the first day of the credit scheme and declared nowhere, and §3
+# obliges a receiver to drop an unknown event in silence. So the shell threw
+# away every replenishment, spent the one window it was given at the start —
+# 64 KB, two seconds of sound — and went deaf for the rest of the stream's
+# life. Nothing failed anywhere: not a line in either journal, and every
+# check of every link green.
+#
+# Read out of the source rather than out of a list kept by hand: a list of
+# "events we send" would be the second place to forget.
+sent = set()
+for folder, _, names in os.walk(os.path.join(ROOT, "core")):
+    for name in names:
+        if not name.endswith(".py"):
+            continue
+        text = io.open(os.path.join(folder, name), encoding="utf-8").read()
+        sent |= set(re.findall(r'Envelope\.event\(\s*"([a-z][a-z_.]+)"', text))
+        sent |= set(re.findall(r'bus\.emit\(\s*"([a-z][a-z_.]+)"', text))
+undeclared = sorted(n for n in sent if n not in EVENTS)
+check("каждое отправляемое событие объявлено в каталоге", not undeclared,
+      f"| шлём, но не объявлено: {undeclared}")
+print(f"     событий шлётся по именам: {len(sent)}")
 
 # The same for methods: a method the document says nothing about is an
 # understanding known to one side.

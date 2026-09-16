@@ -926,6 +926,14 @@ class RinaEngine:
                 intent = router_mod.route(text, ctx)
 
         if intent.name == "silence":
+            # Said out loud in the journal, because from outside this is
+            # the same silence as not hearing at all — and a person met
+            # both and could not tell them apart. "Heard, but the name
+            # was not in it" and "heard nothing" want opposite fixes: the
+            # first is about how one speaks to her, the second about the
+            # microphone.
+            log.info("Расслышано, но не мне (%s): %s", intent.stage,
+                     safe(text))
             return
 
         # She was spoken to — so the conversation is open, and for the

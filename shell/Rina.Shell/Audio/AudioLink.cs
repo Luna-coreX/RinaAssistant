@@ -117,7 +117,7 @@ public sealed class AudioLink : IDisposable
 
         _inputStream = 11;
         _credit = 0;
-        Dropped = Sent = 0;
+        Dropped = Sent = Granted = 0;
 
         var answer = await _connection.CallAsync(Methods.StreamOpen, new JsonObject
         {
@@ -132,9 +132,17 @@ public sealed class AudioLink : IDisposable
         }, TimeSpan.FromSeconds(10));
         if (answer.IsError) return false;
 
-        // The core issues the first credit together with its consent to open the stream.
-        Interlocked.Add(ref _credit,
-                        answer.Payload["credit"]?.GetValue<int>() ?? 0);
+        // **The first credit arrives the same way as every later one** — as
+        // a `stream.credit` event, which the core sends just before it
+        // answers. The answer also names the grant, and the shell used to
+        // add *that* instead; so the opening credit travelled one road and
+        // every replenishment another, and when the second road turned out
+        // to be closed the first went on working. What a person met was a
+        // microphone that heard the first two seconds of a stream and
+        // nothing after — 64 KB at 16 kHz is exactly two seconds — while
+        // every one-off listen, being a new stream, got its two seconds
+        // afresh. One road, or a break in the road nobody uses at startup
+        // stays invisible until somebody speaks for longer than the window.
 
         _reading = new CancellationTokenSource();
         _ = Task.Run(() => ReadAsync(_reading.Token));
@@ -193,12 +201,16 @@ public sealed class AudioLink : IDisposable
     /// <summary>How many bytes may be sent right now.</summary>
     public long Credit => Interlocked.Read(ref _credit);
 
+    /// <summary>How much credit has ever been granted — for the checks.</summary>
+    public long Granted { get; private set; }
+
     private void OnEvent(Envelope message)
     {
-        if (message.Method != "stream.credit") return;
+        if (message.Method != Events.StreamCredit) return;
         if (message.StreamId != _inputStream) return;
-        Interlocked.Add(ref _credit,
-                        message.Payload["bytes"]?.GetValue<int>() ?? 0);
+        var bytes = message.Payload["bytes"]?.GetValue<int>() ?? 0;
+        Granted += bytes;
+        Interlocked.Add(ref _credit, bytes);
     }
 
     /// <summary>Listen to the data channel: synthesised speech comes from there.</summary>

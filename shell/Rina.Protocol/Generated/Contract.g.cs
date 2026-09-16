@@ -259,6 +259,8 @@ public static class Events
     public const string SpeechRecognized = "speech.recognized";
     /// <summary>text: string</summary>
     public const string StreamChunk = "stream.chunk";
+    /// <summary>bytes: integer</summary>
+    public const string StreamCredit = "stream.credit";
     /// <summary>reason: string</summary>
     public const string StreamEnd = "stream.end";
     /// <summary>task_id: string</summary>
@@ -291,6 +293,7 @@ public static class Events
         "reminder.fired",
         "speech.recognized",
         "stream.chunk",
+        "stream.credit",
         "stream.end",
         "task.cancelled",
         "task.done",

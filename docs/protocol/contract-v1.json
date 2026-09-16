@@ -382,6 +382,15 @@
         "type": "string"
       }
     },
+    "stream.credit": {
+      "bytes": {
+        "choices": [],
+        "high": null,
+        "low": 1,
+        "required": true,
+        "type": "integer"
+      }
+    },
     "stream.end": {
       "reason": {
         "choices": [

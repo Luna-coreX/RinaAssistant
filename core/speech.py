@@ -36,6 +36,7 @@ depends on the model.
 """
 
 import array
+import collections
 import math
 import os
 import struct
@@ -80,20 +81,37 @@ class Segmenter:
     first crossed the threshold already contains the beginning of a word, so
     it goes into the phrase whole rather than from the point where the
     threshold fired.
+
+    **And neither is the run-up before it.** A word does not begin at full
+    voice: "Рина" opens on a consonant quieter than the threshold, and that
+    whole chunk — a tenth of a second — used to be thrown away before the
+    phrase started. Recognition was then handed a phrase beginning in the
+    middle of its first word, and turned «рина что ты умеешь» into
+    «приятно что ты умеешь». The first word is the one that matters most:
+    in "always listening" it is the name, and a name half-eaten is a name
+    not heard. So the last fraction of a second of quiet is kept and goes
+    in front of the phrase.
     """
 
     def __init__(self, rate: int = RATE, threshold: float = 0.02,
                  silence: float = 0.7, min_speech: float = 0.25,
-                 max_speech: float = 20.0):
+                 max_speech: float = 20.0, lead: float = 0.4):
         self.rate = rate
         self.threshold = threshold
         self.silence = silence
         self.min_speech = min_speech
         self.max_speech = max_speech
+        #: How much of the quiet before a phrase goes into it. Long enough
+        #: for the attack of a word, short enough not to drag in the end of
+        #: the previous one.
+        self.lead = lead
         self._buffer = bytearray()
         self._quiet = 0.0
         self._speech = 0.0
         self._speaking = False
+        #: The quiet just gone by, waiting to be needed.
+        self._lead: "collections.deque[bytes]" = collections.deque()
+        self._lead_seconds = 0.0
 
     @staticmethod
     def level(pcm: bytes) -> float:
@@ -124,6 +142,11 @@ class Segmenter:
         done: list[bytes] = []
 
         if loud:
+            if not self._speaking:
+                for earlier in self._lead:
+                    self._buffer.extend(earlier)
+                self._lead.clear()
+                self._lead_seconds = 0.0
             self._speaking = True
             self._quiet = 0.0
             self._speech += seconds
@@ -137,6 +160,15 @@ class Segmenter:
                 phrase = self.flush()
                 if phrase is not None:
                     done.append(phrase)
+        else:
+            # Quiet, and nothing being said: remember it in case a word
+            # starts in the next chunk. Only the last `lead` seconds —
+            # this is a run-up, not a recording of the room.
+            self._lead.append(pcm)
+            self._lead_seconds += seconds
+            while self._lead and self._lead_seconds > self.lead:
+                gone = self._lead.popleft()
+                self._lead_seconds -= len(gone) / (self.rate * SAMPLE_BYTES)
 
         if self._speaking and self._speech >= self.max_speech:
             # Too long a phrase is no reason to accumulate endlessly: the
@@ -153,6 +185,8 @@ class Segmenter:
         self._buffer.clear()
         self._quiet = self._speech = 0.0
         self._speaking = False
+        self._lead.clear()
+        self._lead_seconds = 0.0
         if speech < self.min_speech:
             return None
         return phrase

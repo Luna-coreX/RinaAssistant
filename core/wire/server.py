@@ -57,6 +57,14 @@ from core.wire.transport import Channels, TransportClosed
 log = get_logger("wire")
 
 
+#: The settings that decide **what gets built** for voice — as against
+#: those read at every use (`voice`, `speed`). A change to any of them
+#: makes the current recogniser or synthesiser stale; a change to anything
+#: else does not. See `ProtocolServer._voice_follows_settings`.
+_VOICE_KEYS = ("stt_engine", "vosk_model", "whisper_model",
+               "tts_engine", "piper_model")
+
+
 class ProtocolServer:
     """The core as a correspondent: parses requests, sends events."""
 
@@ -110,11 +118,9 @@ class ProtocolServer:
         #: Those passed in from outside are not rebuilt: the check set them deliberately.
         self._speech_given = (recogniser is not None, synthesiser is not None)
         store = getattr(engine, "_settings", None)
-        self._speech_wanted = (
-            str((store.get("stt_engine", "disabled") if store else "disabled")
-                or "disabled"),
-            str((store.get("tts_engine", "silent") if store else "silent")
-                or "silent"))
+        self._speech_wanted = tuple(
+            str((store.get(key, "") if store else "") or "")
+            for key in _VOICE_KEYS)
         self.segmenter = speech.Segmenter()
         self._speech_stream = 0
         #: Downloads in flight, by model id — so they can be
@@ -654,6 +660,23 @@ class ProtocolServer:
             # itself and saves, and it must not do that with the store's
             # own write still open. It costs nothing when the mode is
             # already in that state — it returns at the first line.
+            # A choice of engine or model is a choice that must take
+            # effect now. It was applied from two places only — the
+            # "test the voice" button and the moment of speaking — so
+            # recognition, which neither of them touches, went on using
+            # whatever had been built at startup. A person picking Vosk
+            # and a model was told, in reply to the next thing they
+            # said, "recognition is unavailable: choose a model in
+            # settings" — advice to do what they had just done. It came
+            # right after a restart, which is what made it read as "the
+            # first launch is broken".
+            #
+            # After the answer, like the mode below: rebuilding loads a
+            # model, and a caller waiting on `settings.set` should not
+            # wait out a model load to learn their value was saved.
+            if accepted.keys() & set(_VOICE_KEYS):
+                self._after_reply.append(self._voice_follows_settings)
+
             if "always_listen" in accepted:
                 # After the answer, like the restore at the handshake and
                 # for the same reason: applying it announces the mode, and
@@ -1373,13 +1396,42 @@ class ProtocolServer:
         }
         self.receiver = self.receiver or DataReceiver(window=self.credit_window)
         granted = self.credit_window
+        # The grant travels as `stream.credit`, the same road every later
+        # one takes (§8: the initial credit is zero and the sender is
+        # silent until the first one arrives). The number in the answer
+        # below only **reports** it — adding both would give the sender
+        # twice the window and quietly undo the backpressure. The shell
+        # once did exactly that, and the two roads hid a break in the one
+        # that mattered.
         self.send(Envelope.event("stream.credit", {"bytes": granted},
                                  id=self.ids.next(), stream_id=stream_id))
         return {"accepted": True, "credit": granted}
 
     def _stream_close(self, message: Envelope) -> dict:
+        """
+        Close the stream — and hear out what was left half-said.
+
+        **The last phrase used to wait for the next one.** A phrase is cut
+        out by the silence that follows it, and when the microphone shuts
+        at that very moment no silence ever comes: the words stay in the
+        segmenter's buffer. They then surfaced during the **next** listen,
+        so Rina answered the previous phrase almost before the person had
+        started the new one — "she answers instantly and does not let me
+        finish". The journal showed it plainly: two phrases heard, one line
+        of recognised text.
+
+        The end of the stream is the end of the phrase. Nothing more is
+        coming, and there is nothing to wait for.
+        """
         stream_id = message.payload.get("stream_id")
         state = self.incoming.pop(stream_id, None)
+        if state is not None and state.get("kind") == "audio.input":
+            tail = self.segmenter.flush()
+            if tail:
+                self.heard["phrases"] += 1
+                log.info("Договорено при закрытии потока: %.1f с звука",
+                         len(tail) / (16000 * 2))
+                self._queue_phrase(tail)
         return {"closed": state is not None,
                 "bytes": (state or {}).get("bytes", 0)}
 
@@ -1798,8 +1850,16 @@ class ProtocolServer:
         # What is compared is what was asked for, not what came of it: an
         # engine the core cannot do gives "off", and comparing by name would
         # rebuild it on every line.
-        wanted = (str(store.get("stt_engine", "disabled") or "disabled"),
-                  str(store.get("tts_engine", "silent") or "silent"))
+        #
+        # **Everything the builders read, not only the engine's name.**
+        # `recogniser_for` builds Vosk out of `vosk_model` and Whisper out
+        # of `whisper_model`; comparing the names alone meant that picking
+        # a model changed nothing until the core was restarted, and the
+        # person who had just chosen a model heard "recognition is
+        # unavailable, choose a model in settings". The list is here rather
+        # than in `speech.py` on purpose: it is the question "what makes
+        # this stale", and it belongs with the staleness.
+        wanted = tuple(str(store.get(key, "") or "") for key in _VOICE_KEYS)
         if wanted == self._speech_wanted:
             return
         self._speech_wanted = wanted

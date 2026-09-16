@@ -121,6 +121,21 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
     _e("stream.end", _f("reason", "string", "done", "cancelled", "failed"),
        note="при failed рядом идёт error с тем же stream_id"),
 
+    # --- backpressure on the data channel (4.0-D08, §8) ---------------------
+    #
+    # **Declared late, and that cost the voice its hearing.** The core had
+    # been sending this since the credit scheme was written; the catalogue
+    # never mentioned it, and §3 obliges a receiver to drop an event it does
+    # not know about — silently. So the shell dropped every replenishment,
+    # kept only the first window, sent exactly 64 KB of sound — two seconds
+    # at 16 kHz — and went mute for the rest of the stream's life. A one-off
+    # listen opens a new stream and therefore got its two seconds each time,
+    # which is why the failure read as "she hears me sometimes, and never in
+    # «always listening»".
+    _e("stream.credit", _f("bytes", "integer", low=1),
+       note="сколько ещё байт приёмник готов принять по этому потоку; "
+            "поток назван stream_id в конверте"),
+
     # --- long tasks (4.0-D09, §9) -------------------------------------------
     _e("task.progress", _f("task_id", "string"), _f("note", "string"),
        _f("fraction", "number", required=False, low=0.0, high=1.0),

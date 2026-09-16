@@ -82,6 +82,44 @@ if phrases:
           f"| {seconds:.2f} с")
 
 print()
+print("=== начало первого слова не съедается ===")
+# **The one that mattered.** A word opens quieter than it goes on, and the
+# chunk holding that opening is below the threshold. Thrown away, it took
+# the beginning of the first word with it — and in "always listening" the
+# first word is the name. The real recording went in as «Рина, что ты
+# умеешь?» and came out of Vosk as «приятно что ты умеешь»: not a mishearing
+# but a phrase handed over without its start.
+#
+# Fed in the hundred-millisecond chunks the shell actually sends, because
+# the loss is exactly one chunk and a whole-buffer feed cannot show it.
+onset = Segmenter()
+attack, body = 0.2, 0.8
+speech = sound(attack, 0.01) + sound(body, 0.3)      # quiet start, then voice
+for at in range(0, len(silence(0.5)), int(RATE * 0.1) * 2):
+    onset.feed(silence(0.5)[at:at + int(RATE * 0.1) * 2])
+for at in range(0, len(speech), int(RATE * 0.1) * 2):
+    onset.feed(speech[at:at + int(RATE * 0.1) * 2])
+caught = []
+for at in range(0, len(silence(1.0)), int(RATE * 0.1) * 2):
+    caught += onset.feed(silence(1.0)[at:at + int(RATE * 0.1) * 2])
+check("фраза нарезалась", len(caught) == 1, f"| {len(caught)}")
+if caught:
+    # Measured where it matters: find the first loud moment inside the
+    # phrase and look at what lies immediately before it. That has to be
+    # the attack — audible, under the threshold — over its whole length.
+    # Asking about the phrase's own first samples would only find the
+    # run-up's silence, and asking about length would pass on a phrase
+    # padded at the wrong end.
+    step = int(RATE * 0.1) * 2
+    windows = [caught[0][at:at + step] for at in range(0, len(caught[0]), step)]
+    louds = [i for i, w in enumerate(windows) if Segmenter.level(w) >= 0.02]
+    before = windows[max(0, louds[0] - int(attack / 0.1)):louds[0]] if louds else []
+    head = Segmenter.level(b"".join(before)) if before else 0.0
+    check("перед громким местом сохранилось тихое начало слова",
+          len(before) == int(attack / 0.1) and 0.0 < head < 0.02,
+          f"| {len(before)} кадров, громкость {head:.4f}")
+
+print()
 print("=== слишком тихая речь не режется вовсе ===")
 # Not a defect but the commonest cause: a quiet microphone means silence to
 # the segmenter, and silence means no phrase, and no phrase means no error
@@ -125,6 +163,32 @@ check("громкие кадры отделены от тихих",
       f"| громких {seen['loud_frames']} из {seen['frames']}")
 check("фраза дошла до распознавания", seen["phrases"] == 1,
       f"| {seen['phrases']}")
+
+print()
+print("=== микрофон закрыли посреди фразы ===")
+# **The phrase that waited for the next one.** A phrase is cut out by the
+# silence after it, and if the microphone shuts at that very moment no
+# silence ever comes: the words stay in the buffer. They surfaced during
+# the following listen, so Rina answered the previous phrase almost before
+# the person had begun the new one — "she answers instantly and does not
+# let me finish the command". Ending the stream ends the phrase.
+from core.wire.envelope import Envelope
+
+cut_off = ProtocolServer.__new__(ProtocolServer)
+cut_off.engine = engine
+cut_off.segmenter = Segmenter()
+cut_off.recogniser = NoModel()
+cut_off.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+                 "recognitions": 0, "texts": 0}
+cut_off.incoming = {11: {"kind": "audio.input", "format": {},
+                         "bytes": 0, "frames": 0}}
+cut_off._hear(sound(0.8))                       # speech and no silence after
+check("пока поток открыт, фраза ещё ждёт тишины",
+      cut_off.hearing()["phrases"] == 0, f"| {cut_off.hearing()['phrases']}")
+cut_off._stream_close(Envelope.request("stream.close", {"stream_id": 11},
+                                       id="x"))
+check("поток закрылся — фраза договорена",
+      cut_off.hearing()["phrases"] == 1, f"| {cut_off.hearing()['phrases']}")
 
 print()
 print("=== распознавание идёт по одному и по порядку ===")

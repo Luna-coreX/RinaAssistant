@@ -175,6 +175,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-heard"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckHeardAsync(), "heard");
+            return;
+        }
+
         if (args.Contains("--check-listen"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -3318,6 +3325,308 @@ public partial class App
             at++;
         }
         Shutdown();
+    }
+
+    /// <summary>
+    /// A spoken phrase, from sound to answer, with nothing stubbed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The check that should have existed first.</b> Every link of this
+    /// chain had a check of its own — the device works, the stream
+    /// carries, the segmenter cuts, the recogniser recognises, the wake
+    /// word matches, the router routes — and all of them were green while
+    /// a person said "Рина, что ты умеешь?" into the microphone and
+    /// nothing happened. A chain checked link by link is not a checked
+    /// chain: what breaks is the joins, and the joins belong to nobody.
+    /// </para>
+    /// <para>
+    /// So: real sound (a recorded phrase), the real sound link, a real
+    /// core with a real model, the mode switched on the way a person
+    /// switches it — and one question at the end, which is the only
+    /// question a person ever asks. The microphone itself is the one
+    /// thing left out, and deliberately: what it would add is the room,
+    /// and the room is not ours to check.
+    /// </para>
+    /// <para>
+    /// It needs a Vosk model on the machine and says so plainly when
+    /// there is none. A check that downloads fifty megabytes to run is a
+    /// check nobody runs twice.
+    /// </para>
+    /// </remarks>
+    private async Task CheckHeardAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== услышала: от звука до ответа ===");
+
+        var real = CoreLink.FindCore();
+        var model = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RinaAssistant", "models", "vosk-ru-small",
+            "vosk-model-small-ru-0.22");
+        var voice = Path.Combine(real.WorkingDirectory, "tools", "fixtures",
+                                 "said-rina.wav");
+
+        if (!Directory.Exists(model) || !File.Exists(voice))
+        {
+            Console.WriteLine("     пропущено: нет модели Vosk или записи "
+                              + $"({model}, {voice})");
+            Console.WriteLine();
+            Console.WriteLine("Ошибок: 0");
+            Shutdown();
+            return;
+        }
+
+        var home = Path.Combine(Path.GetTempPath(),
+                                "rina-heard-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(home);
+        Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", home);
+        try
+        {
+            // **A bare connection, not `CoreLink`.** The shell's own link
+            // answers "listening" by opening the real microphone, and the
+            // first edition of this check did just that: the room went
+            // into the same stream alongside the recording, the core heard
+            // both at once, and «Рина, что ты умеешь?» came back as
+            // «репина что ты умеешь». A check that records the room is a
+            // check whose result depends on who is in it. That the shell
+            // opens the microphone when the core says so is true and
+            // checked — by `--check-listen`, which is about exactly that.
+            var wire = new Rina.Protocol.CoreConnection();
+            await wire.StartAsync(new Rina.Protocol.CoreLaunch(
+                    real.Python,
+                    Path.Combine(real.WorkingDirectory, "tools",
+                                 "_core_sandboxed.py"),
+                    real.WorkingDirectory),
+                TimeSpan.FromSeconds(40));
+            await wire.HandshakeAsync();
+
+            // The core asks the shell for things while it works out an
+            // answer, and the first voice command asks for the index of
+            // installed programs. Unanswered, that request waits a full
+            // minute and the answer never comes — which is what this
+            // check saw: the phrase recognised, the journal silent, and
+            // «Рина ответила» red for a reason that had nothing to do
+            // with hearing. An empty index is the truthful answer here:
+            // this check is about sound, and no programs were indexed.
+            wire.RequestReceived += request =>
+            {
+                if (request.Method == Rina.Protocol.Methods.AppsIndex)
+                    _ = wire.ReplyAsync(request,
+                                        new JsonObject { ["entries"] = new JsonArray() });
+            };
+
+            var said = new List<string>();
+            var answered = new List<string>();
+            // And what she complains about. Without this the check said
+            // "she did not recognise it" while the core was saying, over
+            // the wire, exactly why — and the sentence a person would
+            // have read on screen went nowhere.
+            var complained = new List<string>();
+            wire.EventReceived += m =>
+            {
+                if (m.Method == Rina.Protocol.Events.SpeechRecognized)
+                    said.Add(m.Payload["text"]?.GetValue<string>() ?? "");
+                if (m.Method == Rina.Protocol.Events.AssistantResponse)
+                    answered.Add(m.Payload["text"]?.GetValue<string>() ?? "");
+                if (m.Method == Rina.Protocol.Events.AssistantError)
+                    complained.Add(m.Payload["text"]?.GetValue<string>() ?? "");
+            };
+
+            Check("ядро на связи", wire.Ready, $"| {wire.CoreVersion}");
+            if (!wire.Ready)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Ошибок: {fails}");
+                Environment.ExitCode = 1;
+                Shutdown();
+                return;
+            }
+
+            // The engine and the model, as a person would choose them.
+            var chosen = await wire.CallAsync(Rina.Protocol.Methods.SettingsSet,
+                new JsonObject
+                {
+                    ["values"] = new JsonObject
+                    {
+                        ["stt_engine"] = "vosk",
+                        ["vosk_model"] = model,
+                        ["wake_words"] = new JsonArray("Рина"),
+                    },
+                }, TimeSpan.FromSeconds(15));
+            // Every key, not the call. `settings.set` reports per key on
+            // purpose — of five values one may not go through — and a
+            // check that looks only at the envelope calls that a success.
+            var refused = (chosen.Payload["verdicts"] as JsonObject ?? [])
+                .Where(v => v.Value?["accepted"]?.GetValue<bool>() != true)
+                .Select(v => $"{v.Key}: {v.Value?["message"]}").ToList();
+            Check("движок, модель и имя приняты",
+                  !chosen.IsError && refused.Count == 0,
+                  $"| {chosen.ErrorCode}{string.Join("; ", refused)}");
+
+            var turned = await wire.CallAsync(
+                Rina.Protocol.Methods.SpeechSetAlwaysListen,
+                new JsonObject { ["enabled"] = true },
+                TimeSpan.FromSeconds(10));
+            Check("режим включён",
+                  turned.Payload["enabled"]?.GetValue<bool>() == true);
+
+            // The sound link, without the device: the room is not ours to
+            // check, and the phrase is on disk.
+            using var audio = new Audio.AudioLink(wire, wire.Data,
+                                                  new Audio.Microphone(),
+                                                  new Audio.Speaker());
+            var opened = await audio.StartCaptureAsync(listen: false);
+            Check("поток звука открыт", opened);
+
+            // Before a single byte: the core is obliged to have granted
+            // credit by the time it consents to the stream, and the
+            // grant has to arrive as an event, the same road every later
+            // grant takes. When it did not, the shell fell back on the
+            // number in the answer and nobody noticed the road was shut.
+            Check("кредит выдан до первого байта", audio.Credit > 0,
+                  $"| {audio.Credit} Б");
+
+            // The recorded phrase, in the chunks the microphone would send.
+            var wave = File.ReadAllBytes(voice);
+            var sound = wave.AsMemory(44);          // past the wav header
+            const int chunk = 3200;                 // 100 ms at 16 kHz
+
+            async Task<int> SayIt()
+            {
+                var gone = 0;
+                for (var at = 0; at < sound.Length; at += chunk)
+                {
+                    var size = Math.Min(chunk, sound.Length - at);
+                    // Waited for, not dropped. The core lets sound through
+                    // by credit, and a chunk refused is a chunk of the
+                    // phrase missing — a microphone that drops a syllable
+                    // is the same as one that mishears it.
+                    var tries = 0;
+                    while (!audio.Push(sound.Slice(at, size).Span) && tries < 40)
+                    {
+                        tries++;
+                        await Task.Delay(25);
+                    }
+                    if (tries >= 40) break;
+                    gone += size;
+                    await Task.Delay(35);
+                }
+                // And silence after it, or the segmenter has no reason to
+                // decide the phrase has ended.
+                var hush = new byte[chunk];
+                for (var i = 0; i < 20; i++)
+                {
+                    audio.Push(hush);
+                    await Task.Delay(35);
+                }
+                return gone;
+            }
+
+            var pushed = await SayIt();
+            Check("звук ушёл в ядро целиком", pushed == sound.Length,
+                  $"| {pushed} из {sound.Length} Б");
+
+            // **Past the first window, deliberately.** The phrase is 2.6
+            // seconds and the window two, so the sound does not fit in
+            // what is granted at the start: this only goes through if
+            // credit keeps coming back as the core handles the sound.
+            // The check that asked for "more than half" would have passed
+            // on the broken build, and did.
+            Check("кредит возвращался по ходу", audio.Granted > 64 * 1024,
+                  $"| выдано {audio.Granted} Б за поток");
+            Check("ничего не потерялось по дороге", audio.Dropped == 0,
+                  $"| потеряно {audio.Dropped} Б");
+
+            for (var i = 0; i < 120 && answered.Count == 0; i++)
+                await Task.Delay(100);
+
+            Check("фраза распозналась", said.Count > 0,
+                  $"| {string.Join(" / ", said)}");
+            Check("и в ней услышано имя",
+                  said.Any(t => t.ToLowerInvariant().Contains("рин")),
+                  $"| {string.Join(" / ", said)}");
+            Check("и Рина ответила", answered.Count > 0,
+                  $"| {string.Join(" / ", answered)}");
+            Check("и ни на что не пожаловалась", complained.Count == 0,
+                  $"| {string.Join(" / ", complained)}");
+
+            // --- and again, into the same stream ------------------------
+            //
+            // **The half of the complaint that lasted longest.** A stream
+            // that works once and never again is exactly what a person
+            // met: the window granted at the start was two seconds of
+            // sound, the first phrase fitted inside it, and after that
+            // the microphone was open and deaf. Every press of the hotkey
+            // opened a new stream and so got its two seconds afresh —
+            // which is why "always listening", where the stream lives on,
+            // was the mode that never worked. One phrase proves nothing
+            // about the second.
+            var wasSaid = said.Count;
+            await SayIt();
+            for (var i = 0; i < 120 && said.Count == wasSaid; i++)
+                await Task.Delay(100);
+            Check("и вторую фразу в том же потоке услышала",
+                  said.Count > wasSaid,
+                  $"| {said.Count} фраз(ы) за поток: {string.Join(" / ", said)}");
+
+            // And the thing that made all of the above go dark: an event
+            // the core sends and the shell does not know. §3 has the
+            // receiver drop such an event without a word, which is right
+            // for a notification and ruinous for a grant of credit. The
+            // silence is the point, so somebody has to look.
+            Check("незнакомых событий не приходило",
+                  wire.IgnoredEvents.Count == 0,
+                  $"| {string.Join(", ", wire.IgnoredEvents.Distinct())}");
+
+            // When the chain breaks, the core's own journal is the only
+            // account of where — the same file a person attaches to a
+            // complaint. Printing it here saves the half-hour of putting
+            // the sandbox back together by hand, and it is printed only
+            // on failure: a green check that prints a page is a check
+            // whose output nobody reads.
+            if (fails > 0) CoreJournal(home);
+            await wire.DisposeAsync();
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", null);
+            try { Directory.Delete(home, recursive: true); }
+            catch { /* уйдёт со временным каталогом */ }
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>The tail of the core's journal from a sandbox — for a failure.</summary>
+    private static void CoreJournal(string home)
+    {
+        var log = Directory.Exists(home)
+            ? Directory.GetFiles(home, "rina.log", SearchOption.AllDirectories)
+                       .FirstOrDefault()
+            : null;
+        if (log is null)
+        {
+            Console.WriteLine($"     журнала ядра нет в {home}");
+            return;
+        }
+        Console.WriteLine($"     --- журнал ядра ({log}) ---");
+        var lines = Journal(log).Split(Environment.NewLine);
+        foreach (var line in lines.Skip(Math.Max(0, lines.Length - 40)))
+            if (line.Trim().Length > 0) Console.WriteLine("     " + line.TrimEnd());
     }
 
     /// <summary>
