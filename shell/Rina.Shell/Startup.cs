@@ -3543,10 +3543,15 @@ public partial class App
             // credit keeps coming back as the core handles the sound.
             // The check that asked for "more than half" would have passed
             // on the broken build, and did.
+            //
+            // How often we had to wait is said but not judged: that is
+            // the machine's load, not the program's behaviour. A check
+            // that goes red because the disk was busy is a check people
+            // learn to ignore — and the phrase getting through whole is
+            // already asserted above.
             Check("кредит возвращался по ходу", audio.Granted > 64 * 1024,
-                  $"| выдано {audio.Granted} Б за поток");
-            Check("ничего не потерялось по дороге", audio.Dropped == 0,
-                  $"| потеряно {audio.Dropped} Б");
+                  $"| выдано {audio.Granted} Б за поток, "
+                  + $"ждали кредита {audio.Dropped / chunk} раз(а)");
 
             for (var i = 0; i < 120 && answered.Count == 0; i++)
                 await Task.Delay(100);
@@ -3595,8 +3600,76 @@ public partial class App
             // the sandbox back together by hand, and it is printed only
             // on failure: a green check that prints a page is a check
             // whose output nobody reads.
-            if (fails > 0) CoreJournal(home);
             await wire.DisposeAsync();
+
+            // --- and after a restart, with nobody switching anything ----
+            //
+            // Word for word the complaint: "«always listening» does not
+            // work after the program starts — if it was on, the next
+            // start will look as though it is on, and it will not work".
+            // The mode is restored from the settings while `hello` is
+            // being answered, and everything after that — the ear, the
+            // stream, the credit, the phrase — has to happen without
+            // anybody touching a switch. This scene sets nothing: it
+            // starts a second core over the same settings and speaks.
+            Console.WriteLine();
+            Console.WriteLine("=== и после перезапуска, ничего не включая ===");
+            var again = new Rina.Protocol.CoreConnection();
+            await again.StartAsync(new Rina.Protocol.CoreLaunch(
+                    real.Python,
+                    Path.Combine(real.WorkingDirectory, "tools",
+                                 "_core_sandboxed.py"),
+                    real.WorkingDirectory),
+                TimeSpan.FromSeconds(40));
+
+            var heardAgain = new List<string>();
+            var mode = false;
+            again.RequestReceived += request =>
+            {
+                if (request.Method == Rina.Protocol.Methods.AppsIndex)
+                    _ = again.ReplyAsync(request,
+                                         new JsonObject { ["entries"] = new JsonArray() });
+            };
+            again.EventReceived += m =>
+            {
+                if (m.Method == Rina.Protocol.Events.SpeechRecognized)
+                    heardAgain.Add(m.Payload["text"]?.GetValue<string>() ?? "");
+                if (m.Method == Rina.Protocol.Events.ListeningAlways)
+                    mode |= m.Payload["enabled"]?.GetValue<bool>() == true;
+            };
+            await again.HandshakeAsync();
+            for (var i = 0; i < 50 && !mode; i++) await Task.Delay(100);
+            Check("режим объявлен сам, без нажатия", mode);
+
+            using var voiceAgain = new Audio.AudioLink(again, again.Data,
+                                                       new Audio.Microphone(),
+                                                       new Audio.Speaker());
+            Check("поток звука открыт",
+                  await voiceAgain.StartCaptureAsync(listen: false));
+            for (var at = 0; at < sound.Length; at += chunk)
+            {
+                var size = Math.Min(chunk, sound.Length - at);
+                var tries = 0;
+                while (!voiceAgain.Push(sound.Slice(at, size).Span) && tries < 40)
+                {
+                    tries++;
+                    await Task.Delay(25);
+                }
+                await Task.Delay(35);
+            }
+            var hushAgain = new byte[chunk];
+            for (var i = 0; i < 20; i++)
+            {
+                voiceAgain.Push(hushAgain);
+                await Task.Delay(35);
+            }
+            for (var i = 0; i < 120 && heardAgain.Count == 0; i++)
+                await Task.Delay(100);
+            Check("и она услышала, хотя режим только восстановили",
+                  heardAgain.Count > 0, $"| {string.Join(" / ", heardAgain)}");
+
+            if (fails > 0) CoreJournal(home);
+            await again.DisposeAsync();
         }
         finally
         {

@@ -1685,6 +1685,11 @@ class ProtocolServer:
     _stt_thread = None
     _stt_guard = threading.Lock()
 
+    #: Whether the absence of a voice has already been reported — see
+    #: `_speak`. On the class, like the two above, so that a server put
+    #: together field by field in a check has it too.
+    _said_mute = False
+
     #: How many phrases may wait. Recognition slower than speech has to
     #: lose something; what it must not do is fall further and further
     #: behind, answering a minute late. The oldest goes, and it is said out
@@ -1878,7 +1883,18 @@ class ProtocolServer:
         """
         self._voice_follows_settings()
         if not self.synthesiser.available():
-            return          # the text already went as an event; there is simply no voice
+            # The text already went as an event; there is simply no voice.
+            # Said in the journal once, because a mute Rina is otherwise
+            # indistinguishable from a broken one — and on a machine
+            # without a synthesis package she is mute from the first
+            # minute, with nothing anywhere to say why.
+            if not self._said_mute:
+                self._said_mute = True
+                log.info("Голоса нет (%s): %s. Ответы остаются текстом.",
+                         getattr(self.synthesiser, "name", "?"),
+                         getattr(self.synthesiser, "last_error", "")
+                         or "движок синтеза недоступен")
+            return
         pcm = self.synthesiser.synthesize(
             text,
             voice=str(self._settings().get("voice", "") if self._settings()
