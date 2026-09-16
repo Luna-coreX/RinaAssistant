@@ -280,6 +280,116 @@ check("распознанное исполнилось, и ответ тоже �
       any("Засекла" in said for said in voice.said), f"| {voice.said}")
 check("местный динамик при этом молчал", box.spoken == [], f"| {box.spoken}")
 
+
+print()
+print("=== E04: длинная реплика уходит целиком ===")
+# **What a person heard as "her speech glitches sometimes".** Sending
+# used to `break` when the credit ran short, that is, throw away the rest
+# of the reply. The initial self-issued credit is 32 KB — two thirds of a
+# second of sound — and the loop runs through in microseconds, long
+# before the shell could return credit for what it had played. Short
+# replies fitted the window, long ones were cut, and neither journal had
+# a line about it.
+#
+# The shell here is an imitation, but it behaves like the real one in the
+# single thing that matters: it returns credit **as it plays**, not at
+# once. A receiver that pays instantly is exactly the check that would
+# stay green with the defect in place.
+import threading
+
+from core.wire.data import DataSender
+from core.wire.envelope import Envelope
+
+
+class Ids:
+    def __init__(self):
+        self.n = 0
+
+    def next(self):
+        self.n += 1
+        return str(self.n)
+
+
+class Playing:
+    """An imitation shell that plays: takes bytes and pays for them after."""
+
+    def __init__(self, server, pipe):
+        self.server = server
+        self.pipe = pipe
+        self.taken = 0
+        self.stop = False
+
+    def start(self):
+        thread = threading.Thread(target=self._play, daemon=True)
+        thread.start()
+        return self
+
+    def _play(self):
+        while not self.stop:
+            piece = self.pipe.recv()
+            if not piece:
+                _time.sleep(0.005)
+                continue
+            self.taken += len(piece)
+            # Played — so the credit for it goes back, the way
+            # `AudioLink.ReadAsync` returns it after `RoomAsync`.
+            _time.sleep(0.005)
+            self.server._stream_credit(Envelope.request(
+                "stream.credit", {"stream_id": 21, "bytes": len(piece)},
+                id="c"))
+
+
+def speaker(wait=None):
+    """A bare server that can only send sound — and the pipe to listen on."""
+    heard_side, core_side = InProcessTransport.pair()
+    made = ProtocolServer.__new__(ProtocolServer)
+    made.channels = Channels(None, core_side)
+    made.data = DataSender()
+    made.ids = Ids()
+    made.send = lambda envelope: None
+    made._speech_stream = 0
+    made._speech_rate = 0
+    made._speech_queue = None
+    made._speech_sender = None
+    made._running = True
+    if wait is not None:
+        made.SPEECH_WAIT = wait
+    return made, heard_side
+
+
+reply = speech.tone(4.0, rate=24000)          # four times the first window
+
+long_server, long_pipe = speaker()
+player = Playing(long_server, long_pipe).start()
+long_server.send_speech(reply, 24000)
+until(lambda: player.taken >= len(reply), seconds=25.0)
+player.stop = True
+
+check("вся реплика ушла к оболочке",
+      long_server.data._credit[21].sent == len(reply),
+      f"| отправлено {long_server.data._credit[21].sent} из {len(reply)} Б "
+      f"({len(reply) / 48000:.1f} с звука)")
+check("и оболочка приняла столько же", player.taken >= len(reply),
+      f"| принято {player.taken} Б")
+
+print()
+print("=== E04: а если оболочка замолчала — сказано вслух ===")
+# The other half of the same rule. Waiting for ever is no improvement on
+# cutting off: a shell that has stopped playing must not hold a reply in
+# the core until the end of time. What must not happen is the silence
+# about it — so the cut is a warning in the journal, not a `break`.
+deaf, _deaf_pipe = speaker(wait=0.3)         # nobody takes it and nobody pays
+began = _time.monotonic()
+deaf.send_speech(reply, 24000)
+until(lambda: 21 in deaf.data.open
+      and deaf.data._credit[21].sent >= 32 * 1024, seconds=5.0)
+_time.sleep(0.6)          # longer than the wait for credit is allowed
+spent = _time.monotonic() - began
+check("не ждёт вечно", spent < 3.0, f"| остановилась через {spent:.1f} с")
+check("и отправила ровно то, на что был кредит",
+      deaf.data._credit[21].sent == 32 * 1024,
+      f"| {deaf.data._credit[21].sent} Б")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

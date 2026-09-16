@@ -1495,7 +1495,24 @@ public partial class App
         Check("звук даёт заметный уровень", loud > 0.3f, $"| {loud:0.00}");
 
         // --- F09: a stream into a real core with credit ---
-        var link = new CoreLink(new MainWindow(), CoreLink.FindCore());
+        //
+        // **The core is sandboxed, and that is not tidiness.** This check
+        // used to raise the developer's own core over the developer's own
+        // settings, and the day "always listening" started working the
+        // check went red: the mode was on in that profile, so the shell
+        // opened the real microphone by itself, the room went into the
+        // same stream, and the core counted more bytes than the check had
+        // sent. Nothing was broken — the check was asking about this
+        // machine's settings and calling the answer a defect.
+        var real = CoreLink.FindCore();
+        var home = Path.Combine(Path.GetTempPath(),
+                                "rina-audio-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(home);
+        Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", home);
+        var link = new CoreLink(new MainWindow(), new Rina.Protocol.CoreLaunch(
+            real.Python,
+            Path.Combine(real.WorkingDirectory, "tools", "_core_sandboxed.py"),
+            real.WorkingDirectory));
         await link.StartAsync();
         for (var i = 0; i < 400 && link.State != Rina.Protocol.CoreState.Ready; i++)
             await Task.Delay(100);
@@ -1560,6 +1577,10 @@ public partial class App
               $"| запусков {link.CaptureStarts}");
 
         await link.DisposeAsync();
+        Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", null);
+        try { Directory.Delete(home, recursive: true); }
+        catch (IOException) { /* уйдёт со временным каталогом */ }
+
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

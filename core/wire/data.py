@@ -34,6 +34,7 @@ turn the mistake "we forgot to issue credit" into a rarely reproducible one
 """
 
 import struct
+import threading
 from dataclasses import dataclass, field
 from typing import Iterator
 
@@ -162,28 +163,40 @@ class DataSender:
     Credit is kept **per stream**: the microphone and synthesis run at the
     same time and in different directions, and a common tally would tie
     their speeds to each other for no reason whatever.
+
+    **Two threads, one tally.** The credit is granted by whoever reads the
+    control channel and spent by whoever sends the sound — and since
+    sending learned to *wait* for credit, the two overlap for whole
+    seconds at a time rather than by accident. `granted += extra` is three
+    bytecodes, not one, so without the lock a grant arriving mid-send is
+    simply lost — and a lost grant is a reply that stops halfway with
+    nothing in either journal.
     """
 
     def __init__(self):
         self._seq: dict[int, int] = {}
         self._credit: dict[int, Credit] = {}
         self.open: dict[int, str] = {}
+        self._guard = threading.RLock()
 
     def open_stream(self, stream_id: int, kind: str) -> None:
         capability_for_kind(kind)          # an unknown kind: refused at once
-        if stream_id in self.open:
-            raise fault(ERROR_INVALID_STATE, f"поток {stream_id} уже открыт",
-                        stream_id=stream_id)
-        self.open[stream_id] = kind
-        self._seq[stream_id] = 0
-        self._credit[stream_id] = Credit()
+        with self._guard:
+            if stream_id in self.open:
+                raise fault(ERROR_INVALID_STATE, f"поток {stream_id} уже открыт",
+                            stream_id=stream_id)
+            self.open[stream_id] = kind
+            self._seq[stream_id] = 0
+            self._credit[stream_id] = Credit()
 
     def grant(self, stream_id: int, extra: int) -> int:
         """The receiver sent `stream.credit`."""
-        return self._require(stream_id).grant(extra)
+        with self._guard:
+            return self._require(stream_id).grant(extra)
 
     def available(self, stream_id: int) -> int:
-        return self._require(stream_id).available
+        with self._guard:
+            return self._require(stream_id).available
 
     def send(self, stream_id: int, payload: bytes) -> bytes:
         """
@@ -193,17 +206,19 @@ class DataSender:
         Sending without credit is not "a little ahead" but an error: a
         receiver that announced zero is not ready to receive at all.
         """
-        credit = self._require(stream_id)
-        credit.spend(len(payload))
-        self._seq[stream_id] += 1
-        return encode_data_frame(
-            DataFrame(stream_id, self._seq[stream_id], payload))
+        with self._guard:
+            credit = self._require(stream_id)
+            credit.spend(len(payload))
+            self._seq[stream_id] += 1
+            return encode_data_frame(
+                DataFrame(stream_id, self._seq[stream_id], payload))
 
     def close_stream(self, stream_id: int) -> None:
-        self._require(stream_id)
-        del self.open[stream_id]
-        del self._seq[stream_id]
-        del self._credit[stream_id]
+        with self._guard:
+            self._require(stream_id)
+            del self.open[stream_id]
+            del self._seq[stream_id]
+            del self._credit[stream_id]
 
     def close_all(self) -> int:
         """Close every stream: breaking the data channel closes them all (§8)."""

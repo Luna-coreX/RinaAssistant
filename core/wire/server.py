@@ -1441,6 +1441,12 @@ class ProtocolServer:
         extra = int(message.payload.get("bytes") or 0)
         if stream_id in self.data.open and extra > 0:
             self.data.grant(stream_id, extra)
+            # Somebody may be standing over this very number. Waking on
+            # the grant rather than polling for it: a poll would add its
+            # own interval to every chunk of every reply, and the whole
+            # point here is the milliseconds.
+            with self._speech_room:
+                self._speech_room.notify_all()
         return {"accepted": True}
 
     def pump_data(self) -> str:
@@ -1904,11 +1910,85 @@ class ProtocolServer:
             return
         self.send_speech(pcm, self.synthesiser.sample_rate)
 
-    def send_speech(self, pcm: bytes, sample_rate: int) -> None:
-        """Send ready-made sound to the shell in chunks over the data channel."""
-        if self.channels.data is None:
-            return
+    #: Sound waiting to go to the shell, and the thread that sends it.
+    #:
+    #: **Sending waits, and waiting needs somewhere to wait.** The credit
+    #: comes back as the shell plays — a fifth of a second per chunk — so
+    #: whoever sends has to stand still for whole seconds. That cannot be
+    #: the thread that answered `speech.test`: it is the control channel's
+    #: dispatcher, and standing still there means every other request
+    #: waits out the reply being spoken.
+    _speech_queue: "queue.Queue | None" = None
+    _speech_sender = None
+    _speech_guard = threading.Lock()
 
+    #: Woken when credit arrives — see `_room_for`. On the class, like the
+    #: guard above: there is one core to a process, and a server put
+    #: together field by field in a check needs it as much as a real one.
+    _speech_room = threading.Condition()
+
+    #: How long one chunk may wait for credit. Playback of a chunk is
+    #: about a fifth of a second; ten is not "slow machine" but "the other
+    #: side is not playing at all", and then it is better to stop and say
+    #: so than to hold a reply for ever.
+    SPEECH_WAIT = 10.0
+
+    def send_speech(self, pcm: bytes, sample_rate: int) -> None:
+        """
+        Send ready-made sound to the shell over the data channel.
+
+        Queued rather than sent here: see `_speech_queue`. The caller gets
+        its thread back at once, which matters because one of the callers
+        is the dispatcher.
+        """
+        if self.channels.data is None or not pcm:
+            return
+        with self._speech_guard:
+            if self._speech_queue is None:
+                self._speech_queue = queue.Queue()
+            waiting = self._speech_queue
+            if self._speech_sender is None or not self._speech_sender.is_alive():
+                self._speech_sender = threading.Thread(
+                    target=self._send_speech_forever, args=(waiting,),
+                    name="rina-speech", daemon=True)
+                self._speech_sender.start()
+        waiting.put((pcm, sample_rate))
+
+    def _send_speech_forever(self, waiting: "queue.Queue") -> None:
+        """Take utterances one at a time, in the order they were said."""
+        while True:
+            pcm, sample_rate = waiting.get()
+            try:
+                self._push_speech(pcm, sample_rate)
+            except Exception:                           # noqa: BLE001
+                # The thread is the only one there is: letting it die
+                # would mean a silent Rina for the rest of the session.
+                log.exception("Отправка речи сорвалась")
+
+    def _room_for(self, size: int) -> bool:
+        """
+        Wait until there is credit for this much. `False` — nobody is taking it.
+
+        **This is where the reply used to be thrown away.** The loop below
+        broke off at the first shortfall, and the shortfall came at once:
+        the initial self-issued credit is 32 KB, that is two thirds of a
+        second of sound, and the loop runs through in microseconds — far
+        sooner than the shell could return credit for what it had played.
+        Measured on an eight-second reply: 32832 bytes went out of 384000,
+        and nothing said so. A person heard speech that breaks off.
+        """
+        edge = time.monotonic() + self.SPEECH_WAIT
+        with self._speech_room:
+            while self.data.available(self._speech_stream) < size:
+                if not self._running or self.channels.data is None:
+                    return False
+                left = edge - time.monotonic()
+                if left <= 0:
+                    return False
+                self._speech_room.wait(min(left, 0.2))
+        return True
+
+    def _push_speech(self, pcm: bytes, sample_rate: int) -> None:
         # The rate is declared when the stream is opened, so a change of
         # engine is a new stream rather than a continuation of the old one.
         # Otherwise speech at 24000 would go into a stream declared at
@@ -1946,9 +2026,16 @@ class ProtocolServer:
         chunk = 8192
         for offset in range(0, len(pcm), chunk):
             piece = pcm[offset:offset + chunk]
-            if self.data.available(self._speech_stream) < len(piece):
-                break       # the shell cannot keep up: cutting speech off is
-                            # more honest than piling it up in memory
+            if not self._room_for(len(piece)):
+                # Said out loud. Cutting a reply short may be the only
+                # thing left to do when the other side has stopped
+                # playing, but doing it in silence is what made this cost
+                # a day: neither journal had a line, and the failure
+                # arrived as "her speech glitches sometimes".
+                log.warning("Речь оборвана: оболочка не вернула кредит за "
+                            "%.0f с, не отправлено %d Б из %d",
+                            self.SPEECH_WAIT, len(pcm) - offset, len(pcm))
+                return
             self.channels.data.send(self.data.send(self._speech_stream, piece))
 
     # -- the break ---------------------------------------------------------------
