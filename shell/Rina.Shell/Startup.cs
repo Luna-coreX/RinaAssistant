@@ -5075,26 +5075,31 @@ public partial class App
             // The canvas is left as it was found: the checks below build
             // their own graphs, and two stray nodes from this one made the
             // next assertion read a chain nobody assembled.
+            // **Waited for, not slept through.** These three used to
+            // pause 150 ms and read the colour — and a state change
+            // takes 160 by the design system (§7), so the read landed
+            // inside the transition and returned the colour before it.
+            // Red about one run in two, green when run alone, and
+            // nothing wrong with the program: a check racing an
+            // animation it knows the length of.
             var first = editor!.NodePaths.OrderBy(p => p).First();
             editor!.ReportForCheck(first, "running");
-            await Task.Delay(150);
             Check("идущий шаг зеленеет",
-                  editor!.ColourOfNode(first) == "C.Live",
+                  await Until(() => editor!.ColourOfNode(first) == "C.Live"),
                   $"| {editor!.ColourOfNode(first)}");
 
             editor!.ReportForCheck(first, "failed");
-            await Task.Delay(150);
             Check("упавший шаг краснеет",
-                  editor!.ColourOfNode(first) == "C.Signal",
+                  await Until(() => editor!.ColourOfNode(first) == "C.Signal"),
                   $"| {editor!.ColourOfNode(first)}");
 
             // A new trial forgets the last one's colours: left on, they
             // would be read as this run's, and a scenario would look
             // finished a moment before it began.
             editor!.TrialStarting();
-            await Task.Delay(150);
             Check("новая проба забывает прежние цвета",
-                  editor!.ColourOfNode(first) is "C.Seam" or "C.Ink",
+                  await Until(() => editor!.ColourOfNode(first)
+                                    is "C.Seam" or "C.Ink"),
                   $"| {editor!.ColourOfNode(first)}");
 
             // The place goes when the work is done: a column that keeps

@@ -12,10 +12,28 @@ There is no shell here: `note_foreground` is called directly. That is
 exactly the call the protocol makes, and there is nothing to substitute for
 it — while Windows switching windows is not needed by the check.
 """
+import os
 import sys
 import time
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
+sys.path.insert(0, os.path.join(
+    r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
+
+# The checks do not touch the machine (`4.0-I04`).
+#
+# Under the interpreter the core actually runs on, `sounddevice` is
+# installed — so every answer here played a real cue through the real
+# speakers, sixty-nine of them across the suite, and two tests brought
+# the process down on the way out. The group "машина" exists precisely
+# so that the ordinary run touches nothing; this check belongs to the
+# ordinary run.
+#
+# Storage is left alone: these tests bring their own, and moving it
+# would change what they measure rather than what they touch.
+from sandbox import neutralise
+
+neutralise(storage=False)
 
 from core.engine import RinaEngine
 from core.protocol import Events

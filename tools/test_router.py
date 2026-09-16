@@ -1,8 +1,26 @@
 # -*- coding: utf-8 -*-
 """B02: the router is a pure function. Checked without the application."""
+import os
 import sys
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
+sys.path.insert(0, os.path.join(
+    r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
+
+# The checks do not touch the machine (`4.0-I04`).
+#
+# Under the interpreter the core actually runs on, `sounddevice` is
+# installed — so every answer here played a real cue through the real
+# speakers, sixty-nine of them across the suite, and two tests brought
+# the process down on the way out. The group "машина" exists precisely
+# so that the ordinary run touches nothing; this check belongs to the
+# ordinary run.
+#
+# Storage is left alone: these tests bring their own, and moving it
+# would change what they measure rather than what they touch.
+from sandbox import neutralise
+
+neutralise(storage=False)
 
 from core.dialog import Question
 from core.router import route, RouterContext
