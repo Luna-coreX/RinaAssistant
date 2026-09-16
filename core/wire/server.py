@@ -28,6 +28,7 @@ deliberately no separate "sleep mode": a core that outlived its shell is a
 process nobody will close.
 """
 
+import collections
 import contextvars
 import queue
 import secrets
@@ -1687,9 +1688,20 @@ class ProtocolServer:
     #: from parallel threads arrive in whatever order they finish, and a
     #: short phrase overtakes a long one. Commands are said in an order and
     #: mean something in that order.
-    _phrases: "queue.Queue | None" = None
+    _phrases: "collections.deque | None" = None
     _stt_thread = None
-    _stt_guard = threading.Lock()
+
+    #: One lock for the queue and for whoever waits on it. A deque and a
+    #: condition rather than `queue.Queue`, because the bound here means
+    #: two different things at once — see `PHRASE_QUEUE` and
+    #: `PART_QUEUE` — and a single `maxsize` can only say one of them.
+    #:
+    #: Woken with `notify_all`, never `notify`. There is one server to a
+    #: running program but several to a check, and each has a queue of
+    #: its own behind this one condition: `notify` woke whichever thread
+    #: happened to be first in line, which was as likely as not somebody
+    #: else's, and the phrase then waited for a wake-up that never came.
+    _stt_wake = threading.Condition()
 
     #: Whether the absence of a voice has already been reported — see
     #: `_speak`. On the class, like the two above, so that a server put
@@ -1701,6 +1713,29 @@ class ProtocolServer:
     #: behind, answering a minute late. The oldest goes, and it is said out
     #: loud — silently dropping what a person said is the one thing worse.
     PHRASE_QUEUE = 4
+
+    #: And how many **pieces** of a phrase in progress may wait, when the
+    #: engine listens as it goes (`4.0b-E07`). A piece is a tenth of a
+    #: second, so this is twenty seconds — longer than any one phrase.
+    #:
+    #: The overflow rule differs from the one above, because the items
+    #: mean different things. Dropping the oldest of several phrases
+    #: loses one of them; dropping the oldest piece of **one** phrase
+    #: leaves a phrase with a hole in it, which is worse than no phrase
+    #: at all — it is a phrase that says something else. So an overflow
+    #: here abandons the phrase whole, and says so.
+    PART_QUEUE = 200
+
+    def _streaming(self) -> bool:
+        """
+        Whether the engine in use listens as the phrase is being said.
+
+        Asked through `getattr` rather than as a plain attribute: a
+        recogniser substituted in a check is somebody's small class, and
+        the answer for anything that has not said otherwise is "no" —
+        the path that works for every engine.
+        """
+        return bool(getattr(self.recogniser, "streams", False))
 
     def hearing(self) -> dict:
         """Where the sound got to. For the diagnostics and the checks."""
@@ -1764,43 +1799,106 @@ class ProtocolServer:
             log.debug("Звук идёт (%d кадров), громких %d, фраз пока нет",
                       self.heard["frames"], self.heard["loud_frames"])
 
-        for phrase in self.segmenter.feed(pcm):
+        phrases = self.segmenter.feed(pcm)
+
+        # **Listening as it goes, when the engine can** (`4.0b-E07`).
+        # Handing over a finished phrase costs its whole recognition
+        # after the person has stopped talking — 620 ms for Vosk on a
+        # phrase of two and a half seconds. Fed as it goes, the same
+        # engine gives the same words 4 ms after the last piece, because
+        # everything but that piece is already done.
+        #
+        # What is fed is what the segmenter took into the phrase, not the
+        # chunk that arrived: the two differ at the start of a phrase by
+        # the run-up — the quiet beginning of the first word — and in
+        # "always listening" the first word is the name.
+        if self._streaming():
+            if self.segmenter.taken:
+                self._queue_part(self.segmenter.taken)
+            if self.segmenter.gave_up:
+                self._queue_part(None)          # too short: forget it
+
+        for phrase in phrases:
             self.heard["phrases"] += 1
             log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
-            self._queue_phrase(phrase)
+            # Already fed, piece by piece — so what goes into the queue
+            # is the order to finish, not the sound a second time.
+            self._queue_phrase(None if self._streaming() else phrase)
 
-    def _queue_phrase(self, phrase: bytes) -> None:
-        """Put a phrase in the queue; see `_phrases` for why there is one."""
-        with self._stt_guard:
+    def _stt_queue(self) -> "collections.deque":
+        """The queue, and the thread that empties it — made on first use."""
+        with self._stt_wake:
             if self._phrases is None:
-                self._phrases = queue.Queue(maxsize=self.PHRASE_QUEUE)
-            waiting = self._phrases
+                self._phrases = collections.deque()
             if self._stt_thread is None or not self._stt_thread.is_alive():
                 self._stt_thread = threading.Thread(
-                    target=self._recognise_forever, args=(waiting,),
+                    target=self._recognise_forever, args=(self._phrases,),
                     name="rina-stt", daemon=True)
                 self._stt_thread.start()
+            return self._phrases
 
-        while True:
-            try:
-                waiting.put_nowait(phrase)
-                return
-            except queue.Full:
-                try:
-                    old_phrase = waiting.get_nowait()
-                except queue.Empty:
-                    continue        # the worker took one; there is room now
+    def _queue_part(self, part: "bytes | None") -> None:
+        """A piece of the phrase now being said, or `None` to forget it."""
+        waiting = self._stt_queue()
+        with self._stt_wake:
+            waiting.append(("part", part))
+            if len(waiting) > self.PART_QUEUE:
+                # See `PART_QUEUE`: a phrase with a hole in it says
+                # something else, so the whole of it goes, and out loud.
+                waiting.clear()
+                self.heard["dropped"] += 1
+                log.warning("Распознавание не поспевает: фраза брошена целиком")
+            self._stt_wake.notify_all()
+
+    def _queue_phrase(self, phrase: "bytes | None") -> None:
+        """
+        Put a finished phrase in the queue; see `_phrases` for why there is one.
+
+        `None` means the sound has already been fed piece by piece and
+        what is wanted now is the words.
+        """
+        waiting = self._stt_queue()
+        with self._stt_wake:
+            waiting.append(("phrase", phrase))
+            # Only phrases carrying sound are counted against the bound:
+            # one that has already been fed piece by piece is a marker
+            # weighing nothing, and its backlog is the pieces, which have
+            # a bound of their own.
+            while True:
+                heavy = [i for i, (kind, said) in enumerate(waiting)
+                         if kind == "phrase" and said is not None]
+                if len(heavy) <= self.PHRASE_QUEUE:
+                    break
+                gone = waiting[heavy[0]][1]
+                del waiting[heavy[0]]
                 self.heard["dropped"] += 1
                 log.warning(
                     "Распознавание не поспевает: фраза на %.1f с отброшена",
-                    len(old_phrase) / (16000 * 2))
+                    len(gone) / (16000 * 2))
+            self._stt_wake.notify_all()
 
-    def _recognise_forever(self, waiting: "queue.Queue") -> None:
-        """Take phrases one at a time, in the order they were said."""
+    def _recognise_forever(self, waiting: "collections.deque") -> None:
+        """
+        Take what comes, one at a time, in the order it was said.
+
+        Both the listening and the deciding happen here, on one thread:
+        the pieces must reach the engine in order, and the worst single
+        piece took 227 ms to think about — on the thread that reads the
+        data channel that would be sound dropped on the floor.
+        """
         while True:
-            phrase = waiting.get()
+            with self._stt_wake:
+                while not waiting:
+                    self._stt_wake.wait()
+                kind, payload = waiting.popleft()
             try:
-                self._recognise(phrase)
+                if kind == "part":
+                    if payload is None:
+                        self.recogniser.reset()
+                    else:
+                        self.recogniser.feed(payload)
+                else:
+                    self._recognise(payload)
             except Exception:                           # noqa: BLE001
                 # The thread is the only one there is: letting it die would
                 # mean silence for the rest of the session, and silence is
@@ -1817,7 +1915,10 @@ class ProtocolServer:
                     text="Распознавание недоступно: выберите модель в настройках.")
                 return
             self.heard["recognitions"] += 1
-            outcome = self.recogniser.recognise(phrase)
+            # `None` — the sound was fed piece by piece while it was
+            # being said, and what is left is to ask for the words.
+            outcome = (self.recogniser.finish() if phrase is None
+                       else self.recogniser.recognise(phrase))
             if not outcome.ok:
                 log.warning("Распознавание не сложилось: %s", outcome.error)
                 self.engine.bus.emit(
@@ -1877,7 +1978,12 @@ class ProtocolServer:
         if not self._speech_given[1]:
             self.synthesiser = speech.synthesiser_for(store)
         if not self._speech_given[0]:
+            # What the old one had been fed goes with it. A phrase begun
+            # on one engine and finished on another is not a phrase.
+            if self._streaming():
+                self.recogniser.reset()
             self.recogniser = speech.recogniser_for(store)
+            self.segmenter.flush()
 
     def _speak(self, text: str) -> None:
         """

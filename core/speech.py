@@ -112,6 +112,19 @@ class Segmenter:
         #: The quiet just gone by, waiting to be needed.
         self._lead: "collections.deque[bytes]" = collections.deque()
         self._lead_seconds = 0.0
+        #: What the last `feed` put into the phrase — the run-up included.
+        #:
+        #: For an engine that listens as it goes (`Recogniser.streams`):
+        #: it has to be given exactly what the phrase consists of, and in
+        #: time. Reading the buffer from outside would hand it the whole
+        #: phrase again on every chunk; feeding it the raw chunk would
+        #: lose the run-up, which is the beginning of the first word —
+        #: the thing this class was just taught to keep.
+        self.taken = b""
+        #: A phrase ended and was too short to count as one. Whoever is
+        #: listening as it goes has already been fed it and has to be
+        #: told to forget it.
+        self.gave_up = False
 
     @staticmethod
     def level(pcm: bytes) -> float:
@@ -135,31 +148,39 @@ class Segmenter:
 
     def feed(self, pcm: bytes) -> list[bytes]:
         """Take a chunk and return the phrases that have finished."""
+        self.taken = b""
+        self.gave_up = False
         if not pcm:
             return []
         seconds = len(pcm) / (self.rate * SAMPLE_BYTES)
         loud = self.level(pcm) >= self.threshold
         done: list[bytes] = []
+        took = bytearray()
 
         if loud:
             if not self._speaking:
                 for earlier in self._lead:
                     self._buffer.extend(earlier)
+                    took.extend(earlier)
                 self._lead.clear()
                 self._lead_seconds = 0.0
             self._speaking = True
             self._quiet = 0.0
             self._speech += seconds
             self._buffer.extend(pcm)
+            took.extend(pcm)
         elif self._speaking:
             # Silence inside a phrase is recorded all the same: cutting it
             # out means gluing the words together and getting "setatimer".
             self._buffer.extend(pcm)
+            took.extend(pcm)
             self._quiet += seconds
             if self._quiet >= self.silence:
                 phrase = self.flush()
                 if phrase is not None:
                     done.append(phrase)
+                else:
+                    self.gave_up = True
         else:
             # Quiet, and nothing being said: remember it in case a word
             # starts in the next chunk. Only the last `lead` seconds —
@@ -176,6 +197,10 @@ class Segmenter:
             phrase = self.flush()
             if phrase is not None:
                 done.append(phrase)
+            else:
+                self.gave_up = True
+
+        self.taken = bytes(took)
         return done
 
     def flush(self) -> bytes | None:
@@ -200,9 +225,31 @@ class Recogniser(Protocol):
 
     name: str
 
+    #: Whether this engine can listen **as the phrase is being said**
+    #: rather than only to a finished one. Declared rather than guessed
+    #: at by `hasattr`: an engine that grows a method by accident would
+    #: silently change which path it is on.
+    #:
+    #: The whole point is the tail. A phrase handed over whole costs its
+    #: recognition time **after** the person has stopped speaking — 620 ms
+    #: for Vosk on a phrase of two and a half seconds, measured. Fed as it
+    #: goes, the same engine gives the same text 4 ms after the last
+    #: chunk, because everything but the last chunk is already done.
+    streams: bool
+
     def available(self) -> bool: ...
 
     def recognise(self, pcm: bytes, language: str = "ru") -> Heard: ...
+
+    # -- only when `streams` is true ---------------------------------------
+    def feed(self, pcm: bytes) -> None:
+        """A piece of the phrase now being said."""
+
+    def finish(self) -> Heard:
+        """The phrase is over: the text of everything fed since the last one."""
+
+    def reset(self) -> None:
+        """Forget what was fed: the phrase came to nothing."""
 
 
 class DisabledRecogniser:
@@ -214,6 +261,7 @@ class DisabledRecogniser:
     """
 
     name = "disabled"
+    streams = False
 
     def available(self) -> bool:
         return False
@@ -234,10 +282,19 @@ class VoskRecogniser:
 
     name = "vosk"
 
+    #: Vosk was built for a stream — that is what `AcceptWaveform` is —
+    #: and the old code threw the ability away by handing it whole
+    #: phrases after the fact.
+    streams = True
+
     def __init__(self, model_path: str):
         self.model_path = model_path
         self._model = None
         self._error = ""
+        #: The live recogniser for the phrase being said, and what it has
+        #: already settled on. See `feed`.
+        self._live = None
+        self._said: list[str] = []
 
     def available(self) -> bool:
         """
@@ -311,6 +368,50 @@ class VoskRecogniser:
         except Exception as exc:                        # noqa: BLE001
             return Heard(ok=False, error=str(exc))
 
+    # -- listening as it goes (4.0b-E07) -----------------------------------
+    def feed(self, pcm: bytes) -> None:
+        """
+        Take a piece of the phrase now being said.
+
+        Called from the recognition thread and from nowhere else: the
+        worst single piece took 227 ms to think about, and on the thread
+        that reads the data channel that is a piece of sound dropped.
+        """
+        if not self.available() or not self._load():
+            return
+        import json
+
+        import vosk
+
+        if self._live is None:
+            self._live = vosk.KaldiRecognizer(self._model, RATE)
+            self._said = []
+        # Vosk does its own endpointing and may decide an utterance ended
+        # inside our phrase. Then `FinalResult` returns only what came
+        # after that point, and the beginning would be lost — so what it
+        # settles on is collected as it settles.
+        if self._live.AcceptWaveform(pcm):
+            self._said.append(json.loads(self._live.Result()).get("text", ""))
+
+    def finish(self) -> Heard:
+        """The phrase is over — the text of everything fed since the last one."""
+        if self._live is None:
+            return Heard(text="")
+        import json
+
+        try:
+            self._said.append(json.loads(self._live.FinalResult()).get("text", ""))
+            return Heard(text=" ".join(p for p in self._said if p).strip())
+        except Exception as exc:                        # noqa: BLE001
+            return Heard(ok=False, error=str(exc))
+        finally:
+            self.reset()
+
+    def reset(self) -> None:
+        """Forget the phrase: it came to nothing, or somebody changed engine."""
+        self._live = None
+        self._said = []
+
 
 def looks_like_vosk_model(folder: str) -> bool:
     """
@@ -344,6 +445,7 @@ class WhisperRecogniser:
     """
 
     name = "whisper"
+    streams = False
 
     def __init__(self, size: str = "base"):
         self.size = size or "base"
@@ -441,6 +543,11 @@ class FasterWhisperRecogniser:
     """
 
     name = "whisper"
+
+    #: Whisper looks at a whole piece at once — it has no notion of "so
+    #: far". The batch path stays for it, and that is a property of the
+    #: model, not a thing left undone.
+    streams = False
 
     def __init__(self, size: str = "base"):
         self.size = size or "base"

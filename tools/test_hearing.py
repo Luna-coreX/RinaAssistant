@@ -299,6 +299,190 @@ check("и распознавались они в том же порядке",
       f"| {ear.order} байт")
 
 print()
+print("=== распознавание слушает по ходу фразы ===")
+# `4.0b-E07`. An engine that can listen as it goes must be given the
+# phrase **as it is being said**, not after — otherwise its whole cost
+# lands after the person has stopped talking. Measured on the real
+# model: 596 ms that way, 14 ms this way, the same words.
+#
+# Checked without a model first, because this part is plumbing and has
+# to hold for every engine: what is fed, in what order, and what happens
+# to a phrase that came to nothing.
+
+
+class Aloud:
+    """A stand-in that listens as it goes and writes down what it was given."""
+
+    name = "вслух"
+    streams = True
+
+    def __init__(self):
+        self.parts = []
+        self.finished = 0
+        self.forgotten = 0
+
+    @staticmethod
+    def available():
+        return True
+
+    def feed(self, pcm):
+        self.parts.append(pcm)
+
+    def finish(self):
+        self.finished += 1
+        return Heard(text="услышано")
+
+    def reset(self):
+        self.forgotten += 1
+        self.parts = []
+
+    def recognise(self, pcm, language="ru"):       # must never be called
+        self.parts.append(b"WHOLE")
+        return Heard(text="целиком")
+
+
+ear = Aloud()
+live = ProtocolServer.__new__(ProtocolServer)
+live.engine = Recorder()
+live.segmenter = Segmenter()
+live.recogniser = ear
+live.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+              "recognitions": 0, "texts": 0, "dropped": 0}
+live._phrases = None
+live._stt_thread = None
+
+step = int(RATE * 0.1) * 2
+spoken = silence(0.5) + sound(0.2, 0.01) + sound(0.8, 0.3) + silence(1.2)
+for at in range(0, len(spoken), step):
+    live._hear(spoken[at:at + step])
+for _ in range(100):
+    if ear.finished:
+        break
+    time.sleep(0.02)
+
+check("фраза дошла по частям, а не целиком",
+      ear.parts and b"WHOLE" not in ear.parts,
+      f"| частей {len(ear.parts)}")
+check("и в конце спросили слова один раз", ear.finished == 1,
+      f"| {ear.finished}")
+# What is fed is not the chunks that arrived — those include the silence
+# before the phrase — but exactly what the segmenter took, run-up and
+# all. Anything else and the first word loses its beginning again, one
+# floor below where that was just fixed.
+fed = b"".join(ear.parts)
+windows = [fed[at:at + step] for at in range(0, len(fed), step)]
+louds = [i for i, w in enumerate(windows) if Segmenter.level(w) >= 0.02]
+run_up = windows[max(0, louds[0] - 2):louds[0]] if louds else []
+quiet = Segmenter.level(b"".join(run_up)) if run_up else 0.0
+check("и перед громким местом в них тихое начало слова",
+      len(run_up) == 2 and 0.0 < quiet < 0.02,
+      f"| {len(run_up)} кадров, громкость {quiet:.4f}")
+
+# A phrase too short to be one: the engine has been fed it and has to be
+# told to forget, or its words turn up glued to the front of the next.
+short = Aloud()
+tiny = ProtocolServer.__new__(ProtocolServer)
+tiny.engine = Recorder()
+tiny.segmenter = Segmenter()
+tiny.recogniser = short
+tiny.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+              "recognitions": 0, "texts": 0, "dropped": 0}
+tiny._phrases = None
+tiny._stt_thread = None
+brief = sound(0.1, 0.3) + silence(1.2)
+for at in range(0, len(brief), step):
+    tiny._hear(brief[at:at + step])
+for _ in range(100):
+    if short.forgotten:
+        break
+    time.sleep(0.02)
+check("слишком короткое — велено забыть, а не досказать",
+      short.forgotten == 1 and short.finished == 0,
+      f"| забыто {short.forgotten}, спрошено {short.finished}")
+
+print()
+print("=== и на настоящей модели это стоит миллисекунды ===")
+# The gain itself, on the real model and at the speed a person speaks.
+# Fed in a tight loop the difference disappears — all the work simply
+# happens at the end either way — so the sound arrives here in real
+# time, a tenth of a second at a time, as it does from the shell.
+from core.speech import VoskRecogniser
+
+vosk_model = os.path.join(
+    os.environ.get("APPDATA", ""), "RinaAssistant", "models",
+    "vosk-ru-small", "vosk-model-small-ru-0.22")
+here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+recording = os.path.join(here, "tools", "fixtures", "said-rina.wav")
+
+real = VoskRecogniser(vosk_model)
+if not os.path.isfile(recording):
+    print("     пропущено: нет записи")
+elif not real.available():
+    # The package lives where the core lives, and the regression may be
+    # run by another interpreter. Naming what is missing is the
+    # difference between a skip and a mystery.
+    print(f"     пропущено: {real._error or 'Vosk недоступен в этом питоне'}")
+else:
+    said = []
+
+    class Listener:
+        """The engine, reduced to the one event this measurement needs."""
+
+        class bus:
+            @staticmethod
+            def emit(name, **fields):
+                if name == "speech.recognized":
+                    said.append((time.perf_counter(), fields["text"]))
+
+        @staticmethod
+        def is_always_listen():
+            return False
+
+        @staticmethod
+        def handle_command_async(*args, **rest):
+            pass
+
+    real._load()
+    fast = ProtocolServer.__new__(ProtocolServer)
+    fast.engine = Listener()
+    fast.segmenter = Segmenter()
+    fast.recogniser = real
+    fast.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+                  "recognitions": 0, "texts": 0, "dropped": 0}
+    fast._phrases = None
+    fast._stt_thread = None
+
+    with open(recording, "rb") as file:
+        voice = file.read()[44:]
+    coming = voice + silence(2.0)
+    cut = None
+    for at in range(0, len(coming), step):
+        began = time.perf_counter()
+        before = fast.heard["phrases"]
+        fast._hear(coming[at:at + step])
+        if fast.heard["phrases"] > before:
+            cut = time.perf_counter()
+        time.sleep(max(0.0, 0.1 - (time.perf_counter() - began)))
+    for _ in range(300):
+        if said:
+            break
+        time.sleep(0.01)
+
+    check("фраза распозналась", said, f"| {[text for _, text in said]}")
+    check("и распознана верно",
+          said and "рина" in said[0][1].lower(),
+          f"| {said[0][1] if said else ''}")
+    if said and cut:
+        tail = (said[0][0] - cut) * 1000
+        # Handing the phrase over whole costs 596 ms here; listening as
+        # it goes costs 14. The ceiling is set between the two and much
+        # nearer the slow one, so that a busy machine does not redden it:
+        # what is asked is "was the work done in advance", not "how fast
+        # is this computer".
+        check("и слова готовы почти сразу после нарезки", tail < 250,
+              f"| {tail:.0f} мс после конца фразы")
+
+print()
 print("=== что не поспели распознать — сказано вслух ===")
 # Dropping is lawful: recognition slower than speech has to lose
 # something. Falling a minute behind is not, and neither is losing it
