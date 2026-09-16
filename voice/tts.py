@@ -56,6 +56,29 @@ class TTSEngine:
         """
         return None
 
+    #: Whether this engine gives out sound **as it makes it**, rather than
+    #: only when it has made all of it (`4.0b-E10`).
+    #:
+    #: Declared rather than guessed at by `hasattr`, for the same reason
+    #: as `Recogniser.streams`: a method that appears by accident would
+    #: silently move an engine onto a path nobody checked it on.
+    streams = False
+
+    #: What `stream` gives out, as a container name for the decoder.
+    #: Edge speaks mp3; an engine that hands over raw samples would say
+    #: so here and skip the decoding altogether.
+    stream_format = "mp3"
+
+    def stream(self, text, voice=None, volume=75, rate=100):
+        """
+        Yield the audio of `text` in pieces, encoded as `stream_format`.
+
+        Only where `streams` is true. The pieces are what the engine has
+        managed to make so far — for a network engine, what has arrived
+        so far — so the first of them exists long before the last.
+        """
+        raise NotImplementedError
+
     def speak(self, text, voice=None, volume=75, rate=100):
         """Blockingly says the text out loud. rate/volume are per cent (100 = normal)."""
         path = self.render(text, voice=voice, volume=volume, rate=rate)
@@ -396,16 +419,28 @@ class EdgeTTSEngine(TTSEngine):
     def voices(self):
         return list(self.VOICES)
 
+    #: Edge makes the sound on somebody else's computer and sends it as
+    #: it goes — the one engine here that can (`4.0b-E10`).
+    streams = True
+    stream_format = "mp3"
+
+    @staticmethod
+    def _asked(voice, volume, rate):
+        """The three things edge-tts wants, in the shape it wants them."""
+        voice_id = (voice if voice and voice.endswith("Neural")
+                    else "ru-RU-SvetlanaNeural")
+        # in edge-tts, rate is given as a string of the form "+10%" / "-20%"
+        pct = int(rate) - 100
+        vol_pct = int(volume) - 100
+        return (voice_id,
+                f"{'+' if pct >= 0 else ''}{pct}%",
+                f"{'+' if vol_pct >= 0 else ''}{vol_pct}%")
+
     def render(self, text, voice=None, volume=75, rate=100):
         edge_tts = self._try_import()
         if edge_tts is None:
             return None
-        voice_id = voice if voice and voice.endswith("Neural") else "ru-RU-SvetlanaNeural"
-        # in edge-tts, rate is given as a string of the form "+10%" / "-20%"
-        pct = int(rate) - 100
-        rate_str = f"{'+' if pct >= 0 else ''}{pct}%"
-        vol_pct = int(volume) - 100
-        vol_str = f"{'+' if vol_pct >= 0 else ''}{vol_pct}%"
+        voice_id, rate_str, vol_str = self._asked(voice, volume, rate)
         try:
             import asyncio
             tmp = new_temp_file(".mp3", "rina_edge_")
@@ -419,6 +454,58 @@ class EdgeTTSEngine(TTSEngine):
             return tmp
         except Exception:
             return None
+
+    def stream(self, text, voice=None, volume=75, rate=100):
+        """
+        The same speech, but given out as it arrives.
+
+        **Why the thread.** edge-tts is asynchronous and the core's
+        speech path is not; bridging by making the whole path async
+        would mean rewriting everything above for the sake of one
+        engine. So the event loop lives in a thread of its own and the
+        pieces come over a queue — which is also the natural shape for
+        "give me what you have so far".
+        """
+        edge_tts = self._try_import()
+        if edge_tts is None:
+            return
+        voice_id, rate_str, vol_str = self._asked(voice, volume, rate)
+
+        import asyncio
+        import queue
+        import threading
+
+        coming = queue.Queue()
+        DONE = object()
+
+        def pump():
+            async def read():
+                try:
+                    talk = edge_tts.Communicate(text, voice_id,
+                                                rate=rate_str, volume=vol_str)
+                    async for part in talk.stream():
+                        if part["type"] == "audio" and part.get("data"):
+                            coming.put(part["data"])
+                except Exception as trouble:            # noqa: BLE001
+                    coming.put(trouble)
+                finally:
+                    coming.put(DONE)
+
+            asyncio.run(read())
+
+        worker = threading.Thread(target=pump, name="rina-edge", daemon=True)
+        worker.start()
+        while True:
+            piece = coming.get()
+            if piece is DONE:
+                return
+            if isinstance(piece, Exception):
+                # Said out loud rather than swallowed: half a reply and
+                # silence about why is how a network failure looks like
+                # a broken program.
+                log.warning("Edge оборвался: %s", piece)
+                continue
+            yield piece
 
 
 class PiperEngine(TTSEngine):

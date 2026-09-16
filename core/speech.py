@@ -37,9 +37,12 @@ depends on the model.
 
 import array
 import collections
+import io
 import math
 import os
+import queue
 import struct
+import threading
 from typing import Protocol
 
 #: The format sound travels in between the shell and the core.
@@ -708,6 +711,7 @@ class SilentSynthesiser:
 
     name = "silent"
     sample_rate = RATE
+    streams = False
 
     def available(self) -> bool:
         return False
@@ -726,6 +730,10 @@ class PiperSynthesiser:
     """
 
     name = "piper"
+    #: Piper makes a whole utterance at once, locally and quickly. There
+    #: is nothing to stream: by the time the first piece could be handed
+    #: over, the last one exists too.
+    streams = False
 
     def __init__(self, model_path: str):
         self.model_path = model_path
@@ -812,6 +820,117 @@ def pcm_from_file(path: str) -> tuple[bytes, int]:
         return frames, source.getframerate()
 
 
+class _Arriving(io.RawIOBase):
+    """
+    A file that is still being written, read by whoever decodes it.
+
+    The decoder wants a file and the network gives pieces; this is the
+    join. `read` waits for the next piece rather than returning empty —
+    an empty read means the end of the file, and ending a file because
+    the network paused for a moment would cut the reply.
+    """
+
+    def __init__(self):
+        self._parts: "queue.Queue" = queue.Queue()
+        self._rest = b""
+        self._over = False
+
+    def put(self, piece: "bytes | None") -> None:
+        self._parts.put(piece)
+
+    def readable(self) -> bool:
+        return True
+
+    def read(self, size: int = -1) -> bytes:
+        """
+        Whatever is here, and only wait if nothing is.
+
+        **A short read is allowed and a long wait is not.** The decoder
+        asks in thirty-two kilobyte mouthfuls; waiting for a whole one
+        means waiting for most of the reply, and measured it was exactly
+        that — the first frame came out 365 ms in, at the moment the
+        thirty-two kilobytes were complete, not at the moment there was
+        something to decode. Returning less than was asked for is what
+        `read` is allowed to do, and what makes this a stream.
+        """
+        want = size if size > 0 else 1
+        while not self._rest and not self._over:
+            piece = self._parts.get()
+            if piece is None:
+                self._over = True
+                break
+            self._rest += piece
+        while len(self._rest) < want and not self._over:
+            try:
+                piece = self._parts.get_nowait()
+            except queue.Empty:
+                break
+            if piece is None:
+                self._over = True
+                break
+            self._rest += piece
+        out, self._rest = self._rest[:size], self._rest[size:]
+        return out
+
+
+def pcm_from_stream(pieces, container: str = "mp3"):
+    """
+    Decode arriving audio into PCM as it arrives. Yields `(bytes, rate)`.
+
+    **The other half of `4.0b-E10`.** An engine that hands over sound as
+    it makes it is of no use if the decoder waits for the last byte:
+    `soundfile` wants a whole file, and a whole file is exactly what we
+    are trying not to wait for. PyAV reads a stream that cannot be
+    rewound, which is what this is — and it is already in the runtime,
+    because `faster-whisper` brings it.
+
+    The filling runs in a thread of its own because the decoder pulls:
+    it asks the file for bytes and blocks until they come, so somebody
+    else has to be putting them there.
+    """
+    import av
+
+    feed = _Arriving()
+
+    def fill():
+        try:
+            for piece in pieces:
+                if piece:
+                    feed.put(piece)
+        except Exception:                               # noqa: BLE001
+            log.exception("Поток синтеза оборвался")
+        finally:
+            feed.put(None)
+
+    filler = threading.Thread(target=fill, name="rina-tts-feed", daemon=True)
+    filler.start()
+
+    box = None
+    try:
+        # The smallest probe there is, because there is nothing to
+        # probe for: the container is named outright, so reading ahead
+        # to guess it is reading a person is waiting through. Measured
+        # on a real reply: opening takes 21 ms this way, 65 at four
+        # kilobytes, 92 with the defaults.
+        box = av.open(feed, format=container,
+                      options={"probesize": "32", "analyzeduration": "0"})
+        # No rate given: the engine's own rate is kept and declared when
+        # the stream to the shell is opened. Resampling without being
+        # asked costs time and quality for nothing.
+        resampler = av.AudioResampler(format="s16", layout="mono")
+        for frame in box.decode(box.streams.audio[0]):
+            for made in resampler.resample(frame):
+                yield made.to_ndarray().tobytes(), int(made.sample_rate)
+    except Exception as trouble:                        # noqa: BLE001
+        log.warning("Не удалось разобрать поток синтеза: %s", trouble)
+    finally:
+        if box is not None:
+            try:
+                box.close()
+            except Exception:                           # noqa: BLE001
+                pass
+
+
 class EngineSynthesiser:
     """
     Synthesis by the 3.1.0 engines: edge, gtts, pyttsx3, piper.
@@ -833,6 +952,31 @@ class EngineSynthesiser:
         self._settings = settings
         self._rate = RATE
         self.last_error = ""
+
+    @property
+    def streams(self) -> bool:
+        """Whether this engine gives out sound as it makes it (`4.0b-E10`)."""
+        try:
+            return bool(getattr(self._engine(), "streams", False))
+        except Exception:                               # noqa: BLE001
+            return False
+
+    def stream(self, text: str, voice: str = "", rate: int = 100):
+        """The same speech as `synthesize`, in pieces, as it is made."""
+        engine = self._engine()
+        volume = 75
+        if self._settings is not None:
+            try:
+                volume = int(self._settings.get("volume", 75) or 75)
+            except (TypeError, ValueError):
+                volume = 75
+        pieces = engine.stream(text, voice=voice or None, volume=volume,
+                               rate=rate)
+        for pcm, hertz in pcm_from_stream(pieces,
+                                          getattr(engine, "stream_format",
+                                                  "mp3")):
+            self._rate = hertz
+            yield pcm
 
     def _engine(self):
         from voice import tts

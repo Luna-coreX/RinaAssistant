@@ -497,5 +497,138 @@ if first:
                         f"за {whole * 1000:.0f} мс")
 
 print()
+print("=== предложение уходит, пока его ещё делают ===")
+# `4.0b-E10`. Even one sentence is waited out whole today: the request
+# goes and nothing is heard until its last byte comes back. Sent as it
+# arrives, the first sound leaves for the shell while the rest is still
+# being spoken on somebody else's computer.
+
+
+class Trickling:
+    """A synthesiser that hands over pieces, slowly, like a network one."""
+
+    name = "по кускам"
+    sample_rate = 24000
+    streams = True
+    PER_PIECE = 0.05
+
+    def __init__(self, pieces=6, gives=True):
+        self.pieces = pieces
+        self.gives = gives
+        self.asked = []
+
+    @staticmethod
+    def available():
+        return True
+
+    def stream(self, text, voice="", rate=100):
+        self.asked.append(text)
+        for _ in range(self.pieces if self.gives else 0):
+            _time.sleep(self.PER_PIECE)
+            yield speech.tone(0.1, rate=24000)
+
+    def synthesize(self, text, voice="", rate=100):
+        _time.sleep(self.PER_PIECE * self.pieces)
+        return speech.tone(0.6, rate=24000)
+
+
+def saying(voice_box):
+    said = speaker()[0]
+    said.synthesiser = voice_box
+    said._settings = lambda: MemorySettings({"voice": "", "speed": 100})
+    said._speech_wanted = ()
+    said._speech_given = (True, True)
+    said._said_mute = False
+    return said
+
+
+flowing = Trickling()
+core = saying(flowing)
+began = _time.perf_counter()
+arrived = []
+core.send_speech = lambda pcm, hertz: arrived.append(
+    (_time.perf_counter() - began, len(pcm)))
+core._speak("Одно предложение, довольно длинное, но всё же одно.")
+whole = _time.perf_counter() - began
+
+check("кусков ушло столько, сколько пришло", len(arrived) == 6,
+      f"| {len(arrived)}")
+if arrived:
+    # Six pieces at fifty milliseconds: the sentence takes about three
+    # tenths of a second to make, the first piece a twentieth of it.
+    check("первый ушёл, не дожидаясь последнего",
+          arrived[0][0] < whole / 2,
+          f"| первый через {arrived[0][0] * 1000:.0f} мс при всей "
+          f"фразе за {whole * 1000:.0f} мс")
+
+# An engine that gave out nothing at all is tried the old way: it may
+# simply have failed, and one more attempt costs a wait but saves a
+# silence.
+empty = Trickling(gives=False)
+fell_back = saying(empty)
+sent = []
+fell_back.send_speech = lambda pcm, hertz: sent.append(len(pcm))
+fell_back._speak("Ничего не пришло потоком.")
+check("пустой поток — пробуем целиком", len(sent) == 1, f"| {sent}")
+
+print()
+print("=== декодирование идёт вместе с приходом ===")
+# The other half. An engine that hands over sound as it makes it is of
+# no use if the decoder waits for the last byte.
+try:
+    import av
+except ImportError:
+    print("     пропущено: PyAV в этом питоне нет "
+          "(он стоит там же, где ядро — в venv)")
+else:
+    import threading as _threading
+
+    def mp3_of(seconds):
+        """A real mp3, made here, so the check needs no network."""
+        raw = io.BytesIO()
+        box = av.open(raw, mode="w", format="mp3")
+        out = box.add_stream("mp3", rate=24000)
+        out.layout = "mono"
+        frame = av.AudioFrame.from_ndarray(
+            numpy.frombuffer(speech.tone(seconds, rate=24000),
+                             dtype="int16").reshape(1, -1),
+            format="s16", layout="mono")
+        frame.rate = 24000
+        for packet in out.encode(frame):
+            box.mux(packet)
+        for packet in out.encode(None):
+            box.mux(packet)
+        box.close()
+        return raw.getvalue()
+
+    import numpy
+
+    sound = mp3_of(3.0)
+
+    def trickle(data, pieces=30, pause=0.01):
+        step = max(1, len(data) // pieces)
+        for at in range(0, len(data), step):
+            _time.sleep(pause)
+            yield data[at:at + step]
+
+    began = _time.perf_counter()
+    first = None
+    samples = 0
+    for pcm, hertz in speech.pcm_from_stream(trickle(sound)):
+        if first is None:
+            first = _time.perf_counter() - began
+        samples += len(pcm) // 2
+    whole = _time.perf_counter() - began
+
+    check("поток разобрался", samples > 0, f"| {samples / 24000:.1f} с звука")
+    # The mp3 arrives over about three tenths of a second. The first
+    # frame must come out near the beginning of that, not at its end —
+    # and it did come out at the end while the reader waited for a full
+    # thirty-two-kilobyte mouthful before handing anything over.
+    check("первый звук — в начале прихода, а не в конце",
+          first is not None and first < whole / 2,
+          f"| первый через {first * 1000:.0f} мс, всё за {whole * 1000:.0f} мс")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

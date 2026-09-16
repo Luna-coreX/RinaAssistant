@@ -2078,6 +2078,8 @@ class ProtocolServer:
                     else "")
         rate = int((self._settings() or {}).get("speed", 100) or 100)
         for piece in speech.sentences(text):
+            if self._stream_speech(piece, voice, rate):
+                continue
             pcm = self.synthesiser.synthesize(piece, voice=voice, rate=rate)
             if not pcm:
                 # One piece failing is not the whole reply failing: what
@@ -2086,6 +2088,35 @@ class ProtocolServer:
                 log.warning("Не синтезировалось: %s", safe(piece))
                 continue
             self.send_speech(pcm, self.synthesiser.sample_rate)
+
+    def _stream_speech(self, piece: str, voice: str, rate: int) -> bool:
+        """
+        Send one sentence as it is being made. `False` — this engine cannot.
+
+        **`4.0b-E10`.** Even a single sentence is waited out whole today:
+        the request goes, and nothing is heard until the last byte of it
+        comes back. Sent as it arrives, the first sound leaves for the
+        shell while the rest of the sentence is still being spoken on
+        somebody else's computer.
+
+        A sentence that gave out nothing at all falls back to the whole
+        path — the engine may simply have failed, and one more attempt
+        costs a wait but saves a silence. A sentence that broke off in
+        the middle does not: what was heard was heard, and saying the
+        first half twice is worse than losing the second.
+        """
+        if not getattr(self.synthesiser, "streams", False):
+            return False
+        sent = False
+        try:
+            for pcm in self.synthesiser.stream(piece, voice=voice, rate=rate):
+                if not pcm:
+                    continue
+                sent = True
+                self.send_speech(pcm, self.synthesiser.sample_rate)
+        except Exception:                               # noqa: BLE001
+            log.exception("Потоковый синтез сорвался")
+        return sent
 
     #: Sound waiting to go to the shell, and the thread that sends it.
     #:
