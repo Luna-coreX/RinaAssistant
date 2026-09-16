@@ -391,5 +391,111 @@ check("и отправила ровно то, на что был кредит",
       f"| {deaf.data._credit[21].sent} Б")
 
 print()
+print("=== реплика режется на предложения ===")
+# `4.0b-E09`. Where **not** to cut matters more than where to: a dot
+# inside a number, a dot after an abbreviation, a dot before a lower-case
+# letter. A seam in the middle of a sentence sounds worse than a wait.
+from core.speech import LEAST_PIECE, sentences
+
+cases = [
+    ("Я могу запускать приложения и считать. Попробуй сказать: запусти браузер.",
+     2, "обычные два предложения"),
+    ("Скачано 10.5 МБ из 46.2 МБ, осталось совсем немного времени.",
+     1, "точка внутри числа"),
+    ("Открыла браузер, календарь и т.д. Больше ничего не запускала.",
+     1, "точка после сокращения"),
+    ("Готово. Ещё что-нибудь?", 1, "слишком короткое приклеивается к следующему"),
+    ("Первое предложение достаточно длинное. Второе тоже вполне себе "
+     "длинное. И третье не короче прочих.", 3, "три длинных остаются тремя"),
+    ("Без знаков препинания просто длинная фраза", 1, "нечего резать"),
+    ("", 0, "пусто"),
+]
+for text, want, why in cases:
+    got = sentences(text)
+    check(f"{why}", len(got) == want, f"| {len(got)} вместо {want}: {got}")
+
+check("короткий кусок не остаётся один",
+      all(len(part) >= LEAST_PIECE or len(got) == 1
+          for text, _, _ in cases
+          for got in [sentences(text)] for part in got),
+      "| иначе очередь пустеет между половинами ответа")
+
+print()
+print("=== и первое предложение звучит, пока делается остальное ===")
+# The gain itself. A reply of four sentences must not wait for the fourth
+# to be synthesised before the first is heard: that is exactly the wait
+# that made a long answer feel like a hang.
+
+
+class Slow:
+    """
+    A synthesiser that takes its time, like a real one over the network.
+
+    **By the length of the text, not by the call.** The first cut of this
+    slept a fixed quarter-second per call, and then a whole reply cost
+    exactly as much as its first sentence — so the timing check below
+    stayed green with the splitting deliberately removed. A stand-in that
+    does not scale the way the real thing scales measures nothing.
+    """
+
+    name = "медленное"
+    sample_rate = 24000
+    PER_CHARACTER = 0.006
+
+    def __init__(self):
+        self.said = []
+
+    @staticmethod
+    def available():
+        return True
+
+    def synthesize(self, text, voice="", rate=100):
+        _time.sleep(len(text) * self.PER_CHARACTER)
+        self.said.append(text)
+        return speech.tone(1.0, rate=24000)
+
+
+reply = ("Первое предложение достаточно длинное. Второе тоже вполне себе "
+         "длинное. И третье не короче прочих. Четвёртое завершает ответ.")
+
+slow, slow_pipe = speaker()
+slow.synthesiser = Slow()
+slow._settings = lambda: MemorySettings({"voice": "", "speed": 100})
+slow._speech_wanted = ()
+slow._speech_given = (True, True)
+slow._said_mute = False
+
+first = []
+watch = Playing(slow, slow_pipe)
+
+
+def note_first():
+    while not first:
+        piece = slow_pipe.recv()
+        if piece:
+            first.append(_time.perf_counter())
+        else:
+            _time.sleep(0.002)
+
+
+threading.Thread(target=note_first, daemon=True).start()
+began = _time.perf_counter()
+slow._speak(reply)
+whole = _time.perf_counter() - began
+until(lambda: first, seconds=5.0)
+
+check("реплика разошлась по предложениям", len(slow.synthesiser.said) == 4,
+      f"| {slow.synthesiser.said}")
+if first:
+    waited = (first[0] - began) * 1000
+    # Four sentences at a quarter of a second each: the whole reply takes
+    # about a second to make, the first sentence a quarter of it. The
+    # ceiling sits between the two — what is asked is "did the first go
+    # out before the last was made", not "how fast is this computer".
+    check("первый звук ушёл, не дожидаясь последнего предложения",
+          waited < 600, f"| через {waited:.0f} мс при всей реплике "
+                        f"за {whole * 1000:.0f} мс")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

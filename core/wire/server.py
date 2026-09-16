@@ -2064,14 +2064,28 @@ class ProtocolServer:
                          getattr(self.synthesiser, "last_error", "")
                          or "движок синтеза недоступен")
             return
-        pcm = self.synthesiser.synthesize(
-            text,
-            voice=str(self._settings().get("voice", "") if self._settings()
-                      else ""),
-            rate=int((self._settings() or {}).get("speed", 100) or 100))
-        if not pcm:
-            return
-        self.send_speech(pcm, self.synthesiser.sample_rate)
+        # **Sentence by sentence** (`4.0b-E09`). Synthesis of a whole
+        # reply is waited out whole: the person hears nothing until the
+        # last byte of the last word exists. Sent a sentence at a time,
+        # the first is already playing while the rest is still being
+        # made — and `send_speech` queues rather than blocks, so this
+        # loop does not wait for the sound to be heard either.
+        #
+        # The wait before the first syllable then stops depending on how
+        # long the answer is, which is what made long answers feel like
+        # a hang rather than a pause.
+        voice = str(self._settings().get("voice", "") if self._settings()
+                    else "")
+        rate = int((self._settings() or {}).get("speed", 100) or 100)
+        for piece in speech.sentences(text):
+            pcm = self.synthesiser.synthesize(piece, voice=voice, rate=rate)
+            if not pcm:
+                # One piece failing is not the whole reply failing: what
+                # was already said stays said, and going quiet about the
+                # rest is worse than saying most of it.
+                log.warning("Не синтезировалось: %s", safe(piece))
+                continue
+            self.send_speech(pcm, self.synthesiser.sample_rate)
 
     #: Sound waiting to go to the shell, and the thread that sends it.
     #:

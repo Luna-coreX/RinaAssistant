@@ -905,6 +905,85 @@ def synthesiser_for(settings) -> Synthesiser:
 # ---------------------------------------------------------------------------
 # Common
 # ---------------------------------------------------------------------------
+#: Words that end in a dot and do not end a sentence. Short on purpose:
+#: a long list of abbreviations is a list nobody keeps up, and the cost of
+#: a miss here is one seam in the middle of a phrase, not a lost word.
+_NOT_THE_END = ("т", "д", "е", "п", "г", "гг", "мин", "сек", "ч", "стр",
+                "им", "тыс", "млн", "руб", "см", "км", "кг", "напр")
+
+#: Below this many characters a piece is not said on its own but joined
+#: to the next. "Да." synthesised alone plays out in a quarter of a
+#: second and leaves the queue empty while the next sentence is still
+#: being made — and an empty queue between two halves of one answer is a
+#: gap a person hears as a stutter.
+#:
+#: Twenty, because a character is roughly seventy milliseconds of speech:
+#: twenty of them is about a second and a half of sound, comfortably
+#: longer than one request to a synthesiser. Higher and ordinary short
+#: sentences stop being said on their own — the first cut of this was
+#: forty, and "Я могу запускать много разных программ." at thirty-eight
+#: swallowed the sentence after it, which is the whole gain given back.
+LEAST_PIECE = 20
+
+
+def sentences(text: str, least: int = LEAST_PIECE) -> list[str]:
+    """
+    Cut a reply into pieces that can be spoken one after another.
+
+    **Why at all** (`4.0b-E09`): synthesis of a whole reply is waited out
+    whole. Cut into sentences, the first one can be heard while the rest
+    is still being made, and the wait before the first syllable stops
+    depending on how long the answer is.
+
+    Where **not** to cut matters more than where to: a dot inside a
+    number, a dot after an abbreviation, a dot before a lower-case letter
+    — three ways to get a seam in the middle of a sentence, which sounds
+    worse than a long wait.
+    """
+    text = (text or "").strip()
+    if not text:
+        return []
+
+    pieces: list[str] = []
+    piece = ""
+    for i, sign in enumerate(text):
+        piece += sign
+        if sign not in ".!?…":
+            continue
+        rest = text[i + 1:]
+        if rest and not rest[0].isspace():
+            continue                        # "3.14", "то-то.И" — not an end
+        if sign == "." and i and text[i - 1].isdigit():
+            continue                        # "в 10. 5 МБ" is not two sentences
+        # The last word, and inside it the part after the last dot:
+        # "и т.д." is one token, and the piece of it that says this is
+        # an abbreviation is the "д".
+        word = piece.rstrip(".!?… ").split()[-1:]
+        tail = word[0].rstrip(".").split(".")[-1].lower() if word else ""
+        if sign == "." and tail in _NOT_THE_END:
+            continue
+        ahead = rest.lstrip()
+        if ahead and ahead[0].islower():
+            continue                        # a sentence does not begin small
+        pieces.append(piece.strip())
+        piece = ""
+    if piece.strip():
+        pieces.append(piece.strip())
+
+    # Too short a piece joins the one after it — see `LEAST_PIECE`. The
+    # last one has nothing to join, so it joins the one before instead.
+    joined: list[str] = []
+    for part in pieces:
+        if joined and len(joined[-1]) < least:
+            joined[-1] = joined[-1] + " " + part
+        else:
+            joined.append(part)
+    if len(joined) > 1 and len(joined[-1]) < least:
+        tail = joined.pop()
+        joined[-1] = joined[-1] + " " + tail
+    return joined
+
+
 def tone(seconds: float, hertz: float = 440.0, rate: int = RATE) -> bytes:
     """
     Synthetic sound for the checks.
