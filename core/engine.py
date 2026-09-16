@@ -124,6 +124,11 @@ class RinaEngine:
         self._talking_until = 0.0
         self._talking_since = 0.0
         self._talk_timer = None
+
+        #: Whether the shell has been told the microphone is wanted. See
+        #: `_hold_ear`: two things hold it, and only one of them can
+        #: speak at a time.
+        self._ear_open = False
         self._cmd_store = UserCommandStore(settings)
         self._history = HistoryStore(settings)
         self._host = None                    # actions on the window (see set_host)
@@ -339,7 +344,6 @@ class RinaEngine:
         from voice import sounds
 
         sounds.play_activation(self._settings)
-        self._emit(Events.LISTENING_STARTED)
 
         # With a shell the core does not touch the microphone: it has
         # announced that it is listening, and the sound will arrive over the
@@ -347,14 +351,16 @@ class RinaEngine:
         # itself — what is left here is to hold the window open and say when
         # it closed.
         if self.ears_outside:
-            self._emit(Events.CAPTURING, active=True)
+            self._hold_ear()
             try:
                 time.sleep(self.listen_seconds())
             finally:
-                self._emit(Events.CAPTURING, active=False)
-                self._emit(Events.LISTENING_STOPPED)
                 self._busy = False
+                # And **not** "stopped" outright: the mode may still be
+                # holding the ear. See `_hold_ear`.
+                self._hold_ear()
             return
+        self._emit(Events.LISTENING_STARTED)
 
         result = None
         try:
@@ -403,6 +409,36 @@ class RinaEngine:
     #: afternoon of talking near the machine would leave the word
     #: optional until the program was shut down.
     TALK_LIMIT = 180.0
+
+    def _hold_ear(self):
+        """
+        Say whether sound should be coming at all — once, for everybody.
+
+        **Two things hold the microphone open** — the "always listening"
+        mode and a one-off listen on a hotkey — and each of them used to
+        announce its own beginning and end. The shell believes the last
+        thing it was told, so a one-off listen inside the mode said
+        "stopped" when its eight seconds ran out, the shell shut the
+        microphone, and the mode went on being on with nothing listening.
+        A person met that as "always listening does not work — she does
+        not hear me", and then as the same thing on the hotkey: eight
+        seconds of hearing and silence after.
+
+        So the question is asked of the engine rather than of whoever
+        happens to be finishing: is anybody still holding the ear open.
+        A release is only a release when the last holder lets go.
+        """
+        wanted = bool(self._always_listen or self._busy)
+        if wanted == self._ear_open:
+            return
+        self._ear_open = wanted
+        self._emit(Events.CAPTURING, active=wanted)
+        self._emit(Events.LISTENING_STARTED if wanted
+                   else Events.LISTENING_STOPPED)
+        log.info("Микрофон %s (режим %s, разовое %s)",
+                 "открыт" if wanted else "закрыт",
+                 "вкл" if self._always_listen else "выкл",
+                 "идёт" if self._busy else "нет")
 
     def talking(self, now=None):
         """Is a conversation open right now."""
@@ -510,14 +546,16 @@ class RinaEngine:
         # the wake word is required — checked in the same place as it is for
         # typed text.
         if self.ears_outside:
-            self._emit(Events.LISTENING_STARTED)
-            self._emit(Events.CAPTURING, active=True)
+            self._hold_ear()
             try:
                 while not stop_flag.wait(0.2):
                     pass
             finally:
-                self._emit(Events.CAPTURING, active=False)
-                self._emit(Events.LISTENING_STOPPED)
+                # The mode is already off by the time we are here — the
+                # flag is what woke us — so this asks the same question
+                # and gets the right answer even if a one-off listen is
+                # running.
+                self._hold_ear()
             return
 
         engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
@@ -1080,7 +1118,9 @@ class RinaEngine:
             value = int(self._settings.get("listen_seconds", 8))
         except (TypeError, ValueError):
             return 8
-        return max(3, min(20, value))
+        # The floor is in the schema now, where it can be read back; this
+        # only guards a profile written before that.
+        return max(3, min(60, value))
 
     def lang_code(self):
         """The recognition language = the interface language (one setting)."""

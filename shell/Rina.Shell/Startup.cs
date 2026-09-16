@@ -1307,13 +1307,22 @@ public partial class App
         // opened. Asked before it, this counted the greeting's boxes —
         // there are none — and called that "nothing is ticked by default".
         wizard.ShowFor(2);
-        // Two now: the small model and the package it is useless without.
-        // What matters is that nothing heavy is ticked, and `test_setup.py`
-        // holds that by weight; here it is enough that something sensible
-        // is offered ready-ticked at all.
-        Check("что-то отмечено по умолчанию, и немного",
-              wizard.TickedNow is > 0 and <= 3,
-              $"| отмечено {wizard.TickedNow}");
+
+        // **Two questions, and only the first is about this machine.**
+        // The catalogue marks a few things as worth having in advance —
+        // that is a decision about the program — and the wizard ticks
+        // exactly those of them that are not here yet. Asking "is
+        // something ticked" conflated the two, and went red the day the
+        // developer downloaded the very model it was about: on a machine
+        // that already has everything, nothing *should* be ticked.
+        Check("каталог что-то предлагает заранее, и немного",
+              wizard.Wanted.Count is > 0 and <= 3,
+              $"| {string.Join(", ", wizard.Wanted)}");
+        Check("мастер отметил ровно то, чего ещё нет",
+              wizard.TickedIds.OrderBy(x => x)
+                  .SequenceEqual(wizard.WorthTicking.OrderBy(x => x)),
+              $"| отмечено [{string.Join(", ", wizard.TickedIds)}], "
+              + $"стоило [{string.Join(", ", wizard.WorthTicking)}]");
         wizard.ShowFor(at);
 
         wizard.Left = -4000;
@@ -3420,6 +3429,61 @@ public partial class App
             Check("микрофон открылся, хотя никто не просил",
                   again.Capturing && again.CaptureStarts > 0,
                   $"| запусков {again.CaptureStarts}");
+
+            // --- and a one-off listen does not shut it ------------------
+            //
+            // Reported by a person: "always listening does not work — she
+            // does not hear me", and the same on the hotkey, "and on the
+            // next press it does not even let me speak". Two things hold
+            // the microphone open — the mode and a one-off listen — and
+            // each used to announce its own end. The shell believes the
+            // last thing it was told, so the one-off's window ran out,
+            // the shell shut the microphone, and the mode went on being
+            // on with nothing listening.
+            Check("разовое слушание вообще разрешено",
+                  again.Connection?.MayCall(
+                      Rina.Protocol.Methods.SpeechListenOnce) == true,
+                  "| ядро не объявило «stt»");
+
+            // Shortened first, and then **asked how short it really is**.
+            // The core keeps a floor of three seconds under this window,
+            // so asking for one gets three — and a check written against
+            // the number it asked for rather than the number it got
+            // waits too little and passes on a broken program. This one
+            // did, twice.
+            var window = 8;
+            if (again.Connection is { Ready: true } live)
+            {
+                await live.CallAsync(Rina.Protocol.Methods.SettingsSet,
+                    new JsonObject
+                    {
+                        ["values"] = new JsonObject { ["listen_seconds"] = 3 },
+                    }, TimeSpan.FromSeconds(10));
+                var back = await live.CallAsync(
+                    Rina.Protocol.Methods.SettingsGet, new JsonObject
+                    {
+                        ["keys"] = new JsonArray("listen_seconds"),
+                    }, TimeSpan.FromSeconds(10));
+                window = back.Payload["values"]?["listen_seconds"]
+                             ?.GetValue<int>() ?? 8;
+            }
+            Check("окно разового слушания известно", window is > 0 and <= 4,
+                  $"| {window} с");
+
+            await again.ListenOnceAsync();
+
+            // Longer than the window, and that is the whole reason for
+            // the number. The first cut of this check shortened the
+            // window to a second and waited two and a half — but the
+            // core keeps a floor of three seconds under it, so the
+            // listen was **still running** when the question was put,
+            // and "the microphone is open" came out true for the wrong
+            // reason. It stayed green with the defect deliberately put
+            // back.
+            await Task.Delay(window * 1000 + 1800);
+            Check("разовое слушание кончилось — режим держит микрофон",
+                  again.Capturing,
+                  "| иначе режим включён, а слушать нечем");
             await again.DisposeAsync();
         }
         finally

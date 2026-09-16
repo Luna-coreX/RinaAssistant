@@ -78,7 +78,14 @@ CONSTRAINTS: dict[str, Constraint] = {
     "volume": Constraint(low=0, high=100),
     "speed": Constraint(low=50, high=200),
     "wake_sensitivity": Constraint(low=0.0, high=1.0),
-    "listen_seconds": Constraint(low=1, high=60),
+    # Three at the bottom, not one, because three is what the engine
+    # actually uses: `listen_seconds()` raised anything smaller and
+    # said nothing, so the setting read back one while the window
+    # lasted three. A value that means something other than what it
+    # says is a small lie, and it cost an afternoon here — a check
+    # sized its wait by the stored number and passed on a broken
+    # program twice.
+    "listen_seconds": Constraint(low=3, high=60),
     "llm_timeout": Constraint(low=1, high=600, depends_on="llm_enabled"),
     "log_level": Constraint(choices=("DEBUG", "INFO", "WARNING", "ERROR")),
 

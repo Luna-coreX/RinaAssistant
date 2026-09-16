@@ -67,9 +67,34 @@ public partial class SetupWindow : Window
     public int Offered => _models.Count;
 
     /// <summary>How many boxes are ticked on the step shown — for the check.</summary>
-    public int TickedNow =>
+    public int TickedNow => TickedIds.Count;
+
+    /// <summary>Which boxes are ticked on the step shown — for the check.</summary>
+    /// <remarks>
+    /// The names, not the count. A count can only be compared with a
+    /// number somebody chose, and the number depends on what this
+    /// machine happens to have installed already: the check that asked
+    /// "is something ticked" went red the day the developer downloaded
+    /// the very model it is about. The rule has nothing to do with how
+    /// many — it is that the wizard ticks the catalogue's own choices and
+    /// nothing else.
+    /// </remarks>
+    public IReadOnlyList<string> TickedIds =>
         Stage.Content is DependencyObject root
-            ? Boxes(root).Count(b => b.IsChecked == true) : 0;
+            ? Boxes(root).Where(b => b.IsChecked == true)
+                  .Select(b => b.Tag as string ?? "").ToList()
+            : [];
+
+    /// <summary>What the catalogue marks as wanted and not yet here — for the check.</summary>
+    public IReadOnlyList<string> WorthTicking =>
+        _models.Where(m => (m["wanted"]?.GetValue<bool>() ?? false)
+                           && !(m["installed"]?.GetValue<bool>() ?? false))
+               .Select(m => m["id"]?.GetValue<string>() ?? "").ToList();
+
+    /// <summary>What the catalogue marks as wanted at all — for the check.</summary>
+    public IReadOnlyList<string> Wanted =>
+        _models.Where(m => m["wanted"]?.GetValue<bool>() ?? false)
+               .Select(m => m["id"]?.GetValue<string>() ?? "").ToList();
 
     /// <summary>Is there anything on the step at all — for the check.</summary>
     public bool StageFilled => Stage.Content is FrameworkElement;
