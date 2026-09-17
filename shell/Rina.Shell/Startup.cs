@@ -1301,6 +1301,48 @@ public partial class App
         Check("секция «Прочее» пуста", built && !Shown().HasOtherSection,
               built ? "" : "| страница пуста — сказать нечего");
 
+        // Every row is ruled the same way, and every control stands in
+        // the same column — including the row that only opens a sheet.
+        var ruled = Shown().Ruled();
+        Check("у каждого ряда своя черта",
+              ruled.Rows > 0 && ruled.Seamed == ruled.Rows,
+              $"| {ruled.Seamed} из {ruled.Rows}");
+        Check("и все органы управления в одном столбце",
+              ruled.Spread < 0.5,
+              $"| разброс {ruled.Spread:0.0} по {ruled.Measured} рядам");
+
+        // --- the search through forty settings ---
+        //
+        // Asked for. Measured on what is left standing rather than on
+        // the handler having run: a search that runs and hides nothing
+        // is the failure.
+        var all = Shown().Shown;
+        Check("без поиска видно все настройки", all > 20, $"| {all}");
+
+        Shown().FindForCheck("микрофон");
+        var few = Shown().Shown;
+        Check("поиск оставляет только подходящее",
+              few > 0 && few < all, $"| {few} из {all}");
+        Check("и прячет разделы, где ничего не осталось",
+              Shown().ShelvesShown < Pages.SettingsLayout.Sections.Length,
+              $"| разделов {Shown().ShelvesShown}");
+
+        // By the key too: somebody who read «tts_engine» in the journal
+        // should be able to find it by that, and the key is not written
+        // anywhere a person can see.
+        Shown().FindForCheck("tts_engine");
+        Check("настройку находит и по ключу ядра", Shown().Shown == 1,
+              $"| {Shown().Shown}");
+
+        Shown().FindForCheck("ксилофон");
+        Check("а когда ничего не нашлось — так и сказано",
+              Shown().Shown == 0 && Shown().NoMatchSaid.Length > 0,
+              $"| «{Shown().NoMatchSaid}»");
+
+        Shown().FindForCheck("");
+        Check("пустой поиск возвращает всё", Shown().Shown == all,
+              $"| {Shown().Shown} из {all}");
+
         // **Every sheet is measured, not looked at.** Reported by a
         // person: on one sheet the rows "look bad", on another "the
         // buttons are eaten". Both are one fault with two faces — a row

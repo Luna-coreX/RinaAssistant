@@ -16,10 +16,26 @@
       <RowDefinition Height="Auto" />
     </Grid.RowDefinitions>
 
-    <TextBlock Grid.Row="0" Text="{loc:S 'Настройки'}"
-               Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+    <!-- The title, and a way through forty settings. On the same line
+         because a search box on a line of its own would cost a row of
+         the panel for something used once a visit. -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <TextBlock Text="{loc:S 'Настройки'}"
+                 Style="{StaticResource Text.Title}"
+                 VerticalAlignment="Center" />
+      <TextBox x:Name="Find" Style="{StaticResource Field}" Width="280"
+               HorizontalAlignment="Right" VerticalAlignment="Center"
+               TextChanged="OnFind"
+               ui:Ui.Hint="{loc:S 'Найти настройку'}" />
+    </Grid>
 
     <ContentControl x:Name="Empty" Grid.Row="1" Visibility="Collapsed" />
+
+    <!-- The search found nothing. Said out loud, because an empty panel
+         is what a broken one looks like. -->
+    <TextBlock x:Name="NoMatch" Grid.Row="1" Visibility="Collapsed"
+               Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+               HorizontalAlignment="Center" Margin="0,40,0,0" />
 
     <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
                   Padding="0,0,12,0" ui:Smooth.Scrolling="True">

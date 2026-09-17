@@ -1032,6 +1032,11 @@ public static partial class Loc
                 {
                     ["English"] = "Model name",
                 },
+            ["Найти настройку"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Find a setting",
+                },
             ["Напоминание"] =
                 new Dictionary<string, string>
                 {
@@ -1245,6 +1250,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Nothing waiting",
+                },
+            ["Ничего не нашлось по «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing found for “{0}”",
                 },
             ["Ничего не уходит в сеть без вашего ведома."] =
                 new Dictionary<string, string>

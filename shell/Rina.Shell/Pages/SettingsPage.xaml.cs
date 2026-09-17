@@ -271,6 +271,7 @@ public partial class SettingsPage : UserControl
     private void Build()
     {
         Body.Children.Clear();
+        _shelves.Clear();
         var placed = new HashSet<string>();
 
         foreach (var section in SettingsLayout.Sections)
@@ -306,8 +307,136 @@ public partial class SettingsPage : UserControl
         if (strangers.Length > 0)
             Body.Children.Add(BuildSection(SettingsLayout.Other, strangers));
         SectionsShown = Body.Children.Count;
-
+        Sift();
     }
+
+    /// <summary>
+    /// A section, and what a person might call the things in it.
+    /// </summary>
+    /// <remarks>
+    /// Gathered while the panel is built rather than read off the screen
+    /// afterwards: the words are the ones the layout used — the name, the
+    /// small print, the key — and they are known here and nowhere else.
+    /// </remarks>
+    private readonly List<(UIElement Whole, IReadOnlyList<(UIElement Row,
+                           string Words)> Rows)> _shelves = [];
+
+    /// <summary>
+    /// Show only what the search matches.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: forty settings in nine sections is past the point where
+    /// scrolling and reading is finding. Matched on the name, the
+    /// explanation under it and the key the core uses — a person who read
+    /// «tts_engine» in the log should find it by that.
+    /// </para>
+    /// <para>
+    /// <b>Hidden, not rebuilt.</b> Rebuilding the panel on every
+    /// keystroke would throw away the control a person is looking at, and
+    /// with it whatever they had half-typed into it.
+    /// </para>
+    /// <para>
+    /// A section whose rows have all gone goes with them: a heading over
+    /// nothing is a promise that there is something under it.
+    /// </para>
+    /// </remarks>
+    private void Sift()
+    {
+        var asked = (Find?.Text ?? "").Trim();
+        Shown = 0;
+
+        foreach (var (whole, rows) in _shelves)
+        {
+            var left = 0;
+            foreach (var (row, words) in rows)
+            {
+                var fits = asked.Length == 0
+                    || words.Contains(asked,
+                                      StringComparison.CurrentCultureIgnoreCase);
+                row.Visibility = fits ? Visibility.Visible
+                                      : Visibility.Collapsed;
+                if (fits) left++;
+            }
+            whole.Visibility = left > 0 ? Visibility.Visible
+                                        : Visibility.Collapsed;
+            Shown += left;
+        }
+
+        // Said out loud rather than left as an empty panel: an empty
+        // panel is what a broken one looks like.
+        if (Empty.Visibility == Visibility.Visible && asked.Length == 0) return;
+        NoMatch.Visibility = Shown == 0 && asked.Length > 0
+            ? Visibility.Visible : Visibility.Collapsed;
+        NoMatch.Text = S("Ничего не нашлось по «{0}»", asked);
+    }
+
+    /// <summary>How many settings the search leaves — for the check.</summary>
+    public int Shown { get; private set; }
+
+    /// <summary>How many sections are left standing — for the check.</summary>
+    public int ShelvesShown => _shelves.Count(
+        shelf => shelf.Whole.Visibility == Visibility.Visible);
+
+    /// <summary>
+    /// The panel's ruling: how many rows, how many carry a seam, and how
+    /// far their controls' left edges spread.
+    /// </summary>
+    /// <remarks>
+    /// Two sentences a person said about this page — "too close to the
+    /// line compared with everything else, and another one is missing" —
+    /// as two numbers. The row that opens a sheet was built apart from
+    /// the others: no seam of its own, and a button a hundred and fifty
+    /// points right of every control on the page, because it reserved
+    /// two columns where a row has three.
+    /// </remarks>
+    public (int Rows, int Seamed, double Spread, int Measured) Ruled()
+    {
+        // Laid out first: the widths are read off the arranged tree,
+        // and the panel may have been rebuilt a moment ago.
+        UpdateLayout();
+
+        // **Every row, not every framed row.** The first version asked
+        // only the borders, so a row built without one was not counted
+        // as unseamed — it was not counted at all, and the break that
+        // took the frame off the sheet openers stayed green.
+        var rows = _shelves.SelectMany(shelf => shelf.Rows)
+                           .Select(row => row.Row)
+                           .OfType<FrameworkElement>()
+                           .Where(row => row.IsVisible)
+                           .ToArray();
+
+        var seamed = 0;
+        var edges = new List<double>();
+        foreach (var row in rows)
+        {
+            if (row is Border { BorderThickness.Bottom: >= 1 }) seamed++;
+            var grid = row as Grid ?? (row as Border)?.Child as Grid;
+            var control = grid?.Children.OfType<FrameworkElement>()
+                .FirstOrDefault(c => Grid.GetColumn(c) == 1
+                                     && Grid.GetColumnSpan(c) == 1
+                                     && c.ActualWidth > 0);
+            if (control is null) continue;
+            edges.Add(control.TransformToAncestor(Body)
+                             .Transform(new Point(0, 0)).X);
+        }
+        return (rows.Length, seamed,
+                edges.Count > 0 ? edges.Max() - edges.Min() : 0,
+                edges.Count);
+    }
+
+    /// <summary>What the page says when nothing matched — for the check.</summary>
+    public string NoMatchSaid => NoMatch.Visibility == Visibility.Visible
+        ? NoMatch.Text : "";
+
+    /// <summary>Search for this — for the check.</summary>
+    public void FindForCheck(string asked)
+    {
+        Find.Text = asked;
+        UpdateLayout();
+    }
+
+    private void OnFind(object sender, TextChangedEventArgs e) => Sift();
 
     //: What can be downloaded, and what is happening to it. Filled from
     //: `models.catalogue`, kept fresh by `task.progress`.
@@ -597,9 +726,23 @@ public partial class SettingsPage : UserControl
             Style = (Style)FindResource("Text.Section"),
             Margin = new Thickness(0, 0, 0, 12),
         });
+
+        var rows = new List<(UIElement, string)>();
         foreach (var key in keys)
-            stack.Children.Add(BuildRow(key, ProbeColumn));
-        foreach (var sheet in sheets ?? []) stack.Children.Add(BuildOpener(sheet));
+        {
+            var row = BuildRow(key, ProbeColumn);
+            stack.Children.Add(row);
+            rows.Add((row, $"{SettingsLayout.TitleOf(key)} "
+                           + $"{SettingsLayout.HintOf(key)} {key}"));
+        }
+        foreach (var sheet in sheets ?? [])
+        {
+            var row = BuildOpener(sheet);
+            stack.Children.Add(row);
+            rows.Add((row, $"{S(sheet.Title)} {S(sheet.Note)} "
+                           + string.Join(" ", sheet.Keys)));
+        }
+        _shelves.Add((stack, rows));
         return stack;
     }
 
@@ -612,26 +755,13 @@ public partial class SettingsPage : UserControl
     /// </remarks>
     private UIElement BuildOpener(Sheet sheet)
     {
-        var row = new Grid { Margin = new Thickness(0, 0, 0, 16) };
-        row.ColumnDefinitions.Add(new ColumnDefinition());
-        row.ColumnDefinitions.Add(new ColumnDefinition
-        {
-            Width = new GridLength(ControlColumn),
-        });
+        // **The same three columns as every other row.** Built with two,
+        // its button had the check's column to itself and stood a
+        // hundred and fifty points right of every control on the page.
+        var row = Ranks(ProbeColumn);
 
-        var left = new StackPanel { Margin = new Thickness(0, 0, 16, 0) };
-        left.Children.Add(new TextBlock
-        {
-            Text = S(sheet.Title),
-            Style = (Style)FindResource("Text.Body"),
-        });
-        left.Children.Add(new TextBlock
-        {
-            Text = S(sheet.Note),
-            Style = (Style)FindResource("Text.Meta"),
-            TextWrapping = TextWrapping.Wrap,
-            Margin = new Thickness(0, 2, 0, 0),
-        });
+        var left = Legend(S(sheet.Title), [S(sheet.Note)]);
+        Grid.SetColumn(left, 0);
         row.Children.Add(left);
 
         var open = new Button
@@ -640,12 +770,12 @@ public partial class SettingsPage : UserControl
             Content = S("Открыть"),
             Width = ControlWidth,
             HorizontalAlignment = HorizontalAlignment.Left,
-            VerticalAlignment = VerticalAlignment.Top,
+            VerticalAlignment = VerticalAlignment.Center,
         };
         open.Click += (_, _) => ShowSheet(sheet);
         Grid.SetColumn(open, 1);
         row.Children.Add(open);
-        return row;
+        return Framed(row);
     }
 
     /// <summary>Open one list in its window.</summary>
@@ -764,31 +894,44 @@ public partial class SettingsPage : UserControl
     /// <summary>The width of the checks column. Empty in most rows.</summary>
     private const double ProbeColumn = 150;
 
-    private UIElement BuildRow(string key, double probeColumn,
-                               bool named = true)
+    /// <summary>The three columns every row on a panel stands in.</summary>
+    /// <remarks>
+    /// The control column is one width for the whole page: otherwise
+    /// every row starts where its own label ended, and the right edge
+    /// goes ragged. On a front panel the controls stand in a column.
+    ///
+    /// The third is for the check, and it is <b>also one width for every
+    /// row</b>. With "by content", a row with a button took room from its
+    /// own label, and its control drifted left of its neighbours':
+    /// columns belong to the panel, not to the row.
+    /// </remarks>
+    private static Grid Ranks(double probeColumn)
     {
-        var spec = _schema[key];
         var row = new Grid { MinHeight = 40 };
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(1, GridUnitType.Star),
         });
-        // The control column is one width for the whole page: otherwise
-        // every row starts where its own label ended, and the right edge
-        // goes ragged. On a front panel the controls stand in a column.
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(ControlColumn),
         });
-        // The third column is for the check, and it is **also one width
-        // for every row**. With "by content", a row with a button took room
-        // from its own label, and its control drifted left of its
-        // neighbours': columns belong to the panel, not to the row.
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
             Width = new GridLength(probeColumn),
         });
+        return row;
+    }
 
+    /// <summary>The name and the small print, in the first column.</summary>
+    /// <remarks>
+    /// The title wraps. Trimmed to the column it was cut mid-word —
+    /// «Замечать, какие программы откры» — because the column is what is
+    /// left after the control and the check have taken theirs. A name a
+    /// person cannot read is not a name.
+    /// </remarks>
+    private StackPanel Legend(string title, IEnumerable<string> notes)
+    {
         var label = new StackPanel
         {
             VerticalAlignment = VerticalAlignment.Center,
@@ -798,9 +941,51 @@ public partial class SettingsPage : UserControl
         };
         label.Children.Add(new TextBlock
         {
-            Text = SettingsLayout.TitleOf(key),
+            Text = title,
             Style = (Style)FindResource("Text.Body"),
+            TextWrapping = TextWrapping.Wrap,
         });
+
+        var said = notes.Where(n => n.Length > 0).ToArray();
+        if (said.Length > 0)
+            label.Children.Add(new TextBlock
+            {
+                Text = string.Join(" · ", said),
+                Style = (Style)FindResource("Text.Meta"),
+                Margin = new Thickness(0, 2, 0, 0),
+                TextWrapping = TextWrapping.Wrap,
+            });
+        return label;
+    }
+
+    /// <summary>
+    /// A row in its frame: the padding, and the seam under it.
+    /// </summary>
+    /// <remarks>
+    /// A hairline seam between settings — the same device as in the
+    /// lists: areas of a panel are separated by value and by a seam, not
+    /// by emptiness between tiles.
+    ///
+    /// <b>One frame for every kind of row.</b> The row that opens a sheet
+    /// used to be built apart from this — a bare grid with sixteen points
+    /// under it — so it had no seam of its own and stood hard against the
+    /// one above. Reported as "too close to the line compared with
+    /// everything else, and another one is missing". Both were the same
+    /// omission.
+    /// </remarks>
+    private Border Framed(UIElement row) => new()
+    {
+        BorderBrush = (System.Windows.Media.Brush)FindResource("C.Seam"),
+        BorderThickness = new Thickness(0, 0, 0, 1),
+        Padding = new Thickness(0, 8, 0, 10),
+        Child = row,
+    };
+
+    private UIElement BuildRow(string key, double probeColumn,
+                               bool named = true)
+    {
+        var spec = _schema[key];
+        var row = Ranks(probeColumn);
 
         var notes = new List<string>();
         if (SettingsLayout.HintOf(key).Length > 0)
@@ -809,15 +994,8 @@ public partial class SettingsPage : UserControl
             notes.Add(S("применится после перезапуска"));
         if (!SettingsLayout.Known.Contains(key))
             notes.Add(S("ключ {0} оболочке незнаком", key));
-        if (notes.Count > 0)
-            label.Children.Add(new TextBlock
-            {
-                Text = string.Join(" · ", notes),
-                Style = (Style)FindResource("Text.Meta"),
-                Margin = new Thickness(0, 2, 0, 0),
-                TextWrapping = TextWrapping.Wrap,
-            });
 
+        var label = Legend(SettingsLayout.TitleOf(key), notes);
         Grid.SetColumn(label, 0);
         if (named) row.Children.Add(label);
 
@@ -865,17 +1043,7 @@ public partial class SettingsPage : UserControl
         row.Children.Add(editor);
 
         ApplyDependency(key, spec, row);
-
-        // A hairline seam between settings — the same device as in the
-        // lists: areas of a panel are separated by value and by a seam, not
-        // by emptiness between tiles.
-        return new Border
-        {
-            BorderBrush = (System.Windows.Media.Brush)FindResource("C.Seam"),
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(0, 8, 0, 10),
-            Child = row,
-        };
+        return Framed(row);
     }
 
     /// <summary>Whether this setting has a check of its own.</summary>

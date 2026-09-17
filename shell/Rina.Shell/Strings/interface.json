@@ -1561,5 +1561,11 @@
   },
   "Каждому своё сочетание": {
     "English": "One combination each"
+  },
+  "Найти настройку": {
+    "English": "Find a setting"
+  },
+  "Ничего не нашлось по «{0}»": {
+    "English": "Nothing found for “{0}”"
   }
 }
