@@ -341,10 +341,12 @@ public partial class HomePage : UserControl
         if (playing is null || playing.Title.Length == 0)
         {
             Remote.Visibility = Visibility.Collapsed;
+            Ticking(false);
             return;
         }
 
         Remote.Visibility = Visibility.Visible;
+        Ticking(true);
         Track.Text = playing.Title;
         // Not everything says who: a browser tab often gives a title alone,
         // and an empty line under it would look like something failed to
@@ -353,7 +355,121 @@ public partial class HomePage : UserControl
         Artist.Visibility = playing.Artist.Length > 0
             ? Visibility.Visible : Visibility.Collapsed;
         Cover.Source = playing.Cover;
+        NoCover.Visibility = playing.Cover is null
+            ? Visibility.Visible : Visibility.Collapsed;
+        ShowLine();
         Hold.Content = playing.Running ? "\u23F8" : "\u25B6";
+    }
+
+    /// <summary>
+    /// The length, and where in it we are.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Redrawn on a tick rather than on an event: the register reports a
+    /// position when the source volunteers one, and a bar that waits for
+    /// that stands still and then jumps a handful of seconds. Half a
+    /// second is fast enough that the movement reads as movement and
+    /// cheap enough to cost nothing.
+    /// </para>
+    /// <para>
+    /// <b>Not touched while a person is dragging it.</b> A tick that
+    /// writes the playing position into the slider under a moving hand
+    /// pulls the thumb out from under it, which feels like the interface
+    /// arguing.
+    /// </para>
+    /// </remarks>
+    private void ShowLine()
+    {
+        var spot = _remote?.Where();
+        if (spot is null)
+        {
+            // A live stream, or a browser tab that gives a title and
+            // nothing else. A bar with no end to it is a bar that lies.
+            Line.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        Line.Visibility = Visibility.Visible;
+        Seek.IsEnabled = spot.Seekable;
+        Length.Text = Clocked(spot.Length);
+        if (_scrubbing) return;
+
+        _writing = true;
+        Seek.Maximum = spot.Length.TotalSeconds;
+        Seek.Value = spot.At.TotalSeconds;
+        _writing = false;
+        At.Text = Clocked(spot.At);
+    }
+
+    /// <summary>A length, in the shortest form that is not a riddle.</summary>
+    /// <remarks>
+    /// Minutes and seconds for a song, hours for a recording that has
+    /// them. "0:03:12" for a three-minute track reads as a stopwatch;
+    /// "3:12" reads as a song.
+    /// </remarks>
+    private static string Clocked(TimeSpan span) =>
+        span.TotalHours >= 1
+            ? $"{(int)span.TotalHours}:{span.Minutes:00}:{span.Seconds:00}"
+            : $"{span.Minutes}:{span.Seconds:00}";
+
+    private System.Windows.Threading.DispatcherTimer? _tick;
+    private bool _scrubbing;
+    private bool _writing;
+
+    /// <summary>The tick runs only while there is a bar to move.</summary>
+    /// <remarks>
+    /// Nothing is playing most of the time, and a timer waking twice a
+    /// second to redraw a hidden panel is a thing nobody notices and
+    /// nobody stops.
+    /// </remarks>
+    private void Ticking(bool on)
+    {
+        if (!on)
+        {
+            _tick?.Stop();
+            return;
+        }
+
+        _tick ??= Beat();
+        _tick.Start();
+    }
+
+    private System.Windows.Threading.DispatcherTimer Beat()
+    {
+        var beat = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(500),
+        };
+        beat.Tick += (_, _) => ShowLine();
+        // The page is built afresh on every visit to the section, and a
+        // timer left running would keep a dead page redrawing itself.
+        Unloaded += (_, _) => beat.Stop();
+        return beat;
+    }
+
+    /// <summary>A person took hold of the bar.</summary>
+    private void OnScrubStart(object sender,
+                              System.Windows.Controls.Primitives
+                                    .DragStartedEventArgs e) =>
+        _scrubbing = true;
+
+    /// <summary>And let go — that is where they meant.</summary>
+    private async void OnScrubEnd(object sender,
+                                  System.Windows.Controls.Primitives
+                                        .DragCompletedEventArgs e)
+    {
+        _scrubbing = false;
+        if (_remote is not null)
+            await _remote.Seek(TimeSpan.FromSeconds(Seek.Value));
+    }
+
+    /// <summary>While the hand moves, the figure under it follows.</summary>
+    private void OnScrubbing(object sender,
+                             RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_writing) return;
+        At.Text = Clocked(TimeSpan.FromSeconds(e.NewValue));
     }
 
     private TodoList? _todo;
@@ -468,6 +584,34 @@ public partial class HomePage : UserControl
     {
         if (_remote is not null) await _remote.Next();
     }
+
+    /// <summary>
+    /// Where each part of the player sits — for the check.
+    /// </summary>
+    /// <remarks>
+    /// "The cover on top, the name below it, then the buttons, and the
+    /// length at the bottom" was asked for in words, and words are how it
+    /// would come back. Four numbers going up is the same sentence in a
+    /// form that fails on its own.
+    /// </remarks>
+    public IReadOnlyList<(string What, double Top)> RemoteParts() =>
+    [
+        ("обложка", Above(Cover)),                       // not UI
+        ("название", Above(Track)),                      // not UI
+        ("кнопки", Above(Back)),                         // not UI
+        ("полоска", Above(Seek)),                        // not UI
+    ];
+
+    private double Above(FrameworkElement what) =>
+        what.TransformToAncestor(Remote).Transform(new Point(0, 0)).Y;
+
+    /// <summary>The bar, as it reads — or nothing when there is none.</summary>
+    public string RemoteLine => Line.Visibility == Visibility.Visible
+        ? $"{At.Text} / {Length.Text}" : "";
+
+    /// <summary>What the bar is set to — for the check.</summary>
+    public (double At, double Length, bool Movable) RemoteBar =>
+        (Seek.Value, Seek.Maximum, Seek.IsEnabled);
 
     /// <summary>What the remote is showing — for the check.</summary>
     public string RemoteShows => Remote.Visibility == Visibility.Visible

@@ -968,23 +968,17 @@ public partial class App
                   $"| {home.RemoteShows}");
         }
 
-        // The picture is taken here, while something is showing. After the
-        // seam below the remote is deliberately emptied, and a photograph
-        // of that proves only that an empty panel is empty.
-        if (shot is not null)
-        {
-            Save(window, shot);
-            Console.WriteLine($"снимок: {shot}");
-        }
-
         // --- and the half that is ours, on a quiet machine too ---
         //
         // Whether anything is playing belongs to the person's machine.
         // Whether the home screen lays it out belongs to us, and it has to
         // be checked either way — otherwise the interesting half is tested
         // only when somebody happens to have music on.
-        Remote!.ShowForCheck(new MediaRemote.Sounding(
-            "Проверка", "Тишина в двух актах", Running: true, Cover: null));
+        Remote!.ShowForCheck(
+            new MediaRemote.Sounding("Проверка", "Тишина в двух актах",
+                                     Running: true, Cover: null),
+            new MediaRemote.Spot(TimeSpan.FromSeconds(75),
+                                 TimeSpan.FromSeconds(214), Seekable: true));
         await Until(() => home.RemoteShows.Length > 0, 5);
         Check("подставленное играющее показано целиком",
               home.RemoteShows.Contains("Тишина в двух актах",
@@ -992,6 +986,50 @@ public partial class App
               && home.RemoteShows.Contains("Проверка",
                                            StringComparison.Ordinal),
               $"| {home.RemoteShows}");
+
+        // **The order asked for, as four numbers.** "The cover on top,
+        // the name below it, then the buttons back-stop-forward, and
+        // below that the bar with the length, which one can move along."
+        // Said in words; four tops going down is the same sentence in a
+        // form that goes red by itself.
+        await Until(() => home.RemoteParts()[3].Top > 0, 3);
+        var parts = home.RemoteParts();
+        var order = string.Join(" · ",
+            parts.Select(part => $"{part.What} {part.Top:0}"));
+        var stacked = parts.Zip(parts.Skip(1))
+                           .All(pair => pair.Second.Top > pair.First.Top);
+        Check("части проигрывателя идут сверху вниз", stacked, $"| {order}");
+
+        // And the bar says the length it was given rather than a
+        // fraction of its own: a slider from nought to one looks the
+        // same whatever is playing.
+        var bar = home.RemoteBar;
+        Check("полоска — это настоящая длина",
+              Math.Abs(bar.Length - 214) < 0.5
+              && Math.Abs(bar.At - 75) < 0.5 && bar.Movable,
+              $"| {bar.At:0} из {bar.Length:0}, перемотка {bar.Movable}");
+        Check("и подписана временем", home.RemoteLine == "1:15 / 3:34",
+              $"| «{home.RemoteLine}»");
+
+        // The picture is taken here, of the substituted track rather than
+        // of whatever the machine happens to be playing: the same
+        // photograph every time, on a quiet machine too. Later the panel
+        // is deliberately emptied, and a photograph of that proves only
+        // that an empty panel is empty.
+        if (shot is not null)
+        {
+            Save(window, shot);
+            Console.WriteLine($"снимок: {shot}");
+        }
+
+        // A stream has no end, and a bar with no end to it is a bar that
+        // lies. So there is none.
+        Remote.ShowForCheck(
+            new MediaRemote.Sounding("Lo-Fi Girl", "beats to relax to",
+                                     Running: true, Cover: null), null);
+        await Until(() => home.RemoteLine.Length == 0, 3);
+        Check("у потока без длины полоски нет вовсе",
+              home.RemoteLine.Length == 0, $"| «{home.RemoteLine}»");
 
         Remote.ShowForCheck(null);
         await Until(() => home.RemoteShows.Length == 0, 5);
@@ -4333,8 +4371,19 @@ public partial class App
         Console.WriteLine("=== стекло: накладка поверх главной ===");
 
         window.ShowSectionFor("home");
+        // **Nothing is playing, by decree.** What is measured here is
+        // what shows through the panel and what shows beside it, and
+        // "beside it" is the home screen — which carries a player when
+        // the person happens to have music on. It used to be a strip and
+        // took up almost none of the strip of picture being read; it is
+        // now a card the height of a hand, and the reading beside the
+        // panel became a reading of the card. A check that says a
+        // different thing depending on what is in somebody's Spotify is
+        // not a check.
+        Remote?.ShowForCheck(null);
         await Task.Delay(400);
         var home = (Pages.HomePage)(await SettledPage(window))!;
+        await Until(() => home.RemoteShows.Length == 0, 3);
         home.OpenTodoForCheck();
         await Until(() => home.TodoOnScreen, 5);
 

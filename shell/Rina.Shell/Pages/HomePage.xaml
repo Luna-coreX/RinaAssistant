@@ -91,33 +91,49 @@
         A remote for whatever is already playing (4.0b-A07). Hidden when
         nothing is: an empty panel with three dead buttons says the thing is
         broken, and most of the time nothing is playing.
+
+        Laid out the way a player is laid out: the cover on top, the name
+        under it, the buttons under that, and the length at the bottom.
+        Asked for in those words. The first edition was a strip — a small
+        cover, two lines and three buttons in a row — which reads as a
+        notification about music rather than as something to work with.
+
+        The cover is the thing one recognises the track by, so it is the
+        biggest thing here and not a stamp beside the words.
       -->
       <Border x:Name="Remote" Grid.Row="3" Visibility="Collapsed"
               HorizontalAlignment="Center" Margin="0,0,0,40"
-              MaxWidth="420" Style="{StaticResource Card}">
-        <Grid>
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto" />
-            <ColumnDefinition Width="*" />
-            <ColumnDefinition Width="Auto" />
-          </Grid.ColumnDefinitions>
-
-          <Border Grid.Column="0" Width="44" Height="44"
+              Width="248" Style="{StaticResource Card}">
+        <StackPanel>
+          <Border Width="200" Height="200" HorizontalAlignment="Center"
                   CornerRadius="{StaticResource Radius.Tight}"
-                  Background="{DynamicResource C.FaceLow}">
-            <Image x:Name="Cover" Stretch="UniformToFill" />
+                  Background="{DynamicResource C.FaceLow}"
+                  ClipToBounds="True">
+            <Grid>
+              <!-- Not everything has artwork: a browser tab, a local
+                   file with no tags. Two hundred points of empty grey
+                   reads as a picture that failed to load; a note reads
+                   as music without one. -->
+              <TextBlock x:Name="NoCover" FontFamily="Segoe MDL2 Assets"
+                         Text="&#xE8D6;" FontSize="48"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource C.InkFaint}" />
+              <Image x:Name="Cover" Stretch="UniformToFill" />
+            </Grid>
           </Border>
 
-          <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                      Margin="12,0,12,0">
-            <TextBlock x:Name="Track" Style="{StaticResource Text.Body}"
-                       TextTrimming="CharacterEllipsis" />
-            <TextBlock x:Name="Artist" Style="{StaticResource Text.Meta}"
-                       TextTrimming="CharacterEllipsis" />
-          </StackPanel>
+          <TextBlock x:Name="Track" Style="{StaticResource Text.Body}"
+                     HorizontalAlignment="Center" TextAlignment="Center"
+                     TextTrimming="CharacterEllipsis"
+                     Margin="0,12,0,0" />
+          <TextBlock x:Name="Artist" Style="{StaticResource Text.Meta}"
+                     HorizontalAlignment="Center" TextAlignment="Center"
+                     TextTrimming="CharacterEllipsis" />
 
-          <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Grid.Column="2" Orientation="Horizontal"
-                      VerticalAlignment="Center">
+          <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}"
+                      Orientation="Horizontal" Margin="0,12,0,0"
+                      HorizontalAlignment="Center">
             <Button x:Name="Back" Style="{StaticResource Btn.Quiet}"
                     Content="&#x23EE;" Click="OnPrevious"
                     ToolTip="{loc:S 'Предыдущий'}" />
@@ -128,7 +144,28 @@
                     Content="&#x23ED;" Click="OnNext"
                     ToolTip="{loc:S 'Следующий'}" />
           </StackPanel>
-        </Grid>
+
+          <!--
+            The length, and a way to move about in it. Hidden altogether
+            when the source does not say how long the thing is — a live
+            stream, a browser tab that gives a title and nothing else —
+            because a bar with no end to it is a bar that lies.
+          -->
+          <StackPanel x:Name="Line" Margin="0,12,0,0">
+            <Slider x:Name="Seek" Style="{StaticResource Slide}"
+                    Minimum="0" Maximum="1" SmallChange="5"
+                    LargeChange="30"
+                    Thumb.DragStarted="OnScrubStart"
+                    Thumb.DragCompleted="OnScrubEnd"
+                    ValueChanged="OnScrubbing" />
+            <Grid Margin="0,2,0,0">
+              <TextBlock x:Name="At" Style="{StaticResource Text.Meta}"
+                         HorizontalAlignment="Left" />
+              <TextBlock x:Name="Length" Style="{StaticResource Text.Meta}"
+                         HorizontalAlignment="Right" />
+            </Grid>
+          </StackPanel>
+        </StackPanel>
       </Border>
       <!--
         Things to do (4.0b-A13), in the corner and out of the way.

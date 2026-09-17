@@ -47,6 +47,19 @@ public sealed class MediaRemote
     public sealed record Sounding(string Artist, string Title, bool Running,
                                   BitmapImage? Cover);
 
+    /// <summary>How far into the track it is, and how long the track is.</summary>
+    /// <param name="At">How much has played.</param>
+    /// <param name="Length">How much there is.</param>
+    /// <param name="Seekable">Whether this source lets us move the point.</param>
+    /// <remarks>
+    /// Separate from <see cref="Sounding"/> because it changes every
+    /// second while the rest changes once a song. Handed out on request
+    /// rather than pushed: the register reports a position when it feels
+    /// like it — a source may say nothing for half a minute — so the
+    /// figure is worked out from the last report and the time since.
+    /// </remarks>
+    public sealed record Spot(TimeSpan At, TimeSpan Length, bool Seekable);
+
     private GlobalSystemMediaTransportControlsSessionManager? _manager;
     private GlobalSystemMediaTransportControlsSession? _session;
 
@@ -88,6 +101,71 @@ public sealed class MediaRemote
 
     /// <summary>On to the next.</summary>
     public Task Next() => Press(s => s.TrySkipNextAsync());
+
+    /// <summary>Move the playing point.</summary>
+    /// <remarks>
+    /// Counted from the track's own start, which is not always zero: a
+    /// chapter of a podcast, a fragment of a stream. The register takes
+    /// ticks, and ticks from <c>StartTime</c>.
+    /// </remarks>
+    public Task Seek(TimeSpan to) => Press(s =>
+        s.TryChangePlaybackPositionAsync(
+            (s.GetTimelineProperties().StartTime + to).Ticks));
+
+    /// <summary>Where in the track it is, right now.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Worked out, not merely read.</b> The register updates its
+    /// position when the source bothers to say so, and some say so once
+    /// every several seconds. A bar drawn from that alone stands still
+    /// and then jumps. So what is read is the last reported position and
+    /// the moment it was reported, and the time since is added on while
+    /// the thing is actually sounding.
+    /// </para>
+    /// <para>
+    /// A stale report is not added to: a source that went quiet an hour
+    /// ago would otherwise show an hour of playing that never happened.
+    /// Anything older than a minute is taken as it stands.
+    /// </para>
+    /// </remarks>
+    public Spot? Where()
+    {
+        // Once a check has started making things up, it goes on making
+        // them up: «a stream with no length» is a null, and a null that
+        // meant "ask the machine" would be answered by whatever the
+        // person happens to have playing.
+        if (_pretending) return _pretend;
+
+        var session = _session;
+        if (session is null) return null;
+
+        try
+        {
+            var line = session.GetTimelineProperties();
+            var length = line.EndTime - line.StartTime;
+            if (length <= TimeSpan.Zero) return null;
+
+            var at = line.Position - line.StartTime;
+            var since = DateTimeOffset.Now - line.LastUpdatedTime;
+            if (Playing?.Running == true
+                && since > TimeSpan.Zero && since < TimeSpan.FromMinutes(1))
+                at += since;
+
+            if (at < TimeSpan.Zero) at = TimeSpan.Zero;
+            if (at > length) at = length;
+
+            var can = session.GetPlaybackInfo()?.Controls
+                             .IsPlaybackPositionEnabled ?? false;
+            return new Spot(at, length, can);
+        }
+        catch (Exception exc)                            // noqa
+        {
+            // A source that has gone away between one tick and the next.
+            // The bar simply stops being drawn.
+            Log($"remote timeline unreadable: {exc.GetType().Name}");
+            return null;
+        }
+    }
 
     private async Task Press(
         Func<GlobalSystemMediaTransportControlsSession,
@@ -198,7 +276,18 @@ public sealed class MediaRemote
     /// part: everything after it is our code, and the check exercises it
     /// without waiting for somebody to press play.
     /// </remarks>
-    public void ShowForCheck(Sounding? sounding) => Set(sounding);
+    public void ShowForCheck(Sounding? sounding) => ShowForCheck(sounding, null);
+
+    /// <summary>The same, with a place in the track.</summary>
+    public void ShowForCheck(Sounding? sounding, Spot? spot)
+    {
+        _pretending = true;
+        _pretend = spot;
+        Set(sounding);
+    }
+
+    private Spot? _pretend;
+    private bool _pretending;
 
     private void Set(Sounding? sounding)
     {

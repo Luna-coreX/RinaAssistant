@@ -588,6 +588,16 @@
   <Style x:Key="Slide" TargetType="Slider">
     <Setter Property="Height" Value="{StaticResource Size.Control}" />
     <Setter Property="IsMoveToPointEnabled" Value="True" />
+    <!-- The accent fill below is drawn by `Slider` itself, and only when
+         it has been told there is a range to draw. Without these three
+         the template had a `PART_SelectionRange` of no width, and the
+         part already covered looked exactly like the part still to come
+         — which the template's own note says it must not. -->
+    <Setter Property="IsSelectionRangeEnabled" Value="True" />
+    <Setter Property="SelectionStart"
+            Value="{Binding Minimum, RelativeSource={RelativeSource Self}}" />
+    <Setter Property="SelectionEnd"
+            Value="{Binding Value, RelativeSource={RelativeSource Self}}" />
     <Setter Property="VerticalAlignment" Value="Center" />
     <Setter Property="Template">
       <Setter.Value>
