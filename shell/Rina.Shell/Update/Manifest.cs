@@ -164,13 +164,34 @@ public sealed record Manifest
     {
         var a = Numbers(left);
         var b = Numbers(right);
-        for (var i = 0; i < Math.Max(a.Length, b.Length); i++)
+        for (var i = 0; i < 3; i++)
         {
             var one = i < a.Length ? a[i] : 0;
             var two = i < b.Length ? b[i] : 0;
             if (one != two) return one.CompareTo(two);
         }
-        return 0;
+
+        // **A prerelease is older than the release it leads to.** Split
+        // on every separator, `4.0.0-beta` came out as 4·0·0·0 and
+        // `4.0.0` as 4·0·0 — equal, so a person on the beta would never
+        // have been offered the release it was a beta of. The rule is
+        // semver's: with the three numbers equal, whichever carries a
+        // tag is the earlier one.
+        var tagged = Tag(left);
+        var theirs = Tag(right);
+        if (tagged == theirs) return 0;
+        return tagged.Length == 0 ? 1 : theirs.Length == 0 ? -1
+            : string.CompareOrdinal(tagged, theirs);
+    }
+
+    /// <summary>What follows the three numbers, if anything.</summary>
+    private static string Tag(string version)
+    {
+        var at = version.IndexOf('-');
+        if (at < 0) return "";
+        var tail = version[(at + 1)..];
+        var plus = tail.IndexOf('+');
+        return plus < 0 ? tail : tail[..plus];
     }
 
     private static int[] Numbers(string version) => version

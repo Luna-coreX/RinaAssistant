@@ -293,6 +293,33 @@
   </Style>
 
   <!--
+    The cross inside a tag or a card.
+
+    Not a button with a word in it: the word «Убрать» repeated on six
+    tags is six copies of one word and none of the words a person came
+    to read. A cross is smaller than the thing it removes, which is the
+    right proportion for the destructive half of a label.
+
+    It is still a button and it still says what it does — the name and
+    the tooltip carry «Убрать „Рина“». A mark that works only for those
+    who already know the convention is decoration.
+  -->
+  <Style x:Key="Btn.Cross" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!--
     A button in the corner: transparent until you come near it.
 
     It carries an icon and no word. Nothing about it should draw the eye —

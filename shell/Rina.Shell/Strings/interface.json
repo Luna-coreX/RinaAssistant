@@ -272,12 +272,6 @@
   "ЗНАКОМСТВО": {
     "English": "GETTING STARTED"
   },
-  "Забыть": {
-    "Deutsch": "Vergessen",
-    "English": "Forget",
-    "Español": "Olvidar",
-    "Українська": "Забути"
-  },
   "Забыть все": {
     "Deutsch": "Alle vergessen",
     "English": "Forget all",
@@ -1585,5 +1579,11 @@
   },
   "Скажите — или напишите.": {
     "English": "Say it — or type it."
+  },
+  "Убрать «{0}»": {
+    "English": "Remove “{0}”"
+  },
+  "Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место": {
+    "English": "Drag to move the canvas. Double-click brings it back"
   }
 }

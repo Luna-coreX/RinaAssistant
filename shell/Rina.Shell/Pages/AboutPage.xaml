@@ -39,7 +39,11 @@
                  in the program's own typeface. -->
             <Run Text="Rina" FontSize="48" />
             <LineBreak />
-            <Run Text="Assistant" FontSize="24" />
+            <!-- The second tier is set out letter by letter in `Spread`.
+                 The text is not written here because it is not the word
+                 any more: it is the word with spaces in it, and the word
+                 itself must stay in one place. -->
+            <Run x:Name="Spaced" FontSize="24" />
           </TextBlock>
           <TextBlock x:Name="Version" Style="{StaticResource Text.Meta}"
                      HorizontalAlignment="Center" Margin="0,10,0,0" />

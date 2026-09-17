@@ -89,10 +89,14 @@ public partial class PluginsPage : UserControl
         var got = await Ask(Methods.PluginsList);
         if (got?["items"] is not JsonArray items) return 0;
 
-        _wasEnabled = items.OfType<JsonObject>()
-            .Where(p => p["enabled"]?.GetValue<bool>() == true)
-            .Select(p => p["plugin_id"]?.GetValue<string>() ?? "")
-            .ToHashSet();
+        // Remembered only if nobody has remembered yet: after
+        // `SilenceAsync` everything is off, and taking the reading
+        // again would record "nothing was on" and never put it back.
+        if (_wasEnabled.Count == 0)
+            _wasEnabled = items.OfType<JsonObject>()
+                .Where(p => p["enabled"]?.GetValue<bool>() == true)
+                .Select(p => p["plugin_id"]?.GetValue<string>() ?? "")
+                .ToHashSet();
         var wasEnabled = _wasEnabled;
 
         try
@@ -139,6 +143,44 @@ public partial class PluginsPage : UserControl
         }
     }
 
+    /// <summary>
+    /// Turn every plugin off — for the check.
+    /// </summary>
+    /// <remarks>
+    /// <b>A check begins from a state it set.</b> The section check
+    /// switches a plugin on, sees its section appear, switches it off
+    /// and expects the section to go — but "off" only ever meant "back
+    /// to what the person had", so on a machine where a plugin was
+    /// already on the section stayed and the check called that a
+    /// failure. It was one: of the check, not of the program. What was
+    /// on is remembered here and put back by <see cref="RestoreAsync"/>.
+    /// </remarks>
+    public async Task SilenceAsync()
+    {
+        var now = await Ask(Methods.PluginsList);
+        var items = now?["items"]?.AsArray()?.OfType<JsonObject>().ToArray()
+                    ?? [];
+        _wasEnabled = items
+            .Where(p => p["enabled"]?.GetValue<bool>() == true)
+            .Select(p => p["plugin_id"]?.GetValue<string>() ?? "")
+            .ToHashSet();
+        foreach (var id in _wasEnabled) await SetEnabledAsync(id, false);
+    }
+
+    /// <summary>Switch off the one the check opened — for the check.</summary>
+    /// <remarks>
+    /// Not <see cref="RestoreAsync"/>: restoring means "put back what
+    /// the person had", and the person may have had this very plugin
+    /// on. Turning it off and putting everything back are two acts,
+    /// and the check needs them in that order.
+    /// </remarks>
+    public async Task CloseOpenedAsync()
+    {
+        if (_open.Length == 0) return;
+        await SetEnabledAsync(_open, false);
+        _open = "";
+    }
+
     /// <summary>Which plugins are on right now — for the end-to-end check.</summary>
     public async Task<string[]> EnabledAsync()
     {
@@ -171,9 +213,14 @@ public partial class PluginsPage : UserControl
                                ?.OfType<JsonObject>() ?? [])
         {
             var id = plugin["plugin_id"]?.GetValue<string>() ?? "";
-            if (plugin["enabled"]?.GetValue<bool>() == true
-                && !_wasEnabled.Contains(id))
+            var on = plugin["enabled"]?.GetValue<bool>() == true;
+            // Both ways. Turning off what the check turned on was
+            // always here; turning back on what the check turned off
+            // was not, because until `SilenceAsync` nothing did.
+            if (on && !_wasEnabled.Contains(id))
                 await SetEnabledAsync(id, false);
+            else if (!on && _wasEnabled.Contains(id))
+                await SetEnabledAsync(id, true);
         }
     }
 

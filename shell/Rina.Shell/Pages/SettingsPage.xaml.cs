@@ -307,6 +307,8 @@ public partial class SettingsPage : UserControl
         if (strangers.Length > 0)
             Body.Children.Add(BuildSection(SettingsLayout.Other, strangers));
         SectionsShown = Body.Children.Count;
+        // The page's own columns, by the same measurement as a sheet's.
+        Widen(_shelves.SelectMany(shelf => shelf.Rows).Select(row => row.Row));
         Sift();
     }
 
@@ -828,22 +830,28 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
-    /// Let the column of controls fit the widest one on this sheet.
+    /// Let each column fit the widest thing standing in it.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The page's column is 296, and one control does not fit in it: the
-    /// hotkey recorder — a field and two buttons — wants 364. On the page
-    /// that never showed, because the hotkey moved onto a sheet of its
-    /// own; on the sheet it stood out past the window, and the last
-    /// button was simply not there. Reported as "the buttons are eaten".
+    /// The page's control column is 316, and one control does not fit in
+    /// it: the hotkey recorder — a field and two buttons — wants 364. On
+    /// the page that never showed, because the hotkey moved onto a sheet
+    /// of its own; on the sheet it stood out past the window, and the
+    /// last button was simply not there. Reported as "the buttons are
+    /// eaten".
     /// </para>
     /// <para>
-    /// Widened rather than the control narrowed: 296 is what the page's
-    /// rows agreed on, and a sheet holds different rows. The width is
-    /// asked of the control — <c>Measure</c> — instead of being written
-    /// down again here, where it would go stale the first time a button's
-    /// word changed length.
+    /// The check column went the same way for a smaller reason: it is a
+    /// hundred and fifty, «Проверить микрофон» fitted in that in one
+    /// typeface and lost its last three letters in the next. A width
+    /// written down is a width measured against whatever was on the
+    /// screen the day it was written.
+    /// </para>
+    /// <para>
+    /// Widened rather than the control narrowed, and asked of the
+    /// control — <c>Measure</c> — instead of written down again here,
+    /// where it would go stale the first time a word changed length.
     /// </para>
     /// </remarks>
     private void Widen(IEnumerable<UIElement> rows)
@@ -853,20 +861,73 @@ public partial class SettingsPage : UserControl
                         .OfType<Grid>()
                         .Where(grid => grid.ColumnDefinitions.Count == 3)
                         .ToArray();
+        if (grids.Length == 0) return;
 
-        var wanted = ControlColumn;
-        foreach (var child in grids.SelectMany(g => g.Children
-                                                     .OfType<FrameworkElement>())
-                     .Where(c => Grid.GetColumn(c) == 1
-                                 && Grid.GetColumnSpan(c) == 1))
+        foreach (var column in new[] { 1, 2 })
         {
-            child.Measure(new Size(double.PositiveInfinity,
-                                   double.PositiveInfinity));
-            wanted = Math.Max(wanted, child.DesiredSize.Width);
-        }
+            var wanted = grids[0].ColumnDefinitions[column].Width.Value;
+            // A column nobody stands in stays as it is — nought for a
+            // sheet with nothing to check, and that is the point of it.
+            if (wanted <= 0) continue;
 
-        foreach (var grid in grids)
-            grid.ColumnDefinitions[1].Width = new GridLength(wanted);
+            foreach (var child in grids
+                         .SelectMany(g => g.Children.OfType<FrameworkElement>())
+                         .Where(c => Grid.GetColumn(c) == column
+                                     && Grid.GetColumnSpan(c) == 1))
+            {
+                child.Measure(new Size(double.PositiveInfinity,
+                                       double.PositiveInfinity));
+                wanted = Math.Max(wanted, child.DesiredSize.Width
+                                          + child.Margin.Left
+                                          + child.Margin.Right);
+            }
+
+            foreach (var grid in grids)
+                grid.ColumnDefinitions[column].Width = new GridLength(wanted);
+        }
+    }
+
+    /// <summary>
+    /// Controls given less room than they asked for — for the check.
+    /// </summary>
+    /// <remarks>
+    /// A button whose word does not fit says a different word:
+    /// «Проверить микро». Reported by eye, and by eye is how it would
+    /// come back — so it is a number: what the control asked for
+    /// against what it got.
+    /// </remarks>
+    public (int Pinched, string Worst) Squeezed()
+    {
+        UpdateLayout();
+        var worst = "";
+        var over = 0.0;
+        var pinched = 0;
+        foreach (var control in _shelves
+                     .SelectMany(shelf => shelf.Rows)
+                     .SelectMany(row => Inside(row.Row))
+                     .Where(c => c.IsVisible && c.ActualWidth > 0))
+        {
+            control.Measure(new Size(double.PositiveInfinity,
+                                     double.PositiveInfinity));
+            var short_ = control.DesiredSize.Width - control.ActualWidth;
+            if (short_ <= 0.5) continue;
+            pinched++;
+            if (short_ <= over) continue;
+            over = short_;
+            worst = control is ContentControl { Content: { } said }
+                ? $"«{said}» не хватило {short_:0}"              // not UI
+                : $"{control.GetType().Name} не хватило {short_:0}"; // not UI
+        }
+        return (pinched, worst);
+    }
+
+    private static IEnumerable<FrameworkElement> Inside(UIElement row)
+    {
+        if (row is not Border { Child: Grid grid }) yield break;
+        foreach (var child in grid.Children.OfType<FrameworkElement>())
+            if (child is System.Windows.Controls.Primitives.ButtonBase
+                      or ComboBox)
+                yield return child;
     }
 
     /// <summary>
@@ -1548,6 +1609,139 @@ public partial class SettingsPage : UserControl
     private double Tight => (double)FindResource("Sp.Tight");
 
     /// <summary>
+    /// A word with a cross in it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: "make the wake words and the learned matches into
+    /// tags, drop the «Убрать» button and put a cross in the tag
+    /// itself". It is the better shape for the thing: six wake words in
+    /// a column of rows is a table of one column, and a table of one
+    /// column is a list pretending to be data. They are labels, and
+    /// labels sit side by side and wrap.
+    /// </para>
+    /// <para>
+    /// <b>The cross is a button with a name.</b> A cross says nothing
+    /// to a screen reader and nothing to somebody who has not met the
+    /// convention, so it carries «убрать „Рина“» as its automation name
+    /// and the same as its tooltip. A mark that only works for people
+    /// who already know it is decoration.
+    /// </para>
+    /// </remarks>
+    private Border Chip(string said, string full, Action drop)
+    {
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(new TextBlock
+        {
+            Text = said,
+            Style = (Style)FindResource("Text.Body"),
+            VerticalAlignment = VerticalAlignment.Center,
+            MaxWidth = 320,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+
+        var cross = new Button
+        {
+            Style = (Style)FindResource("Btn.Cross"),
+            Content = "\uE711",                          // not UI
+            Margin = new Thickness(Tight, 0, 0, 0),
+            ToolTip = S("Убрать «{0}»", full),
+        };
+        System.Windows.Automation.AutomationProperties.SetName(
+            cross, S("Убрать «{0}»", full));
+        cross.Click += (_, _) => drop();
+        row.Children.Add(cross);
+
+        return new Border
+        {
+            Background = (System.Windows.Media.Brush)
+                FindResource("C.Glass.Control"),
+            BorderBrush = (System.Windows.Media.Brush)FindResource("C.Seam"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = (CornerRadius)FindResource("Radius.Max"),
+            Padding = new Thickness(Inner, 4, 4, 4),
+            Margin = new Thickness(0, 0, Tight, Tight),
+            ToolTip = full,
+            Child = row,
+        };
+    }
+
+    /// <summary>Where tags live: side by side, wrapping.</summary>
+    private static WrapPanel Field() => new()
+    {
+        Orientation = Orientation.Horizontal,
+    };
+
+    /// <summary>
+    /// A folder as a card: what it is called, and where it is.
+    /// </summary>
+    /// <remarks>
+    /// Asked for. A path in one trimmed line answers neither question a
+    /// person has — «C:\Users\…\vosk-model-small…» told them which
+    /// folder only if they could read the middle of it, and the middle
+    /// is what the ellipsis ate. The last part of the path is the name;
+    /// the whole of it stands underneath, wrapped, because it is the
+    /// part one checks.
+    /// </remarks>
+    private Border Card(string path, Action drop)
+    {
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+
+        var named = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        named.Children.Add(new TextBlock
+        {
+            Text = Leaf(path),
+            Style = (Style)FindResource("Text.Body"),
+            TextTrimming = TextTrimming.CharacterEllipsis,
+        });
+        named.Children.Add(new TextBlock
+        {
+            Text = path,
+            Style = (Style)FindResource("Text.Meta"),
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 2, Inner, 0),
+        });
+        Grid.SetColumn(named, 0);
+        grid.Children.Add(named);
+
+        var cross = new Button
+        {
+            Style = (Style)FindResource("Btn.Cross"),
+            Content = "\uE711",                          // not UI
+            VerticalAlignment = VerticalAlignment.Top,
+            ToolTip = S("Убрать «{0}»", path),
+        };
+        System.Windows.Automation.AutomationProperties.SetName(
+            cross, S("Убрать «{0}»", path));
+        cross.Click += (_, _) => drop();
+        Grid.SetColumn(cross, 1);
+        grid.Children.Add(cross);
+
+        return new Border
+        {
+            Style = (Style)FindResource("Card"),
+            Margin = new Thickness(0, 0, 0, Tight),
+            Child = grid,
+        };
+    }
+
+    /// <summary>The last part of a path — what the folder is called.</summary>
+    private static string Leaf(string path)
+    {
+        var cut = path.TrimEnd('\\', '/');
+        var at = cut.LastIndexOfAny(['\\', '/']);
+        return at >= 0 && at + 1 < cut.Length ? cut[(at + 1)..] : cut;
+    }
+
+    /// <summary>
     /// A list: what is in it, what to add, what to take away.
     /// </summary>
     /// <remarks>
@@ -1562,28 +1756,27 @@ public partial class SettingsPage : UserControl
                                    .Where(v => v.Length > 0).ToList();
         var stack = new StackPanel();
 
-        foreach (var item in items)
+        async void Drop(string what)
         {
-            var shown = new TextBlock
-            {
-                Text = item,
-                Style = (Style)FindResource("Text.Meta"),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = item,
-            };
-            var drop = new Button
-            {
-                Style = (Style)FindResource("Btn"),
-                Content = S("Убрать"),
-                Tag = item,
-            };
-            drop.Click += async (_, _) =>
-            {
-                items.Remove(item);
-                await SaveAsync(key, new JsonArray(
-                    items.Select(v => (JsonNode)v!).ToArray()));
-            };
-            stack.Children.Add(ValueRow(shown, drop));
+            items.Remove(what);
+            await SaveAsync(key, new JsonArray(
+                items.Select(v => (JsonNode)v!).ToArray()));
+        }
+
+        // A path is a card and a word is a tag. The mark is the value's
+        // make-up, not the key's name: a new list of folders will be
+        // cards by itself.
+        if (format == "folder")
+        {
+            foreach (var item in items)
+                stack.Children.Add(Card(item, () => Drop(item)));
+        }
+        else
+        {
+            var field = Field();
+            foreach (var item in items)
+                field.Children.Add(Chip(item, item, () => Drop(item)));
+            if (items.Count > 0) stack.Children.Add(field);
         }
 
         async Task AddAsync(string what)
@@ -1720,31 +1913,22 @@ public partial class SettingsPage : UserControl
     {
         var stack = new StackPanel();
 
+        var learned = Field();
         foreach (var (word, bound) in current ?? [])
         {
-            var shown = new TextBlock
-            {
-                Text = DescribeBinding(word, bound),
-                Style = (Style)FindResource("Text.Meta"),
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                ToolTip = DescribeBinding(word, bound),
-            };
-            var drop = new Button
-            {
-                Style = (Style)FindResource("Btn"),
-                Content = S("Забыть"),
-            };
+            var said = DescribeBinding(word, bound);
             var forgotten = word;
-            drop.Click += async (_, _) =>
+            async void Forget()
             {
                 var left = new JsonObject();
                 foreach (var (other, value) in current ?? [])
                     if (other != forgotten)
                         left[other] = value?.DeepClone();
                 await SaveAsync(key, left);
-            };
-            stack.Children.Add(ValueRow(shown, drop));
+            }
+            learned.Children.Add(Chip(said, said, Forget));
         }
+        if (learned.Children.Count > 0) stack.Children.Add(learned);
 
         var counted = new TextBlock
         {

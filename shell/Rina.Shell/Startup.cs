@@ -699,6 +699,11 @@ public partial class App
             // developer switched them all off. A check that reads the
             // profile it is run under measures the machine, not the
             // program.
+            // From a known state: whatever the person has switched on
+            // is switched off for the duration and put back at the end.
+            // Otherwise "we switched it off and the section went" is a
+            // sentence about somebody else's plugins.
+            await plugins.SilenceAsync();
             var drawn = await plugins.OpenFirstPageAsync(keepOpen: true);
             Check("плагин включился и отдал свою страницу", drawn > 0,
                   $"| элементов {drawn}");
@@ -715,13 +720,15 @@ public partial class App
             // And it goes when the plugin does. Both halves are the rule:
             // a section that stays behind says "I use this" about
             // something nobody uses.
-            await plugins.RestoreAsync();
+            await plugins.CloseOpenedAsync();
             await link.RefreshPluginSectionsAsync();
             await Task.Delay(400);
             Check("выключили — раздел ушёл",
                   !window.SectionNames().Any(n => n.StartsWith("plugin:")),
                   $"| {string.Join(", ", window.SectionNames())}");
 
+            // And only now everything the person had goes back.
+            await plugins.RestoreAsync();
             var after = await plugins.EnabledAsync();
             Check("проверка вернула плагины как было",
                   before.SequenceEqual(after),
@@ -1308,6 +1315,15 @@ public partial class App
         Check("секция «Прочее» пуста", built && !Shown().HasOtherSection,
               built ? "" : "| страница пуста — сказать нечего");
 
+        // Nothing on the page is given less room than it asked for.
+        // «Проверить микрофон» became «Проверить микро» the day the
+        // typeface changed, and a column written down as a number is a
+        // column measured against whatever was on the screen when it
+        // was written.
+        var tight = Shown().Squeezed();
+        Check("ни одному органу не тесно", tight.Pinched == 0,
+              tight.Pinched == 0 ? "" : $"| {tight.Pinched}, " + tight.Worst);
+
         // Every row is ruled the same way, and every control stands in
         // the same column — including the row that only opens a sheet.
         var ruled = Shown().Ruled();
@@ -1388,6 +1404,25 @@ public partial class App
                       ? $"| ширина {edge:0}"
                       : $"| за краем {past.Count}, дальше всех "
                         + $"{past.Max():0} при {edge:0}");
+
+            // A cross is a mark, and a mark says nothing by itself.
+            // Every one of them carries the word it stands for, so a
+            // screen reader and a tooltip both say «убрать „Рина“»
+            // rather than «кнопка».
+            var crossStyle = Application.Current.TryFindResource("Btn.Cross");
+            var crosses = Deep(leaf).OfType<System.Windows.Controls.Button>()
+                .Where(b => ReferenceEquals(b.Style, crossStyle))
+                .ToArray();
+            if (crosses.Length > 0)
+            {
+                var named = crosses.Count(b =>
+                    (System.Windows.Automation.AutomationProperties.GetName(b)
+                        ?? "").Length > 0
+                    && b.ToolTip is not null);
+                Check($"«{name}»: каждый крестик говорит, что уберёт",
+                      named == crosses.Length,
+                      $"| названо {named} из {crosses.Length}");
+            }
 
             // And inside a list the buttons stand in a column. Laid out
             // one after another they started where each row's own word
@@ -2173,6 +2208,27 @@ public partial class App
         Check("версии сравниваются числами, а не строками",
               Update.Manifest.Compare("4.0.10", "4.0.9") > 0,
               "| иначе десятая заплата никогда не предложится");
+
+        // **A prerelease is older than the release it leads to.** Split
+        // on every separator, `4.0.0-beta` gave 4·0·0·0 and `4.0.0`
+        // gave 4·0·0: equal, so somebody sitting on the beta would
+        // never have been offered the 4.0.0 it was a beta of.
+        Check("бета старше своего выпуска",
+              Update.Manifest.Compare("4.0.0-beta", "4.0.0") < 0
+              && Update.Manifest.Compare("4.0.0", "4.0.0-beta") > 0,
+              "| иначе с беты не уйти");
+        Check("а до следующей заплаты ей далеко",
+              Update.Manifest.Compare("4.0.0-beta", "4.0.1") < 0);
+        Check("две беты сравниваются между собой",
+              Update.Manifest.Compare("4.0.0-beta2", "4.0.0-beta1") > 0);
+        Check("отметка сборки версию не меняет",
+              Update.Manifest.Compare("4.0.0+abc", "4.0.0") == 0);
+
+        // And the shell itself is a beta now, rather than «4.0.0» with
+        // a word written beside it.
+        Check("оболочка называет себя бетой",
+              App.ShellVersion.EndsWith("-beta", StringComparison.Ordinal),
+              $"| {App.ShellVersion}");
 
         Console.WriteLine();
         Console.WriteLine("=== U03: четыре сценария ===");
@@ -2983,6 +3039,66 @@ public partial class App
             yield return path.Trim('[', ']').Replace("^", "");
         }
     }
+
+    /// <summary>
+    /// Pairs of controls standing closer together than they should.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported twice by a person: "the buttons are stuck to each
+    /// other, it is like that on nearly every tab" — and after the
+    /// first round, "you did not unstick them everywhere, in commands
+    /// it is still like that". The first round put a gap into every
+    /// horizontal <c>StackPanel</c>; the pair in a command's row are
+    /// two cells of a <c>Grid</c>, and a grid has no panel to give a
+    /// gap to. One fix, one blind spot, and the eye found it.
+    /// </para>
+    /// <para>
+    /// So the question is asked of the screen instead of the markup:
+    /// two things a person can press, side by side on the same line,
+    /// with less than a hair between them. Anything nested inside
+    /// anything else is skipped — a button holding a border is not its
+    /// own neighbour.
+    /// </para>
+    /// </remarks>
+    private static IEnumerable<(string Near, string Far, double Gap)> Crowded(
+        FrameworkElement root, double least)
+    {
+        var all = Deep(root).OfType<FrameworkElement>()
+            .Where(e => e is System.Windows.Controls.Primitives.ButtonBase
+                          or System.Windows.Controls.ComboBox
+                          or System.Windows.Controls.TextBox)
+            .Where(e => e.IsVisible && e.ActualWidth > 0)
+            .ToList();
+
+        for (var i = 0; i < all.Count; i++)
+            for (var j = i + 1; j < all.Count; j++)
+            {
+                var one = all[i];
+                var two = all[j];
+                if (one.IsAncestorOf(two) || two.IsAncestorOf(one)) continue;
+
+                var mine = Where(one, root);
+                var theirs = Where(two, root);
+                // On the same line: if they do not overlap vertically
+                // they are not neighbours, however close their edges.
+                if (theirs.Bottom <= mine.Top || theirs.Top >= mine.Bottom)
+                    continue;
+
+                var gap = theirs.Left >= mine.Right ? theirs.Left - mine.Right
+                        : mine.Left >= theirs.Right ? mine.Left - theirs.Right
+                        : double.NaN;      // one is on top of the other
+                if (double.IsNaN(gap) || gap + 0.5 >= least) continue;
+
+                yield return (Said(one), Said(two), gap);
+            }
+    }
+
+    /// <summary>What a control is called, for a complaint about it.</summary>
+    private static string Said(FrameworkElement what) =>
+        what is System.Windows.Controls.ContentControl { Content: { } said }
+            ? said.ToString() ?? what.GetType().Name
+            : what.GetType().Name;
 
     private static Rect Where(FrameworkElement what, FrameworkElement root) =>
         what.TransformToAncestor(root).TransformBounds(
@@ -5519,14 +5635,48 @@ public partial class App
                         + $"на {off.Worst:0}");
             Check("холст разлинован", editor!.SurfaceRuled);
 
-            // And it moves. Asked of the surface rather than of the
-            // handler: a handler that runs and moves nothing is the
-            // failure being guarded against.
-            var moved = editor!.RoamForCheck(60, 40);
-            Check("холст двигается под рукой",
-                  moved.Across > 0 || moved.Down > 0,
-                  $"| ушёл на {moved.Across:0} вбок и {moved.Down:0} вниз");
-            editor!.RoamForCheck(-60, -40);
+            // Centred to begin with. Reported as "these commands are
+            // not centred on the canvas", and it is four numbers: the
+            // room left of the graph against the room right of it.
+            //
+            // **On a graph that fits.** One larger than the window is
+            // put at its top left on purpose — centring something
+            // taller than the view hides its beginning — so measuring
+            // that one would pass whatever the rule was.
+            // **As drawn, not after asking.** The complaint was that
+            // the graph is not centred *to begin with*; a check that
+            // centres it first and then measures would agree with a
+            // build that never centres anything.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "website", "example.com");
+            await Task.Delay(200);
+            var around = editor!.GraphSides();
+            Check("граф стоит посередине холста",
+                  around.Left > 1 && around.Top > 1
+                  && Math.Abs(around.Left - around.Right) < 1.0
+                  && Math.Abs(around.Top - around.Bottom) < 1.0,
+                  $"| слева {around.Left:0}, справа {around.Right:0}, "
+                  + $"сверху {around.Top:0}, снизу {around.Bottom:0}; "
+                  + editor!.Sizes);
+
+            // And it moves — anywhere. Asked of the surface rather than
+            // of the handler: a handler that runs and moves nothing is
+            // the failure being guarded against. Five thousand points
+            // is far past the far side of anything drawn, which is the
+            // whole point of «полное свободное перемещение»: the old
+            // surface stopped where the nodes did.
+            var moved = editor!.RoamForCheck(5000, -4000);
+            Check("холст уходит куда угодно",
+                  Math.Abs(moved.Across - (around.Left + 5000)) < 1.0
+                  && Math.Abs(moved.Down - (around.Top - 4000)) < 1.0,
+                  $"| ушёл на {moved.Across:0} и {moved.Down:0}");
+
+            // And comes back.
+            var home = editor!.CentreForCheck();
+            Check("и возвращается на место",
+                  Math.Abs(home.Across - around.Left) < 1.0
+                  && Math.Abs(home.Down - around.Top) < 1.0,
+                  $"| {home.Across:0}, {home.Down:0}");
 
             Check("в покое порты не горят", editor!.PortsLit == 0,
                   $"| горит {editor!.PortsLit} из {editor!.PortsShown}");
@@ -6010,6 +6160,27 @@ public partial class App
         // that the page failed to load.
         Check("необратимые кнопки вообще нашлись", counted > 0,
               $"| {counted}");
+        // And nothing anywhere is stuck to its neighbour. A hair is
+        // the floor: below that two controls read as one.
+        var hair = (double)Application.Current.FindResource("Sp.Tight");
+        var stuck = new List<string>();
+        var pairs = 0;
+        foreach (var section in new[] { "home", "dialog", "commands",
+                                        "reminders", "plugins", "privacy",
+                                        "settings", "about" })
+        {
+            window.ShowSectionFor(section);
+            await Task.Delay(700);
+            if (window.CurrentPage is not FrameworkElement one) continue;
+            pairs++;
+            foreach (var (near, far, gap) in Crowded(one, hair))
+                stuck.Add($"{section}: «{near}» и «{far}» через {gap:0}");
+        }
+        Check("разделы вообще открылись", pairs > 0, $"| {pairs}");
+        Check($"нигде две кнопки не ближе {hair:0}", stuck.Count == 0,
+              stuck.Count == 0 ? $"| разделов {pairs}"
+                  : "| " + string.Join("; ", stuck.Take(8)));
+
         Check($"вокруг необратимого просвет в {wanted:0}",
               crowded.Count == 0,
               crowded.Count == 0 ? $"| проверено {counted}"

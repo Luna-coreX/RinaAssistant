@@ -128,6 +128,45 @@ public partial class App : Application
     /// </remarks>
     public static MediaRemote? Remote { get; private set; }
 
+    /// <summary>
+    /// Which build of the window this is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// From the assembly, and from the <b>informational</b> version
+    /// rather than from <c>GetName().Version</c>: the numeric one holds
+    /// four integers and nothing else, so `4.0.0-beta` arrived here as
+    /// «4.0.0» and the beta was invisible everywhere it mattered.
+    /// </para>
+    /// <para>
+    /// The build system adds `+{commit}` to it; that is for a build log,
+    /// not for a person, and it is cut off.
+    /// </para>
+    /// <para>
+    /// One property, because there were two places: «about» read the
+    /// assembly and the foot of the column had `4.0.0` typed into the
+    /// markup. Two sources of one number part company at the first
+    /// release — and this one had already parted company with the core's.
+    /// </para>
+    /// </remarks>
+    public static string ShellVersion
+    {
+        get
+        {
+            var said = typeof(App).Assembly
+                .GetCustomAttributes(
+                    typeof(System.Reflection.AssemblyInformationalVersionAttribute),
+                    false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault()?.InformationalVersion ?? "";
+            var plus = said.IndexOf('+');
+            if (plus > 0) said = said[..plus];
+            return said.Length > 0 ? said
+                : typeof(App).Assembly.GetName().Version is { } v
+                    ? $"{v.Major}.{v.Minor}.{v.Build}" : "4.0.0";
+        }
+    }
+
     /// <summary>Start following what the machine is playing.</summary>
     public static async Task StartRemoteAsync()
     {

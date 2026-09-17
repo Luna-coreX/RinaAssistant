@@ -40,7 +40,12 @@
           <Button Grid.Column="2" Style="{StaticResource Btn}"
                   Content="{loc:S 'Выполнить'}" Tag="{Binding Id}"
                   Click="OnRun" />
+          <!-- The gap by hand, because these are cells of a grid and
+               `Ui.Gap` spaces out the children of a panel. Flush against
+               «Выполнить» the two read as one control; measured by
+               `check-pages`. -->
           <Button Grid.Column="3" Style="{StaticResource Btn}"
+                  Margin="{StaticResource Pad.InnerLeft}"
                   Content="{loc:S 'Править'}" Tag="{Binding Id}"
                   Click="OnEdit" />
           <Button Grid.Column="4" Style="{StaticResource Btn.Danger}"

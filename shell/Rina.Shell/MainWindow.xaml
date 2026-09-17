@@ -151,8 +151,10 @@
                        MouseLeftButtonUp="OnAbout"
                        ToolTip="{loc:S 'Версии, ссылки, из чего собрана'}" />
           </StackPanel>
+          <!-- Set from the assembly in the code beside this. It used
+               to be typed here, which made two sources for one number. -->
           <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
-                     Text="4.0.0" Margin="0,2,0,0" />
+                     Margin="0,2,0,0" />
         </StackPanel>
       </Grid>
 

@@ -44,6 +44,14 @@ public partial class AboutPage : UserControl
         InitializeComponent();
         _link = link;
 
+        Spaced.Text = Spread(SecondTier);
+        // What is written and what is read are now two things: the
+        // second tier has spaces between its letters, and a screen
+        // reader given «A s s i s t a n t» spells it out. The name it
+        // announces is the name.
+        System.Windows.Automation.AutomationProperties.SetName(
+            Wordmark, $"Rina {SecondTier}");
+
         Version.Text = ShellVersion;
         BuildLinks();
         BuildPlaces();
@@ -55,6 +63,36 @@ public partial class AboutPage : UserControl
         Unloaded += (_, _) => App.AccentChanged -= Flow;
         Loaded += async (_, _) => await ShowPartsAsync();
     }
+
+    /// <summary>The second tier of the name.</summary>
+    private const string SecondTier = "Assistant";
+
+    /// <summary>
+    /// Set a word out, letter by letter.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: «предлагаю попробовать растянуть „Assistant“, т.е.
+    /// типа „A s s i s t a n t“». It is what a wordmark does with its
+    /// quieter half — the wide word under the tall one reads as a
+    /// setting for it rather than as a second word.
+    /// </para>
+    /// <para>
+    /// <b>By spaces, and knowingly so.</b> WPF has no letter spacing on
+    /// a <c>TextBlock</c>, which is why the design system removed
+    /// tracking from the tokens rather than leave a number nobody
+    /// applies. This is not tracking brought back: it is one word, on
+    /// one wordmark, set out by hand — and what it costs is that the
+    /// written text is no longer the word, which is paid for above by
+    /// giving the block the real name.
+    /// </para>
+    /// <para>
+    /// A thin space, not an ordinary one: an ordinary space at this
+    /// size pulls the letters into separate words.
+    /// </para>
+    /// </remarks>
+    private static string Spread(string word) =>
+        string.Join(' ', word.ToCharArray());
 
     /// <summary>
     /// The name, with a slow light running through it.
@@ -299,10 +337,8 @@ public partial class AboutPage : UserControl
     /// </remarks>
     private const string Unknown = "—";
 
-    /// <summary>The shell's version — from the assembly, not from a string in the code.</summary>
-    private static string ShellVersion =>
-        typeof(AboutPage).Assembly.GetName().Version is { } v
-            ? $"{v.Major}.{v.Minor}.{v.Build}" : "4.0.0";
+    /// <summary>The shell's version — from the assembly.</summary>
+    private static string ShellVersion => App.ShellVersion;
 
     private async Task ShowPartsAsync()
     {

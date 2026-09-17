@@ -626,14 +626,6 @@ public static partial class Loc
                 {
                     ["English"] = "Entries forgotten: {0}",
                 },
-            ["Забыть"] =
-                new Dictionary<string, string>
-                {
-                    ["Deutsch"] = "Vergessen",
-                    ["English"] = "Forget",
-                    ["Español"] = "Olvidar",
-                    ["Українська"] = "Забути",
-                },
             ["Забыть все"] =
                 new Dictionary<string, string>
                 {
@@ -1639,6 +1631,11 @@ public static partial class Loc
                 {
                     ["English"] = "Drag to move it",
                 },
+            ["Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Drag to move the canvas. Double-click brings it back",
+                },
             ["Почти тихо: {0}%. Проверьте, тот ли микрофон выбран."] =
                 new Dictionary<string, string>
                 {
@@ -2216,6 +2213,11 @@ public static partial class Loc
                     ["English"] = "Remove",
                     ["Español"] = "Quitar",
                     ["Українська"] = "Прибрати",
+                },
+            ["Убрать «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remove “{0}”",
                 },
             ["Убрать совсем"] =
                 new Dictionary<string, string>

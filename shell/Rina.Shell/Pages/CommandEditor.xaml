@@ -58,13 +58,27 @@
            that forks is drawn forking. -->
       <Border Grid.Column="0" Style="{StaticResource Rows}"
               Margin="0,0,12,0">
-        <!-- The surface is ruled and can be pulled about: `Roam` in the
-             code beside this. The canvas keeps a background so that a
-             press on empty ruling is a press on something. -->
-        <ScrollViewer x:Name="Deck" HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto">
-          <Canvas x:Name="Board" Background="Transparent" Margin="16" />
-        </ScrollViewer>
+        <!--
+          The surface is ruled and has no edges: `Roam` in the code
+          beside this.
+
+          A `ScrollViewer` used to be here, and panning moved its
+          offsets — which stop at the far side of what is drawn. That
+          is a window over a sheet of paper, not a surface: you cannot
+          pull the graph to one side to think in the space beside it.
+          Now the canvas carries a translation and nothing bounds it;
+          the box around it only clips and catches the press, and the
+          ruling lives on the box so that it goes on for ever rather
+          than ending where the nodes do.
+        -->
+        <Grid x:Name="Deck" ClipToBounds="True" Background="Transparent">
+          <Canvas x:Name="Board" Margin="16"
+                  HorizontalAlignment="Left" VerticalAlignment="Top">
+            <Canvas.RenderTransform>
+              <TranslateTransform x:Name="Roaming" />
+            </Canvas.RenderTransform>
+          </Canvas>
+        </Grid>
       </Border>
 
       <!-- The inspector: the selected node and nothing else. -->

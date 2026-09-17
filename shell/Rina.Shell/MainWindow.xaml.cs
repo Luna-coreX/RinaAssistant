@@ -56,6 +56,10 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // One number, one source: the assembly. It used to be typed into
+        // the markup here and read from the assembly on «about», and the
+        // two would have parted company at the first release.
+        Version.Text = App.ShellVersion;
         Pane.RenderTransform = _paneRise;
 
         // The living background (4.0b-A06). It follows whether there is

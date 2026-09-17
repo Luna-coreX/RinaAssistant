@@ -84,6 +84,14 @@ public partial class CommandEditor
     private void DrawSteps()
     {
         Board.Children.Clear();
+        // **Reset, and it was not.** `_widest` is the rightmost column
+        // the layout reached, and it was only ever raised — so a graph
+        // that had once had a branch kept the width of that branch for
+        // the rest of the session, however much was deleted. Hidden by
+        // the old floor of 520 and by a scroll viewer that shows no
+        // scrollbar for slack; visible the moment the graph had to be
+        // centred in what it actually occupies.
+        _widest = 0;
         _boxes.Clear();
         _byPath.Clear();
         _ports.Clear();
@@ -101,11 +109,14 @@ public partial class CommandEditor
                  && StandsAlone(only["type"]?.GetValue<string>() ?? "");
         var bottom = Place(_chain, 0, Headroom, null, "steps.");
 
-        // The board is as large as what is on it. Fixed, it either cut the
-        // graph off or left a field of emptiness under a graph of two.
-        Board.Width = Math.Max(520, _widest + NodeWidth + 40);
-        Board.Height = Math.Max(220, bottom + 40);
+        // The board is exactly as large as what is on it. It used to
+        // have a floor of 520 by 220 — room for a scrollbar to decide
+        // there was nothing to scroll — and the surface has no edges
+        // now, so a floor would only push the graph off centre.
+        Board.Width = _widest + NodeWidth;
+        Board.Height = bottom;
         Rule();
+        Centre();
         Paint();
         ShowPicked();
     }
@@ -680,6 +691,41 @@ public partial class CommandEditor
     }
 
     /// <summary>
+    /// Put the graph in the middle of what can be seen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported: "and these commands are not centred on the canvas to
+    /// begin with". They were not: the first node went at nought by
+    /// nought, so a graph of two sat in the top left corner of a field
+    /// of nothing.
+    /// </para>
+    /// <para>
+    /// <b>Only until the person moves it.</b> After that the view is
+    /// theirs: re-centring on every change would snatch it back every
+    /// time a node was added. A double-click on the empty surface asks
+    /// for the middle again.
+    /// </para>
+    /// <para>
+    /// A graph larger than the window is put at its top left rather
+    /// than centred: centring something taller than the view hides its
+    /// beginning, and the beginning is where one reads from.
+    /// </para>
+    /// </remarks>
+    private void Centre(bool anyway = false)
+    {
+        if (_roamed && !anyway) return;
+        // Laid out first: the box's size is what this is measured
+        // against, and a graph just rebuilt has not been arranged.
+        Deck.UpdateLayout();
+        Roaming.X = Math.Max(0, (Deck.ActualWidth - Board.ActualWidth) / 2);
+        Roaming.Y = Math.Max(0, (Deck.ActualHeight - Board.ActualHeight) / 2);
+        _roamed = anyway ? false : _roamed;
+    }
+
+    private bool _roamed;
+
+    /// <summary>
     /// Rule the surface.
     /// </summary>
     /// <remarks>
@@ -709,7 +755,12 @@ public partial class CommandEditor
         var dot = new GeometryDrawing(
             (Brush)FindResource("C.Seam"), null,
             new RectangleGeometry(new Rect(0, 0, 1, 1)));
-        Board.Background = new DrawingBrush(dot)
+        // **On the box, not on the canvas.** Laid on the canvas the
+        // ruling ended where the nodes did, and pulling the surface
+        // aside showed a blank field beside a ruled one — the surface
+        // looked as though it stopped. The tile follows the canvas by
+        // its own transform, so it goes on as far as one cares to pull.
+        Deck.Background = new DrawingBrush(dot)
         {
             TileMode = TileMode.Tile,
             Viewport = new Rect(0, 0, step, step),
@@ -718,8 +769,11 @@ public partial class CommandEditor
             AlignmentX = AlignmentX.Left,
             AlignmentY = AlignmentY.Top,
             Opacity = 0.6,
+            Transform = _ruling,
         };
     }
+
+    private readonly TranslateTransform _ruling = new();
 
     /// <summary>
     /// Dragging the empty surface moves the surface.
@@ -748,77 +802,120 @@ public partial class CommandEditor
     /// </remarks>
     private void Roam()
     {
-        Board.MouseLeftButtonDown += (_, e) => TakeSurface(e);
-        Board.MouseDown += (_, e) =>
+        Deck.MouseLeftButtonDown += (_, e) => TakeSurface(e);
+        Deck.MouseDown += (_, e) =>
         {
             if (e.ChangedButton == System.Windows.Input.MouseButton.Middle)
                 TakeSurface(e);
         };
-        Board.MouseMove += (_, e) => MoveSurface(e);
-        Board.MouseLeftButtonUp += (_, _) => DropSurface();
-        Board.MouseUp += (_, e) =>
+        Deck.MouseMove += (_, e) => MoveSurface(e);
+        Deck.MouseLeftButtonUp += (_, _) => DropSurface();
+        Deck.MouseUp += (_, e) =>
         {
             if (e.ChangedButton == System.Windows.Input.MouseButton.Middle)
                 DropSurface();
         };
 
-        // Shift and the wheel go sideways. `ScrollViewer` does the
-        // upright half by itself and nothing at all for the other one,
-        // and a graph that forks is wider than it is tall.
+        // A double-click on the empty surface asks for the middle back.
+        // Without a way back, "move it wherever you like" is a way to
+        // lose the graph.
+        Deck.MouseLeftButtonDown += (_, e) =>
+        {
+            if (e.ClickCount == 2) Centre(anyway: true);
+        };
+
+        // The wheel moves the surface as the hand does. `ScrollViewer`
+        // used to do the upright half; there is no scroll viewer any
+        // more, and a graph that forks is wider than it is tall, so
+        // both halves are here.
         Deck.PreviewMouseWheel += (_, e) =>
         {
-            if (System.Windows.Input.Keyboard.Modifiers
-                != System.Windows.Input.ModifierKeys.Shift) return;
-            Deck.ScrollToHorizontalOffset(Deck.HorizontalOffset - e.Delta);
+            var sideways = System.Windows.Input.Keyboard.Modifiers
+                           == System.Windows.Input.ModifierKeys.Shift;
+            Shift(sideways ? e.Delta : 0, sideways ? 0 : e.Delta);
             e.Handled = true;
         };
 
-        Deck.ScrollChanged += (_, _) => Board.Cursor =
-            Deck.ScrollableWidth > 0 || Deck.ScrollableHeight > 0
-                ? System.Windows.Input.Cursors.Hand
-                : System.Windows.Input.Cursors.Arrow;
+        Deck.Cursor = System.Windows.Input.Cursors.Hand;
+        Deck.ToolTip = S("Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место");
     }
 
     private Point _tookAt;
     private Vector _tookFrom;
-    private bool _roaming;
+    private bool _holding;
+
+    /// <summary>Move the surface by so much, and remember that it moved.</summary>
+    private void Shift(double across, double down)
+    {
+        Roaming.X += across;
+        Roaming.Y += down;
+        _ruling.X = Roaming.X;
+        _ruling.Y = Roaming.Y;
+        _roamed = true;
+    }
 
     private void TakeSurface(System.Windows.Input.MouseButtonEventArgs e)
     {
         _tookAt = e.GetPosition(Deck);
-        _tookFrom = new Vector(Deck.HorizontalOffset, Deck.VerticalOffset);
-        _roaming = true;
-        Board.CaptureMouse();
-        Board.Cursor = System.Windows.Input.Cursors.ScrollAll;
+        _tookFrom = new Vector(Roaming.X, Roaming.Y);
+        _holding = true;
+        Deck.CaptureMouse();
+        Deck.Cursor = System.Windows.Input.Cursors.ScrollAll;
     }
 
     private void MoveSurface(System.Windows.Input.MouseEventArgs e)
     {
-        if (!_roaming) return;
+        if (!_holding) return;
         var now = e.GetPosition(Deck);
-        Deck.ScrollToHorizontalOffset(_tookFrom.X - (now.X - _tookAt.X));
-        Deck.ScrollToVerticalOffset(_tookFrom.Y - (now.Y - _tookAt.Y));
+        // **Nothing bounds this.** The surface is not a sheet with a
+        // window over it; it goes where it is pulled.
+        Roaming.X = _tookFrom.X + (now.X - _tookAt.X);
+        Roaming.Y = _tookFrom.Y + (now.Y - _tookAt.Y);
+        _ruling.X = Roaming.X;
+        _ruling.Y = Roaming.Y;
+        _roamed = true;
     }
 
     private void DropSurface()
     {
-        if (!_roaming) return;
-        _roaming = false;
-        Board.ReleaseMouseCapture();
-        Board.Cursor = System.Windows.Input.Cursors.Hand;
+        if (!_holding) return;
+        _holding = false;
+        Deck.ReleaseMouseCapture();
+        Deck.Cursor = System.Windows.Input.Cursors.Hand;
     }
 
     /// <summary>Move the surface — for the check.</summary>
     public (double Across, double Down) RoamForCheck(double across, double down)
     {
-        Deck.ScrollToHorizontalOffset(Deck.HorizontalOffset + across);
-        Deck.ScrollToVerticalOffset(Deck.VerticalOffset + down);
+        Shift(across, down);
         Deck.UpdateLayout();
-        return (Deck.HorizontalOffset, Deck.VerticalOffset);
+        return (Roaming.X, Roaming.Y);
+    }
+
+    /// <summary>Put it back in the middle — for the check.</summary>
+    public (double Across, double Down) CentreForCheck()
+    {
+        Centre(anyway: true);
+        return (Roaming.X, Roaming.Y);
+    }
+
+    /// <summary>Where the graph sits inside the box — for the check.</summary>
+    /// <summary>The box and the graph in it — for a failing check.</summary>
+    public string Sizes =>
+        $"холст {Deck.ActualWidth:0}x{Deck.ActualHeight:0}, "     // not UI
+        + $"граф {Board.ActualWidth:0}x{Board.ActualHeight:0}";   // not UI
+
+    public (double Left, double Right, double Top, double Bottom) GraphSides()
+    {
+        Deck.UpdateLayout();
+        return (Roaming.X,
+                Deck.ActualWidth - Roaming.X - Board.ActualWidth,
+                Roaming.Y,
+                Deck.ActualHeight - Roaming.Y - Board.ActualHeight);
     }
 
     /// <summary>Is the surface ruled — for the check.</summary>
-    public bool SurfaceRuled => Board.Background is DrawingBrush
+    public bool SurfaceRuled => Deck.Background is DrawingBrush
     {
         TileMode: TileMode.Tile,
     };
