@@ -180,6 +180,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-fonts"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckFontsAsync(), "fonts");
+            return;
+        }
+
         if (args.Contains("--check-fields"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -3939,6 +3946,122 @@ public partial class App
             catch { /* уйдёт со временным каталогом */ }
         }
 
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The typeface on the screen is the one the design system names.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A font substitution is silent.</b> WPF asks for a family, does
+    /// not find it, takes the next one in the list — and nothing is
+    /// said. Three families had been named by system names, so on a
+    /// machine without them the whole program was set in something else
+    /// and looked deliberate. Now they travel inside the assembly, and
+    /// this asks the assembly whether they arrived.
+    /// </para>
+    /// <para>
+    /// Asked of the drawn text, not of the resource. A resource that
+    /// resolves and a <c>TextBlock</c> that uses it are two claims:
+    /// every role names a family in the tokens, and a role whose style
+    /// forgot to read it would pass the first and fail here.
+    /// </para>
+    /// </remarks>
+    private async Task CheckFontsAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== шрифты: те ли, что названы ===");
+
+        var packed = System.Windows.Media.Fonts.GetFontFamilies(
+            new Uri("pack://application:,,,/Fonts/")).ToArray();
+        var names = packed
+            .SelectMany(f => f.FamilyNames.Values)
+            .Distinct()
+            .OrderBy(n => n, StringComparer.Ordinal)
+            .ToArray();
+        Check("шрифты приехали внутри сборки", packed.Length > 0,
+              $"| семейств {packed.Length}: {string.Join(", ", names)}");
+
+        foreach (var key in new[] { "Font.Display", "Font.Ui", "Font.Figure" })
+        {
+            var family = (System.Windows.Media.FontFamily)
+                Application.Current.FindResource(key);
+            // The name a `FontFamily` resolves to is not the name asked
+            // for: a family that is not there resolves to whatever came
+            // next, and reports that one. So the question is whether the
+            // resolved family is among the ones that arrived.
+            var got = family.FamilyNames.Values.ToArray();
+            var found = got.Any(n => names.Contains(n));
+            Check($"{key} — из привезённых", found,
+                  $"| {family.Source} → {string.Join("/", got)}");
+        }
+
+        // And the styles read the roles. A window is needed: a style
+        // resolves its setters against the tree it is used in.
+        var window = new Window
+        {
+            Width = 420, Height = 260, Left = -4000, Top = -4000,
+        };
+        var panel = new System.Windows.Controls.StackPanel();
+        window.Content = panel;
+
+        var roles = new[]
+        {
+            ("Text.Title", "Font.Display"),
+            ("Text.Section", "Font.Ui"),
+            ("Text.Body", "Font.Ui"),
+            ("Text.Meta", "Font.Ui"),
+            ("Text.Figure", "Font.Figure"),
+        };
+        var shown = new List<(string Role, System.Windows.Controls.TextBlock At,
+                              string Wanted)>();
+        foreach (var (role, wanted) in roles)
+        {
+            var line = new System.Windows.Controls.TextBlock
+            {
+                Text = "Рина 4.0.0",
+                Style = (Style)Application.Current.FindResource(role),
+            };
+            panel.Children.Add(line);
+            shown.Add((role, line, wanted));
+        }
+        window.Show();
+        await Task.Delay(300);
+
+        foreach (var (role, at, wanted) in shown)
+        {
+            var family = (System.Windows.Media.FontFamily)
+                Application.Current.FindResource(wanted);
+            Check($"{role} набран шрифтом {wanted}",
+                  at.FontFamily.Source == family.Source,
+                  $"| {at.FontFamily.Source}");
+        }
+
+        // The readings keep their columns. The face is proportional now,
+        // and «11» and «77» being different widths is how a number under
+        // a slider jitters as it is dragged.
+        var figure = shown.First(one => one.Role == "Text.Figure").At;
+        var lined = System.Windows.Documents.Typography
+                          .GetNumeralAlignment(figure);
+        Check("у показаний цифры табличные",
+              lined == System.Windows.FontNumeralAlignment.Tabular,
+              $"| {lined}");
+
+        window.Close();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

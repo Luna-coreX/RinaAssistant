@@ -73,11 +73,19 @@
     <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
   </Style>
 
-  <!-- Instrument readings: digits must not jump when the value changes. -->
+  <!-- Instrument readings: digits must not jump when the value changes.
+
+       `tabular: true` has been in the tokens since the design system was
+       written, and until now nothing applied it: the readings were set
+       in a monospaced face, where every glyph is one width anyway, so
+       the word cost nothing and did nothing. The face is proportional
+       now, and the line below is what the token has been saying all
+       along. -->
   <Style x:Key="Text.Figure" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
     <Setter Property="FontFamily" Value="{StaticResource Type.Figure.Family}" />
     <Setter Property="FontSize" Value="{StaticResource Type.Figure.Size}" />
     <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="Typography.NumeralAlignment" Value="Tabular" />
   </Style>
 
   <Style x:Key="Text.Speech" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">

@@ -56,45 +56,45 @@
   <sys:Double x:Key="State.PrimaryPress.Wash">0.7</sys:Double>
 
   <!-- Гарнитуры -->
-  <FontFamily x:Key="Font.Display">Century Gothic, Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial</FontFamily>
-  <FontFamily x:Key="Font.Ui">Segoe UI Variable Text, Segoe UI Variable Text, Segoe UI, Arial</FontFamily>
-  <FontFamily x:Key="Font.Mono">Cascadia Mono, Cascadia Mono, Consolas</FontFamily>
+  <FontFamily x:Key="Font.Display">pack://application:,,,/Fonts/#Unbounded</FontFamily>
+  <FontFamily x:Key="Font.Ui">pack://application:,,,/Fonts/#Onest</FontFamily>
+  <FontFamily x:Key="Font.Figure">pack://application:,,,/Fonts/#Geologica</FontFamily>
 
   <!-- Роли текста (§3): семейство, размер, начертание -->
-  <FontFamily x:Key="Type.Title.Family">{StaticResource Font.Display}</FontFamily>
+  <FontFamily x:Key="Type.Title.Family">pack://application:,,,/Fonts/#Unbounded</FontFamily>
   <sys:Double x:Key="Type.Title.Size">22</sys:Double>
   <FontWeight x:Key="Type.Title.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Title.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Section.Family">{StaticResource Font.Display}</FontFamily>
+  <FontFamily x:Key="Type.Section.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Section.Size">11</sys:Double>
   <FontWeight x:Key="Type.Section.Weight">700</FontWeight>
   <sys:Boolean x:Key="Type.Section.Upper">true</sys:Boolean>
-  <FontFamily x:Key="Type.Nav.Family">{StaticResource Font.Display}</FontFamily>
+  <FontFamily x:Key="Type.Nav.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Nav.Size">13</sys:Double>
   <FontWeight x:Key="Type.Nav.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Nav.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Legend.Family">{StaticResource Font.Ui}</FontFamily>
+  <FontFamily x:Key="Type.Legend.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Legend.Size">12</sys:Double>
   <FontWeight x:Key="Type.Legend.Weight">500</FontWeight>
   <sys:Boolean x:Key="Type.Legend.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Body.Family">{StaticResource Font.Ui}</FontFamily>
+  <FontFamily x:Key="Type.Body.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Body.Size">13</sys:Double>
   <FontWeight x:Key="Type.Body.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Body.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Value.Family">{StaticResource Font.Ui}</FontFamily>
+  <FontFamily x:Key="Type.Value.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Value.Size">14</sys:Double>
   <FontWeight x:Key="Type.Value.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Value.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Figure.Family">{StaticResource Font.Mono}</FontFamily>
+  <FontFamily x:Key="Type.Figure.Family">pack://application:,,,/Fonts/#Geologica</FontFamily>
   <sys:Double x:Key="Type.Figure.Size">13</sys:Double>
   <FontWeight x:Key="Type.Figure.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Figure.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Speech.Family">{StaticResource Font.Ui}</FontFamily>
+  <FontFamily x:Key="Type.Speech.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Speech.Size">15</sys:Double>
   <FontWeight x:Key="Type.Speech.Weight">400</FontWeight>
   <sys:Double x:Key="Type.Speech.Leading">1.6</sys:Double>
   <sys:Boolean x:Key="Type.Speech.Upper">false</sys:Boolean>
-  <FontFamily x:Key="Type.Meta.Family">{StaticResource Font.Ui}</FontFamily>
+  <FontFamily x:Key="Type.Meta.Family">pack://application:,,,/Fonts/#Onest</FontFamily>
   <sys:Double x:Key="Type.Meta.Size">11</sys:Double>
   <FontWeight x:Key="Type.Meta.Weight">400</FontWeight>
   <sys:Boolean x:Key="Type.Meta.Upper">false</sys:Boolean>

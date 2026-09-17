@@ -878,7 +878,7 @@ public partial class SettingsPage : UserControl
     /// edge was ragged, and the panel read as a list rather than as an
     /// instrument.
     /// </remarks>
-    private const double ControlColumn = 296;
+    private const double ControlColumn = 316;
 
     /// <summary>
     /// The width of the control itself inside the column.
@@ -888,8 +888,13 @@ public partial class SettingsPage : UserControl
     /// Each used to carry its own — 280, 200, 276 — and the right edge
     /// wandered by eighty points. On an instrument the controls stand in a
     /// column, and a column has two sides, not one.
+    ///
+    /// Twenty wider than it was, because the text face is. «Edge Neural
+    /// (онлайн, естественный)» fitted in two hundred and eighty and lost
+    /// its closing bracket the day the face changed: a column measured
+    /// against one typeface is a column measured against nothing.
     /// </remarks>
-    private const double ControlWidth = 280;
+    private const double ControlWidth = 300;
 
     /// <summary>The width of the checks column. Empty in most rows.</summary>
     private const double ProbeColumn = 150;

@@ -12,6 +12,50 @@
   <ItemGroup>
     <ProjectReference Include="..\Rina.Protocol\Rina.Protocol.csproj" />
   </ItemGroup>
+  <!--
+    Шрифты едут внутри сборки (`4.0b-E05`).
+
+    Наборный, текстовый и шрифт показаний — это три решения
+    дизайн-системы, а не три надежды на то, что у человека что-то
+    установлено. Пока семейства назывались системными именами,
+    заголовки на половине машин набирались запасным шрифтом, и об
+    этом никто бы не узнал: подмена молчалива.
+
+    Начертаний взято ровно столько, сколько называют роли: Light,
+    Regular, Medium, SemiBold, Bold. Остальные лежат в
+    `assets/fonts` и в сборку не попадают — по мегабайту за
+    начертание, которого никто не просит.
+  -->
+  <ItemGroup>
+    <Resource Include="..\..\assets\fonts\Onest\Onest-Light.ttf"
+              Link="Fonts\Onest-Light.ttf" />
+    <Resource Include="..\..\assets\fonts\Onest\Onest-Regular.ttf"
+              Link="Fonts\Onest-Regular.ttf" />
+    <Resource Include="..\..\assets\fonts\Onest\Onest-Medium.ttf"
+              Link="Fonts\Onest-Medium.ttf" />
+    <Resource Include="..\..\assets\fonts\Onest\Onest-SemiBold.ttf"
+              Link="Fonts\Onest-SemiBold.ttf" />
+    <Resource Include="..\..\assets\fonts\Onest\Onest-Bold.ttf"
+              Link="Fonts\Onest-Bold.ttf" />
+
+    <Resource Include="..\..\assets\fonts\Unbounded\Unbounded-Light.ttf"
+              Link="Fonts\Unbounded-Light.ttf" />
+    <Resource Include="..\..\assets\fonts\Unbounded\Unbounded-Regular.ttf"
+              Link="Fonts\Unbounded-Regular.ttf" />
+    <Resource Include="..\..\assets\fonts\Unbounded\Unbounded-Medium.ttf"
+              Link="Fonts\Unbounded-Medium.ttf" />
+
+    <Resource Include="..\..\assets\fonts\Geologica\Geologica-Light.ttf"
+              Link="Fonts\Geologica-Light.ttf" />
+    <Resource Include="..\..\assets\fonts\Geologica\Geologica-Regular.ttf"
+              Link="Fonts\Geologica-Regular.ttf" />
+    <Resource Include="..\..\assets\fonts\Geologica\Geologica-Medium.ttf"
+              Link="Fonts\Geologica-Medium.ttf" />
+    <Resource Include="..\..\assets\fonts\Geologica\Geologica-SemiBold.ttf"
+              Link="Fonts\Geologica-SemiBold.ttf" />
+    <Resource Include="..\..\assets\fonts\Geologica\Geologica-Bold.ttf"
+              Link="Fonts\Geologica-Bold.ttf" />
+  </ItemGroup>
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.0" />
     <PackageReference Include="NAudio" Version="2.2.1" />

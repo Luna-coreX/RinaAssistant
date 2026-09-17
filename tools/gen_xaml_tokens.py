@@ -226,30 +226,51 @@ def common_xaml(tokens: dict) -> str:
     #: `... Small`. Every heading in the application had been set in the
     #: fallback, silently, since `4.0-R03`.
     FALLBACK = {
-        # Bahnschrift is second on purpose: Century Gothic is not on every
-        # Windows install, and falling straight through to a neutral
-        # grotesque would lose the whole character of the setting exactly
-        # where it is missing.
-        "display": "Bahnschrift, Segoe UI Variable Display, Segoe UI, Arial",
+        "display": "Segoe UI Variable Display, Segoe UI, Arial",
         "ui": "Segoe UI Variable Text, Segoe UI, Arial",
+        "figure": "Cascadia Mono, Consolas",
         "mono": "Cascadia Mono, Consolas",
     }
+
+    #: A family that travels inside the assembly is addressed by place
+    #: rather than by name: a name may mean nothing on the machine, while
+    #: a resource in the assembly is always there. Such a family needs no
+    #: fallback stack — if the resource is missing the build is broken,
+    #: and quietly putting somebody else's typeface here would hide that.
+    bundled = set(typo.get("bundled", []))
+    #: How each family is written in the markup, so that a role can
+    #: write the same thing.
+    written = {}
     for name, value in typo["family"].items():
-        fallback = FALLBACK.get(name, "Segoe UI, Arial")
-        lines.append(f'  <FontFamily x:Key="Font.{key(name)}">{value}, '
-                     f'{fallback}</FontFamily>')
+        if value in bundled:
+            written[name] = f"pack://application:,,,/Fonts/#{value}"
+        else:
+            written[name] = f'{value}, {FALLBACK.get(name, "Segoe UI, Arial")}'
+        lines.append(f'  <FontFamily x:Key="Font.{key(name)}">'
+                     f'{written[name]}</FontFamily>')
 
     lines.append("")
     lines.append("  <!-- Роли текста (§3): семейство, размер, начертание -->")
     for role, spec in typo["role"].items():
         r = key(role)
-        # The role's family, resolved here. The roles have named a family
+        # The role's family, written out. The roles have named a family
         # since `4.0-R03`, and until `4.0b-A06` nothing read it: every style
         # inherited the one UI face, so `"family": "display"` was a word in
         # a file. A token nobody applies is not a decision but a note.
+        #
+        # **And then it was read, and still did nothing.** This used to
+        # emit the text `{StaticResource Font.Display}` *inside* a
+        # `FontFamily` element — which is not a reference to anything but
+        # the name of a font family, one that does not exist. WPF looked
+        # for a typeface called «{StaticResource Font.Display}», did not
+        # find it, and fell through to the system default in silence.
+        # Every role but the one the base style set was in the wrong face
+        # for two releases, and changing the family in the tokens changed
+        # nothing that could be seen. The family is written out here
+        # instead: a generated file may repeat itself, that is what a
+        # generator is for.
         lines.append(f'  <FontFamily x:Key="Type.{r}.Family">'
-                     f'{{StaticResource Font.{key(spec.get("family", "ui"))}}}'
-                     f'</FontFamily>')
+                     f'{written[spec.get("family", "ui")]}</FontFamily>')
         lines.append(f'  <sys:Double x:Key="Type.{r}.Size">{spec["size"]}</sys:Double>')
         lines.append(f'  <FontWeight x:Key="Type.{r}.Weight">{spec["weight"]}</FontWeight>')
         if "leading" in spec:
