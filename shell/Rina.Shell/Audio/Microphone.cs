@@ -36,7 +36,6 @@ public sealed class Microphone : IDisposable
     public const int Bits = 16;
 
     private WaveInEvent? _device;
-    private bool _muted;
 
     /// <summary>A chunk of audio arrived. Already in the right format.</summary>
     public event Action<byte[]>? Captured;
@@ -46,21 +45,6 @@ public sealed class Microphone : IDisposable
 
     /// <summary>Capture is running.</summary>
     public bool Running { get; private set; }
-
-    /// <summary>
-    /// Do not listen to oneself.
-    /// </summary>
-    /// <remarks>
-    /// While Rina is speaking, capture continues but nothing goes out.
-    /// Muted, not stopped: stopping and starting a device take tens of
-    /// milliseconds, and on every reply those would turn into a swallowed
-    /// beginning of the next phrase.
-    /// </remarks>
-    public bool Muted
-    {
-        get => _muted;
-        set => _muted = value;
-    }
 
     public static IReadOnlyList<AudioDevice> Devices()
     {
@@ -146,7 +130,7 @@ public sealed class Microphone : IDisposable
     {
         var chunk = e.Buffer.AsSpan(0, e.BytesRecorded).ToArray();
         Level?.Invoke(LevelOf(chunk));
-        if (!_muted) Captured?.Invoke(chunk);
+        Captured?.Invoke(chunk);
     }
 
     /// <summary>

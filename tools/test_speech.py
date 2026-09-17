@@ -630,5 +630,164 @@ else:
           f"| первый через {first * 1000:.0f} мс, всё за {whole * 1000:.0f} мс")
 
 print()
+print("=== перебить можно словом ===")
+# `4.0b-E12`. The microphone stays open while she talks, because a
+# person who cannot cut in stops talking to her and starts waiting her
+# out — and waiting somebody out is not a conversation. Two things then
+# have to hold: her own voice must not count as somebody speaking, and
+# the words that cut in must actually cut.
+import collections as _collections
+
+
+class Ear:
+    """A recogniser that gives back whatever it was told to."""
+
+    name = "подсказанное"
+    streams = False
+
+    def __init__(self, text):
+        self.text = text
+
+    @staticmethod
+    def available():
+        return True
+
+    def recognise(self, pcm, language="ru"):
+        return speech.Heard(text=self.text)
+
+
+def listening(heard_text, said_before=(), wake=("рина",), talking=True):
+    """
+    A core that has just heard `heard_text` and lately said the rest.
+
+    `talking` is whether speech of hers is in flight — because that is
+    what makes interrupting mean anything. Interrupting silence is not
+    an interruption, and saying so in the journal would teach a person
+    to stop reading the word.
+    """
+    box = ProtocolServer.__new__(ProtocolServer)
+    box._talking_out = talking
+    box.recogniser = Ear(heard_text)
+    box.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
+                 "recognitions": 0, "texts": 0, "dropped": 0}
+    box._settings = lambda: MemorySettings({"wake_words": list(wake)})
+    box._lately_said = _collections.deque(said_before, maxlen=4)
+    box._speech_queue = None
+    box.ids = Ids()
+    box.sent = []
+    box.send = lambda envelope: box.sent.append(envelope.method)
+    box.routed = []
+    box.announced = []
+
+    class Engine:
+        class bus:
+            @staticmethod
+            def emit(name, **fields):
+                box.announced.append((name, fields.get("text", "")))
+
+        @staticmethod
+        def is_always_listen():
+            return True
+
+        @staticmethod
+        def handle_command_async(text, source="voice", require_wake=False):
+            box.routed.append(text)
+
+    box.engine = Engine()
+    return box
+
+
+mine = listening("я могу запускать приложения и считать",
+                 said_before=["Я могу запускать приложения и считать."])
+mine._recognise(b"\x00\x00")
+check("свои же слова обратно — не в счёт",
+      mine.announced == [] and mine.routed == [],
+      f"| {mine.announced}, {mine.routed}")
+check("и речь из-за них не рвётся", "speech.stop" not in mine.sent,
+      f"| {mine.sent}")
+
+# Not a word-for-word match: recognition of one's own voice through a
+# speaker is imperfect, and demanding an exact one would let every
+# second echo through.
+askew = listening("я могу запускать приложение и считать",
+                  said_before=["Я могу запускать приложения и считать."])
+askew._recognise(b"\x00\x00")
+check("и расслышанные с ошибкой — тоже", askew.announced == [],
+      f"| {askew.announced}")
+
+stopped = listening("стоп", said_before=["Я могу запускать приложения."])
+stopped._recognise(b"\x00\x00")
+check("«стоп» обрывает речь", "speech.stop" in stopped.sent,
+      f"| {stopped.sent}")
+# "Stop" was about the talking, and the talking has stopped: carrying it
+# on to the router afterwards would look for a command called "стоп".
+check("и командой не становится", stopped.routed == [],
+      f"| {stopped.routed}")
+check("но человек видит, что его услышали",
+      [n for n, _ in stopped.announced] == ["speech.recognized"],
+      f"| {stopped.announced}")
+
+named = listening("рина сколько времени",
+                  said_before=["Я могу запускать приложения."])
+named._recognise(b"\x00\x00")
+check("имя тоже обрывает речь", "speech.stop" in named.sent, f"| {named.sent}")
+check("и фраза при этом доходит до разбора",
+      named.routed == ["рина сколько времени"], f"| {named.routed}")
+
+quiet = listening("какая сегодня погода",
+                  said_before=["Я могу запускать приложения."])
+quiet._recognise(b"\x00\x00")
+check("прочее речь не рвёт", "speech.stop" not in quiet.sent, f"| {quiet.sent}")
+
+# And when she is not talking, there is nothing to interrupt. Without
+# this every phrase with her name in it — that is, most of them in
+# "always listening" — would announce an interruption of nothing.
+silent = listening("рина сколько времени", talking=False)
+silent._recognise(b"\x00\x00")
+check("молчащую не перебивают", "speech.stop" not in silent.sent,
+      f"| {silent.sent}")
+check("а фраза всё равно разбирается",
+      silent.routed == ["рина сколько времени"], f"| {silent.routed}")
+
+print()
+print("=== перебитое не договаривается ===")
+# Stopping the sending leaves up to a second of sound already in the
+# shell's queue; stopping the playing leaves the rest of the reply still
+# to come. A person who interrupted hears the difference at once.
+cut, cut_pipe = speaker()
+cut.sent = []
+cut.send = lambda envelope: cut.sent.append(envelope.method)
+cut.synthesiser = Slow()
+cut._settings = lambda: MemorySettings({"voice": "", "speed": 100})
+cut._speech_wanted = ()
+cut._speech_given = (True, True)
+cut._said_mute = False
+cut._lately_said = None
+
+# Nothing is stubbed here: the sound really goes down the pipe, so
+# "she is talking" is true because she is, and not because the check
+# said so.
+taken = Playing(cut, cut_pipe).start()
+
+
+def interrupt_once_started():
+    while not taken.taken:
+        _time.sleep(0.005)
+    cut.hush()
+
+
+threading.Thread(target=interrupt_once_started, daemon=True).start()
+cut._speak("Первое предложение достаточно длинное. Второе тоже вполне себе "
+           "длинное. И третье не короче прочих. Четвёртое завершает ответ.")
+until(lambda: cut._cut_in, seconds=5.0)
+_time.sleep(0.3)
+taken.stop = True
+said = cut.synthesiser.said
+check("остаток реплики не сказан", len(said) < 4,
+      f"| произнесено предложений {len(said)} из четырёх")
+check("и оболочке велено замолчать", "speech.stop" in cut.sent,
+      f"| {cut.sent}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

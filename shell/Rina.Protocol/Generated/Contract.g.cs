@@ -257,6 +257,8 @@ public static class Events
     public const string ReminderFired = "reminder.fired";
     /// <summary>text: string</summary>
     public const string SpeechRecognized = "speech.recognized";
+    /// <summary>без полей</summary>
+    public const string SpeechStop = "speech.stop";
     /// <summary>text: string</summary>
     public const string StreamChunk = "stream.chunk";
     /// <summary>bytes: integer</summary>
@@ -292,6 +294,7 @@ public static class Events
         "listening.stopped",
         "reminder.fired",
         "speech.recognized",
+        "speech.stop",
         "stream.chunk",
         "stream.credit",
         "stream.end",

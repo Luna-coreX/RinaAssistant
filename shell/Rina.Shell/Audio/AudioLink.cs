@@ -29,11 +29,19 @@ namespace Rina.Shell.Audio;
 /// dropped is counted — losing it in silence is not allowed.
 /// </para>
 /// <para>
-/// <b>Rina does not listen to herself.</b> While playback is going on,
-/// capture is muted. Otherwise synthesised speech reaches the microphone,
-/// is recognised as a command, and Rina answers herself — in 3.1.0 a
-/// counter of speakers saved us from this, and the reason has not gone
-/// anywhere.
+/// <b>Rina can be interrupted</b> (<c>4.0b-E12</c>). The microphone stays
+/// open while she speaks, because a person who cannot cut in stops
+/// talking to her and starts waiting her out — and waiting somebody out
+/// is not a conversation.
+/// </para>
+/// <para>
+/// It used to be muted, and for a real reason: synthesised speech reaches
+/// the microphone, is recognised, and Rina answers herself. The reason has
+/// not gone away; the answer to it has moved. The core knows what it is
+/// saying and throws out a phrase that is its own words coming back, and
+/// while she talks only two things act at all — her name and "stop".
+/// Muting solved the echo by making the room inaudible; this solves it by
+/// telling her voice from anybody else's.
 /// </para>
 /// </remarks>
 public sealed class AudioLink : IDisposable
@@ -78,7 +86,6 @@ public sealed class AudioLink : IDisposable
 
         _microphone.Captured += OnCaptured;
         _microphone.Level += level => Level?.Invoke(level);
-        _speaker.Speaking += speaking => _microphone.Muted = speaking;
         _connection.EventReceived += OnEvent;
     }
 

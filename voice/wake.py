@@ -34,6 +34,21 @@ def threshold():
     return max(0.5, min(0.98, value))
 
 
+#: What stops her mid-sentence (`4.0b-E12`).
+#:
+#: Next to the wake words because it is the same act: addressing her
+#: while she talks. Short and plain — a person interrupting does not
+#: pick their words, and a list of polite variants would be a list of
+#: words nobody says at that moment.
+HUSH_WORDS = ("стоп", "хватит", "замолчи", "тихо", "молчи",
+              "stop", "quiet")
+
+
+def hush_asked(text) -> bool:
+    """Was this said to stop her talking?"""
+    return any(word in _tokenize(text) for word in HUSH_WORDS)
+
+
 def get_wake_words(settings) -> list:
     """Returns the list of the wake word's variants (in lower case)."""
     words = settings.get("wake_words", None)

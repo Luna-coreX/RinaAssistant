@@ -1765,6 +1765,28 @@ class ProtocolServer:
     #: together field by field in a check has it too.
     _said_mute = False
 
+    #: The last few things Rina said, to tell her own voice from a
+    #: person's (`4.0b-E12`). The microphone stays open while she
+    #: speaks, so her words come back through it; a phrase that is what
+    #: she is saying is not a phrase anybody said to her.
+    _lately_said: "collections.deque | None" = None
+
+    #: How many of them to keep. Enough to cover what may still be
+    #: playing while the next phrase is being recognised, and no more:
+    #: this is an echo guard, not a memory of the conversation.
+    ECHO_MEMORY = 4
+
+    #: Raised when a person cuts in: what is still queued is thrown
+    #: away rather than spoken over them.
+    _cut_in = False
+
+    #: Whether there is speech of hers in flight right now. Without it
+    #: every phrase with her name in it — that is, most of them in
+    #: "always listening" — would announce an interruption of nothing:
+    #: a line in the journal, an event on the wire, and a word that
+    #: stops meaning anything because it is said when nothing happened.
+    _talking_out = False
+
     #: How many phrases may wait. Recognition slower than speech has to
     #: lose something; what it must not do is fall further and further
     #: behind, answering a minute late. The oldest goes, and it is said out
@@ -1986,8 +2008,35 @@ class ProtocolServer:
                 log.info("Фраза распозналась пустой — тишина или шум")
                 return          # silence is neither an error nor worth reporting
 
+            if self._is_her_own(outcome.text):
+                # Her own voice, through the open microphone. Said at
+                # debug: this happens on every reply and is normal, and
+                # a journal that reports the normal buries the rest.
+                log.debug("Это её собственные слова, не в счёт: %s",
+                          safe(outcome.text))
+                return
+
             self.heard["texts"] += 1
             log.info("Распознано: %s", safe(outcome.text))
+
+            # **Cut in.** Addressed by name or told to stop while she is
+            # talking — the speech breaks off there and then. Sending is
+            # stopped as well as playing: a second of sound already lies
+            # in the shell's queue, and a second of talking over somebody
+            # who has just interrupted is the whole of what interrupting
+            # is against.
+            from voice import wake as wake_mod
+
+            hushed = wake_mod.hush_asked(outcome.text)
+            named = bool(wake_mod.find_wake(
+                outcome.text, wake_mod.get_wake_words(self._settings() or {}))[0])
+            if hushed or named:
+                self.hush()
+            if hushed:
+                # "Stop" is not a command to carry out afterwards: it
+                # was about the talking, and the talking has stopped.
+                self.engine.bus.emit("speech.recognized", text=outcome.text)
+                return
 
             # The recognised words are announced before anything is decided
             # about them, and that is deliberate: a person must see what was
@@ -2042,6 +2091,47 @@ class ProtocolServer:
             self.recogniser = speech.recogniser_for(store)
             self.segmenter.flush()
 
+    def _is_her_own(self, said: str) -> bool:
+        """Is this what Rina is saying right now, come back through the air?"""
+        from voice.textmatch import normalize, similar
+
+        heard = normalize(said)
+        if not heard or self._lately_said is None:
+            return False
+        for mine in self._lately_said:
+            spoken = normalize(mine)
+            if not spoken:
+                continue
+            # Inside, or close to the whole of it: recognition of one's
+            # own voice through a speaker is imperfect, and demanding an
+            # exact match would let every second echo through.
+            if heard in spoken or similar(heard, spoken, threshold=0.72):
+                return True
+        return False
+
+    def hush(self) -> None:
+        """
+        Stop talking: throw away what is queued and tell the shell to cut.
+
+        Both halves matter. Stopping the sending leaves up to a second
+        of sound already in the shell's queue; stopping the playing
+        leaves the rest of the reply still to come. A person who
+        interrupted hears the difference immediately.
+        """
+        if not self._talking_out and not (self._speech_queue
+                                          and not self._speech_queue.empty()):
+            return          # there was nothing to interrupt
+        self._cut_in = True
+        waiting = self._speech_queue
+        if waiting is not None:
+            while True:
+                try:
+                    waiting.get_nowait()
+                except queue.Empty:
+                    break
+        log.info("Перебили — замолкаю")
+        self.send(Envelope.event("speech.stop", {}, id=self.ids.next()))
+
     def _speak(self, text: str) -> None:
         """
         Synthesise and send to the shell.
@@ -2077,7 +2167,18 @@ class ProtocolServer:
         voice = str(self._settings().get("voice", "") if self._settings()
                     else "")
         rate = int((self._settings() or {}).get("speed", 100) or 100)
+
+        # What she is about to say, so that hearing it back does not
+        # count as somebody saying it — see `_is_her_own`.
+        if self._lately_said is None:
+            self._lately_said = collections.deque(maxlen=self.ECHO_MEMORY)
+        self._lately_said.append(text)
+
+        self._cut_in = False
         for piece in speech.sentences(text):
+            if self._cut_in:
+                log.info("Остаток реплики не сказан: перебили")
+                return
             if self._stream_speech(piece, voice, rate):
                 continue
             pcm = self.synthesiser.synthesize(piece, voice=voice, rate=rate)
@@ -2197,6 +2298,13 @@ class ProtocolServer:
         return True
 
     def _push_speech(self, pcm: bytes, sample_rate: int) -> None:
+        self._talking_out = True
+        try:
+            self._push_speech_now(pcm, sample_rate)
+        finally:
+            self._talking_out = False
+
+    def _push_speech_now(self, pcm: bytes, sample_rate: int) -> None:
         # The rate is declared when the stream is opened, so a change of
         # engine is a new stream rather than a continuation of the old one.
         # Otherwise speech at 24000 would go into a stream declared at
@@ -2233,6 +2341,8 @@ class ProtocolServer:
 
         chunk = 8192
         for offset in range(0, len(pcm), chunk):
+            if self._cut_in:
+                return          # interrupted: the rest is not sent
             piece = pcm[offset:offset + chunk]
             if not self._room_for(len(piece)):
                 # Said out loud. Cutting a reply short may be the only

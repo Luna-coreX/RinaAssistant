@@ -1464,28 +1464,46 @@ public partial class App
         // Nothing was needed for this check that was not here already: a
         // speaker, a tone, and waiting. What was missing was asking.
         var alone = new Audio.Speaker();
-        var ear = new Audio.Microphone();
-        alone.Speaking += value => ear.Muted = value;
         try
         {
             alone.Enqueue(Tone(seconds: 0.4));
-            Check("пока говорит — микрофон заглушен", alone.IsSpeaking && ear.Muted);
+            Check("речь началась сама", alone.IsSpeaking);
 
             for (var waited = 0; waited < 60 && alone.IsSpeaking; waited++)
                 await Task.Delay(100);
             Check("договорив, речь кончается сама, без закрытия потока",
                   !alone.IsSpeaking, $"| в очереди {alone.Pending} Б");
-            Check("и микрофон снова слышит", !ear.Muted);
         }
-        finally { alone.Dispose(); ear.Dispose(); }
+        finally { alone.Dispose(); }
 
-        // --- "do not listen to oneself": muting, not stopping the device ---
-        var microphone = new Audio.Microphone();
-        speaker.Speaking += value => microphone.Muted = value;
+        // --- and the microphone is not shut while she talks (4.0b-E12) ---
+        //
+        // The rule turned round, and the check with it. It used to mute:
+        // synthesised speech reaches the microphone, is recognised, and
+        // Rina answers herself. It now stays open, because a person who
+        // cannot cut in stops talking to her and starts waiting her out.
+        // The echo is answered in the core instead — it knows what it is
+        // saying and throws its own words out — and while she talks only
+        // her name and "stop" act at all.
+        //
+        // There is deliberately no assertion here that the microphone
+        // is open. The switch that shut it is gone — `Microphone` has
+        // no `Muted` any more — so what guards the rule is that the
+        // capability does not exist, and the compiler is a better
+        // guard than a check. Adding a way to feed the microphone from
+        // outside purely so this could watch it would be production
+        // code that only a check ever walks, which is the defect this
+        // file is full of accounts of.
+        //
+        // What the rule replaces muting with — she does not act on her
+        // own words, and only her name or "stop" get through while she
+        // talks — is language, lives in the core, and is checked in
+        // `test_speech.py`.
         speaker.Enqueue(tone);
-        Check("пока Рина говорит, микрофон заглушен", microphone.Muted);
+        Check("речь идёт", speaker.IsSpeaking);
         speaker.Interrupt();
-        Check("после речи слушает снова", !microphone.Muted);
+        Check("и обрывается сразу", !speaker.IsSpeaking && speaker.Pending == 0,
+              $"| в очереди {speaker.Pending} Б");
         speaker.Dispose();
 
         // --- level: silence and sound differ ---
@@ -1522,7 +1540,8 @@ public partial class App
         if (link.Connection is { Ready: true } connection)
         {
             using var audio = new Audio.AudioLink(connection, connection.Data,
-                                                  microphone, new Audio.Speaker());
+                                                  new Audio.Microphone(),
+                                                  new Audio.Speaker());
             // We do not switch the device on: otherwise real sound from
             // the room would go into the stream too, and the check would be
             // counting somebody else's.

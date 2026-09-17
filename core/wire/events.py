@@ -121,6 +121,14 @@ EVENTS: dict[str, EventSpec] = {s.name: s for s in (
     _e("stream.end", _f("reason", "string", "done", "cancelled", "failed"),
        note="при failed рядом идёт error с тем же stream_id"),
 
+    # --- the person cut in (4.0b-E12) ---------------------------------------
+    #
+    # Speech is stopped, not merely stopped being sent: what is already
+    # in the shell's queue is a second of sound, and a second of talking
+    # over somebody who has just interrupted you is the whole of what
+    # interrupting is against.
+    _e("speech.stop", note="перебили: оборвать речь и выбросить недоигранное"),
+
     # --- backpressure on the data channel (4.0-D08, §8) ---------------------
     #
     # **Declared late, and that cost the voice its hearing.** The core had

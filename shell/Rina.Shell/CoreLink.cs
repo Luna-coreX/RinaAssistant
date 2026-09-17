@@ -61,6 +61,7 @@ public sealed class CoreLink : IAsyncDisposable
         {
             _window.OnCoreEvent(message);
             FollowListening(message);
+            if (message.Method == Rina.Protocol.Events.SpeechStop) Hush();
             CoreEvent?.Invoke(message);
         });
 
@@ -676,6 +677,18 @@ public sealed class CoreLink : IAsyncDisposable
     /// keep in step.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// The person cut in: stop talking now (<c>4.0b-E12</c>).
+    /// </summary>
+    /// <remarks>
+    /// Interrupted, not drained. Everywhere else the queue is allowed to
+    /// play out — cutting the end off an utterance was a defect once and
+    /// is written up as one. Here the opposite is true: what is left in
+    /// the queue is a second of talking over somebody who has just asked
+    /// her to stop.
+    /// </remarks>
+    private void Hush() => _voice?.Interrupt();
+
     private void FollowListening(Envelope message)
     {
         var wanted = message.Method switch
