@@ -31,6 +31,7 @@ use_utf8()
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SHELL = os.path.join(ROOT, "shell", "Rina.Shell")
 TABLE = os.path.join(SHELL, "Strings", "interface.json")
+TOKENS = os.path.join(ROOT, "docs", "design", "tokens.json")
 
 # Startup.cs — the self-checks' captions: they go to a developer's console
 # rather than to a person, and translating them would mean translating our
@@ -89,6 +90,14 @@ def main() -> int:
 
     used = set()
     loose = []
+
+    # **The accents are named in the design tokens.** They reach the
+    # window through `Accents.g.xaml`, which is generated and therefore
+    # skipped here — so nothing in the scanned sources mentions them,
+    # and their translations looked like rows nobody asks for. They are
+    # asked for: `SettingsPage` hands every accent's title to `S`.
+    with io.open(TOKENS, encoding="utf-8") as source:
+        used.update(json.load(source).get("accent_titles", {}).values())
 
     for path, kind in sources():
         text = io.open(path, encoding="utf-8").read()

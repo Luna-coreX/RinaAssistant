@@ -1371,6 +1371,28 @@ public partial class App
               ruled.Spread < 0.5,
               $"| разброс {ruled.Spread:0.0} по {ruled.Measured} рядам");
 
+        // --- what a dropdown offers is words, not identifiers ---
+        //
+        // Reported: "the finishes are not translated in Russian, and
+        // the accents are not translated in English". The finishes were
+        // never translated at all — the core stores «silver», and the
+        // page showed what it stored; the accents were named in the
+        // design tokens, in Russian, and went to the screen as they
+        // were. Both are the same fault: a name that never passed
+        // through the table.
+        foreach (var key in new[] { "finish", "accent" })
+        {
+            var offered = Shown().Offered(key);
+            var raw = offered.Where(one => one.Said == one.Value).ToArray();
+            Check($"«{key}»: есть из чего выбрать", offered.Count > 0,
+                  $"| {offered.Count}");
+            Check($"«{key}»: показаны слова, а не ключи", raw.Length == 0,
+                  raw.Length == 0
+                      ? "| " + string.Join(", ", offered.Select(o => o.Said))
+                      : "| как есть: " + string.Join(", ",
+                                                     raw.Select(o => o.Value)));
+        }
+
         // --- the search through forty settings ---
         //
         // Asked for. Measured on what is left standing rather than on

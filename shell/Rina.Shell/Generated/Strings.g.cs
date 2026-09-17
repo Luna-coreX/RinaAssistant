@@ -474,6 +474,11 @@ public static partial class Loc
                 {
                     ["English"] = "Done: {0}",
                 },
+            ["Графит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Graphite",
+                },
             ["Громкость"] =
                 new Dictionary<string, string>
                 {
@@ -981,6 +986,11 @@ public static partial class Loc
                 {
                     ["English"] = "Where to save the diagnostic package",
                 },
+            ["Латунь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Brass",
+                },
             ["метаданные версии {0}, а мы умеем 1"] =
                 new Dictionary<string, string>
                 {
@@ -1008,6 +1018,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*",
+                },
+            ["Мох"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Moss",
                 },
             ["на чём они разговаривают"] =
                 new Dictionary<string, string>
@@ -1389,6 +1404,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "window, audio, system layer",
+                },
+            ["Орхидея"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Orchid",
                 },
             ["Остановить"] =
                 new Dictionary<string, string>
@@ -1931,6 +1951,11 @@ public static partial class Loc
                 {
                     ["English"] = "seconds",
                 },
+            ["Серебро"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Silver",
+                },
             ["Серебро, чёрное или графит"] =
                 new Dictionary<string, string>
                 {
@@ -2158,6 +2183,11 @@ public static partial class Loc
                 {
                     ["English"] = "Installing…",
                 },
+            ["Сталь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Steel",
+                },
             ["Статистика команд"] =
                 new Dictionary<string, string>
                 {
@@ -2236,6 +2266,11 @@ public static partial class Loc
                     ["English"] = "Notifications",
                     ["Español"] = "Notificaciones",
                     ["Українська"] = "Сповіщення",
+                },
+            ["Уголь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Ember",
                 },
             ["Удалить"] =
                 new Dictionary<string, string>
@@ -2476,6 +2511,11 @@ public static partial class Loc
                     ["Español"] = "Sensibilidad de activación",
                     ["Українська"] = "Чутливість активації",
                 },
+            ["Чёрное"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Black",
+                },
             ["Шаг {0} из {1}"] =
                 new Dictionary<string, string>
                 {
@@ -2568,6 +2608,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The language of the window and of Rina's words",
+                },
+            ["Янтарь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Amber",
                 },
         };
 }

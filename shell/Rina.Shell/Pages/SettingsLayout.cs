@@ -232,6 +232,26 @@ public static class SettingsLayout
         // shell's business: one and the same paint reads differently on
         // light and on dark.
         "accent",
+        // And the finish itself. The core stores the name and knows
+        // nothing else about it; what it is called in a person's
+        // language is the design system's business, and the design
+        // system is here. Until this line the dropdown offered
+        // «silver», «black», «graphite» — three English words in a
+        // Russian window, and three lower-case ones in an English one.
+        "finish",
+    ];
+
+    /// <summary>What a finish is called.</summary>
+    /// <remarks>
+    /// Names rather than the keys the core stores. The keys are
+    /// identifiers and must not change; these are words, and they are
+    /// translated like every other word on the screen.
+    /// </remarks>
+    public static readonly (string Value, string Title)[] Finishes =
+    [
+        ("silver", Word("Серебро")),
+        ("black", Word("Чёрное")),
+        ("graphite", Word("Графит")),
     ];
 
     /// <summary>

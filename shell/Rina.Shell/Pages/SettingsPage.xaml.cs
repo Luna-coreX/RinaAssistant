@@ -95,6 +95,25 @@ public partial class SettingsPage : UserControl
         return found;
     }
 
+    /// <summary>
+    /// What a setting offers, and in what words — for the check.
+    /// </summary>
+    /// <remarks>
+    /// Both halves: the value the core stores and the word a person
+    /// reads. A dropdown that offers «silver» offers an identifier, and
+    /// an identifier is not a word in anybody's language.
+    /// </remarks>
+    public IReadOnlyList<(string Value, string Said)> Offered(string key)
+    {
+        if (_options.TryGetValue(key, out var known))
+            return known.Select(one => (one.Item1, one.Item2)).ToArray();
+        if (_schema.TryGetValue(key, out var spec)
+            && spec["choices"] is JsonArray choices)
+            return choices.Select(one => (one!.GetValue<string>(),
+                                          one!.GetValue<string>())).ToArray();
+        return [];
+    }
+
     /// <summary>What width a control is obliged to have.</summary>
     public static double WantedControlWidth => ControlWidth;
 
@@ -200,7 +219,15 @@ public partial class SettingsPage : UserControl
                 var finish = _values.GetValueOrDefault("finish")
                                  ?.GetValue<string>() ?? "black";
                 _options[key] = App.Accents(finish)
-                    .Select(a => (a.Value, a.Title, true, "")).ToList();
+                    .Select(a => (a.Value, S(a.Title), true, "")).ToList();
+                continue;
+            }
+
+            if (key == "finish")
+            {
+                _options[key] = SettingsLayout.Finishes
+                    .Select(one => (one.Value, S(one.Title), true, ""))
+                    .ToList();
                 continue;
             }
 

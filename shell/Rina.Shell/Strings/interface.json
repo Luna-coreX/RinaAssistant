@@ -1585,5 +1585,32 @@
   },
   "Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место": {
     "English": "Drag to move the canvas. Double-click brings it back"
+  },
+  "Серебро": {
+    "English": "Silver"
+  },
+  "Чёрное": {
+    "English": "Black"
+  },
+  "Графит": {
+    "English": "Graphite"
+  },
+  "Янтарь": {
+    "English": "Amber"
+  },
+  "Уголь": {
+    "English": "Ember"
+  },
+  "Латунь": {
+    "English": "Brass"
+  },
+  "Мох": {
+    "English": "Moss"
+  },
+  "Сталь": {
+    "English": "Steel"
+  },
+  "Орхидея": {
+    "English": "Orchid"
   }
 }
