@@ -824,5 +824,83 @@ check("длительность реплики посчитана и перед�
       f"| {held} с при четырёх секундах звука")
 
 print()
+print("=== два ответа не перемешиваются ===")
+# **Reproduced before it was fixed.** Every reply is spoken on a thread
+# of its own, and since `4.0b-E09` each puts its sentences into the same
+# queue one at a time — so two threads put theirs in alternately. Two
+# replies of three sentences each came out as
+# `второй, первый, второй, первый, второй, первый`. A person met it by
+# repeating a command they thought had not been heard.
+both, both_pipe = speaker()
+both.synthesiser = Slow()
+both._settings = lambda: MemorySettings({"voice": "", "speed": 100})
+both._speech_wanted = ()
+both._speech_given = (True, True)
+both._said_mute = False
+both._lately_said = None
+both.sent = []
+both.send = lambda envelope: both.sent.append(envelope.method)
+
+whose = []
+both.send_speech = lambda pcm, hertz: whose.append(
+    threading.current_thread().name)
+
+one = "Раз предложение длинное. Два предложение длинное. Три подлиннее."
+two = "Четыре предложение длинное. Пять предложение длинное. Шесть тоже."
+first = threading.Thread(target=both._speak, name="первый", args=(one,))
+second = threading.Thread(target=both._speak, name="второй", args=(two,))
+first.start()
+_time.sleep(0.02)
+second.start()
+first.join()
+second.join()
+
+# Whoever spoke, spoke without being cut into: the names must come in
+# runs, never alternating.
+shuffled = any(whose[i] != whose[i + 1] and whose[i] in whose[i + 2:]
+               for i in range(len(whose) - 2))
+check("предложения одного ответа идут подряд", not shuffled, f"| {whose}")
+check("и оба ответа что-то сказали", len(set(whose)) == 2, f"| {whose}")
+
+print()
+print("=== новая команда обрывает прежний ответ, а напоминание — нет ===")
+# The rule is about commands, not about speech: asked something else,
+# she stops saying the previous thing, because finishing an answer
+# nobody is waiting for any more is talking over the person who moved
+# on. A reminder going off in the middle of an answer is not that — it
+# waits its turn instead of eating the answer.
+from core.engine import RinaEngine
+
+cut_calls = []
+person = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+person.voice_out = lambda text, **rest: None
+person.hush_out = lambda: cut_calls.append(True)
+
+person.handle_command("сколько будет два плюс два", source="voice")
+check("команда обрывает прежнюю реплику", len(cut_calls) == 1,
+      f"| {len(cut_calls)}")
+
+before = len(cut_calls)
+person.say("Напоминание: позвонить маме.")
+check("а сама реплика — нет", len(cut_calls) == before,
+      f"| {len(cut_calls) - before}")
+
+# And a phrase that was not addressed to her cuts nothing either.
+quiet_one = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+    "always_listen": True,
+}))
+quiet_one.voice_out = lambda text, **rest: None
+quiet_one._always_listen = True
+silent_cuts = []
+quiet_one.hush_out = lambda: silent_cuts.append(True)
+quiet_one.handle_command("кто-то что-то сказал в комнате", source="voice",
+                         require_wake=True)
+check("сказанное не ей ничего не обрывает", silent_cuts == [],
+      f"| {silent_cuts}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

@@ -97,6 +97,8 @@ class RinaEngine:
         #: Called when the engine writes a setting itself — see
         #: `_settings_changed`. Set from outside, like `voice_out`.
         self.settings_changed = None
+        #: Called to cut off speech in progress — see `_hush_previous`.
+        self.hush_out = None
         self._apps_cache = None
         #: Who opens a page in a browser. The same place as the rest of what
         #: touches the machine; until it is set, the core opens it itself,
@@ -842,6 +844,15 @@ class RinaEngine:
         self._settings_changed()
         self.say(tr("Включила: {about}.", about=intent.arg("about") or key))
 
+    def _hush_previous(self):
+        """Stop whatever is being said: something new has been asked."""
+        if self.hush_out is None:
+            return
+        try:
+            self.hush_out()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось оборвать прежнюю реплику")
+
     def _settings_changed(self):
         """
         The engine has written a setting itself — tell whoever must rebuild.
@@ -1017,6 +1028,19 @@ class RinaEngine:
         # answering a question nobody asked.
         if source in ("voice", "always"):
             self._open_talk()
+
+        # **A new command replaces the answer to the old one.**
+        #
+        # Asked something else, she stops saying the previous thing:
+        # finishing an answer nobody is waiting for any more is talking
+        # over the person who moved on. Met as a mess — a command said
+        # three times because it seemed unheard, three answers, and all
+        # of them at once.
+        #
+        # Here rather than where speech is sent, because the rule is
+        # about commands and not about speech: a reminder going off in
+        # the middle of an answer waits its turn instead of eating it.
+        self._hush_previous()
 
         if intent.name == "offer.accepted":
             # The "yes" goes into the conversation like any other word.

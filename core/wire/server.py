@@ -144,6 +144,8 @@ class ProtocolServer:
         # switching the listening mode — takes a different road from
         # `settings.set`, and the voice is rebuilt on that road only.
         engine.settings_changed = self._voice_follows_settings
+        # A new command silences the answer to the previous one.
+        engine.hush_out = self.hush
         engine.launch_out = self.launch_app
         # What is going on outside the command (`4.0b-A09`): which program
         # is in front, whether one is running. The shell has the machine
@@ -1787,6 +1789,28 @@ class ProtocolServer:
     #: stops meaning anything because it is said when nothing happened.
     _talking_out = False
 
+    #: One reply at a time.
+    #:
+    #: **Two answers at once came out shuffled together.** Every reply
+    #: is spoken on a thread of its own, and since `4.0b-E09` each one
+    #: puts its sentences into the same queue one by one — so two
+    #: threads put theirs in alternately. Reproduced outright: two
+    #: replies of three sentences each left as
+    #: `второй, первый, второй, первый, второй, первый`. A person met
+    #: it by repeating a command they thought had not been heard.
+    #:
+    #: Not "the second waits its turn" but "the second replaces the
+    #: first": she was asked something new, and finishing the old
+    #: answer first is answering a question nobody is waiting for any
+    #: more. The waiting is only until the old thread notices.
+    _speak_guard = threading.Lock()
+
+    #: Whether a reply is being made or sent right now — the thing a
+    #: new one has to stop. Wider than `_talking_out`, which is only
+    #: about the pushing: synthesis takes seconds of its own, and a
+    #: reply interrupted during them must stop too.
+    _reply_running = False
+
     #: How many phrases may wait. Recognition slower than speech has to
     #: lose something; what it must not do is fall further and further
     #: behind, answering a minute late. The oldest goes, and it is said out
@@ -2118,8 +2142,8 @@ class ProtocolServer:
         leaves the rest of the reply still to come. A person who
         interrupted hears the difference immediately.
         """
-        if not self._talking_out and not (self._speech_queue
-                                          and not self._speech_queue.empty()):
+        if not (self._reply_running or self._talking_out
+                or (self._speech_queue and not self._speech_queue.empty())):
             return          # there was nothing to interrupt
         self._cut_in = True
         waiting = self._speech_queue
@@ -2154,6 +2178,23 @@ class ProtocolServer:
                          getattr(self.synthesiser, "last_error", "")
                          or "движок синтеза недоступен")
             return
+        # Replies queue here rather than cut in on each other: a
+        # reminder going off in the middle of an answer must not take
+        # the rest of that answer with it. What **does** cut is a new
+        # command — the person asked something else — and that is
+        # decided where commands are, in `RinaEngine.handle_command`.
+        with self._speak_guard:
+            self._reply_running = True
+            try:
+                self._say_it(text)
+            finally:
+                self._reply_running = False
+
+    def _say_it(self, text: str) -> None:
+        voice = str(self._settings().get("voice", "") if self._settings()
+                    else "")
+        rate = int((self._settings() or {}).get("speed", 100) or 100)
+
         # **Sentence by sentence** (`4.0b-E09`). Synthesis of a whole
         # reply is waited out whole: the person hears nothing until the
         # last byte of the last word exists. Sent a sentence at a time,
@@ -2164,10 +2205,7 @@ class ProtocolServer:
         # The wait before the first syllable then stops depending on how
         # long the answer is, which is what made long answers feel like
         # a hang rather than a pause.
-        voice = str(self._settings().get("voice", "") if self._settings()
-                    else "")
-        rate = int((self._settings() or {}).get("speed", 100) or 100)
-
+        #
         # What she is about to say, so that hearing it back does not
         # count as somebody saying it — see `_is_her_own`.
         if self._lately_said is None:
