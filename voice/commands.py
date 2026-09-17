@@ -156,18 +156,44 @@ def handle_builtin_command(text):
 # (4.0-B02) can determine the topic without receiving a ready-made phrase:
 # an intent and its speaking are different things, and after the split the
 # text of an answer is assembled by the core, not by the parse.
+# **Being addressed is not yet a command, but it is already a
+# conversation.**
+#
+# Of six ordinary ways of addressing her — hello, thank you, goodbye,
+# how are you, who are you, what can you do — one was answered. The
+# rest ran to the end of the parse and got "Извини, я не поняла
+# команду", and with "always listening" off, a web search for the word
+# "привет".
+#
+# Not decoration. The target model of behaviour ends on «Спасибо,
+# Рина» — «Всегда рада помочь», and an assistant that answers "did not
+# understand" to a greeting does not enter that conversation at all.
+# The answers stay short: being addressed is closed with one line and
+# does not pretend to be a conversation that is not there yet.
 ANSWERS = {
     "name": lambda: tr("Меня зовут Рина, я твой голосовой ассистент."),
-    "thanks": lambda: tr("Всегда пожалуйста!"),
+    "thanks": lambda: tr("Всегда рада помочь."),
+    "hello": lambda: tr("Привет. Слушаю."),
+    "bye": lambda: tr("До встречи."),
+    "how_are_you": lambda: tr("У меня всё ровно. Чем помочь?"),
     "capabilities": lambda: tr(
         "Я могу запускать приложения, считать, искать в интернете и "
         "выполнять команды плагинов. Попробуй сказать: запусти браузер."),
 }
 
+# Kept narrow on purpose. The stages that carry a real errand — things
+# to do, reminders, system actions, launching — all run before this
+# one, so "какие дела" reaches the list and "напомни сказать привет"
+# reaches the reminders. What arrives here is what none of them wanted.
 ANSWER_PHRASES = {
     "name": ("как тебя зовут", "твоё имя", "твое имя", "your name",
-             "who are you"),
+             "who are you", "ты кто", "кто ты"),
     "thanks": ("спасибо", "благодарю", "thank", "thanks"),
+    "hello": ("привет", "здравствуй", "здорово", "доброе утро",
+              "добрый день", "добрый вечер", "hello", "hi there"),
+    "bye": ("пока", "до свидания", "до встречи", "спокойной ночи",
+            "goodbye", "bye"),
+    "how_are_you": ("как дела", "как ты", "как жизнь", "how are you"),
     "capabilities": ("что ты умеешь", "твои возможности", "what can you do",
                      "your capabilities"),
 }

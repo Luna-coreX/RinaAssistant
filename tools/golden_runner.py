@@ -406,7 +406,15 @@ def classify(obs, text=""):
          lambda r: intent("reminder.list", empty=True)),
         ("Нечего отменять.",
          lambda r: intent("reminder.cancel", empty=True)),
+        # Both wordings. 3.1 said "Всегда пожалуйста!" and 4.0-beta says
+        # "Всегда рада помочь." — the answer changed on purpose, and this
+        # table exists to recognise the topic, not to freeze the phrase.
+        # Keeping the old one is what makes the set still about 3.1: a
+        # recording that quietly follows every rewording stops being a
+        # recording.
         ("Всегда пожалуйста!",
+         lambda r: intent("builtin.answer", topic="thanks")),
+        ("Всегда рада помочь.",
          lambda r: intent("builtin.answer", topic="thanks")),
     ]
     for exact, make in table:

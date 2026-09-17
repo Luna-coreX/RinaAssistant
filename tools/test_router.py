@@ -252,6 +252,33 @@ quiet.handle_command("что ты умеешь", source="typed")
 check("напечатанное разговора не открывает", not quiet.talking())
 
 print()
+print("=== обращение — это ещё не команда, но уже разговор ===")
+# Out of six ordinary ways of addressing her, one was answered. The
+# rest went to the end of the parse and got "Извини, я не поняла
+# команду" — and with "always listening" off, a web search for the word
+# "привет". The target model of behaviour ends on «Спасибо, Рина» —
+# «Всегда рада помочь»; an assistant that answers "не поняла" to a
+# greeting does not enter that conversation at all.
+for text, want in [
+    ("привет", "builtin.answer"),
+    ("здравствуй", "builtin.answer"),
+    ("спасибо", "builtin.answer"),
+    ("пока", "builtin.answer"),
+    ("как дела", "builtin.answer"),
+    ("ты кто", "builtin.answer"),
+    ("что ты умеешь", "builtin.answer"),
+    # And it takes nothing that belongs to somebody else: the stages
+    # that carry a real errand run before this one, and have to keep
+    # running first.
+    ("какие дела", "todo.list"),
+    ("напомни через 5 минут сказать привет соседу", "reminder.create"),
+    ("запиши позвонить и сказать спасибо", "todo.add"),
+    ("найди как дела у рынка акций", "websearch"),
+]:
+    got = route(text, RouterContext()).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+print()
 print("=== делить — это делить, а не умножать ===")
 # **Answered confidently and wrongly.** «5 делить на 0» came out as
 # «Получается 0»: the bare verb was missing from the table, so it was
