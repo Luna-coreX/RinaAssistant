@@ -5893,6 +5893,30 @@ public partial class App
         Check("ни одна подпись не пришла пустой", blank.Count == 0,
               blank.Count == 0 ? "" : "| " + string.Join("; ", blank.Take(6)));
 
+        // --- the name on «about» ---
+        //
+        // Asked for: "centre it, change the size and the structure,
+        // perhaps give the text some flow". Centring is a number, and
+        // so is flow: the ink at the left of the name is one colour now
+        // and another a second and a half from now.
+        window.ShowSectionFor("about");
+        await Until(() => window.CurrentPage is Pages.AboutPage, 5);
+        await Task.Delay(400);
+        var about = (Pages.AboutPage)window.CurrentPage!;
+
+        var sides = about.NameSides();
+        Check("имя стоит посередине карточки",
+              Math.Abs(sides.Left - sides.Right) < 1.0,
+              $"| слева {sides.Left:0}, справа {sides.Right:0}");
+        Check("по имени идёт свет", about.NameFlows);
+
+        var litWas = about.NameInk();
+        await Task.Delay(1500);
+        var litNow = about.NameInk();
+        Check("и свет действительно движется",
+              Math.Abs(litNow - litWas) > 2.0,
+              $"| было {litWas:0.0}, стало {litNow:0.0}");
+
         // A screenshot with real records: an empty page and a page with
         // one command look different, and it is the second one worth
         // checking.

@@ -47,7 +47,154 @@ public partial class AboutPage : UserControl
         Version.Text = ShellVersion;
         BuildLinks();
         BuildPlaces();
+        Flow();
+        // The ink is the finish's, and a person may change the finish
+        // while this page is open. A brush built once would keep the
+        // old one.
+        App.AccentChanged += Flow;
+        Unloaded += (_, _) => App.AccentChanged -= Flow;
         Loaded += async (_, _) => await ShowPartsAsync();
+    }
+
+    /// <summary>
+    /// The name, with a slow light running through it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: "make the heading a little more interesting — centre
+    /// it, change the size and the structure, perhaps animate it
+    /// slightly, give it some flow."
+    /// </para>
+    /// <para>
+    /// <b>A moving brush, not moving letters.</b> Letters that slide are
+    /// something to watch; ink that changes slowly is something to
+    /// glance at, and this is a page one glances at. The gradient runs
+    /// between the page's own ink and the accent — no new colour — and
+    /// it repeats, so the light arrives from the left for ever instead
+    /// of snapping back.
+    /// </para>
+    /// <para>
+    /// Six seconds. Not a motion token: those are for a change of state
+    /// — a press, a panel — and they are measured in a fifth of a
+    /// second. This is weather, not a transition, and weather that took
+    /// two hundred milliseconds would be a flicker.
+    /// </para>
+    /// <para>
+    /// <b>It stops when the page goes.</b> An animation on a brush of a
+    /// page nobody is looking at is a timer that never ends; the page is
+    /// built afresh on every visit, and there would be one more each
+    /// time.
+    /// </para>
+    /// </remarks>
+    private void Flow()
+    {
+        var ink = (System.Windows.Media.SolidColorBrush)
+            FindResource("C.Ink");
+        var lit = (System.Windows.Media.SolidColorBrush)
+            FindResource("C.Signal");
+
+        var run = new System.Windows.Media.LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 0),
+            MappingMode = System.Windows.Media.BrushMappingMode
+                                .RelativeToBoundingBox,
+            SpreadMethod = System.Windows.Media.GradientSpreadMethod.Repeat,
+            GradientStops =
+            [
+                new System.Windows.Media.GradientStop(ink.Color, 0.0),
+                new System.Windows.Media.GradientStop(lit.Color, 0.5),
+                new System.Windows.Media.GradientStop(ink.Color, 1.0),
+            ],
+        };
+
+        var slide = new System.Windows.Media.TranslateTransform();
+        run.RelativeTransform = slide;
+        Wordmark.Foreground = run;
+
+        var move = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = TimeSpan.FromSeconds(6),
+            RepeatBehavior = System.Windows.Media.Animation
+                                   .RepeatBehavior.Forever,
+        };
+        slide.BeginAnimation(
+            System.Windows.Media.TranslateTransform.XProperty, move);
+        _flowing = slide;
+        Unloaded += (_, _) => Still();
+    }
+
+    private System.Windows.Media.TranslateTransform? _flowing;
+
+    private void Still() => _flowing?.BeginAnimation(
+        System.Windows.Media.TranslateTransform.XProperty, null);
+
+    /// <summary>Is the name flowing — for the check.</summary>
+    public bool NameFlows =>
+        Wordmark.Foreground is System.Windows.Media.LinearGradientBrush
+        {
+            RelativeTransform: System.Windows.Media.TranslateTransform,
+        };
+
+    /// <summary>
+    /// How light the ink is at the left of the name — for the check.
+    /// </summary>
+    /// <remarks>
+    /// <b>The left third, not the whole.</b> The gradient repeats once
+    /// across the name, so at every moment the whole of it is somewhere
+    /// on the letters and the average over all of them barely moves —
+    /// a check on that average would call a frozen brush "flowing". A
+    /// third of the width holds part of the cycle, and that part
+    /// travels.
+    ///
+    /// Only ink, never paper: the gaps between letters are transparent,
+    /// and counting them would drown the reading in nothing.
+    /// </remarks>
+    public double NameInk()
+    {
+        UpdateLayout();
+        var wide = Math.Max(1, (int)Wordmark.ActualWidth);
+        var tall = Math.Max(1, (int)Wordmark.ActualHeight);
+        var frame = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            wide, tall, 96, 96,
+            System.Windows.Media.PixelFormats.Pbgra32);
+        // Through a brush, not straight. `Render` puts a visual where it
+        // stands inside its parent, and this one stands a hundred and
+        // sixty points in — off the right edge of a bitmap its own
+        // size, which is why the first reading was a bitmap of nothing.
+        var draw = new System.Windows.Media.DrawingVisual();
+        using (var paint = draw.RenderOpen())
+            paint.DrawRectangle(
+                new System.Windows.Media.VisualBrush(Wordmark), null,
+                new Rect(0, 0, wide, tall));
+        frame.Render(draw);
+        var pixels = new byte[wide * tall * 4];
+        frame.CopyPixels(pixels, wide * 4, 0);
+
+        double sum = 0;
+        var seen = 0;
+        for (var y = 0; y < tall; y++)
+            for (var x = 0; x < wide / 3; x++)
+            {
+                var spot = (y * wide + x) * 4;
+                if (pixels[spot + 3] < 64) continue;
+                sum += (pixels[spot] + pixels[spot + 1] + pixels[spot + 2])
+                       / 3.0;
+                seen++;
+            }
+        return seen > 0 ? sum / seen : 0;
+    }
+
+    /// <summary>Where the name stands in its card — for the check.</summary>
+    public (double Left, double Right) NameSides()
+    {
+        UpdateLayout();
+        var card = (FrameworkElement)Wordmark.Parent;
+        var at = Wordmark.TransformToAncestor(card)
+                         .Transform(new Point(0, 0));
+        return (at.X, card.ActualWidth - at.X - Wordmark.ActualWidth);
     }
 
     /// <summary>What the last check said — for the end-to-end check.</summary>

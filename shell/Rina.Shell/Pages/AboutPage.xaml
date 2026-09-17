@@ -10,27 +10,36 @@
 
       <!-- Who this is. The name, the version and one line about what she
            does: without it "Rina 4.0.0" tells a first-time reader nothing. -->
-      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
-        <StackPanel>
-          <!--
-            The name carries the card, and the version stands beside it.
+      <!--
+        The name carries the card, and the version stands under it.
 
-            It was the other way round: the name in body text and the
-            number under it in the figure face, larger — so the card
-            announced «4.0.0» and mentioned, in passing, what it was the
-            version of. On the one page a person opens to find out what
-            this program is, that is the wrong way round.
-          -->
-          <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
-            <TextBlock Text="Rina Assistant"
-                       Style="{StaticResource Text.Title}"
-                       VerticalAlignment="Bottom" />
-            <TextBlock x:Name="Version" Style="{StaticResource Text.Figure}"
-                       VerticalAlignment="Bottom"
-                       Margin="12,0,0,4" />
-          </StackPanel>
+        It was the other way round once: the name in body text and the
+        number under it in the figure face, larger — so the card
+        announced «4.0.0» and mentioned, in passing, what it was the
+        version of. On the one page a person opens to find out what this
+        program is, that is the wrong way round.
+
+        Then it was a line in the top left corner, which is where a
+        heading goes on every other page — and this is not every other
+        page. It is the one place the program says its own name, so the
+        name stands in the middle, in two tiers, at a size nothing else
+        here uses. The flow across it is built in `Flow`.
+      -->
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+              Padding="32,32,32,28">
+        <StackPanel HorizontalAlignment="Center">
+          <TextBlock x:Name="Wordmark" TextAlignment="Center"
+                     HorizontalAlignment="Center"
+                     FontFamily="{StaticResource Type.Title.Family}"
+                     LineHeight="52" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Rina" FontSize="48" FontWeight="Light" />
+            <LineBreak />
+            <Run Text="Assistant" FontSize="24" FontWeight="Light" />
+          </TextBlock>
+          <TextBlock x:Name="Version" Style="{StaticResource Text.Meta}"
+                     HorizontalAlignment="Center" Margin="0,10,0,0" />
           <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
-                     Margin="0,8,0,0"
+                     TextAlignment="Center" MaxWidth="440" Margin="0,14,0,0"
                      Text="{loc:S 'Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.'}" />
         </StackPanel>
       </Border>
