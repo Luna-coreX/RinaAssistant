@@ -34,7 +34,7 @@
     <!-- What is said. Along the top because it is what the whole graph
          hangs from: everything below happens when one of these is heard. -->
     <StackPanel Grid.Row="1" Margin="0,0,0,12">
-      <StackPanel Orientation="Horizontal">
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
         <TextBlock Text="{loc:S 'Фразы, по которым сработает'}"
                    Style="{StaticResource Text.Body}"
                    VerticalAlignment="Center" Margin="0,0,12,0" />
@@ -98,7 +98,7 @@
       <TextBlock x:Name="Summary" Style="{StaticResource Text.Meta}"
                  TextWrapping="Wrap" Margin="0,0,0,10" />
 
-      <StackPanel Orientation="Horizontal">
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
         <Button Style="{StaticResource Btn.Primary}"
                 Content="{loc:S 'Сохранить'}" Click="OnSave" />
         <Button Style="{StaticResource Btn}" Content="{loc:S 'Отмена'}"

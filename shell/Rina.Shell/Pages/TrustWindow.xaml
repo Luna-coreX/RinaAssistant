@@ -1,6 +1,7 @@
 <Window x:Class="Rina.Shell.Pages.TrustWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
         xmlns:loc="clr-namespace:Rina.Shell.Strings"
         Title="{loc:S 'Запуск без подписи'}" Width="560"
         SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
@@ -26,7 +27,7 @@
       <TextBlock x:Name="AppSource" Style="{StaticResource Text.Meta}"
                  Margin="0,0,0,20" />
 
-      <StackPanel Orientation="Horizontal">
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
         <Button Style="{StaticResource Btn}"
                 Content="{loc:S 'Запустить один раз'}" Click="OnOnce" />
         <Button Style="{StaticResource Btn}" Margin="8,0,0,0"

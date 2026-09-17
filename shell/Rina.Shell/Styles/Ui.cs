@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 
 namespace Rina.Shell.Styles;
@@ -33,6 +34,76 @@ public static class Ui
 
     public static void SetHint(DependencyObject element, string value)
         => element.SetValue(HintProperty, value);
+
+    /// <summary>
+    /// The space between things standing in a row.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// WPF has no gap on a panel, so every row of buttons in this
+    /// program was written without one and every row of buttons was
+    /// stuck together — «Экспорт|Очистить», «Новая команда|Импорт|
+    /// Экспорт», and so on down almost every page. Noticed by the
+    /// person using it, on a screenshot where the two buttons read as
+    /// one wide one with a line through it.
+    /// </para>
+    /// <para>
+    /// A property on the panel rather than a margin on each child: a
+    /// margin has to be left off the last one, which is a thing to
+    /// remember every time a button is added and a thing nobody
+    /// remembers. Here the panel spaces whatever it happens to
+    /// contain, including what is added later.
+    /// </para>
+    /// </remarks>
+    public static readonly DependencyProperty GapProperty =
+        DependencyProperty.RegisterAttached(
+            "Gap", typeof(double), typeof(Ui),
+            new PropertyMetadata(0.0, OnGapChanged));
+
+    public static double GetGap(DependencyObject element)
+        => (double)element.GetValue(GapProperty);
+
+    public static void SetGap(DependencyObject element, double value)
+        => element.SetValue(GapProperty, value);
+
+    private static void OnGapChanged(DependencyObject where,
+                                     DependencyPropertyChangedEventArgs e)
+    {
+        if (where is not Panel panel) return;
+        panel.Loaded -= SpaceOut;
+        panel.Loaded += SpaceOut;
+        if (panel.IsLoaded) SpaceOut(panel, new RoutedEventArgs());
+    }
+
+    private static void SpaceOut(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Panel panel) return;
+        var gap = GetGap(panel);
+        if (gap <= 0) return;
+        // Down the column or along the row, whichever this panel is.
+        // A `StackPanel` says so itself; anything else is laid out
+        // side by side often enough that a row is the safe guess.
+        var sideways = panel is not StackPanel stack
+                       || stack.Orientation == Orientation.Horizontal;
+        var seen = panel.Children.OfType<FrameworkElement>()
+                        .Where(child => child.Visibility != Visibility.Collapsed)
+                        .ToList();
+        for (var i = 0; i < seen.Count; i++)
+        {
+            var last = i == seen.Count - 1;
+            var was = seen[i].Margin;
+            // Only the side this panel stacks along, and only what was
+            // not set by hand: a child with its own margin asked for
+            // it, and taking that away would move something somebody
+            // placed deliberately.
+            seen[i].Margin = sideways
+                ? new Thickness(was.Left, was.Top,
+                                last ? was.Right : Math.Max(was.Right, gap),
+                                was.Bottom)
+                : new Thickness(was.Left, was.Top, was.Right,
+                                last ? was.Bottom : Math.Max(was.Bottom, gap));
+        }
+    }
 
     /// <summary>What a button is washed with under the pointer.</summary>
     /// <remarks>

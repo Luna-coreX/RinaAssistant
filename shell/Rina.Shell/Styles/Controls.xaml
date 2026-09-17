@@ -177,12 +177,22 @@
             </Trigger>
             <!-- Focus by a border, not by a background highlight: a keyboard
                  user has to see where they are without guessing whether this
-                 is selected or hovered. -->
-            <Trigger Property="IsKeyboardFocused" Value="True">
+                 is selected or hovered.
+                 And only while the keyboard is what is being used: clicking
+                 a button focuses it too, so the ring appeared after a mouse
+                 click and meant nothing there. See `Styles.Navigation`. -->
+            <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding IsKeyboardFocused,
+                           RelativeSource={RelativeSource Self}}" Value="True" />
+                <Condition Binding="{Binding ByKeyboard,
+                           Source={x:Static ui:Navigation.Current}}"
+                           Value="True" />
+              </MultiDataTrigger.Conditions>
               <Setter TargetName="Ring" Property="BorderBrush"
                       Value="{DynamicResource C.Signal}" />
               <Setter TargetName="Ring" Property="BorderThickness" Value="2" />
-            </Trigger>
+            </MultiDataTrigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
             </Trigger>
@@ -421,6 +431,8 @@
     </Setter>
   </Style>
 
+  <ui:CaretGutter x:Key="CaretGutter" />
+
   <!-- A field: sunk, without a border. The boundary is drawn by a step in value. -->
   <Style x:Key="Field" TargetType="TextBox">
     <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
@@ -435,13 +447,25 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
+          <!-- The padding is not put on the border. A `TextBox`
+               applies its own `Padding` to the text inside the content
+               host, so passing it to the border as well applied it
+               twice: the hint stood at twelve and the first character
+               at twenty-six. Measured, not guessed: the check named
+               `check-fields` asks the geometry and says both numbers.
+               So the border holds only its own thickness, the text is
+               placed by the box's padding as it always was, and the
+               hint is given the same padding as a margin. One number,
+               two things that must agree. -->
           <Border x:Name="Well" Background="{TemplateBinding Background}"
-                  CornerRadius="{StaticResource Radius.Max}"
-                  Padding="{TemplateBinding Padding}">
+                  CornerRadius="{StaticResource Radius.Max}">
             <Grid>
               <!-- The hint sits under the content: it goes out as soon as
                    text appears in the field, and never becomes a value. -->
               <TextBlock x:Name="Hint" VerticalAlignment="Center"
+                         Margin="{Binding Padding,
+                                  RelativeSource={RelativeSource TemplatedParent},
+                                  Converter={StaticResource CaretGutter}}"
                          IsHitTestVisible="False"
                          Foreground="{DynamicResource C.InkFaint}"
                          FontFamily="{StaticResource Font.Ui}"
@@ -467,7 +491,11 @@
               <Setter TargetName="Well" Property="BorderBrush"
                       Value="{DynamicResource C.Signal}" />
               <Setter TargetName="Well" Property="BorderThickness" Value="2" />
-              <Setter TargetName="Well" Property="Padding" Value="10,0" />
+              <!-- On the box, not on the border: the padding now moves
+                   the text and the hint together, and two pixels of
+                   border are paid for by two of padding so that
+                   nothing shifts when a person clicks in. -->
+              <Setter Property="Padding" Value="10,0" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>

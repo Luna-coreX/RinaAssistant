@@ -21,7 +21,7 @@
             version of. On the one page a person opens to find out what
             this program is, that is the wrong way round.
           -->
-          <StackPanel Orientation="Horizontal">
+          <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
             <TextBlock Text="Rina Assistant"
                        Style="{StaticResource Text.Title}"
                        VerticalAlignment="Bottom" />
@@ -96,7 +96,7 @@
 
       <TextBlock Text="{loc:S 'ДИАГНОСТИКА'}"
                  Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
-      <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal" Margin="0,0,0,8">
         <Button x:Name="CollectDiagnostics" Style="{StaticResource Btn}"
                 Content="{loc:S 'Собрать пакет'}"
                 Click="OnCollectDiagnostics" />

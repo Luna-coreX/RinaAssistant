@@ -29,7 +29,7 @@
     <!-- A gap twice the usual: what is dangerous is set apart by emptiness
          rather than by colour (DIRECTION §3). At twelve points the reset
          button read as a continuation of the list of settings. -->
-    <StackPanel x:Name="Bottom" Grid.Row="2" Orientation="Horizontal">
+    <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" x:Name="Bottom" Grid.Row="2" Orientation="Horizontal">
       <!-- The reset is set apart by emptiness, not by colour: between the
            irreversible and its neighbours the gap is twice the usual
            (DIRECTION §3). -->

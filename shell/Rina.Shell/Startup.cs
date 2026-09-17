@@ -48,6 +48,11 @@ public partial class App
         try { Console.OutputEncoding = System.Text.Encoding.UTF8; }
         catch (IOException) { }
 
+        // Who is driving — the pointer or the keyboard. Asked by the
+        // focus ring, and asked from the first keystroke, so it is
+        // started before any window exists.
+        Styles.Navigation.Watch();
+
         var args = e.Args;
 
         // The language can be set from outside: a screenshot in another
@@ -172,6 +177,13 @@ public partial class App
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Watched(ShotMotionAsync(window, strip), "motion-strip");
+            return;
+        }
+
+        if (args.Contains("--check-fields"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckFieldsAsync(), "fields");
             return;
         }
 
@@ -3729,6 +3741,97 @@ public partial class App
             catch { /* уйдёт со временным каталогом */ }
         }
 
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// A field's hint stands where its text will stand.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported by a person: "the placeholder and the start of typing
+    /// are in different places, and it is like that everywhere". It is
+    /// one template, so it is one measurement — and the measurement is
+    /// the point: "looks about right" is how a two-pixel step survives
+    /// for a year.
+    /// </para>
+    /// <para>
+    /// Asked of the geometry rather than of the picture. The hint is a
+    /// `TextBlock` in the template and the text is drawn by the box
+    /// itself, and `GetRectFromCharacterIndex` says exactly where the
+    /// first character goes. Two numbers that have to be the same one.
+    /// </para>
+    /// </remarks>
+    private async Task CheckFieldsAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== поле: подсказка стоит там же, где текст ===");
+
+        var window = new Window
+        {
+            Width = 420, Height = 160, ShowActivated = true,
+            WindowStartupLocation = WindowStartupLocation.CenterScreen,
+        };
+        var box = new System.Windows.Controls.TextBox
+        {
+            Style = (Style)Application.Current.Resources["Field"],
+            Width = 360,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Styles.Ui.SetHint(box, "Скажите или напишите: «запусти браузер»");
+        window.Content = box;
+        window.Show();
+        await Task.Delay(400);
+
+        double HintLeft()
+        {
+            var hint = box.Template.FindName("Hint", box) as FrameworkElement;
+            if (hint is null) return double.NaN;
+            return hint.TransformToAncestor(box).Transform(new Point(0, 0)).X;
+        }
+
+        var hintAt = HintLeft();
+        box.Text = "С";
+        box.UpdateLayout();
+        await Task.Delay(120);
+        var textAt = box.GetRectFromCharacterIndex(0).X;
+        Check("пустое поле: подсказка и текст в одном месте",
+              Math.Abs(hintAt - textAt) < 0.6,
+              $"| подсказка {hintAt:0.0}, текст {textAt:0.0}");
+
+        // And the same with the field focused: the focus ring is two
+        // pixels thick and the padding is cut by two to pay for it, so
+        // nothing may move when a person clicks into the field.
+        box.Text = "";
+        box.Focus();
+        box.UpdateLayout();
+        await Task.Delay(200);
+        var hintFocused = HintLeft();
+        box.Text = "С";
+        box.UpdateLayout();
+        await Task.Delay(120);
+        var textFocused = box.GetRectFromCharacterIndex(0).X;
+        Check("и в поле с фокусом тоже",
+              Math.Abs(hintFocused - textFocused) < 0.6,
+              $"| подсказка {hintFocused:0.0}, текст {textFocused:0.0}");
+        Check("и при щелчке в поле ничего не сдвинулось",
+              Math.Abs(hintAt - hintFocused) < 0.6,
+              $"| было {hintAt:0.0}, стало {hintFocused:0.0}");
+
+        window.Close();
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
