@@ -27,6 +27,19 @@ public partial class SheetWindow : Window
         foreach (var element in content) Body.Children.Add(element);
     }
 
+    /// <summary>Show these instead of what is there.</summary>
+    /// <remarks>
+    /// The window still knows nothing about settings: it is handed a
+    /// new set of the same kind of thing and puts it where the old one
+    /// was. Who decided that the old one is stale is the page's
+    /// business.
+    /// </remarks>
+    public void Refill(IEnumerable<UIElement> content)
+    {
+        Body.Children.Clear();
+        foreach (var element in content) Body.Children.Add(element);
+    }
+
     /// <summary>How many things are in it — for the check.</summary>
     public int Rows => Body.Children.Count;
 

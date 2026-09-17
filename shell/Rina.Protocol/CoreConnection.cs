@@ -115,6 +115,18 @@ public sealed class CoreConnection : IAsyncDisposable
             RedirectStandardError = true,
             RedirectStandardOutput = true,
             UseShellExecute = false,
+            // **No console.** Python is a console program, and Windows
+            // gives a console program a window whether or not anybody
+            // wants one — redirecting its output is not the same as
+            // saying "draw nothing". So a black window flashed up
+            // beside Rina at every start and stayed there, and the
+            // person reasonably asked what it was.
+            //
+            // Not `pythonw.exe`: that is a different executable, chosen
+            // by us rather than by the environment, and the journal we
+            // read off the error stream is the thing that explains a
+            // core that failed to start.
+            CreateNoWindow = true,
         };
         foreach (var extra in launch.ExtraArguments ?? [])
             start.ArgumentList.Add(extra);

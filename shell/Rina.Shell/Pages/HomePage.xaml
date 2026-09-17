@@ -109,41 +109,25 @@
         nothing is: an empty panel with three dead buttons says the thing is
         broken, and most of the time nothing is playing.
 
-        Laid out the way a player is laid out: the cover on top, the name
-        under it, the buttons under that, and the length at the bottom.
-        Asked for in those words. The first edition was a strip — a small
-        cover, two lines and three buttons in a row — which reads as a
-        notification about music rather than as something to work with.
+        Laid out the way a player is laid out: the name on top, the
+        buttons under it, and the length at the bottom. The first
+        edition was a strip — two lines and three buttons in a row —
+        which reads as a notification about music rather than as
+        something to work with.
 
-        The cover is the thing one recognises the track by, so it is the
-        biggest thing here and not a stamp beside the words.
+        **There was artwork here, and it went.** Two hundred points of
+        somebody's cover, blown up from whatever thumbnail the register
+        happened to hold, is a low photograph pretending to be a big
+        one — "выглядит грустно", and it was. Nothing is fetched for it
+        any more either: see `MediaRemote`.
       -->
       <Border x:Name="Remote" Grid.Row="3" Visibility="Collapsed"
               HorizontalAlignment="Center" Margin="0,0,0,40"
               Width="248" Style="{StaticResource Card}">
         <StackPanel>
-          <Border Width="200" Height="200" HorizontalAlignment="Center"
-                  CornerRadius="{StaticResource Radius.Tight}"
-                  Background="{DynamicResource C.FaceLow}"
-                  ClipToBounds="True">
-            <Grid>
-              <!-- Not everything has artwork: a browser tab, a local
-                   file with no tags. Two hundred points of empty grey
-                   reads as a picture that failed to load; a note reads
-                   as music without one. -->
-              <TextBlock x:Name="NoCover" FontFamily="Segoe MDL2 Assets"
-                         Text="&#xE8D6;" FontSize="48"
-                         HorizontalAlignment="Center"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource C.InkFaint}" />
-              <Image x:Name="Cover" Stretch="UniformToFill" />
-            </Grid>
-          </Border>
-
           <TextBlock x:Name="Track" Style="{StaticResource Text.Body}"
                      HorizontalAlignment="Center" TextAlignment="Center"
-                     TextTrimming="CharacterEllipsis"
-                     Margin="0,12,0,0" />
+                     TextTrimming="CharacterEllipsis" />
           <TextBlock x:Name="Artist" Style="{StaticResource Text.Meta}"
                      HorizontalAlignment="Center" TextAlignment="Center"
                      TextTrimming="CharacterEllipsis" />

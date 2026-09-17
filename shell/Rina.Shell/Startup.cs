@@ -180,6 +180,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-window"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckWindowAsync(), "window");
+            return;
+        }
+
         if (args.Contains("--check-fonts"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -336,6 +343,22 @@ public partial class App
         var shot = Value(args, "--shot");
         if (shot is null)
         {
+            // The size it was left at last time (`Kept`). Only on a
+            // real run: a check that inherited whatever size a person
+            // happened to leave the window would measure a different
+            // screen on every machine, and the whole point of these
+            // checks is that they measure the program.
+            var size = Kept.OnScreen(Kept.Window());
+            window.Width = size.Width;
+            window.Height = size.Height;
+            if (size.Full) window.WindowState = WindowState.Maximized;
+            window.Closing += (_, _) => Kept.Window(new Kept.Size(
+                window.RestoreBounds.Width > 0
+                    ? window.RestoreBounds.Width : window.Width,
+                window.RestoreBounds.Height > 0
+                    ? window.RestoreBounds.Height : window.Height,
+                window.WindowState == WindowState.Maximized));
+
             // The core is raised after the window is shown, not before: a
             // person must see the program at once rather than a second
             // later, a second spent by another process on starting up. The
@@ -579,6 +602,19 @@ public partial class App
 
         Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
               $"| {link.State}");
+
+        // **And it brought no window with it.** Reported by a person: "a
+        // command prompt opens when the program starts". Asked of the
+        // desktop rather than of the launch options: `CreateNoWindow` is
+        // what we set, and whether a window exists is what they saw.
+        var pid = link.Connection?.CorePid;
+        var windows = pid is { } id ? WindowsOf(id) : [];
+        Check("ядро не открыло ни одного окна",
+              pid is not null && windows.Length == 0,
+              pid is null ? "| ядро не запущено этим окном"
+                  : $"| окон {windows.Length}"
+                    + (windows.Length > 0
+                        ? ": " + string.Join(", ", windows.Take(3)) : ""));
         Check("состояние доехало до окна", seen.Count > 0,
               "| " + string.Join(" → ", seen));
         Check("окно показывает связь словами",
@@ -990,7 +1026,7 @@ public partial class App
         // only when somebody happens to have music on.
         Remote!.ShowForCheck(
             new MediaRemote.Sounding("Проверка", "Тишина в двух актах",
-                                     Running: true, Cover: null),
+                                     Running: true),
             new MediaRemote.Spot(TimeSpan.FromSeconds(75),
                                  TimeSpan.FromSeconds(214), Seekable: true));
         await Until(() => home.RemoteShows.Length > 0, 5);
@@ -1001,12 +1037,13 @@ public partial class App
                                            StringComparison.Ordinal),
               $"| {home.RemoteShows}");
 
-        // **The order asked for, as four numbers.** "The cover on top,
-        // the name below it, then the buttons back-stop-forward, and
-        // below that the bar with the length, which one can move along."
-        // Said in words; four tops going down is the same sentence in a
-        // form that goes red by itself.
-        await Until(() => home.RemoteParts()[3].Top > 0, 3);
+        // **The order asked for, as three numbers.** "The name on top,
+        // then the buttons back-stop-forward, and below that the bar
+        // with the length, which one can move along." Said in words;
+        // three tops going down is the same sentence in a form that
+        // goes red by itself. There were four: the cover was the first,
+        // and it was taken off the screen.
+        await Until(() => home.RemoteParts()[2].Top > 0, 3);
         var parts = home.RemoteParts();
         var order = string.Join(" · ",
             parts.Select(part => $"{part.What} {part.Top:0}"));
@@ -1040,7 +1077,7 @@ public partial class App
         // lies. So there is none.
         Remote.ShowForCheck(
             new MediaRemote.Sounding("Lo-Fi Girl", "beats to relax to",
-                                     Running: true, Cover: null), null);
+                                     Running: true), null);
         await Until(() => home.RemoteLine.Length == 0, 3);
         Check("у потока без длины полоски нет вовсе",
               home.RemoteLine.Length == 0, $"| «{home.RemoteLine}»");
@@ -1342,10 +1379,15 @@ public partial class App
         var all = Shown().Shown;
         Check("без поиска видно все настройки", all > 20, $"| {all}");
 
-        Shown().FindForCheck("микрофон");
+        // **The word is taken from the page, not typed in here.** A
+        // literal «микрофон» finds nothing when the interface is in
+        // English, and the check then said the search was broken when
+        // the only broken thing was the check.
+        var looked = Pages.SettingsLayout.TitleOf("input_device");
+        Shown().FindForCheck(looked);
         var few = Shown().Shown;
         Check("поиск оставляет только подходящее",
-              few > 0 && few < all, $"| {few} из {all}");
+              few > 0 && few < all, $"| «{looked}»: {few} из {all}");
         Check("и прячет разделы, где ничего не осталось",
               Shown().ShelvesShown < Pages.SettingsLayout.Sections.Length,
               $"| разделов {Shown().ShelvesShown}");
@@ -1465,6 +1507,99 @@ public partial class App
             }
 
             leaf.Close();
+        }
+
+        // --- a list shows what is in it, now ---
+        //
+        // Reported: "in «Слова активации» and the others the list does
+        // not update at once, you have to reopen the window". Measured
+        // by doing it: type a word, press the button, count the tags —
+        // and then take it away again, because these are the person's
+        // own settings.
+        var wake = sheets.FirstOrDefault(one => one.Keys.Contains("wake_words"));
+        if (wake is null) Check("лист со словами нашёлся", false);
+        else
+        {
+            // **What was there is read from the core and written back
+            // at the end**, whatever happens in between. These are a
+            // person's own wake words, and a check that leaves one of
+            // its own behind has changed the machine it measured.
+            var before = await link.AskAsync(Rina.Protocol.Methods.SettingsGet, new JsonObject
+            {
+                ["keys"] = new JsonArray("wake_words"),
+            });
+            var kept = before?["values"]?["wake_words"]?.DeepClone();
+
+            // A word of this run's own: a fixed one collides with the
+            // leftovers of a run that died before tidying up, and the
+            // list refuses a duplicate — so the check would then be
+            // measuring "nothing happened" and calling it a failure.
+            var mine = $"проверка-{DateTime.Now:HHmmss}";
+
+            var leaf = Shown().OpenSheetForCheck(wake);
+            var arriving = (FrameworkElement)leaf.Content;
+            await Until(() => arriving.Opacity >= 0.999, 3);
+
+            int Tags() => Deep(leaf).OfType<System.Windows.Controls.Button>()
+                .Count(b => ReferenceEquals(
+                    b.Style, Application.Current.TryFindResource("Btn.Cross")));
+
+            var had = Tags();
+            var typed = Deep(leaf).OfType<System.Windows.Controls.TextBox>()
+                                  .FirstOrDefault();
+            var add = Deep(leaf).OfType<System.Windows.Controls.Button>()
+                .FirstOrDefault(b => b.Content as string
+                                     == Strings.Loc.S("Добавить"));
+            Check("на листе есть поле и кнопка «Добавить»",
+                  typed is not null && add is not null);
+
+            if (typed is not null && add is not null)
+            {
+                typed.Text = mine;
+                add.RaiseEvent(new RoutedEventArgs(
+                    System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+                var grew = await Until(() => Tags() == had + 1, 6);
+                Check("добавленное слово появилось без переоткрытия окна",
+                      grew, $"| было {had}, стало {Tags()}");
+
+                // Taking it away is only a question if putting it there
+                // worked: asked after a failed add, "the count is what
+                // it was" is true and says nothing.
+                if (grew)
+                {
+                    var cross = Deep(leaf)
+                        .OfType<System.Windows.Controls.Button>()
+                        .FirstOrDefault(b =>
+                            (System.Windows.Automation.AutomationProperties
+                                .GetName(b) ?? "").Contains(
+                                    mine, StringComparison.Ordinal));
+                    Check("у нового слова есть свой крестик",
+                          cross is not null);
+                    cross?.RaiseEvent(new RoutedEventArgs(
+                        System.Windows.Controls.Primitives.ButtonBase
+                              .ClickEvent));
+                    Check("и убранное исчезло тоже сразу",
+                          await Until(() => Tags() == had, 6),
+                          $"| было {had}, стало {Tags()}");
+                }
+            }
+
+            Shown().CloseSheetForCheck();
+
+            // Back to what the person had, through the core, by name.
+            if (kept is not null)
+                await link.AskAsync(Rina.Protocol.Methods.SettingsSet, new JsonObject
+                {
+                    ["values"] = new JsonObject { ["wake_words"] = kept },
+                });
+            var after = await link.AskAsync(Rina.Protocol.Methods.SettingsGet, new JsonObject
+            {
+                ["keys"] = new JsonArray("wake_words"),
+            });
+            Check("слова активации остались как были",
+                  after?["values"]?["wake_words"]?.ToJsonString()
+                  == kept?.ToJsonString(),
+                  $"| {after?["values"]?["wake_words"]?.ToJsonString()}");
         }
 
         if (shot is not null)
@@ -3104,6 +3239,44 @@ public partial class App
         what.TransformToAncestor(root).TransformBounds(
             new Rect(what.RenderSize));
 
+    /// <summary>Top-level windows belonging to a process.</summary>
+    /// <remarks>
+    /// Asked of the desktop, because "we passed `CreateNoWindow`" and
+    /// "no window appeared" are different claims, and the person saw
+    /// the second one.
+    /// </remarks>
+    private static string[] WindowsOf(int pid)
+    {
+        var found = new List<string>();
+        EnumWindows((handle, _) =>
+        {
+            GetWindowThreadProcessId(handle, out var owner);
+            if (owner != pid || !IsWindowVisible(handle)) return true;
+            var name = new System.Text.StringBuilder(256);
+            GetWindowText(handle, name, name.Capacity);
+            found.Add(name.Length > 0 ? name.ToString() : $"#{handle}");
+            return true;
+        }, IntPtr.Zero);
+        return [.. found];
+    }
+
+    private delegate bool EachWindow(IntPtr handle, IntPtr data);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool EnumWindows(EachWindow each, IntPtr data);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(
+        IntPtr handle, out int pid);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr handle);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll",
+        CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int GetWindowText(
+        IntPtr handle, System.Text.StringBuilder text, int count);
+
     private static IEnumerable<DependencyObject> Deep(DependencyObject root)
     {
         foreach (var child in Children(root))
@@ -4062,6 +4235,88 @@ public partial class App
             catch { /* уйдёт со временным каталогом */ }
         }
 
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The window opens at a size, and remembers the one it was left at.
+    /// </summary>
+    /// <remarks>
+    /// Asked for: "make the window bigger at startup, and save the size
+    /// in the settings". Not in the settings — the reason is in
+    /// <see cref="Kept"/> — but remembered, and that is the part worth
+    /// measuring: written, read back, refused when it is nonsense, and
+    /// never allowed off the edge of the screen it will open on.
+    /// </remarks>
+    private async Task CheckWindowAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== окно: размер, который помнят ===");
+
+        // What the person has is read first and written back at the end:
+        // these are their own windows.
+        var was = Kept.Window();
+        var mine = new Kept.Size(1234, 765, Full: false);
+        Kept.Window(mine);
+        var back = Kept.Window();
+        Check("размер окна записался и прочёлся",
+              Math.Abs(back.Width - mine.Width) < 0.5
+              && Math.Abs(back.Height - mine.Height) < 0.5
+              && back.Full == mine.Full,
+              $"| {back.Width:0}x{back.Height:0}, во весь экран {back.Full}");
+
+        Kept.Window(new Kept.Size(0, 0, Full: false));
+        Check("несуразный размер не берётся",
+              Kept.Window().Width == Kept.Default.Width,
+              $"| {Kept.Window().Width:0}");
+
+        var room = SystemParameters.WorkArea;
+        var huge = Kept.OnScreen(new Kept.Size(9000, 9000, Full: false));
+        Check("и размер с чужого монитора ужимается по месту",
+              huge.Width <= room.Width + 0.5
+              && huge.Height <= room.Height + 0.5,
+              $"| {huge.Width:0}x{huge.Height:0} "
+              + $"при {room.Width:0}x{room.Height:0}");
+
+        Check("по умолчанию окно больше прежних 940x620",
+              Kept.Default.Width > 940 && Kept.Default.Height > 620,
+              $"| {Kept.Default.Width:0}x{Kept.Default.Height:0}");
+
+        // And a window opened for real takes that size. Asked of a
+        // window rather than of the number: the reading is only about
+        // the program if something read it.
+        Kept.Window(mine);
+        var window = new MainWindow();
+        var size = Kept.OnScreen(Kept.Window());
+        window.Width = size.Width;
+        window.Height = size.Height;
+        window.Left = -4000;
+        window.Top = -4000;
+        window.Show();
+        await Task.Delay(300);
+        Check("окно открылось этого размера",
+              Math.Abs(window.ActualWidth - size.Width) < 1.0
+              && Math.Abs(window.ActualHeight - size.Height) < 1.0,
+              $"| {window.ActualWidth:0}x{window.ActualHeight:0}");
+        Check("и меньше разумного не сжимается",
+              window.MinWidth >= 640 && window.MinHeight >= 480,
+              $"| не меньше {window.MinWidth:0}x{window.MinHeight:0}");
+        window.Close();
+
+        Kept.Window(was);
         Console.WriteLine();
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;

@@ -1,5 +1,4 @@
 using System.IO;
-using System.Windows.Media.Imaging;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.Media.Control;
 using Windows.Storage.Streams;
@@ -43,9 +42,14 @@ public sealed class MediaRemote
     /// <param name="Artist">Who; may be empty — not everything says.</param>
     /// <param name="Title">What.</param>
     /// <param name="Running">Sounding right now, rather than paused.</param>
-    /// <param name="Cover">The artwork, if the source gave one.</param>
-    public sealed record Sounding(string Artist, string Title, bool Running,
-                                  BitmapImage? Cover);
+    /// <remarks>
+    /// There was artwork in here. The home screen showed it and then
+    /// stopped — a thumbnail blown up to two hundred points is a poor
+    /// picture pretending to be a good one — and reading it cost a
+    /// stream and a decode on every change of track. A field nobody
+    /// draws is work nobody sees.
+    /// </remarks>
+    public sealed record Sounding(string Artist, string Title, bool Running);
 
     /// <summary>How far into the track it is, and how long the track is.</summary>
     /// <param name="At">How much has played.</param>
@@ -229,41 +233,13 @@ public sealed class MediaRemote
                 == GlobalSystemMediaTransportControlsSessionPlaybackStatus
                     .Playing;
 
-            Report(new Sounding(about.Artist ?? "", about.Title ?? "", running,
-                                await CoverAsync(about)));
+            Report(new Sounding(about.Artist ?? "", about.Title ?? "",
+                                running));
         }
         catch (Exception exc)                            // noqa
         {
             Log($"remote unreadable: {exc.GetType().Name}");
             Report(null);
-        }
-    }
-
-    /// <summary>The artwork, if there is one and it can be read.</summary>
-    private static async Task<BitmapImage?> CoverAsync(
-        GlobalSystemMediaTransportControlsSessionMediaProperties about)
-    {
-        if (about.Thumbnail is null) return null;
-        try
-        {
-            using var stream = await about.Thumbnail.OpenReadAsync();
-            using var memory = new MemoryStream();
-            await stream.AsStreamForRead().CopyToAsync(memory);
-            memory.Position = 0;
-
-            var image = new BitmapImage();
-            image.BeginInit();
-            image.CacheOption = BitmapCacheOption.OnLoad;
-            image.StreamSource = memory;
-            image.EndInit();
-            // Frozen: it is built off the interface thread and shown on it.
-            image.Freeze();
-            return image;
-        }
-        catch (Exception exc)                            // noqa
-        {
-            Log($"cover unreadable: {exc.GetType().Name}");
-            return null;
         }
     }
 

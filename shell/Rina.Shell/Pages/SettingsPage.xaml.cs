@@ -785,7 +785,90 @@ public partial class SettingsPage : UserControl
     {
         var window = MakeSheet(sheet);
         window.Owner = Window.GetWindow(this);
-        window.ShowDialog();
+        _open = (sheet, window);
+        try { window.ShowDialog(); }
+        finally { _open = null; }
+    }
+
+    /// <summary>Open a sheet without blocking — for the check.</summary>
+    /// <remarks>
+    /// The same window and the same registration as <c>ShowSheet</c>,
+    /// minus <c>ShowDialog</c>, which does not come back until somebody
+    /// closes it. A check that went through the real opener would hang
+    /// rather than measure.
+    /// </remarks>
+    internal SheetWindow OpenSheetForCheck(Sheet sheet)
+    {
+        var window = MakeSheet(sheet);
+        window.Left = -4000;
+        window.Top = -4000;
+        _open = (sheet, window);
+        window.Show();
+        return window;
+    }
+
+    /// <summary>Stop calling that sheet open — for the check.</summary>
+    internal void CloseSheetForCheck()
+    {
+        _open?.Window.Close();
+        _open = null;
+    }
+
+    //: The sheet on the screen, so that a value saved from it can be
+    //: shown on it. Null when none is open.
+    private (Sheet Sheet, SheetWindow Window)? _open;
+
+    /// <summary>
+    /// Draw the open sheet again, because what it shows has changed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Reported: "in «Слова активации» and the others the list does not
+    /// update at once, you have to reopen the window". It did not: the
+    /// editors are built when the window opens and read the values as
+    /// they were then, so a word added went to the core, came back
+    /// accepted, and was nowhere to be seen.
+    /// </para>
+    /// <para>
+    /// Rebuilt rather than patched in place. A list editor knows how to
+    /// draw a list of values; teaching it to also add one tag and take
+    /// another away would be a second description of the same thing,
+    /// and the two part company on the first odd case — a word the core
+    /// refused, a duplicate, a value the core changed on the way in.
+    /// </para>
+    /// <para>
+    /// <b>The typing goes on.</b> Rebuilding throws away the field that
+    /// was being typed into, and somebody adding six words in a row
+    /// would have to click back into it six times. If the focus was in
+    /// the sheet, it goes back to the sheet's first field.
+    /// </para>
+    /// </remarks>
+    private void Refill(Sheet sheet, SheetWindow window)
+    {
+        var typing = System.Windows.Input.Keyboard.FocusedElement
+                         is TextBox box
+                     && window.IsAncestorOf(box);
+        window.Refill(SheetRows(sheet));
+        if (!typing) return;
+        window.Dispatcher.BeginInvoke(() =>
+        {
+            var first = Deep(window).OfType<TextBox>()
+                                    .FirstOrDefault(t => t.IsEnabled);
+            first?.Focus();
+        }, System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    private static IEnumerable<DependencyObject> Deep(DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper
+                          .GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper
+                              .GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Deep(child)) yield return deeper;
+        }
     }
 
     /// <summary>The same window, built but not shown.</summary>
@@ -796,7 +879,11 @@ public partial class SettingsPage : UserControl
     /// and a sheet nobody can measure is how a button came to stand past
     /// the right edge for a whole release.
     /// </remarks>
-    internal SheetWindow MakeSheet(Sheet sheet)
+    internal SheetWindow MakeSheet(Sheet sheet) =>
+        new(S(sheet.Title), S(sheet.Note), SheetRows(sheet));
+
+    /// <summary>The editors a sheet holds, built afresh.</summary>
+    private List<UIElement> SheetRows(Sheet sheet)
     {
         // The editors are built here, by the same code that would have put
         // them on the page. The window holds them and knows nothing about
@@ -826,7 +913,7 @@ public partial class SettingsPage : UserControl
             rows.Add(BuildDownloads());
 
         Widen(rows);
-        return new SheetWindow(S(sheet.Title), S(sheet.Note), rows);
+        return rows;
     }
 
     /// <summary>
@@ -2032,6 +2119,8 @@ public partial class SettingsPage : UserControl
         if (accepted)
         {
             _values[key] = value;
+            if (_open is { } shown && shown.Sheet.Keys.Contains(key))
+                Refill(shown.Sheet, shown.Window);
             if (key == "finish" && _link is not null)
             {
                 var finish = value.GetValue<string>();

@@ -396,9 +396,6 @@ public partial class HomePage : UserControl
         Artist.Text = playing.Artist;
         Artist.Visibility = playing.Artist.Length > 0
             ? Visibility.Visible : Visibility.Collapsed;
-        Cover.Source = playing.Cover;
-        NoCover.Visibility = playing.Cover is null
-            ? Visibility.Visible : Visibility.Collapsed;
         ShowLine();
         Hold.Content = playing.Running ? "\u23F8" : "\u25B6";
     }
@@ -638,7 +635,6 @@ public partial class HomePage : UserControl
     /// </remarks>
     public IReadOnlyList<(string What, double Top)> RemoteParts() =>
     [
-        ("обложка", Above(Cover)),                       // not UI
         ("название", Above(Track)),                      // not UI
         ("кнопки", Above(Back)),                         // not UI
         ("полоска", Above(Seek)),                        // not UI
