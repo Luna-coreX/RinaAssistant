@@ -217,7 +217,7 @@ public sealed class MediaRemote
         var session = _session;
         if (session is null)
         {
-            Set(null);
+            Report(null);
             return;
         }
 
@@ -229,13 +229,13 @@ public sealed class MediaRemote
                 == GlobalSystemMediaTransportControlsSessionPlaybackStatus
                     .Playing;
 
-            Set(new Sounding(about.Artist ?? "", about.Title ?? "", running,
-                             await CoverAsync(about)));
+            Report(new Sounding(about.Artist ?? "", about.Title ?? "", running,
+                                await CoverAsync(about)));
         }
         catch (Exception exc)                            // noqa
         {
             Log($"remote unreadable: {exc.GetType().Name}");
-            Set(null);
+            Report(null);
         }
     }
 
@@ -288,6 +288,20 @@ public sealed class MediaRemote
 
     private Spot? _pretend;
     private bool _pretending;
+
+    /// <summary>What the machine says — unless a check has taken over.</summary>
+    /// <remarks>
+    /// A check that says "nothing is playing" has to be obeyed for as
+    /// long as it is measuring. Without this the register went on
+    /// reporting the person's own music a moment later, the panel came
+    /// back, and the check measured a screen it had just asked to be
+    /// cleared.
+    /// </remarks>
+    private void Report(Sounding? sounding)
+    {
+        if (_pretending) return;
+        Set(sounding);
+    }
 
     private void Set(Sounding? sounding)
     {

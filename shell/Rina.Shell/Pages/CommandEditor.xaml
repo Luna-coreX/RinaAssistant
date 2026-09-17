@@ -58,7 +58,10 @@
            that forks is drawn forking. -->
       <Border Grid.Column="0" Style="{StaticResource Rows}"
               Margin="0,0,12,0">
-        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+        <!-- The surface is ruled and can be pulled about: `Roam` in the
+             code beside this. The canvas keeps a background so that a
+             press on empty ruling is a press on something. -->
+        <ScrollViewer x:Name="Deck" HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
           <Canvas x:Name="Board" Background="Transparent" Margin="16" />
         </ScrollViewer>

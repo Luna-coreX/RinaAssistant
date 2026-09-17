@@ -104,6 +104,7 @@ public partial class CommandEditor : UserControl
                           action["destructive"]?.GetValue<bool>() ?? false));
 
         if (existing is not null) Fill(existing);
+        Roam();
         DrawSteps();
         ShowSummary();
     }

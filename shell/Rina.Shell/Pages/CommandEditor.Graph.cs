@@ -17,9 +17,10 @@ namespace Rina.Shell.Pages;
 /// <para>
 /// The seed of a node graph, and deliberately a seed. What is here: nodes
 /// on a surface, wires drawn between them, a fork that actually forks, a
-/// port on each node to grow the graph from, and an inspector for whichever
-/// node is selected. What is not here: dragging nodes where you like, and
-/// wires you draw by hand between arbitrary ports.
+/// port on each node to grow the graph from, an inspector for whichever
+/// node is selected, a ruled surface and a way to move about on it. What
+/// is not here: dragging nodes where you like, and wires you draw by hand
+/// between arbitrary ports.
 /// </para>
 /// <para>
 /// <b>Why those two are missing, and not by oversight.</b> A command is a
@@ -47,6 +48,33 @@ public partial class CommandEditor
     private const double GapAcross = 60;
     private const double PortSize = 18;
 
+    /// <summary>How far a branch's contents hang below the node.</summary>
+    /// <remarks>
+    /// Twenty-six, and the branch's name — «делать», «тогда», «иначе» —
+    /// was written into the same twenty-six points as the wire crossing
+    /// them. Word over line. Forty-four gives the word a line of its own
+    /// and leaves the wire above it.
+    /// </remarks>
+    private const double BranchDrop = 44;
+
+    /// <summary>Where a branch's wire turns across.</summary>
+    /// <remarks>
+    /// Above the name rather than through the middle of the drop, which
+    /// is where a wire turns by default.
+    /// </remarks>
+    private const double BranchBend = 12;
+
+    /// <summary>
+    /// Room above the first node, for the port that stands there.
+    /// </summary>
+    /// <remarks>
+    /// The graph used to start at nought, and the port before the first
+    /// step is drawn eighteen points higher — off the top of the surface,
+    /// where half of it was cut off by the edge. A place to add a step at
+    /// the very beginning that one cannot see is not a place.
+    /// </remarks>
+    private const double Headroom = 26;
+
     //: Which node the inspector is showing. The step itself, not an index:
     //: indices shift when something above is removed, and the inspector
     //: would quietly start editing a different step.
@@ -71,12 +99,13 @@ public partial class CommandEditor
         var only = _chain.Count == 1 ? _chain[0] as JsonObject : null;
         _alone = only is not null
                  && StandsAlone(only["type"]?.GetValue<string>() ?? "");
-        var bottom = Place(_chain, 0, 0, null, "steps.");
+        var bottom = Place(_chain, 0, Headroom, null, "steps.");
 
         // The board is as large as what is on it. Fixed, it either cut the
         // graph off or left a field of emptiness under a graph of two.
         Board.Width = Math.Max(520, _widest + NodeWidth + 40);
         Board.Height = Math.Max(220, bottom + 40);
+        Rule();
         Paint();
         ShowPicked();
     }
@@ -157,9 +186,15 @@ public partial class CommandEditor
             step[name] = inner;
         }
         var at = x + GapAcross;
-        Board.Children.Add(Text(label, at + 4, y + 2, "Text.Meta"));
-        Wire(x + 20, y, at + NodeWidth / 2, y + 26);
-        return Place(inner, at, y + 26, step, path + name + ".");
+        // **Out of the node, not out of thin air.** The wire used to
+        // start twenty points from the node's left edge — a point on
+        // nothing — and came away looking broken. A wire leaves a node
+        // where every other wire here leaves one: the middle of its
+        // bottom edge.
+        Wire(x + NodeWidth / 2, y, at + NodeWidth / 2, y + BranchDrop,
+             y + BranchBend);
+        Board.Children.Add(Text(label, at, y + BranchDrop - 20, "Text.Meta"));
+        return Place(inner, at, y + BranchDrop, step, path + name + ".");
     }
 
     /// <summary>One node: what it is, and how much of what it does fits.</summary>
@@ -626,7 +661,11 @@ public partial class CommandEditor
     /// like a mistake; the bend is only ever seen where the graph actually
     /// turns, which is where it means something.
     /// </remarks>
-    private void Wire(double x1, double y1, double x2, double y2)
+    private void Wire(double x1, double y1, double x2, double y2) =>
+        Wire(x1, y1, x2, y2, (y1 + y2) / 2);
+
+    /// <summary>A wire, turning across at a height one chooses.</summary>
+    private void Wire(double x1, double y1, double x2, double y2, double bend)
     {
         var line = new Polyline
         {
@@ -634,10 +673,187 @@ public partial class CommandEditor
             StrokeThickness = 1.5,
             Points = Math.Abs(x1 - x2) < 1
                 ? [new Point(x1, y1), new Point(x2, y2)]
-                : [new Point(x1, y1), new Point(x1, (y1 + y2) / 2),
-                   new Point(x2, (y1 + y2) / 2), new Point(x2, y2)],
+                : [new Point(x1, y1), new Point(x1, bend),
+                   new Point(x2, bend), new Point(x2, y2)],
         };
         Board.Children.Add(line);
+    }
+
+    /// <summary>
+    /// Rule the surface.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for, and it earns its place: an unmarked field gives the eye
+    /// nothing to measure a node against, so a graph on it looks crooked
+    /// whether it is or not. A ruling is also what says the surface is
+    /// larger than the window over it — without one, moving it about
+    /// looks like nothing happening.
+    /// </para>
+    /// <para>
+    /// A dot at each crossing rather than lines: lines through a graph
+    /// made of lines would read as more wires. The step is the space
+    /// scale's own «within», so the surface is ruled in the same units
+    /// everything else on the screen is spaced in.
+    /// </para>
+    /// <para>
+    /// Built here rather than in the markup because the ink is the
+    /// finish's, and the finish changes while the program runs. The
+    /// surface is redrawn on every change to the graph, so it is redrawn
+    /// on a change of finish too.
+    /// </para>
+    /// </remarks>
+    private void Rule()
+    {
+        var step = (double)FindResource("Sp.Within");
+        var dot = new GeometryDrawing(
+            (Brush)FindResource("C.Seam"), null,
+            new RectangleGeometry(new Rect(0, 0, 1, 1)));
+        Board.Background = new DrawingBrush(dot)
+        {
+            TileMode = TileMode.Tile,
+            Viewport = new Rect(0, 0, step, step),
+            ViewportUnits = BrushMappingMode.Absolute,
+            Stretch = Stretch.None,
+            AlignmentX = AlignmentX.Left,
+            AlignmentY = AlignmentY.Top,
+            Opacity = 0.6,
+        };
+    }
+
+    /// <summary>
+    /// Dragging the empty surface moves the surface.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A graph outgrows its window, and reaching the far end of one by
+    /// hunting for a scrollbar is how a canvas stops being a canvas.
+    /// Taking hold of the surface and pulling is what every other canvas
+    /// in the world does.
+    /// </para>
+    /// <para>
+    /// <b>Only the empty surface.</b> A node handles its own press — it
+    /// selects, and it drags itself along the chain — so a press that
+    /// reaches the canvas is a press on nothing, and that is the one that
+    /// means "move the view". The middle button moves it from anywhere,
+    /// including from on top of a node, which is the other half of the
+    /// same convention.
+    /// </para>
+    /// <para>
+    /// The cursor tells the truth: a hand only while there is somewhere
+    /// to move to. On a graph of two nodes that fits, pulling does
+    /// nothing, and a cursor promising otherwise is a small lie told
+    /// every time the editor is opened.
+    /// </para>
+    /// </remarks>
+    private void Roam()
+    {
+        Board.MouseLeftButtonDown += (_, e) => TakeSurface(e);
+        Board.MouseDown += (_, e) =>
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Middle)
+                TakeSurface(e);
+        };
+        Board.MouseMove += (_, e) => MoveSurface(e);
+        Board.MouseLeftButtonUp += (_, _) => DropSurface();
+        Board.MouseUp += (_, e) =>
+        {
+            if (e.ChangedButton == System.Windows.Input.MouseButton.Middle)
+                DropSurface();
+        };
+
+        // Shift and the wheel go sideways. `ScrollViewer` does the
+        // upright half by itself and nothing at all for the other one,
+        // and a graph that forks is wider than it is tall.
+        Deck.PreviewMouseWheel += (_, e) =>
+        {
+            if (System.Windows.Input.Keyboard.Modifiers
+                != System.Windows.Input.ModifierKeys.Shift) return;
+            Deck.ScrollToHorizontalOffset(Deck.HorizontalOffset - e.Delta);
+            e.Handled = true;
+        };
+
+        Deck.ScrollChanged += (_, _) => Board.Cursor =
+            Deck.ScrollableWidth > 0 || Deck.ScrollableHeight > 0
+                ? System.Windows.Input.Cursors.Hand
+                : System.Windows.Input.Cursors.Arrow;
+    }
+
+    private Point _tookAt;
+    private Vector _tookFrom;
+    private bool _roaming;
+
+    private void TakeSurface(System.Windows.Input.MouseButtonEventArgs e)
+    {
+        _tookAt = e.GetPosition(Deck);
+        _tookFrom = new Vector(Deck.HorizontalOffset, Deck.VerticalOffset);
+        _roaming = true;
+        Board.CaptureMouse();
+        Board.Cursor = System.Windows.Input.Cursors.ScrollAll;
+    }
+
+    private void MoveSurface(System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_roaming) return;
+        var now = e.GetPosition(Deck);
+        Deck.ScrollToHorizontalOffset(_tookFrom.X - (now.X - _tookAt.X));
+        Deck.ScrollToVerticalOffset(_tookFrom.Y - (now.Y - _tookAt.Y));
+    }
+
+    private void DropSurface()
+    {
+        if (!_roaming) return;
+        _roaming = false;
+        Board.ReleaseMouseCapture();
+        Board.Cursor = System.Windows.Input.Cursors.Hand;
+    }
+
+    /// <summary>Move the surface — for the check.</summary>
+    public (double Across, double Down) RoamForCheck(double across, double down)
+    {
+        Deck.ScrollToHorizontalOffset(Deck.HorizontalOffset + across);
+        Deck.ScrollToVerticalOffset(Deck.VerticalOffset + down);
+        Deck.UpdateLayout();
+        return (Deck.HorizontalOffset, Deck.VerticalOffset);
+    }
+
+    /// <summary>Is the surface ruled — for the check.</summary>
+    public bool SurfaceRuled => Board.Background is DrawingBrush
+    {
+        TileMode: TileMode.Tile,
+    };
+
+    /// <summary>
+    /// Where everything on the surface sits — for the check.
+    /// </summary>
+    /// <remarks>
+    /// "The components stand crookedly" is a sentence about numbers:
+    /// something is outside the surface it stands on. Those are the
+    /// numbers.
+    /// </remarks>
+    public (int Outside, double Worst, string Where) OffTheSurface()
+    {
+        var outside = 0;
+        var worst = 0.0;
+        var where = "";
+        foreach (var child in Board.Children.OfType<FrameworkElement>())
+        {
+            var left = Canvas.GetLeft(child);
+            var top = Canvas.GetTop(child);
+            if (double.IsNaN(left) || double.IsNaN(top)) continue;
+            child.Measure(new Size(double.PositiveInfinity,
+                                   double.PositiveInfinity));
+            var over = Math.Max(
+                Math.Max(-left, -top),
+                Math.Max(left + child.DesiredSize.Width - Board.Width,
+                         top + child.DesiredSize.Height - Board.Height));
+            if (over <= 0.5) continue;
+            outside++;
+            if (over <= worst) continue;
+            worst = over;
+            where = $"{child.GetType().Name} ({left:0}, {top:0})";
+        }
+        return (outside, worst, where);
     }
 
     private UIElement Text(string said, double x, double y, string style)

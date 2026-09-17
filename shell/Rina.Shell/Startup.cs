@@ -3003,6 +3003,13 @@ public partial class App
         }
 
         Console.WriteLine("=== главная: меню и фигура ===");
+        // **Nothing is playing, by decree.** The figure is measured
+        // against the ring of screen around it, and the player takes a
+        // share of the screen — the taller it grew, the higher the
+        // figure was pushed and the more of the ring fell past the top
+        // edge. Whether it shows at all depends on what the person
+        // happens to have open, so the answer depended on that too.
+        Remote?.ShowForCheck(null);
         window.Left = -4000;
         window.Top = -4000;
         window.Show();
@@ -5296,6 +5303,36 @@ public partial class App
                   $"| ручек {editor!.GripsShown} при узлах {editor!.NodesDrawn}");
             Check("и курсор говорит, что узел двигается",
                   editor!.NodeSaysItMoves);
+
+            // --- the surface: ruled, and something one moves about on ---
+            //
+            // Reported by a person: "the components stand crookedly.
+            // Plus let us add a ruling and free movement over this
+            // surface." Crooked is a number — something drawn outside
+            // the surface it stands on — and the port before the first
+            // step was exactly that: eighteen points above the top edge,
+            // half of it cut off by the frame.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "app", "notepad.exe");
+            editor!.InsertStepForCheck(1, "repeat");
+            editor!.NestStepForCheck(1, "steps", "system");
+            await Task.Delay(200);
+
+            var off = editor!.OffTheSurface();
+            Check("ничего не стоит за краем холста", off.Outside == 0,
+                  off.Outside == 0 ? ""
+                      : $"| {off.Outside} шт., дальше всех {off.Where} "
+                        + $"на {off.Worst:0}");
+            Check("холст разлинован", editor!.SurfaceRuled);
+
+            // And it moves. Asked of the surface rather than of the
+            // handler: a handler that runs and moves nothing is the
+            // failure being guarded against.
+            var moved = editor!.RoamForCheck(60, 40);
+            Check("холст двигается под рукой",
+                  moved.Across > 0 || moved.Down > 0,
+                  $"| ушёл на {moved.Across:0} вбок и {moved.Down:0} вниз");
+            editor!.RoamForCheck(-60, -40);
 
             Check("в покое порты не горят", editor!.PortsLit == 0,
                   $"| горит {editor!.PortsLit} из {editor!.PortsShown}");
