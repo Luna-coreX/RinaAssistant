@@ -180,5 +180,64 @@ check("протухшее предложение не срабатывает",
       store3.get("tts_engine") == "silent", f"| {store3.get('tts_engine')}")
 
 print()
+print("=== вопрос, который знает, что делать с ответом ===")
+# `4.0b-E06`. The kinds before this each knew one action, hard-wired:
+# `choose_app` launches, `choose_todo` closes a thing. That stops
+# working the moment Rina has to ask something she was not written to
+# ask. Now the action travels in the question — an intent's name and
+# its arguments — and two ways of reading the answer differ by one
+# field.
+from core.dialog import ASKED
+from core.router import RouterContext, route
+
+
+def after(question, answer):
+    """What one answer to one question turns into."""
+    return route(answer, RouterContext(pending=question.to_dict()))
+
+
+# Without a slot the question is an offer: yes runs the intent as it
+# stands, no cancels, anything else withdraws it.
+offered = Question.asked("Продолжить работу?", "app.launch",
+                         {"app": "Visual Studio Code"})
+check("согласие запускает то, что предложили",
+      after(offered, "да").name == "app.launch"
+      and after(offered, "да").arg("app") == "Visual Studio Code",
+      f"| {after(offered, 'да')}")
+check("отказ отменяет", after(offered, "нет").name == "cancelled")
+check("и «не надо» тоже — это два слова, а не одно",
+      after(offered, "не надо").name == "cancelled",
+      f"| {after(offered, 'не надо').name}")
+check("непонятное ничего не запускает",
+      after(offered, "а сколько времени") is None
+      or after(offered, "а сколько времени").name != "app.launch")
+
+# With a slot the answer is a value, and the options are suggestions.
+asked = Question.asked("Какую музыку?", "music.play", slot="genre",
+                       options=("Lo-Fi", "Ambient"))
+check("названный вариант понят", after(asked, "Lo-Fi").arg("genre") == "Lo-Fi",
+      f"| {after(asked, 'Lo-Fi').arg('genre')!r}")
+check("и по месту в списке тоже",
+      after(asked, "второе").arg("genre") == "Ambient",
+      f"| {after(asked, 'второе').arg('genre')!r}")
+# The whole point: a question that only accepts what it named is not a
+# question.
+check("не названный ответ принят как сказано",
+      after(asked, "джаз").arg("genre") == "джаз",
+      f"| {after(asked, 'джаз').arg('genre')!r}")
+check("и длинный тоже",
+      after(asked, "что-нибудь спокойное").arg("genre")
+      == "что-нибудь спокойное",
+      f"| {after(asked, 'что-нибудь спокойное').arg('genre')!r}")
+check("отказ остаётся отказом", after(asked, "не надо").name == "cancelled",
+      f"| {after(asked, 'не надо').name}")
+
+# The question is written to a file and sent over the wire like every
+# other: the action has to survive that, or it is not a question here.
+back = Question.from_dict(asked.to_dict())
+check("вопрос с действием переживает запись", back == asked,
+      f"| {back.intent}/{back.slot}/{back.options}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

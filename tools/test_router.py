@@ -252,6 +252,40 @@ quiet.handle_command("что ты умеешь", source="typed")
 check("напечатанное разговора не открывает", not quiet.talking())
 
 print()
+print("=== музыка: спросить, если не сказали какую ===")
+# «включи музыку» is the plainest thing a person says to an assistant,
+# and this one answered "Не нашла программу «музыку»" — the launcher
+# took it, because nothing else would. The gate matters as much as the
+# stage: "включи блокнот" has the same verb and belongs to the
+# launcher, so music takes only what names itself.
+for text, want in [
+    ("включи музыку", "music.ask"),
+    ("поставь музыку", "music.ask"),
+    ("музыку", "music.ask"),
+    ("включи lo-fi", "music.play"),
+    ("включи джаз", "music.play"),
+    ("поставь эмбиент на фон", "music.play"),
+    # Not music, and the order is what says so: the launcher and the
+    # system stage both run around this one.
+    ("включи блокнот", "app.not_found"),
+    ("включи браузер", "app.launch"),
+    ("включи музыку погромче", "system.action"),
+    ("громче", "system.action"),
+]:
+    got = route(text, RouterContext(apps=APPS)).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+# The genre is what was named, without the words that belong to the
+# asking: "спокойную музыку для работы" is a request for something
+# calm, not for a genre called "музыку".
+for text, genre in [("включи lo-fi", "lo fi"),
+                    ("включи спокойную музыку для работы", "спокойную"),
+                    ("поставь эмбиент на фон", "эмбиент")]:
+    got = route(text, RouterContext(apps=APPS)).arg("genre")
+    check(f"жанр из «{text}»", got == genre,
+          "" if got == genre else f"| {got!r} вместо {genre!r}")
+
+print()
 print("=== обращение — это ещё не команда, но уже разговор ===")
 # Out of six ordinary ways of addressing her, one was answered. The
 # rest went to the end of the parse and got "Извини, я не поняла

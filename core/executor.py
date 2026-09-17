@@ -302,6 +302,25 @@ class Executor:
             return Result.failure(error_code="internal")
         return self._ok(make())
 
+    # ---------- music (`4.0b-E06`) ----------
+    def _do_music_ask(self, intent, source):
+        """
+        Asked for music without saying which — so ask, and suggest.
+
+        The suggestions are suggestions: the question takes any answer,
+        because a question that only accepts what it named is not a
+        question. See `dialog.ASKED`.
+        """
+        from voice import music
+
+        names = " или ".join(music.SUGGESTED)
+        return self._ok(tr("Какую музыку? Могу предложить {names}.",
+                           names=names))
+
+    def _do_music_play(self, intent, source):
+        return self._run("play_music", {"genre": intent.arg("genre") or ""},
+                         source=source)
+
     def _do_websearch(self, intent, source):
         return self._run("web_search", {"query": intent.arg("query")},
                          source=source)

@@ -819,6 +819,19 @@ class RinaEngine:
         app_launcher.remember(query, entry.launch, entry.kind, entry.name,
                               settings=self._settings)
 
+    def ask_for(self, prompt, intent, args=None, slot="", options=()):
+        """
+        Say something and wait for an answer that will be acted on.
+
+        The general shape of Rina asking (`4.0b-E06`): the question
+        carries what to do, so a new thing to ask about needs no new
+        kind of question. With a `slot` the answer is a value and the
+        options are suggestions; without one it is yes or no.
+        """
+        self.say(prompt)
+        self._ask(dialog_mod.Question.asked(prompt, intent, args, slot,
+                                            options))
+
     def offer(self, key, value, about, sentence):
         """
         Say something is now possible, and offer to switch it on.
@@ -1137,6 +1150,14 @@ class RinaEngine:
             return Question(kind=dialog_mod.CHOOSE_APP,
                             options=tuple(intent.arg("options") or ()),
                             query=intent.arg("query") or "")
+        if intent.name == "music.ask":
+            # The suggestions travel with the question; the answer may
+            # be neither of them, and then it is taken as said. See
+            # `dialog.ASKED`.
+            from voice import music
+
+            return Question.asked(intent.text or "", "music.play",
+                                  slot="genre", options=music.SUGGESTED)
         if intent.name == "todo.ambiguous":
             return Question(kind=dialog_mod.CHOOSE_TODO,
                             options=tuple(intent.arg("options") or ()),

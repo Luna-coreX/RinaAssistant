@@ -13,6 +13,7 @@ stale.
     choose_app       which of several programs to launch
     choose_todo      which of several things on the list was meant
     offer_setting    Rina offered to switch something on; yes or no
+    asked            a question that carries what to do with the answer
     confirm_action   confirm a dangerous system action
     confirm_command  confirm a dangerous user command
 
@@ -48,10 +49,34 @@ CHOOSE_TODO = "choose_todo"
 #: value and nothing else: an offer that could do anything would be a
 #: way of asking a person to approve something they were never told.
 OFFER_SETTING = "offer_setting"
+
+#: A question that carries what to do with the answer.
+#:
+#: **The kinds above each know one action.** `choose_app` launches,
+#: `choose_todo` closes a thing, `offer_setting` writes a setting — and
+#: each needed its own kind because the action was hard-wired into it.
+#: That stops working the moment Rina has to ask something she was not
+#: written to ask: "Какую музыку?" is the same act as "Какое дело
+#: закрыть?" and shares nothing with it in the code.
+#:
+#: So the action travels **in** the question: an intent's name and its
+#: arguments, which are words and numbers and therefore survive being
+#: written to a file and sent over the wire — the constraint every
+#: question here is built under.
+#:
+#: Two ways of reading the answer, and the difference is one field:
+#:
+#: * no `slot` — the answer is yes or no, and yes runs the intent as it
+#:   stands. That is an offer.
+#: * a `slot` — the answer is a value, and it fills that argument. The
+#:   options are then **suggestions, not a list**: "Могу предложить
+#:   Ambient или Lo-Fi" invites those two and accepts "джаз", because a
+#:   question that only accepts what it named is not a question.
+ASKED = "asked"
 CONFIRM_ACTION = "confirm_action"
 CONFIRM_COMMAND = "confirm_command"
 
-KINDS = (CHOOSE_APP, CHOOSE_TODO, OFFER_SETTING,
+KINDS = (CHOOSE_APP, CHOOSE_TODO, OFFER_SETTING, ASKED,
          CONFIRM_ACTION, CONFIRM_COMMAND)
 
 
@@ -79,6 +104,11 @@ class Question:
     #: for offer_setting — which setting is offered, and what it becomes
     setting_key: str = ""
     setting_value: str = ""
+    #: for `asked` — what to do with the answer: an intent's name, the
+    #: arguments already known, and which argument the answer fills.
+    intent: str = ""
+    args: tuple = ()
+    slot: str = ""
     #: the confirmation issued for a dangerous action (4.0-C05).
     #: Kept in the question, because a person's consent applies to a
     #: particular call rather than to the fact that a question was once asked.
@@ -88,6 +118,14 @@ class Question:
         if self.kind not in KINDS:
             raise ValueError(f"неизвестный вид вопроса: {self.kind!r}")
         object.__setattr__(self, "options", tuple(self.options))
+        # A dict would make the question mutable through the back door
+        # — the same reason `Intent.args` is frozen. Pairs, so that it
+        # still writes to a file as itself.
+        if isinstance(self.args, dict):
+            object.__setattr__(self, "args",
+                               tuple(sorted(self.args.items())))
+        else:
+            object.__setattr__(self, "args", tuple(self.args))
 
     def expired(self, now=None):
         return (now or time.time()) - self.asked_at > TTL_SECONDS
@@ -101,10 +139,14 @@ class Question:
     def to_dict(self):
         return {"kind": self.kind, "asked_at": self.asked_at,
                 "action": self.action, "command_id": self.command_id,
-                "options": [dict(o) for o in self.options],
+                "options": [dict(o) if isinstance(o, dict) else o
+                            for o in self.options],
                 "query": self.query,
                 "setting_key": self.setting_key,
                 "setting_value": self.setting_value,
+                "intent": self.intent,
+                "args": [list(pair) for pair in self.args],
+                "slot": self.slot,
                 "confirmation_id": self.confirmation_id}
 
     @classmethod
@@ -117,6 +159,9 @@ class Question:
                    query=str(data.get("query", "")),
                    setting_key=str(data.get("setting_key", "")),
                    setting_value=str(data.get("setting_value", "")),
+                   intent=str(data.get("intent", "")),
+                   args=tuple(tuple(pair) for pair in (data.get("args") or ())),
+                   slot=str(data.get("slot", "")),
                    confirmation_id=str(data.get("confirmation_id", "")))
 
     @classmethod
@@ -131,6 +176,13 @@ class Question:
         return cls(kind=CHOOSE_TODO, query=query,
                    options=tuple({"id": i["id"], "text": i["text"]}
                                  for i in items))
+
+    @classmethod
+    def asked(cls, prompt, intent, args=None, slot="", options=()):
+        """A question that knows what to do with the answer."""
+        return cls(kind=ASKED, query=str(prompt), intent=str(intent),
+                   args=args or {}, slot=str(slot),
+                   options=tuple(str(o) for o in options))
 
     @classmethod
     def offer_setting(cls, key, value, about=""):

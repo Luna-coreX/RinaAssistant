@@ -147,8 +147,12 @@ def route(text, ctx=None):
     # before the rest because no other stage wants the word — but it is
     # cheap to parse and definite, and a phrase it does not take falls
     # through untouched.
+    # `_music` before `_launch` and after `_system`: "включи музыку" is
+    # a launch by grammar and not by meaning, and "включи музыку
+    # погромче" is about the volume. Both are settled by order rather
+    # than by a cleverer parse.
     for stage in (_answer_to_question, _why, _todo, _reminder, _system,
-                  _teach, _launch, _builtin, _tail):
+                  _teach, _music, _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
             return intent.with_(text=command)
@@ -169,6 +173,32 @@ def _strip_wake(text, ctx):
     return strip_wake(text, list(words))
 
 
+def _said(command, words):
+    """
+    Was one of these said — a word among words, or a phrase in the line.
+
+    **`НЕ НАДО` is two words.** Every place here asked
+    `any(w in tokens for w in ctx.no_words)`, which cannot match a
+    phrase: "не надо" was no refusal anywhere, including in front of
+    "выключить компьютер?". There the question was merely withdrawn —
+    the cautious side of the mistake — but when a free answer became
+    possible (`dialog.ASKED`) the same gap made Rina say "Включаю не
+    надо".
+    """
+    from voice.textmatch import normalize
+
+    low = normalize(command or "")
+    tokens = low.split()
+    for word in words or ():
+        word = normalize(word)
+        if " " in word:
+            if word in low:
+                return True
+        elif word in tokens:
+            return True
+    return False
+
+
 def _answer_to_question(command, ctx):
     """Is the phrase an answer to a question asked earlier?"""
     pending = ctx.pending
@@ -179,14 +209,13 @@ def _answer_to_question(command, ctx):
     if kind in ("confirm_action", "confirm_command"):
         from voice.textmatch import normalize
 
-        words = normalize(command).split()
         # Refusal is checked before consent — that is how 3.1.0 behaves, and
         # "no, go on" reads as a refusal (see the inventory, §2).
-        if any(w in words for w in ctx.no_words):
+        if _said(command, ctx.no_words):
             return Intent("cancelled", {"was": kind,
                                         "action": pending.get("action", "")},
                           stage="pending")
-        if any(w in words for w in ctx.yes_words):
+        if _said(command, ctx.yes_words):
             # The confirmation from the question travels along with the
             # intent: without it the registry will reject the dangerous
             # action (4.0-C05).
@@ -202,15 +231,51 @@ def _answer_to_question(command, ctx):
                           stage="pending")
         return None            # an unclear answer: the question is withdrawn, see the core
 
-    if kind == "offer_setting":
-        from voice.textmatch import normalize
+    if kind == "asked":
+        from voice.textmatch import normalize, pick
 
-        words = normalize(command).split()
+        args = dict(tuple(pair) for pair in (pending.get("args") or ()))
+        intent_name = str(pending.get("intent") or "")
+        if not intent_name:
+            return None
+        slot = str(pending.get("slot") or "")
+        options = [str(o) for o in (pending.get("options") or ())]
+
+        if not slot:
+            # No slot: the question was an offer, and the answer is yes
+            # or no. Refusal first, as everywhere here.
+            if _said(command, ctx.no_words):
+                return Intent("cancelled", {"was": kind}, stage="pending")
+            if _said(command, ctx.yes_words):
+                return Intent(intent_name, args, stage="pending")
+            return None
+
+        # A refusal is a refusal even here. Checked before the answer
+        # is taken as a value, or "не надо" becomes the genre and Rina
+        # says "Включаю не надо" — met on the first run of this.
+        if _said(command, ctx.no_words):
+            return Intent("cancelled", {"was": kind}, stage="pending")
+
+        # A slot: the answer is a value. The options were **suggestions**
+        # — "Могу предложить Ambient или Lo-Fi" invites those two and
+        # accepts "джаз", because a question that only takes what it
+        # named is not a question. So a named option wins if it is
+        # recognised, and anything else is taken as said.
+        index, cancelled = pick(command, options) if options else (None, False)
+        if cancelled:
+            return Intent("cancelled", {"was": kind}, stage="pending")
+        said = options[index] if index is not None else command.strip()
+        if not said:
+            return None
+        return Intent(intent_name, dict(args, **{slot: said}),
+                      stage="pending")
+
+    if kind == "offer_setting":
         # Refusal before consent, as everywhere here: "нет, не надо" reads
         # as a refusal (inventory, §2).
-        if any(w in words for w in ctx.no_words):
+        if _said(command, ctx.no_words):
             return Intent("cancelled", {"was": kind}, stage="pending")
-        if any(w in words for w in ctx.yes_words):
+        if _said(command, ctx.yes_words):
             return Intent("offer.accepted",
                           {"key": pending.get("setting_key", ""),
                            "value": pending.get("setting_value", ""),
@@ -554,6 +619,20 @@ def _launch(command, ctx):
                        "query": decision.query}, stage="launcher")
     return Intent("app.not_found", {"query": decision.query},
                   stage="launcher")
+
+
+def _music(command, ctx):
+    """Music: asked for by name, or asked about."""
+    from voice import music
+
+    if not music.about_music(command):
+        return None         # "включи блокнот" belongs to the launcher
+    if music.asked_without_saying_which(command):
+        return Intent("music.ask", stage="music")
+    genre = music.genre_in(command)
+    if not genre:
+        return Intent("music.ask", stage="music")
+    return Intent("music.play", {"genre": genre}, stage="music")
 
 
 def _builtin(command, ctx):

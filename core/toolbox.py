@@ -357,6 +357,24 @@ WEB_SEARCH = Tool(
     errors=("internal",),
 )
 
+PLAY_MUSIC = Tool(
+    name="play_music",
+    summary="Открыть музыку выбранного жанра.",
+    params=(
+        Param("genre", "string", "Жанр или что именно поставить.",
+              required=False),
+    ),
+    # The same permission as a search, because that is what it is: a
+    # page on somebody else's site, opened in the browser. A tool of
+    # its own all the same — the journal should say "put music on",
+    # not "searched the web", or the record of what Rina did stops
+    # describing what she did.
+    permissions={"network.external"},
+    idempotent=True,
+    returns="Подтверждение с жанром.",
+    errors=("internal",),
+)
+
 ASK_MODEL = Tool(
     name="ask_model",
     summary="Задать вопрос языковой модели.",
@@ -383,7 +401,7 @@ ALL_TOOLS = (
     ADD_TODO, LIST_TODO, CLOSE_TODO,
     RUN_USER_COMMAND, TRY_USER_COMMAND, EXPLAIN_LAST,
     DISPATCH_PLUGIN_COMMAND,
-    CALCULATE, WEB_SEARCH, ASK_MODEL,
+    CALCULATE, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,
 )
 
 

@@ -554,6 +554,36 @@ def _close_todo(ctx, args):
     return ToolResult.done(tr("Готово: {text}.", text=named))
 
 
+def _play_music(ctx, args):
+    """
+    Put music on: a video site, searched for the genre.
+
+    **Nothing is named by hand.** A link to the best Lo-Fi stream today
+    is a dead link in a year, and a person told "включаю Lo-Fi Girl"
+    and shown an error is worse off than one told what was actually
+    done. So the genre becomes a search on the site where such things
+    live, and Rina says what she opened.
+    """
+    from voice import music, websearch
+
+    genre = (args.get("genre") or "").strip()
+    url = websearch.youtube_url(music.search_for(genre))
+    said = tr("Включаю {genre}.", genre=genre) if genre \
+        else tr("Включаю музыку.")
+
+    opener = getattr(ctx, "open_url", None)
+    if opener is not None:
+        opened, why = opener(url)
+        if why != NO_SHELL:
+            return (ToolResult.done(said) if opened
+                    else ToolResult.failed(
+                        tr("Не удалось открыть браузер."), "internal"))
+
+    if websearch.open_url(url):
+        return ToolResult.done(said)
+    return ToolResult.failed(tr("Не удалось открыть браузер."), "internal")
+
+
 def _web_search(ctx, args):
     from voice import websearch
 
@@ -648,6 +678,7 @@ IMPLEMENTATIONS = {
     "list_todo": _list_todo,
     "close_todo": _close_todo,
     "web_search": _web_search,
+    "play_music": _play_music,
     "ask_model": _ask_model,
 }
 

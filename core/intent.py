@@ -84,6 +84,14 @@ INTENTS = {
     "system.confirm":     "Опасное действие, нужно подтверждение. Аргументы: action",
     "command.confirm":    "Пользовательская команда опасна, нужно подтверждение",
 
+    # music (`4.0b-E06`)
+    #
+    # Two, because asking and doing are two things: "включи музыку" has
+    # no genre in it and one has to be asked for, and the answer to
+    # that question may be anything at all.
+    "music.ask":          "Просили музыку, не сказав какую",
+    "music.play":         "Включить музыку. Аргументы: genre",
+
     # answers
     "calc":               "Арифметика. Аргументы: result",
     "calc.zero_division": "Деление на ноль",
@@ -110,6 +118,7 @@ INTENTS = {
 
 #: Intents after which the core waits for the user's answer.
 PENDING_INTENTS = frozenset({"app.ambiguous", "todo.ambiguous",
+                             "music.ask",
                              "system.confirm", "command.confirm"})
 
 

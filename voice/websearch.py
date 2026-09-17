@@ -43,6 +43,29 @@ def search_url(query, engine_id=DEFAULT_ENGINE):
     return template.format(q=urllib.parse.quote_plus(query))
 
 
+#: Where music lives. Not among `ENGINES`: those are things a person
+#: picks between in the settings, and this is not a choice — it is
+#: where a video of a genre is, and picking Bing instead would not be
+#: a preference but a mistake.
+VIDEO_URL = "https://www.youtube.com/results?search_query={q}"
+
+
+def youtube_url(query):
+    """A search on the video site — for music (`4.0b-E06`)."""
+    return VIDEO_URL.format(q=urllib.parse.quote_plus(query or ""))
+
+
+def open_url(url):
+    """Open a page in the browser. True on success."""
+    if not (url or "").strip():
+        return False
+    try:
+        webbrowser.open(url)
+        return True
+    except Exception:
+        return False
+
+
 def open_search(query, engine_id=DEFAULT_ENGINE):
     """Opens a search in the browser. True on success."""
     query = (query or "").strip()
