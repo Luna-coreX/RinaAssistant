@@ -46,6 +46,7 @@ public partial class HomePage : UserControl
     public HomePage(CoreLink? link)
     {
         InitializeComponent();
+        Greeting.Text = Openings[Today]();
         _link = link;
         _figure = new Figure(Face);
         _figure.Build();
@@ -261,6 +262,47 @@ public partial class HomePage : UserControl
     }
 
     private void OnAccentChanged() => _figure.Build();
+
+    /// <summary>
+    /// The lines Rina opens with.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Kept by the shell rather than by the core, and that is the same
+    /// boundary as everywhere: this is not something Rina says — nothing
+    /// is spoken, and the core may not even be up when the home screen
+    /// draws — it is something the screen shows. What she says is the
+    /// core's; what is written on a panel is the shell's.
+    /// </para>
+    /// <para>
+    /// <b>One per run, not one per visit.</b> Chosen when the program
+    /// starts and kept: a line that changed every time somebody came
+    /// back to the home screen would be a thing moving in the corner of
+    /// the eye, which is the opposite of filling an emptiness.
+    /// </para>
+    /// </remarks>
+    private static readonly Func<string>[] Openings =
+    [
+        () => S("Чем могу помочь?"),
+        () => S("С чего начнём?"),
+        () => S("Я вас слушаю."),
+        () => S("Что сделаем сегодня?"),
+        () => S("Готова помочь."),
+        () => S("Скажите — или напишите."),
+    ];
+
+    private static readonly int Today = Random.Shared.Next(Openings.Length);
+
+    /// <summary>What is written over the figure — for the check.</summary>
+    public string Opening => Greeting.Text;
+
+    /// <summary>Hide the opening — for the check.</summary>
+    /// <remarks>
+    /// The figure is measured against the ring of screen around it, and
+    /// this line stands inside that ring. Words in the sample make the
+    /// reading a reading of the words.
+    /// </remarks>
+    public void BareForCheck() => Greeting.Visibility = Visibility.Collapsed;
 
     private readonly MediaRemote? _remote;
 

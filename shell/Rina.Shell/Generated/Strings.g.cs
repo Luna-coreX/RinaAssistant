@@ -459,6 +459,11 @@ public static partial class Loc
                 {
                     ["English"] = "A voice assistant living on your computer: it hears, answers, launches programs and reminds.",
                 },
+            ["Готова помочь."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Ready when you are.",
+                },
             ["Готово"] =
                 new Dictionary<string, string>
                 {
@@ -1851,6 +1856,11 @@ public static partial class Loc
                 {
                     ["English"] = "Rina is a voice assistant that runs on this computer. A few questions, and that is all.",
                 },
+            ["С чего начнём?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where shall we start?",
+                },
             ["С этих слов начинается обращение к Рине"] =
                 new Dictionary<string, string>
                 {
@@ -1958,6 +1968,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Say a phrase…",
+                },
+            ["Скажите — или напишите."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say it — or type it.",
                 },
             ["Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик."] =
                 new Dictionary<string, string>
@@ -2356,6 +2371,11 @@ public static partial class Loc
                 {
                     ["English"] = "What calls Rina and her actions",
                 },
+            ["Чем могу помочь?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How can I help?",
+                },
             ["Чем Рина говорит. Офлайновые работают без интернета"] =
                 new Dictionary<string, string>
                 {
@@ -2426,6 +2446,11 @@ public static partial class Loc
                 {
                     ["English"] = "What Rina knows about me",
                 },
+            ["Что сделаем сегодня?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What shall we do today?",
+                },
             ["Что скачано и где лежит"] =
                 new Dictionary<string, string>
                 {
@@ -2466,6 +2491,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "This program isn’t signed",
+                },
+            ["Я вас слушаю."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "I am listening.",
                 },
             ["Ядро"] =
                 new Dictionary<string, string>

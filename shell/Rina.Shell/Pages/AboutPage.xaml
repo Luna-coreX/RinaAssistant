@@ -32,9 +32,14 @@
                      HorizontalAlignment="Center"
                      FontFamily="{StaticResource Type.Title.Family}"
                      LineHeight="52" LineStackingStrategy="BlockLineHeight">
-            <Run Text="Rina" FontSize="48" FontWeight="Light" />
+            <!-- No weight of their own: `Light` is a face the display
+                 family does not have, and asking for one sent the whole
+                 mark to the next font in the fallback chain — the name
+                 of the program was the one place on the screen not set
+                 in the program's own typeface. -->
+            <Run Text="Rina" FontSize="48" />
             <LineBreak />
-            <Run Text="Assistant" FontSize="24" FontWeight="Light" />
+            <Run Text="Assistant" FontSize="24" />
           </TextBlock>
           <TextBlock x:Name="Version" Style="{StaticResource Text.Meta}"
                      HorizontalAlignment="Center" Margin="0,10,0,0" />

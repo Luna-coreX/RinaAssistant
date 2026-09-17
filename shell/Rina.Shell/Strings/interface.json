@@ -1567,5 +1567,23 @@
   },
   "Ничего не нашлось по «{0}»": {
     "English": "Nothing found for “{0}”"
+  },
+  "Чем могу помочь?": {
+    "English": "How can I help?"
+  },
+  "С чего начнём?": {
+    "English": "Where shall we start?"
+  },
+  "Я вас слушаю.": {
+    "English": "I am listening."
+  },
+  "Что сделаем сегодня?": {
+    "English": "What shall we do today?"
+  },
+  "Готова помочь.": {
+    "English": "Ready when you are."
+  },
+  "Скажите — или напишите.": {
+    "English": "Say it — or type it."
   }
 }

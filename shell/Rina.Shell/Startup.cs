@@ -3075,6 +3075,18 @@ public partial class App
         Check("окно открывается на главной",
               window.CurrentPage is Pages.HomePage,
               $"| {window.CurrentPage?.GetType().Name}");
+
+        // --- the line over the figure ---
+        //
+        // Asked for, to fill the emptiness of the screen: a word over
+        // the sphere, one of several, a different one each time the
+        // program starts. Checked for being there and for holding
+        // still — a line that changed on every visit to the section
+        // would be movement in the corner of the eye, which is what
+        // this was added against.
+        var opening = ((Pages.HomePage)window.CurrentPage!).Opening;
+        Check("над сферой есть слово", opening.Length > 0, $"| «{opening}»");
+
         Check("разделы спрятаны за меню", !window.MenuOpen);
         Check("и колонка свёрнута", window.MenuWidth < 1,
               $"| ширина {window.MenuWidth:0.0}");
@@ -3083,6 +3095,16 @@ public partial class App
         await Until(() => window.MenuWidth > 100);
         Check("три полоски открывают разделы", window.MenuWidth > 100,
               $"| ширина {window.MenuWidth:0.0}");
+
+        // Away and back: the page is built afresh on every visit, and
+        // the line over the figure must not be built afresh with it.
+        window.ShowSectionFor("settings");
+        await Until(() => window.CurrentPage is Pages.SettingsPage, 5);
+        window.ShowSectionFor("home");
+        await Until(() => window.CurrentPage is Pages.HomePage, 5);
+        var again = ((Pages.HomePage)window.CurrentPage!).Opening;
+        Check("и за один запуск оно одно и то же", again == opening,
+              $"| было «{opening}», стало «{again}»");
 
         window.ShowMenu(false);
         await Until(() => window.MenuWidth < 1);
@@ -3191,6 +3213,13 @@ public partial class App
             // Put back afterwards: a check that walks out having
             // changed the look is a check that changed what it
             // measured for everything after it.
+            // **And the screen is bared first.** The ring sampled for
+            // «beside» passes through the line written over the figure,
+            // and words in the sample make this a reading of the words.
+            // The line is the screen's, not the figure's.
+            home.BareForCheck();
+            await Task.Delay(200);
+
             var wasFinish = _finishAtStart;
             var beforeSwap = Lit(window, home);
             App.ApplyFinish("black");

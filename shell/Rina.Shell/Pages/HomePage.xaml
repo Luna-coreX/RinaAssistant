@@ -39,7 +39,24 @@
         instrument's aperture, and an aperture that changes size with the
         window is a puddle.
       -->
-      <Grid Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Center">
+      <StackPanel Grid.Row="0" VerticalAlignment="Center"
+                  HorizontalAlignment="Center">
+        <!--
+          A word over the figure, and a different one each time the
+          program starts. Asked for, and for a stated reason: to fill the
+          emptiness of the screen.
+
+          **This is not the caption that was removed.** That one said what
+          Rina was doing — «Жду», «Слушаю» — and the figure says that
+          already, which is why it went. This says nothing about her
+          state; it is an opening, and it is the same line for the whole
+          run of the program, so it does not change under the eye.
+        -->
+        <TextBlock x:Name="Greeting" HorizontalAlignment="Center"
+                   TextAlignment="Center" Margin="0,0,0,32"
+                   Style="{StaticResource Text.Title}"
+                   Foreground="{DynamicResource C.InkSoft}" />
+
         <Image x:Name="Face" Width="264" Height="264"
                IsHitTestVisible="False" />
 
@@ -50,7 +67,7 @@
           perfect, and the perfect one wins the eye. The figure's own rim is
           the edge.
         -->
-      </Grid>
+      </StackPanel>
 
       <!--
         What she is doing is said by the figure and by nothing else.
