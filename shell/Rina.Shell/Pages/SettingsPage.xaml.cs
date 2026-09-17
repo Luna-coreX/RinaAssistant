@@ -345,7 +345,20 @@ public partial class SettingsPage : UserControl
         _states.Clear();
         _buttons.Clear();
 
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 32) };
+        // Away from the seam above it, and inset on the right by exactly
+        // as much as the controls are. Butted against the seam the heading
+        // read as a caption belonging to the row above — reported as "too
+        // close to the line compared with everything else"; and its
+        // buttons ended sixteen points to the right of every control on
+        // the sheet, which is the gap between the column and the control
+        // standing in it. Sixteen written out here would be sixteen in two
+        // places.
+        var stack = new StackPanel
+        {
+            Margin = new Thickness(0, (double)FindResource("Sp.Between"),
+                                   ControlColumn - ControlWidth,
+                                   (double)FindResource("Sp.Between")),
+        };
         stack.Children.Add(new TextBlock
         {
             Text = S("Скачивание моделей").ToUpperInvariant(),
@@ -584,7 +597,8 @@ public partial class SettingsPage : UserControl
             Style = (Style)FindResource("Text.Section"),
             Margin = new Thickness(0, 0, 0, 12),
         });
-        foreach (var key in keys) stack.Children.Add(BuildRow(key));
+        foreach (var key in keys)
+            stack.Children.Add(BuildRow(key, ProbeColumn));
         foreach (var sheet in sheets ?? []) stack.Children.Add(BuildOpener(sheet));
         return stack;
     }
@@ -637,12 +651,40 @@ public partial class SettingsPage : UserControl
     /// <summary>Open one list in its window.</summary>
     private void ShowSheet(Sheet sheet)
     {
+        var window = MakeSheet(sheet);
+        window.Owner = Window.GetWindow(this);
+        window.ShowDialog();
+    }
+
+    /// <summary>The same window, built but not shown.</summary>
+    /// <remarks>
+    /// Split off so a check can measure a sheet. <c>ShowDialog</c> does
+    /// not come back until a person closes the window, so a check that
+    /// went through <c>ShowSheet</c> would hang rather than measure —
+    /// and a sheet nobody can measure is how a button came to stand past
+    /// the right edge for a whole release.
+    /// </remarks>
+    internal SheetWindow MakeSheet(Sheet sheet)
+    {
         // The editors are built here, by the same code that would have put
         // them on the page. The window holds them and knows nothing about
         // settings: a window that could also build one would be a second
         // place where that is decided.
+        // The check column is the page's, not every surface's. A sheet
+        // holding words or hotkeys has nothing to check, and the hundred
+        // and fifty points it reserved were taken off the editor: on the
+        // hotkeys sheet the last button went past the edge — reported as
+        // "the buttons are eaten".
+        var probes = sheet.Keys.Any(HasProbe) ? ProbeColumn : 0;
+
+        // A sheet of one key does not repeat its own name. The window is
+        // headed «Слова активации / С этих слов начинается обращение к
+        // Рине», and the row underneath said exactly that again, word for
+        // word. A sheet of several needs the names: it is the only thing
+        // telling Whisper's line from Vosk's.
+        var alone = sheet.Keys.Length == 1;
         var rows = sheet.Keys.Where(_schema.ContainsKey)
-                             .Select(BuildRow)
+                             .Select(k => BuildRow(k, probes, named: !alone))
                              .ToList();
 
         // The models are a list too, and they live behind the same kind of
@@ -651,11 +693,50 @@ public partial class SettingsPage : UserControl
         if (sheet.Keys.Contains("whisper_model") && _models.Count > 0)
             rows.Add(BuildDownloads());
 
-        var window = new SheetWindow(S(sheet.Title), S(sheet.Note), rows)
+        Widen(rows);
+        return new SheetWindow(S(sheet.Title), S(sheet.Note), rows);
+    }
+
+    /// <summary>
+    /// Let the column of controls fit the widest one on this sheet.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The page's column is 296, and one control does not fit in it: the
+    /// hotkey recorder — a field and two buttons — wants 364. On the page
+    /// that never showed, because the hotkey moved onto a sheet of its
+    /// own; on the sheet it stood out past the window, and the last
+    /// button was simply not there. Reported as "the buttons are eaten".
+    /// </para>
+    /// <para>
+    /// Widened rather than the control narrowed: 296 is what the page's
+    /// rows agreed on, and a sheet holds different rows. The width is
+    /// asked of the control — <c>Measure</c> — instead of being written
+    /// down again here, where it would go stale the first time a button's
+    /// word changed length.
+    /// </para>
+    /// </remarks>
+    private void Widen(IEnumerable<UIElement> rows)
+    {
+        var grids = rows.OfType<Border>()
+                        .Select(border => border.Child)
+                        .OfType<Grid>()
+                        .Where(grid => grid.ColumnDefinitions.Count == 3)
+                        .ToArray();
+
+        var wanted = ControlColumn;
+        foreach (var child in grids.SelectMany(g => g.Children
+                                                     .OfType<FrameworkElement>())
+                     .Where(c => Grid.GetColumn(c) == 1
+                                 && Grid.GetColumnSpan(c) == 1))
         {
-            Owner = Window.GetWindow(this),
-        };
-        window.ShowDialog();
+            child.Measure(new Size(double.PositiveInfinity,
+                                   double.PositiveInfinity));
+            wanted = Math.Max(wanted, child.DesiredSize.Width);
+        }
+
+        foreach (var grid in grids)
+            grid.ColumnDefinitions[1].Width = new GridLength(wanted);
     }
 
     /// <summary>
@@ -683,7 +764,8 @@ public partial class SettingsPage : UserControl
     /// <summary>The width of the checks column. Empty in most rows.</summary>
     private const double ProbeColumn = 150;
 
-    private UIElement BuildRow(string key)
+    private UIElement BuildRow(string key, double probeColumn,
+                               bool named = true)
     {
         var spec = _schema[key];
         var row = new Grid { MinHeight = 40 };
@@ -704,7 +786,7 @@ public partial class SettingsPage : UserControl
         // neighbours': columns belong to the panel, not to the row.
         row.ColumnDefinitions.Add(new ColumnDefinition
         {
-            Width = new GridLength(ProbeColumn),
+            Width = new GridLength(probeColumn),
         });
 
         var label = new StackPanel
@@ -737,7 +819,7 @@ public partial class SettingsPage : UserControl
             });
 
         Grid.SetColumn(label, 0);
-        row.Children.Add(label);
+        if (named) row.Children.Add(label);
 
         var editor = BuildEditor(key, spec);
         _editors[key] = editor;
@@ -761,11 +843,15 @@ public partial class SettingsPage : UserControl
         {
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             row.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            Grid.SetRow(editor, 1);
+            Grid.SetRow(editor, named ? 1 : 0);
             Grid.SetColumn(editor, 0);
-            Grid.SetColumnSpan(editor, 2);
-            editor.HorizontalAlignment = HorizontalAlignment.Left;
-            editor.Margin = new Thickness(0, 8, 0, 0);
+            Grid.SetColumnSpan(editor, 3);
+            // Stretched, not left: the rows inside are two columns, and a
+            // column that is only as wide as its contents is not a column
+            // — the buttons huddled against the words in the left half of
+            // the window with three hundred points of nothing beside them.
+            editor.HorizontalAlignment = HorizontalAlignment.Stretch;
+            editor.Margin = new Thickness(0, named ? 8 : 0, 0, 0);
         }
         else
         {
@@ -792,6 +878,15 @@ public partial class SettingsPage : UserControl
         };
     }
 
+    /// <summary>Whether this setting has a check of its own.</summary>
+    /// <remarks>
+    /// Asked before the row is built, because the column for it is
+    /// reserved across the whole surface — and a surface with nothing to
+    /// check must not reserve it.
+    /// </remarks>
+    private static bool HasProbe(string key) =>
+        key is "voice" or "input_device";
+
     /// <summary>
     /// A check next to the setting it checks.
     /// </summary>
@@ -810,7 +905,7 @@ public partial class SettingsPage : UserControl
     /// </remarks>
     private FrameworkElement? BuildProbe(string key)
     {
-        if (key is not ("voice" or "input_device")) return null;
+        if (!HasProbe(key)) return null;
 
         var probe = new Button
         {
@@ -1235,6 +1330,51 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>
+    /// A value, and the button that does something to it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A row is two columns, not two things in a line.</b> Laid out one
+    /// after another, every button started where its own word ended: six
+    /// words of different lengths gave six buttons at six different
+    /// places, and the short words had the button pressed right up
+    /// against them. Reported as "this looks bad".
+    /// </para>
+    /// <para>
+    /// So the value takes what there is and the button stands at the
+    /// right edge — the same edge for every row, the way the controls on
+    /// the page stand in a column. What does not fit is trimmed with an
+    /// ellipsis and kept whole in the tooltip.
+    /// </para>
+    /// </remarks>
+    private ValueLine ValueRow(FrameworkElement value, FrameworkElement act)
+    {
+        var row = new ValueLine { Margin = new Thickness(0, 0, 0, Tight) };
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = GridLength.Auto,
+        });
+        value.VerticalAlignment = VerticalAlignment.Center;
+        value.Margin = new Thickness(0, 0, Inner, 0);
+        act.HorizontalAlignment = HorizontalAlignment.Right;
+        Grid.SetColumn(value, 0);
+        Grid.SetColumn(act, 1);
+        row.Children.Add(value);
+        row.Children.Add(act);
+        return row;
+    }
+
+    /// <summary>The space between things inside one row.</summary>
+    private double Inner => (double)FindResource("Sp.Inner");
+
+    /// <summary>The space between rows of one list.</summary>
+    private double Tight => (double)FindResource("Sp.Tight");
+
+    /// <summary>
     /// A list: what is in it, what to add, what to take away.
     /// </summary>
     /// <remarks>
@@ -1251,19 +1391,13 @@ public partial class SettingsPage : UserControl
 
         foreach (var item in items)
         {
-            var row = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-            };
-            row.Children.Add(new TextBlock
+            var shown = new TextBlock
             {
                 Text = item,
                 Style = (Style)FindResource("Text.Meta"),
-                VerticalAlignment = VerticalAlignment.Center,
-                MaxWidth = 220,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 ToolTip = item,
-            });
+            };
             var drop = new Button
             {
                 Style = (Style)FindResource("Btn"),
@@ -1276,8 +1410,7 @@ public partial class SettingsPage : UserControl
                 await SaveAsync(key, new JsonArray(
                     items.Select(v => (JsonNode)v!).ToArray()));
             };
-            row.Children.Add(drop);
-            stack.Children.Add(row);
+            stack.Children.Add(ValueRow(shown, drop));
         }
 
         async Task AddAsync(string what)
@@ -1291,7 +1424,7 @@ public partial class SettingsPage : UserControl
         var adding = new StackPanel
         {
             Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 4, 0, 0),
+            Margin = new Thickness(0, Inner, 0, 0),
         };
 
         // A folder is picked with a dialogue, a word is typed. One button
@@ -1316,7 +1449,7 @@ public partial class SettingsPage : UserControl
             {
                 Style = (Style)FindResource("Field"),
                 Width = 170,
-                Margin = new Thickness(0, 0, 8, 0),
+                Margin = new Thickness(0, 0, Inner, 0),
             };
             Styles.Ui.SetHint(typed, S("новое слово"));
             var add = new Button
@@ -1367,19 +1500,13 @@ public partial class SettingsPage : UserControl
 
         foreach (var (name, title, _, _) in actions)
         {
-            var row = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 4),
-            };
-            row.Children.Add(new TextBlock
+            var named = new TextBlock
             {
                 Text = title,
                 Style = (Style)FindResource("Text.Meta"),
-                VerticalAlignment = VerticalAlignment.Center,
-                Width = 190,
-                Margin = new Thickness(0, 0, 8, 0),
-            });
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = title,
+            };
 
             var box = new HotkeyBox(current?[name]?.GetValue<string>() ?? "");
             var action = name;
@@ -1394,8 +1521,7 @@ public partial class SettingsPage : UserControl
                 if (written.Length > 0) next[action] = written;
                 await SaveAsync(key, next);
             };
-            row.Children.Add(box);
-            stack.Children.Add(row);
+            stack.Children.Add(ValueRow(named, box));
         }
         return stack;
     }
@@ -1423,21 +1549,13 @@ public partial class SettingsPage : UserControl
 
         foreach (var (word, bound) in current ?? [])
         {
-            var line = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                Margin = new Thickness(0, 0, 0, 2),
-            };
-            line.Children.Add(new TextBlock
+            var shown = new TextBlock
             {
                 Text = DescribeBinding(word, bound),
                 Style = (Style)FindResource("Text.Meta"),
-                VerticalAlignment = VerticalAlignment.Center,
-                MaxWidth = 300,
                 TextTrimming = TextTrimming.CharacterEllipsis,
                 ToolTip = DescribeBinding(word, bound),
-                Margin = new Thickness(0, 0, 8, 0),
-            });
+            };
             var drop = new Button
             {
                 Style = (Style)FindResource("Btn"),
@@ -1452,22 +1570,14 @@ public partial class SettingsPage : UserControl
                         left[other] = value?.DeepClone();
                 await SaveAsync(key, left);
             };
-            line.Children.Add(drop);
-            stack.Children.Add(line);
+            stack.Children.Add(ValueRow(shown, drop));
         }
 
-        var row = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Margin = new Thickness(0, 4, 0, 0),
-        };
-        row.Children.Add(new TextBlock
+        var counted = new TextBlock
         {
             Text = S("записей: {0}", current?.Count ?? 0),
             Style = (Style)FindResource("Text.Meta"),
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 8, 0),
-        });
+        };
         var forget = new Button
         {
             Style = (Style)FindResource("Btn"),
@@ -1475,7 +1585,8 @@ public partial class SettingsPage : UserControl
             IsEnabled = (current?.Count ?? 0) > 0,
         };
         forget.Click += async (_, _) => await SaveAsync(key, new JsonObject());
-        row.Children.Add(forget);
+        var row = ValueRow(counted, forget);
+        row.Margin = new Thickness(0, Inner, 0, 0);
         stack.Children.Add(row);
         return stack;
     }
@@ -1649,3 +1760,15 @@ public partial class SettingsPage : UserControl
         catch (Exception error) { Note.Text = error.Message; return null; }
     }
 }
+
+/// <summary>
+/// A row of "a value, and what to do with it".
+/// </summary>
+/// <remarks>
+/// A class rather than a plain <c>Grid</c> so a check can find these
+/// rows in a built sheet and measure them: that every button in a list
+/// stands at the same edge, and that none of them stands past the
+/// window's. Both were reported by eye, and by eye is how they came
+/// back.
+/// </remarks>
+internal sealed class ValueLine : Grid;

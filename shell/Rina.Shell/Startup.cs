@@ -1263,6 +1263,88 @@ public partial class App
         Check("секция «Прочее» пуста", built && !Shown().HasOtherSection,
               built ? "" : "| страница пуста — сказать нечего");
 
+        // **Every sheet is measured, not looked at.** Reported by a
+        // person: on one sheet the rows "look bad", on another "the
+        // buttons are eaten". Both are one fault with two faces — a row
+        // laid out wider than the window holding it — and both are a
+        // number: the right edge of a thing against the right edge of the
+        // sheet. An eye finds this once; a number finds it every time.
+        var sheets = Pages.SettingsLayout.Sections
+            .SelectMany(s => s.Sheets ?? []).ToArray();
+        var shots = 1;
+        Check("листы есть, есть что мерить", sheets.Length > 0,
+              $"| листов {sheets.Length}");
+
+        foreach (var sheet in sheets)
+        {
+            var name = Strings.Loc.S(sheet.Title);
+            var leaf = Shown().MakeSheet(sheet);
+            leaf.Left = -4000;
+            leaf.Top = -4000;
+            leaf.Show();
+            // It arrives with a scale and a rise (`4.0b-E04`), and while
+            // that is running every edge is somewhere else. Waited out by
+            // the condition rather than by a number of milliseconds: the
+            // one flake this suite has had came from a timing guess.
+            var arriving = (FrameworkElement)leaf.Content;
+            await Until(() => arriving.Opacity >= 0.999, 3);
+            leaf.UpdateLayout();
+
+            var edge = leaf.ActualWidth;
+            var past = Deep(leaf).OfType<FrameworkElement>()
+                .Where(e => e.IsVisible && e.ActualWidth > 0)
+                .Select(e => Where(e, leaf).Right)
+                .Where(right => right > edge + 0.5)
+                .ToList();
+            Check($"«{name}»: ничего не выходит за край", past.Count == 0,
+                  past.Count == 0
+                      ? $"| ширина {edge:0}"
+                      : $"| за краем {past.Count}, дальше всех "
+                        + $"{past.Max():0} при {edge:0}");
+
+            // And inside a list the buttons stand in a column. Laid out
+            // one after another they started where each row's own word
+            // ended — six words, six places — and against a short word
+            // the button sat right up against it.
+            foreach (var group in Deep(leaf).OfType<Pages.ValueLine>()
+                         .GroupBy(System.Windows.Media.VisualTreeHelper.GetParent))
+            {
+                var lines = group.ToArray();
+                if (lines.Length < 2) continue;
+                // By the right edge: that is the edge they are lined up
+                // on. «Забыть» and «Забыть всё» are different widths, so
+                // their left edges differ by the length of a word — and
+                // that is not the fault being looked for.
+                var edges = lines
+                    .Select(line => Where((FrameworkElement)line.Children[1],
+                                          leaf).Right)
+                    .ToArray();
+                Check($"«{name}»: кнопки списка в одном столбце",
+                      edges.Max() - edges.Min() < 0.5,
+                      $"| строк {lines.Length}, разброс "
+                      + $"{edges.Max() - edges.Min():0.0}");
+
+                var squeezed = lines.Count(line =>
+                    Where((FrameworkElement)line.Children[1], leaf).Left
+                    - Where((FrameworkElement)line.Children[0], leaf).Right
+                    < 6 - 0.5);
+                Check($"«{name}»: значение и кнопка не слиплись",
+                      squeezed == 0, $"| слиплось строк {squeezed}");
+            }
+
+            // A picture of each one alongside the numbers. The numbers
+            // say whether anything is past the edge; only a picture says
+            // whether what is inside the edge reads as a list.
+            if (shot is not null)
+            {
+                var one = shot.Replace(".png", $"-{shots++}.png");
+                Save(leaf, one);
+                Console.WriteLine($"снимок листа: {one}");
+            }
+
+            leaf.Close();
+        }
+
         if (shot is not null)
         {
             Save(window, shot);

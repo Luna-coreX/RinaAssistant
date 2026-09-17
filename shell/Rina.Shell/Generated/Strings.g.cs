@@ -54,6 +54,16 @@ public static partial class Loc
                 {
                     ["English"] = "http://localhost:11434",
                 },
+            ["Vosk"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Vosk",
+                },
+            ["Whisper"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Whisper",
+                },
             ["{0} ГБ"] =
                 new Dictionary<string, string>
                 {
@@ -418,6 +428,11 @@ public static partial class Loc
                     ["English"] = "Voice",
                     ["Español"] = "Voz",
                     ["Українська"] = "Голос",
+                },
+            ["Голос Piper"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Piper voice",
                 },
             ["Голос и распознавание — на вашем компьютере."] =
                 new Dictionary<string, string>
@@ -855,6 +870,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Source",
+                },
+            ["Каждому своё сочетание"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "One combination each",
                 },
             ["Как вас звать"] =
                 new Dictionary<string, string>
@@ -1348,6 +1368,11 @@ public static partial class Loc
                 {
                     ["English"] = "The shell does not know what this data is, so it shows it as it stands.",
                 },
+            ["Одна комбинация на всё окно"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "One combination for the whole window",
+                },
             ["Окно уходит в трей, а не на панель задач"] =
                 new Dictionary<string, string>
                 {
@@ -1390,6 +1415,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Finish",
+                },
+            ["Отдельные действия"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Separate actions",
                 },
             ["Открыть"] =
                 new Dictionary<string, string>
@@ -1441,6 +1471,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Plugin folder",
+                },
+            ["Папка с распакованной моделью"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The folder with the unpacked model",
                 },
             ["Папки поиска программ"] =
                 new Dictionary<string, string>
@@ -1523,6 +1558,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Confirmation",
+                },
+            ["Позвать Рину"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Call Rina",
                 },
             ["Поиск"] =
                 new Dictionary<string, string>
@@ -1755,6 +1795,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Sections",
+                },
+            ["Размер модели: чем больше, тем точнее и медленнее"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model size: the bigger, the more accurate and the slower",
                 },
             ["Распаковываю…"] =
                 new Dictionary<string, string>
@@ -2242,6 +2287,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "the .onnx file",
+                },
+            ["Файл голоса .onnx"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The .onnx voice file",
                 },
             ["Файл не разобрался как JSON."] =
                 new Dictionary<string, string>

@@ -26,7 +26,24 @@ public sealed record Section(string Title, Labelled[] Keys,
 /// ones: what changed is where they are shown, not what they are.
 /// </para>
 /// </remarks>
-public sealed record Sheet(string Title, string Note, string[] Keys);
+public sealed record Sheet(string Title, string Note, string[] Keys,
+                          Labelled[]? Named = null)
+{
+    /// <summary>
+    /// What each key on this sheet is called.
+    /// </summary>
+    /// <remarks>
+    /// A sheet of one key borrows the sheet's own title: the header
+    /// already says «Слова активации», and repeating it on the row
+    /// below said it twice — and said it as `wake_words`, because
+    /// nothing else knew the name. A sheet of several needs one name
+    /// each, and gives them in `Named`.
+    /// </remarks>
+    public Labelled Label(string key) =>
+        Named?.FirstOrDefault(n => n.Key == key)
+        ?? (Keys.Length == 1 ? new Labelled(key, Title, Note)
+                             : new Labelled(key, key));
+}
 
 /// <summary>
 /// The layout of the settings screen — entirely the shell's business.
@@ -93,7 +110,13 @@ public static class SettingsLayout
                 ["wake_words"]),
             new(Word("Модели"),
                 Word("Что скачано и где лежит"),
-                ["whisper_model", "vosk_model", "piper_model"]),
+                ["whisper_model", "vosk_model", "piper_model"],
+                [new("whisper_model", Word("Whisper"),
+                     Word("Размер модели: чем больше, тем точнее и медленнее")),
+                 new("vosk_model", Word("Vosk"),
+                     Word("Папка с распакованной моделью")),
+                 new("piper_model", Word("Голос Piper"),
+                     Word("Файл голоса .onnx"))]),
         ]),
         new(Word("Звук"),
         [
@@ -133,7 +156,11 @@ public static class SettingsLayout
         [
             new(Word("Комбинации клавиш"),
                 Word("Чем вызывать Рину и её действия"),
-                ["hotkey", "action_hotkeys"]),
+                ["hotkey", "action_hotkeys"],
+                [new("hotkey", Word("Позвать Рину"),
+                     Word("Одна комбинация на всё окно")),
+                 new("action_hotkeys", Word("Отдельные действия"),
+                     Word("Каждому своё сочетание"))]),
         ]),
         new(Word("ИИ"),
         [
@@ -248,17 +275,29 @@ public static class SettingsLayout
     };
 
     /// <summary>Every key the shell knows by name.</summary>
+    /// <summary>Every key this layout has a place for — sheets included.</summary>
+    /// <remarks>
+    /// **The sheets were left out, and that was visible.** A key that
+    /// lives on a sheet of its own — `wake_words`, `hotkey` — counted
+    /// as unknown, so its own sheet showed it as "wake_words · ключ
+    /// wake_words оболочке незнаком", under a header that had just
+    /// named it properly. A place on a sheet is a place.
+    /// </remarks>
+    private static IEnumerable<Labelled> Everything =>
+        Sections.SelectMany(s => s.Keys)
+                .Concat(Sections.SelectMany(s => s.Sheets ?? [])
+                                .SelectMany(sheet => sheet.Keys
+                                                          .Select(sheet.Label)));
+
     public static readonly HashSet<string> Known =
-        Sections.SelectMany(s => s.Keys).Select(k => k.Key).ToHashSet();
+        Everything.Select(k => k.Key).ToHashSet();
 
     public static string TitleOf(string key) => S(
-        Sections.SelectMany(s => s.Keys).FirstOrDefault(k => k.Key == key)?.Title
-        ?? key);
+        Everything.FirstOrDefault(k => k.Key == key)?.Title ?? key);
 
     public static string HintOf(string key)
     {
-        var hint = Sections.SelectMany(s => s.Keys)
-            .FirstOrDefault(k => k.Key == key)?.Hint ?? "";
+        var hint = Everything.FirstOrDefault(k => k.Key == key)?.Hint ?? "";
         return hint.Length > 0 ? S(hint) : "";
     }
 }

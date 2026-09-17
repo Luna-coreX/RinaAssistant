@@ -1531,5 +1531,35 @@
   },
   "Разговор": {
     "English": "Talking"
+  },
+  "Whisper": {
+    "English": "Whisper"
+  },
+  "Vosk": {
+    "English": "Vosk"
+  },
+  "Размер модели: чем больше, тем точнее и медленнее": {
+    "English": "Model size: the bigger, the more accurate and the slower"
+  },
+  "Папка с распакованной моделью": {
+    "English": "The folder with the unpacked model"
+  },
+  "Голос Piper": {
+    "English": "Piper voice"
+  },
+  "Файл голоса .onnx": {
+    "English": "The .onnx voice file"
+  },
+  "Позвать Рину": {
+    "English": "Call Rina"
+  },
+  "Одна комбинация на всё окно": {
+    "English": "One combination for the whole window"
+  },
+  "Отдельные действия": {
+    "English": "Separate actions"
+  },
+  "Каждому своё сочетание": {
+    "English": "One combination each"
   }
 }
