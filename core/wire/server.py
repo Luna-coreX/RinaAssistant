@@ -2175,11 +2175,14 @@ class ProtocolServer:
         self._lately_said.append(text)
 
         self._cut_in = False
+        spoken = 0.0
         for piece in speech.sentences(text):
             if self._cut_in:
                 log.info("Остаток реплики не сказан: перебили")
-                return
-            if self._stream_speech(piece, voice, rate):
+                break
+            said = self._stream_speech(piece, voice, rate)
+            if said:
+                spoken += said
                 continue
             pcm = self.synthesiser.synthesize(piece, voice=voice, rate=rate)
             if not pcm:
@@ -2188,11 +2191,20 @@ class ProtocolServer:
                 # rest is worse than saying most of it.
                 log.warning("Не синтезировалось: %s", safe(piece))
                 continue
+            spoken += len(pcm) / 2 / max(self.synthesiser.sample_rate, 1)
             self.send_speech(pcm, self.synthesiser.sample_rate)
 
-    def _stream_speech(self, piece: str, voice: str, rate: int) -> bool:
+        # The conversation's window belongs to the person, so it starts
+        # when they can speak — after she stops. See
+        # `RinaEngine.talk_after_speaking`.
+        if spoken:
+            self.engine.talk_after_speaking(spoken)
+
+    def _stream_speech(self, piece: str, voice: str, rate: int) -> float:
         """
-        Send one sentence as it is being made. `False` — this engine cannot.
+        Send one sentence as it is made. Returns the seconds of sound sent.
+
+        Zero means this engine cannot stream — or gave out nothing.
 
         **`4.0b-E10`.** Even a single sentence is waited out whole today:
         the request goes, and nothing is heard until the last byte of it
@@ -2207,13 +2219,13 @@ class ProtocolServer:
         first half twice is worse than losing the second.
         """
         if not getattr(self.synthesiser, "streams", False):
-            return False
-        sent = False
+            return 0.0
+        sent = 0.0
         try:
             for pcm in self.synthesiser.stream(piece, voice=voice, rate=rate):
                 if not pcm:
                     continue
-                sent = True
+                sent += len(pcm) / 2 / max(self.synthesiser.sample_rate, 1)
                 self.send_speech(pcm, self.synthesiser.sample_rate)
         except Exception:                               # noqa: BLE001
             log.exception("Потоковый синтез сорвался")

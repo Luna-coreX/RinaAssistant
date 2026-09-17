@@ -448,8 +448,37 @@ class RinaEngine:
         now = time.monotonic() if now is None else now
         return now < self._talking_until
 
-    def _open_talk(self):
-        """Start a conversation, or push its end further off."""
+    def talk_after_speaking(self, seconds):
+        """
+        Her own reply must not eat the conversation's window.
+
+        **The whole feature was unusable because of this.** The window
+        opens when the phrase is understood, and then Rina answers: a
+        second or two before the first sound, nine seconds of speech.
+        By the time the person can say the next thing without her name,
+        fifteen seconds have gone and the window has closed — met in a
+        person's journal three times in a row, thirty seconds between
+        "что ты умеешь" and the answer to it:
+
+            `13:11:55  Команда (voice): 'что ты умеешь?'`
+            `13:12:25  'Хорошо, запустите им.'`
+            `13:12:26  Расслышано, но не мне (wake)`
+
+        The window is a person's opportunity to speak, so it has to
+        begin when they **can** speak — after she stops. The length of
+        the reply is known exactly: it is the sound that was sent.
+        """
+        if not self.talking():
+            return          # nothing to hold open
+        self._open_talk(after=max(0.0, float(seconds)))
+
+    def _open_talk(self, after=0.0):
+        """
+        Start a conversation, or push its end further off.
+
+        `after` is how much of what follows is Rina talking: the window
+        is measured from the end of that, not from now.
+        """
         now = time.monotonic()
         fresh = not self.talking(now)
         if fresh:
@@ -457,7 +486,7 @@ class RinaEngine:
 
         # The ceiling wins over the extension: the last exchange of a long
         # conversation gets a shorter window, and then it is over.
-        until = min(now + self.TALK_WINDOW,
+        until = min(now + after + self.TALK_WINDOW,
                     self._talking_since + self.TALK_LIMIT)
         if until <= now:
             self._close_talk()

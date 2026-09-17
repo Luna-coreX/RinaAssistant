@@ -352,6 +352,11 @@ def speaker(wait=None):
     made._speech_queue = None
     made._speech_sender = None
     made._running = True
+    # An engine that does nothing: speaking tells it how long the reply
+    # was (`4.0b-E06`, the conversation window), and a bare skeleton has
+    # nobody to tell.
+    made.engine = type("Nobody", (), {
+        "talk_after_speaking": staticmethod(lambda seconds: None)})()
     if wait is not None:
         made.SPEECH_WAIT = wait
     return made, heard_side
@@ -787,6 +792,36 @@ check("остаток реплики не сказан", len(said) < 4,
       f"| произнесено предложений {len(said)} из четырёх")
 check("и оболочке велено замолчать", "speech.stop" in cut.sent,
       f"| {cut.sent}")
+
+print()
+print("=== ядро сообщает, сколько говорило ===")
+# The arithmetic above is only worth anything if somebody supplies the
+# number. Four sentences, a second of sound each.
+counted, counted_pipe = speaker()
+counted.synthesiser = Slow()
+counted._settings = lambda: MemorySettings({"voice": "", "speed": 100})
+counted._speech_wanted = ()
+counted._speech_given = (True, True)
+counted._said_mute = False
+counted._lately_said = None
+counted.send_speech = lambda pcm, hertz: None
+
+held = []
+
+
+class Held:
+    @staticmethod
+    def talk_after_speaking(seconds):
+        held.append(seconds)
+
+
+counted.engine = Held()
+counted._speak("Первое предложение достаточно длинное. Второе тоже вполне "
+               "себе длинное. И третье не короче прочих. Четвёртое "
+               "завершает ответ.")
+check("длительность реплики посчитана и передана",
+      len(held) == 1 and 3.5 < held[0] < 4.5,
+      f"| {held} с при четырёх секундах звука")
 
 print()
 print("ИТОГО ошибок:", fails)

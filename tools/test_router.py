@@ -252,6 +252,65 @@ quiet.handle_command("что ты умеешь", source="typed")
 check("напечатанное разговора не открывает", not quiet.talking())
 
 print()
+print("=== окно разговора не съедается её же ответом ===")
+# **The defect that made the whole feature unusable.** The window opens
+# when the phrase is understood, and then Rina answers: a second or two
+# before the first sound, nine seconds of speech. By the time a person
+# can say the next thing without her name, fifteen seconds are gone.
+# Straight from the journal, three times over — and note the apostrophe
+# left out of this sentence on purpose: a stray one pairs with the next
+# quote mark and hides the Russian below from the language check.
+
+#
+#     `13:11:55  Команда (voice): 'что ты умеешь?'`
+#     `13:12:25  'Хорошо, запустите им.'`
+#     `13:12:26  Расслышано, но не мне (wake)`
+#
+# The window belongs to whoever is listening, so it begins when they
+# can speak — after she stops.
+import time as _clock
+
+from core.engine import RinaEngine
+from core.settings_api import MemorySettings
+
+talker = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+talker._open_talk()
+now = _clock.monotonic()
+check("окно открыто на пятнадцать секунд",
+      talker.talking(now + 14) and not talker.talking(now + 16),
+      f"| {round(talker._talking_until - now, 1)} с")
+
+talker.talk_after_speaking(9.0)
+check("девять секунд её речи окно не тратят",
+      talker.talking(now + 16),
+      "| иначе человек говорит уже в закрытое окно")
+check("а после её молчания — те же пятнадцать",
+      talker.talking(now + 23) and not talker.talking(now + 25),
+      f"| {round(talker._talking_until - now, 1)} с от начала")
+
+# The ceiling still wins: a long conversation ends when it ends, and
+# replies do not buy their way past it.
+long_one = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+long_one._open_talk()
+long_one._talking_since = _clock.monotonic() - long_one.TALK_LIMIT + 5
+long_one.talk_after_speaking(60.0)
+check("потолок разговора не обойти длинной репликой",
+      not long_one.talking(_clock.monotonic() + 10),
+      f"| осталось {round(long_one._talking_until - _clock.monotonic(), 1)} с")
+
+# And nothing is held open when no conversation is on: an answer to a
+# typed line must not make the name optional.
+typed = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+typed.talk_after_speaking(9.0)
+check("без разговора ответ его не открывает", not typed.talking())
+
+print()
 print("=== неизменяемость намерения ===")
 i = route("запусти телеграм", ctx)
 try:
