@@ -124,10 +124,10 @@ public static partial class Loc
                 {
                     ["English"] = "“Done”",
                 },
-            ["«который час» · «запусти браузер» · «посчитай 15 * 12»"] =
+            ["«который час» · «запусти браузер» · «посчитай 15 на 12»"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "“what time is it” · “open the browser” · “calculate 15 * 12”",
+                    ["English"] = "“what time is it” · “open the browser” · “calculate 15 times 12”",
                 },
             ["«напомни через 15 минут выключить духовку»"] =
                 new Dictionary<string, string>

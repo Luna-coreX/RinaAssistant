@@ -207,6 +207,21 @@ def decode(raw: bytes) -> Envelope:
         raise fault(ERROR_INVALID_ENVELOPE,
                     "сообщение не разбирается как JSON в UTF-8",
                     reason=str(exc)) from None
+    except RecursionError:
+        # **A thousand brackets are a message, not a crash.** `json`
+        # parses nesting by recursing, so a deeply nested payload
+        # exhausts the stack and raises `RecursionError` — which is not
+        # a `ProtocolFault` and so travels straight past every handler
+        # written to deal with a bad message. Measured: two thousand
+        # levels do it. The pipe has the machine's own processes on the
+        # other end of it (that is why a pipe and not a port), and one
+        # of them being able to end the core with a single line is not
+        # a thing to leave standing.
+        #
+        # Said without the reason: formatting one means touching the
+        # thing that has just run the stack out.
+        raise fault(ERROR_INVALID_ENVELOPE,
+                    "сообщение вложено слишком глубоко") from None
     if not isinstance(data, dict):
         raise fault(ERROR_INVALID_ENVELOPE,
                     "сообщение обязано быть объектом")

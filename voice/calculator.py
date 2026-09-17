@@ -21,6 +21,7 @@ from core.i18n import t as tr
 TRIGGERS = (
     "посчитай", "подсчитай", "вычисли", "сколько будет", "чему равно",
     "умножить", "умножь", "разделить", "раздели", "поделить", "подели",
+    "делить", "дели",
     "прибавь", "прибавить", "отними", "отнять", "вычти", "вычесть", "сложи",
     "calculate", "compute", "how much is", "what is",
 )
@@ -30,7 +31,16 @@ TRIGGERS = (
 # apart into "разделить" plus a separate "на" and the expression breaks.
 WORD_OPS = [
     # the compound ones
+    #
+    # **Every way of saying "divide" belongs here, and the bare verb
+    # most of all.** «делить» was missing, so "5 делить на 0" lost the
+    # verb as a filler word, met the rule that turns «на» into
+    # multiplication, and came out as `5 * 0` — "Получается 0". A
+    # calculator that answers a division confidently with the wrong
+    # operation is worse than one that says it did not understand.
     (r"\bразделить на\b", "/"), (r"\bподелить на\b", "/"),
+    (r"\bделить на\b", "/"), (r"\bдели на\b", "/"),
+    (r"\bраздели на\b", "/"), (r"\bподели на\b", "/"),
     (r"\bумножить на\b", "*"), (r"\bумножь на\b", "*"),
     (r"\bdivided by\b", "/"), (r"\bmultiplied by\b", "*"),
     (r"\bв степени\b", "**"), (r"\bв квадрате\b", "**2"),
@@ -39,6 +49,7 @@ WORD_OPS = [
     (r"\bминус\b", "-"), (r"\bотнять\b", "-"), (r"\bвычесть\b", "-"),
     (r"\bумножить\b", "*"), (r"\bумножь\b", "*"),
     (r"\bразделить\b", "/"), (r"\bподелить\b", "/"),
+    (r"\bделить\b", "/"), (r"\bраздели\b", "/"), (r"\bподели\b", "/"),
     (r"\bplus\b", "+"), (r"\bminus\b", "-"), (r"\btimes\b", "*"),
     # "на" as multiplication — only last, once the other phrases are parsed
     (r"\bна\b(?=\s*\d)", "*"),

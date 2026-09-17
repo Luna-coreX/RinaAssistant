@@ -66,6 +66,10 @@ INTENTS = {
     "alias.teach":        "Человек назвал правило: слово -> программа. Аргументы: word, app, said",
     "reminder.ambiguous": "Напоминание к программе: кандидатов несколько. Аргументы: options, query",
     "reminder.unknown_app": "Напоминание к программе: такой программы нет. Аргументы: query",
+    # Asked to remind, and did not say when. An intent of its own,
+    # because the alternative was a web search for the person's own
+    # errand — useless as an answer and wrong as an action.
+    "reminder.no_time":   "Просили напомнить, но не сказали когда",
 
     "alias.ambiguous":    "Учить нечему: названная программа сама неоднозначна. Аргументы: options, query, word",
     "alias.unknown":      "Учить нечему: названной программы нет. Аргументы: query, word",

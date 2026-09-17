@@ -196,6 +196,17 @@ class Executor:
     def _do_reminder_list(self, intent, source):
         return self._run("list_reminders", {}, source=source)
 
+    def _do_reminder_no_time(self, intent, source):
+        """
+        Asked to remind, did not say when.
+
+        Says what is missing, in the same shape as "«запиши» без
+        продолжения": a person who is told what was not understood says
+        the missing half, and a person who is shown search results says
+        nothing and stops asking.
+        """
+        return self._fail(tr("Не поняла, когда напомнить."), "internal")
+
     def _do_reminder_cancel(self, intent, source):
         return self._run("cancel_reminder", {}, source=source)
 

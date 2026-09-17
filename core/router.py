@@ -257,6 +257,14 @@ def _reminder(command, ctx):
     from voice import reminders
 
     parsed = reminders.parse(command)
+    if parsed is None and reminders.asked_for_one(command):
+        # **Asked about time and got no time out of it.** Falling
+        # through meant the next stages had their go and the phrase
+        # ended in a web search: "напомни позвонить маме" — an ordinary
+        # thing to say — was sent to a search engine, which is useless
+        # as an answer and, for somebody's own errand, worse than
+        # useless as an action.
+        return Intent("reminder.no_time", stage="reminders")
     if parsed is None:
         return None
 

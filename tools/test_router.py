@@ -252,6 +252,56 @@ quiet.handle_command("что ты умеешь", source="typed")
 check("напечатанное разговора не открывает", not quiet.talking())
 
 print()
+print("=== делить — это делить, а не умножать ===")
+# **Answered confidently and wrongly.** «5 делить на 0» came out as
+# «Получается 0»: the bare verb was missing from the table, so it was
+# dropped as filler, «на» met the rule that makes it multiplication,
+# and the expression became `5 * 0`. A calculator that gives the wrong
+# operation without a word is worse than one that says it did not
+# understand.
+from voice import calculator
+
+sums = [
+    ("сколько будет 5 делить на 0", "calc.zero_division", None),
+    ("сколько будет 10 делить на 2", "calc", "5"),
+    ("сколько будет 12 дели на 4", "calc", "3"),
+    ("сколько будет 100 разделить на 5", "calc", "20"),
+    ("сколько будет 9 подели на 3", "calc", "3"),
+    # And multiplication is still multiplication: the rule that turns
+    # «на» into a product is what this broke against, and it has to
+    # survive the fix.
+    ("сколько будет 7 на 6", "calc", "42"),
+    ("посчитай 8 умножить на 3", "calc", "24"),
+]
+for text, want_name, want_result in sums:
+    got = calculator.classify(text)
+    name = got[0] if got else "—"
+    result = (got[1] or {}).get("result") if got else None
+    check(f"{text}",
+          name == want_name and (want_result is None or result == want_result),
+          f"| {name} {result}")
+
+print()
+print("=== просьба напомнить без времени не идёт в интернет ===")
+# «напомни позвонить маме» — an ordinary thing to say — used to reach
+# the search stage and be sent to a search engine: useless as an answer,
+# and for somebody's own errand worse than useless as an action.
+for text, want in [
+    ("напомни позвонить маме", "reminder.no_time"),
+    ("напомни", "reminder.no_time"),
+    ("поставь будильник", "reminder.no_time"),
+    ("напомни через 0 секунд проверить", "reminder.no_time"),
+    ("напомни через 5 минут позвонить", "reminder.create"),
+    # But a phrase that merely contains the word is a phrase, not a
+    # request: the first cut of this caught it and answered "Не поняла,
+    # когда напомнить" to a question about psychology.
+    ("что такое напоминание в психологии", "fallback.search"),
+    ("расскажи про будильники", "fallback.search"),
+]:
+    got = route(text, RouterContext()).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+print()
 print("=== окно разговора не съедается её же ответом ===")
 # **The defect that made the whole feature unusable.** The window opens
 # when the phrase is understood, and then Rina answers: a second or two

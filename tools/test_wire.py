@@ -441,6 +441,50 @@ check("готовое поле не затирается", kept.trace == "t-св
 
 # ---------------------------------------------------------------------------
 print()
+print("=== враждебный конверт остаётся ошибкой протокола ===")
+# **A crash is not a refusal.** Everything unparseable has to come out
+# as `protocol.invalid_envelope`, because that is what every handler on
+# the receiving side is written to deal with. Anything else travels
+# past them.
+#
+# Deep nesting was the one that did not: `json` parses brackets by
+# recursing, so two thousand of them exhausted the stack and raised
+# `RecursionError`. The pipe has the machine's own processes on the
+# other end — that is why it is a pipe and not a port — and one of
+# them being able to end the core with a single line is not a thing to
+# leave standing.
+hostile = [
+    ("пусто", b""),
+    ("не JSON", b"{{{"),
+    ("не объект", b"[1,2,3]"),
+    ("null вместо объекта", b"null"),
+    ("нет обязательных полей", b'{"v":1}'),
+    ("payload не объект",
+     b'{"v":1,"type":"event","id":"a","method":"x","timestamp":1,'
+     b'"trace_id":"t","payload":[1]}'),
+    ("битый UTF-8",
+     b'{"v":1,"type":"event","id":"\xff\xfe","method":"x","timestamp":1,'
+     b'"trace_id":"t","payload":{}}'),
+    ("вложенность в две тысячи скобок",
+     ('{"v":1,"type":"event","id":"a","method":"x","timestamp":1,'
+      '"trace_id":"t","payload":' + "[" * 2000 + "]" * 2000 + "}").encode()),
+    ("вложенность в двадцать тысяч",
+     ('{"v":1,"type":"event","id":"a","method":"x","timestamp":1,'
+      '"trace_id":"t","payload":' + "[" * 20000 + "]" * 20000 + "}").encode()),
+]
+for note, raw in hostile:
+    try:
+        decode(raw)
+        outcome = "принят"
+    except ProtocolFault as trouble:
+        outcome = trouble.error.code
+    except BaseException as trouble:                    # noqa: BLE001
+        outcome = type(trouble).__name__
+    check(f"{note}", outcome == ERROR_INVALID_ENVELOPE,
+          "" if outcome == ERROR_INVALID_ENVELOPE else f"| {outcome}")
+
+# ---------------------------------------------------------------------------
+print()
 print("=== D11: каталог событий ===")
 
 # Compared with the 3.1.0 list: the specification was written from it, and an

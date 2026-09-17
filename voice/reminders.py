@@ -174,6 +174,29 @@ def _reminder_text(text):
     return cleaned.strip(" ,.—-")
 
 
+def asked_for_one(text) -> bool:
+    """
+    Was this a request about time at all — whatever came of parsing it.
+
+    Needed apart from `parse`, which answers "did it come out". The two
+    differ exactly where it matters: "напомни позвонить маме" is a
+    request with no time in it, and treating the failure to parse as
+    "not about reminders" sent the phrase off to a web search.
+    """
+    low = normalize(text or "")
+    if not low:
+        return False
+    # **Only at the front of the phrase.** A request begins with the
+    # asking: "напомни позвонить маме", "поставь будильник". The same
+    # words further in belong to a sentence about them — "что такое
+    # напоминание в психологии" is a question, and answering it with
+    # "Не поняла, когда напомнить" is a worse failure than the search
+    # this was written to prevent.
+    head = low.split()[:2]
+    return any(word in head for word in
+               TIMER_WORDS + REMIND_WORDS + ALARM_WORDS)
+
+
 def parse(text):
     """Recognises a command about time. Returns Parsed or None."""
     if not text:

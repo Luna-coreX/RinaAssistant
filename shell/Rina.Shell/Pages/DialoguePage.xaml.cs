@@ -233,7 +233,11 @@ public partial class DialoguePage : UserControl
             ? EmptyState.For(
                 S("Разговор пуст"),
                 S("Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."),
-                S("«который час» · «запусти браузер» · «посчитай 15 * 12»"),
+                // Said out loud as well as typed: the box above says
+                // "Скажите вслух или напишите ниже", and "15 * 12" is
+                // not something a person can say. "На" is how the sign
+                // is spoken, and it is what the parser takes.
+                S("«который час» · «запусти браузер» · «посчитай 15 на 12»"),
                 onGlass: true)
             : null;
         Empty.Visibility = nothing ? Visibility.Visible : Visibility.Collapsed;

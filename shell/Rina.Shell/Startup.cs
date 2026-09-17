@@ -2309,15 +2309,26 @@ public partial class App
             // check reads "nothing lit", which is exactly what a broken
             // highlight reads as: the check cannot tell the two apart, so
             // it has to ask outright.
-            Check("курсор дошёл до окна", rows[0].IsMouseOver,
-                  rows[0].IsMouseOver ? ""
-                  : "| поверх нашего стоит чужое окно; наводку здесь "
-                    + "не измерить, и «не подсветилось» ничего не значит");
+            // **Cannot measure is not the same as found a defect.**
+            // Somebody else's window on top means the pointer never
+            // reaches ours, and then every assertion below reads
+            // "nothing lit" — which is also what a broken highlight
+            // reads as. Reporting that as a failure made a full run red
+            // on any desktop with a window open, and a suite that is
+            // red for a reason outside the program is a suite people
+            // stop reading.
+            //
+            // So it is said as a skip, in the words the regression
+            // collects and shows in its summary ("пропущено: …"): loud
+            // enough to be seen, honest enough not to claim a defect.
             if (!rows[0].IsMouseOver)
             {
+                Console.WriteLine("     пропущено: поверх нашего стоит чужое "
+                                  + "окно; наводку здесь не измерить, и "
+                                  + "«не подсветилось» ничего не значит");
                 Console.WriteLine();
                 Console.WriteLine($"Ошибок: {fails}");
-                Environment.ExitCode = 1;
+                Environment.ExitCode = fails == 0 ? 0 : 1;
                 SetCursorPos(was.X, was.Y);
                 Shutdown();
                 return;
@@ -5192,9 +5203,15 @@ public partial class App
             // The same trap the settings check fell into once already.
             var shown = fresh!;
             await shown.ReloadForCheckAsync();
-            await Task.Delay(300);
+            // Waited for, not slept through. The reload goes to the core
+            // over the wire, and three hundred milliseconds is a guess
+            // about how long that takes: red about one run in twenty,
+            // green when run alone. The height goes into the message so
+            // that a real failure says which of the two things went
+            // wrong — not folded, or not loaded at all.
             Check("встроенные свёрнуты сразу",
-                  shown.FoldedForCheck("builtin"));
+                  await Until(() => shown.FoldedForCheck("builtin")),
+                  $"| высота списка {shown.ListHeight:0}");
             var closed = shown.ListHeight;
             shown.FoldForCheck("builtin", false);
 
