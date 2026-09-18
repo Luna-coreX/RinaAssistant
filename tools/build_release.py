@@ -316,6 +316,38 @@ def main(argv):
     return 0
 
 
+def find_iscc():
+    """
+    Where the Inno Setup compiler actually is.
+
+    **`PATH` is not where it lives.** The installer does not add itself
+    to `PATH` — it puts `ISCC.exe` in its own folder under Program
+    Files — so `shutil.which` answered "no" on a machine where it was
+    installed, and the build honestly reported a missing step for days
+    while the compiler sat ten centimetres away. An honest report of a
+    wrong reading is still a wrong reading.
+    """
+    found = shutil.which("ISCC") or shutil.which("ISCC.exe")
+    if found:
+        return found
+
+    # The usual places, newest first. Named rather than searched for:
+    # walking Program Files to find a compiler is slower than knowing
+    # where compilers go.
+    roots = [os.environ.get("ProgramFiles(x86)"),
+             os.environ.get("ProgramFiles"),
+             os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs")]
+    for version in ("6", "5", ""):
+        for root in roots:
+            if not root:
+                continue
+            path = os.path.join(root, f"Inno Setup {version}".strip(),
+                                "ISCC.exe")
+            if os.path.isfile(path):
+                return path
+    return ""
+
+
 def wrap_installer(wanted):
     """
     Wrap the layout into an installer, if there is anything to do it with.
@@ -329,7 +361,7 @@ def wrap_installer(wanted):
     script = os.path.join(ROOT, "packaging", "rina.iss")
     if not os.path.isfile(script):
         return ""
-    compiler = shutil.which("ISCC") or shutil.which("ISCC.exe")
+    compiler = find_iscc()
     if not compiler:
         if wanted:
             raise SystemExit(
@@ -338,13 +370,31 @@ def wrap_installer(wanted):
                 "без него: раскладка уже готова.")
         say("установщик пропущен", "нет ISCC (Inno Setup) — раскладка готова")
         return ""
-    say("собираем установщик", os.path.basename(script))
-    done = subprocess.run([compiler, script], capture_output=True, text=True,
+    version = core_version()
+    say("собираем установщик", f"{os.path.basename(script)} {version}")
+    done = subprocess.run([compiler, f"/DAppVersion={version}", script],
+                          capture_output=True, text=True,
                           encoding="utf-8", errors="replace", env=child_env())
     if done.returncode != 0:
         raise SystemExit("установщик не собрался:\n"
                          + (done.stdout or "")[-1200:])
-    return os.path.join(ROOT, "dist", "RinaAssistant-4.0.0-setup.exe")
+    return os.path.join(ROOT, "dist",
+                        f"RinaAssistant-{version}-setup.exe")
+
+
+def core_version():
+    """
+    Which version this build is, asked of the one place that knows.
+
+    `version.py` is the core's own number (ADR 0004). The installer used
+    to carry its own copy, written as a literal, and the two had already
+    parted: the core said `4.0.0-beta` and the downloaded file said
+    `4.0.0`.
+    """
+    about = {}
+    with io.open(os.path.join(ROOT, "version.py"), encoding="utf-8") as src:
+        exec(src.read(), about)                          # noqa: S102
+    return str(about.get("APP_VERSION") or "0.0.0")
 
 
 if __name__ == "__main__":

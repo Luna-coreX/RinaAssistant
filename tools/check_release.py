@@ -252,6 +252,128 @@ finally:
             core.kill()
     shutil.rmtree(home, ignore_errors=True)
 
+# ---------------------------------------------------------------------------
+# And the installer itself, if one was built
+# ---------------------------------------------------------------------------
+#
+# **The file a person downloads is part of the release.** Everything
+# above checks the layout — what the installer will put on disk — and
+# nothing checked the installer. Both halves of that were wrong at once:
+# the compiler was on the machine and the build could not find it
+# (`shutil.which` looks in `PATH`, and Inno Setup does not put itself
+# there), so no installer had ever been built; and the script carried
+# its own copy of the version as a literal, so when the core became
+# `4.0.0-beta` the file went on being called `4.0.0` — the download
+# lying about what is inside it.
+print()
+print("=== установщик ===")
+
+about = {}
+with io.open(os.path.join(ROOT, "version.py"), encoding="utf-8") as src:
+    exec(src.read(), about)                              # noqa: S102
+version = str(about.get("APP_VERSION") or "")
+
+wanted = os.path.join(ROOT, "dist", f"RinaAssistant-{version}-setup.exe")
+built = [name for name in os.listdir(os.path.join(ROOT, "dist"))
+         if name.endswith("-setup.exe")] \
+    if os.path.isdir(os.path.join(ROOT, "dist")) else []
+
+if not built:
+    # Not a failure: the layout is usable without it, and this check
+    # runs on machines with no Inno Setup. Said out loud, though —
+    # silence here would read as "checked".
+    print(f"     (установщика нет; собрать: python tools/build_release.py "
+          f"--installer)")
+else:
+    check("установщик назван версией ядра", os.path.isfile(wanted),
+          f"| ждали {os.path.basename(wanted)}, лежит {built}")
+    if os.path.isfile(wanted):
+        weight = os.path.getsize(wanted) / 1024 / 1024
+        # A hundred megabytes of runtime and shell. Twenty would mean
+        # the payload did not get in; a check on "the file exists"
+        # would pass on an empty stub.
+        check("и весит как выпуск, а не как заглушка", weight > 50,
+              f"| {weight:.0f} МБ")
+
+# ---------------------------------------------------------------------------
+# The whole way round: install, run, uninstall
+# ---------------------------------------------------------------------------
+#
+# Opt-in (`--probe-install`), because it takes minutes and writes to the
+# disk. But it is the only thing that answers the question a person
+# actually asks of a release — "does it install and does it then go
+# away" — and both halves of that were wrong the first time it was run:
+# the layout was fine and the uninstaller left fifty-eight files behind.
+#
+# Into a folder of its own and out again. The person's data in %APPDATA%
+# is not touched: an uninstall that took it would be a different defect,
+# and a check that arranged one would be worse.
+if "--probe-install" in sys.argv:
+    print()
+    print("=== установка и удаление ===")
+
+    setup = wanted if os.path.isfile(wanted) else ""
+    if not setup:
+        check("есть что ставить", False, "| установщик не собран")
+    else:
+        where = os.path.join(tempfile.gettempdir(), "rina-release-probe")
+        shutil.rmtree(where, ignore_errors=True)
+        quiet = ["/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART"]
+
+        put = subprocess.run([setup, *quiet, f"/DIR={where}"],
+                             capture_output=True, text=True,
+                             encoding="utf-8", errors="replace")
+        check("установщик отработал", put.returncode == 0,
+              f"| код {put.returncode}")
+
+        shell = os.path.join(where, "Rina.Shell.exe")
+        check("оболочка поставлена", os.path.isfile(shell))
+
+        if os.path.isfile(shell):
+            # The shell's own end-to-end check, run from where it was
+            # installed: it raises the installed core and talks to it.
+            # "The files are on disk" and "the program works from
+            # there" are different claims.
+            alive = subprocess.run([shell, "--check-core"],
+                                   capture_output=True, text=True,
+                                   encoding="utf-8", errors="replace",
+                                   cwd=where, timeout=600)
+            check("поставленная программа поднимает своё ядро",
+                  alive.returncode == 0, f"| код {alive.returncode}")
+
+        removers = [name for name in os.listdir(where)
+                    if name.startswith("unins") and name.endswith(".exe")] \
+            if os.path.isdir(where) else []
+        check("деинсталлятор на месте", bool(removers), f"| {removers}")
+
+        if removers:
+            gone = subprocess.run(
+                [os.path.join(where, removers[0]), *quiet],
+                capture_output=True, text=True,
+                encoding="utf-8", errors="replace")
+            check("удаление отработало", gone.returncode == 0,
+                  f"| код {gone.returncode}")
+            # The uninstaller hands control back before it has finished
+            # taking itself away.
+            for _ in range(20):
+                if not os.path.isdir(where):
+                    break
+                time.sleep(0.5)
+
+            left = []
+            for base, _dirs, files in os.walk(where):
+                left.extend(os.path.join(base, one) for one in files)
+            # **Nothing left.** Python writes `__pycache__` beside the
+            # modules it runs, and the uninstaller removes only what it
+            # put there — so the first real run of this left fifty-eight
+            # files and a tree of folders in a place a person would find
+            # six months later.
+            check("после удаления ничего не осталось", not left,
+                  f"| {len(left)} файлов, например "
+                  + ", ".join(os.path.relpath(one, where)
+                              for one in left[:3]))
+            shutil.rmtree(where, ignore_errors=True)
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
