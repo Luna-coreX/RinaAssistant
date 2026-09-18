@@ -3698,6 +3698,7 @@ public partial class App
         // look. This whole block ran against such a page and was green.
         // Found by asking it for a screenshot and getting an empty corner.
         var page = (Pages.HomePage)(await SettledPage(window))!;
+
         var list = page.OpenTodoForCheck();
         await Until(() => page.TodoShowing && list.IsLoaded, 5);
         await Until(() => page.TodoOnScreen, 5);
@@ -3778,6 +3779,48 @@ public partial class App
         await Until(() => shown.TilesShown == 1, 5);
         Check("объявленная плитка рисуется", shown.TilesShown == 1,
               $"| {shown.TilesShown}");
+
+
+        // --- a tile is something one can use, not only look at ---
+        //
+        // Both halves of this were broken at once and neither said so.
+        // A plugin's input field carried a fixed width of 220 inside a
+        // tile 208 wide, so its button stood off the edge and the field
+        // could not be sent; and its placeholder was put into `Tag`,
+        // which the field's template does not read, so a plugin's hint
+        // was never shown to anybody. Found by writing a plugin with a
+        // field on it and looking.
+        //
+        // Drawn from a made-up tile rather than from whatever is
+        // installed: a check that needs a particular plugin switched on
+        // is a check about somebody's machine.
+        shown.ShowTilesForCheck([
+            new JsonObject
+            {
+                ["id"] = "проверка",
+                ["elements"] = new JsonArray(
+                    new JsonObject
+                    {
+                        ["kind"] = "card",
+                        ["text"] = "Плитка",
+                        ["children"] = new JsonArray(
+                            new JsonObject
+                            {
+                                ["kind"] = "input",
+                                ["action"] = "нечего",
+                                ["text"] = "подсказка поля",
+                                ["variant"] = "=",
+                            }),
+                    }),
+            },
+        ]);
+        await Task.Delay(300);
+
+        var inside = shown.TileFits();
+        Check("поле плагина помещается в плитку вместе с кнопкой",
+              inside.Fits, $"| {inside.Said}");
+        Check("и подсказка поля видна", inside.Hinted,
+              $"| «{inside.Hint}»");
 
         shown.ShowTilesForCheck([]);
         await Until(() => shown.TilesShown == 0, 5);

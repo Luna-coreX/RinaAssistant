@@ -337,10 +337,77 @@ public partial class HomePage : UserControl
             var view = new PluginView(_link, id);
             view.Draw(elements);
             view.Margin = new Thickness(0, 0, 12, 12);
-            view.MaxWidth = 208;
+            view.MaxWidth = TileWidth;
             Tiles.Items.Add(view);
         }
     }
+
+    /// <summary>
+    /// Does what is on a tile fit on it — for the check.
+    /// </summary>
+    /// <remarks>
+    /// A tile is narrow on purpose, and everything a plugin puts on one
+    /// has to live inside that. Measured rather than looked at: the
+    /// field that did not fit had been there since tiles existed, and
+    /// every check was green.
+    /// </remarks>
+    public (bool Fits, bool Hinted, string Hint, string Said) TileFits()
+    {
+        // **Measured on a narrow tile, not on today's tile.** The
+        // property is "the field gives way and the button keeps its
+        // size", and a tile wide enough for both hides a field that
+        // cannot give way at all: the fixed 220 fits in 320 and the
+        // check would go green over the very fault it was written for.
+        foreach (var narrow in Tiles.Items.OfType<PluginView>())
+            narrow.MaxWidth = 200;
+        UpdateLayout();
+        var over = 0.0;
+        var hint = "";
+        var hinted = false;
+        foreach (var view in Tiles.Items.OfType<PluginView>())
+        {
+            foreach (var child in Everything(view).OfType<FrameworkElement>())
+            {
+                if (child.ActualWidth <= 0) continue;
+                var at = child.TransformToAncestor(view)
+                              .Transform(new Point(0, 0));
+                over = Math.Max(over, at.X + child.ActualWidth
+                                      - view.ActualWidth);
+                if (child is not TextBox box) continue;
+                hint = Styles.Ui.GetHint(box) ?? "";
+                hinted = hint.Length > 0;
+            }
+        }
+        foreach (var back in Tiles.Items.OfType<PluginView>())
+            back.MaxWidth = TileWidth;
+        UpdateLayout();
+        return (over <= 0.5, hinted, hint,
+                $"при ширине 200 вылезает на {Math.Max(0, over):0}"); // not UI
+    }
+
+    private static IEnumerable<DependencyObject> Everything(
+        DependencyObject root)
+    {
+        var count = System.Windows.Media.VisualTreeHelper
+                          .GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper
+                              .GetChild(root, i);
+            yield return child;
+            foreach (var deeper in Everything(child)) yield return deeper;
+        }
+    }
+
+    /// <summary>
+    /// How wide a tile is allowed to be.
+    /// </summary>
+    /// <remarks>
+    /// Two hundred and eight was set when a tile was two lines of text.
+    /// A field with a button beside it does not fit in that, and the
+    /// window is no longer nine hundred points wide either.
+    /// </remarks>
+    private const double TileWidth = 320;
 
     /// <summary>How many tiles are showing — for the check.</summary>
     public int TilesShown => Tiles.Items.Count;
@@ -364,7 +431,7 @@ public partial class HomePage : UserControl
                 || elements.Count == 0) continue;
             var view = new PluginView(_link, one["id"]?.GetValue<string>() ?? "");
             view.Draw(elements);
-            view.MaxWidth = 208;
+            view.MaxWidth = TileWidth;
             Tiles.Items.Add(view);
         }
     }

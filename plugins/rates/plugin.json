@@ -1,0 +1,11 @@
+{
+  "id": "rates",
+  "name": "Курс",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Курс доллара и евро по Центробанку — плиткой на главном экране и по вопросу вслух.",
+  "icon": "₽",
+  "entry": "RatesPlugin",
+  "api_version": 4,
+  "permissions": ["network.external"]
+}

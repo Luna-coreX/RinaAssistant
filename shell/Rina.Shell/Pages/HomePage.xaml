@@ -94,9 +94,13 @@
         is for, the remote belongs to something that is already happening, and
         a plugin's tile is something to glance at.
       -->
+      <!-- Wide enough for a tile one can do something in. Four
+           hundred and forty was set when a tile was two lines of text;
+           a field with a button beside it does not fit in half of that,
+           and the window is no longer nine hundred points wide either. -->
       <ItemsControl x:Name="Tiles" Grid.Row="2"
                     HorizontalAlignment="Center" Margin="0,0,0,16"
-                    MaxWidth="440">
+                    MaxWidth="680">
         <ItemsControl.ItemsPanel>
           <ItemsPanelTemplate>
             <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />

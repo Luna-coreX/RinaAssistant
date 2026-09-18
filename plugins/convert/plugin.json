@@ -1,0 +1,10 @@
+{
+  "id": "convert",
+  "name": "Пересчёт",
+  "version": "1.0.0",
+  "author": "NeuroSync Foundry Team",
+  "description": "Переводит величины: «5 км в мили», «20 °C в °F», «3 кг в фунты». Поле прямо на главном экране.",
+  "icon": "⇄",
+  "entry": "ConvertPlugin",
+  "api_version": 4
+}

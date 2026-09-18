@@ -255,15 +255,25 @@ public partial class PluginView : UserControl
                 return button;
 
             case "input":
+                // **No fixed width.** Two hundred and twenty points
+                // inside a home tile two hundred and eight wide pushed
+                // the button off the edge, and a field one cannot send
+                // is a field one cannot use. The field gives way and the
+                // button keeps its size: of the two, the button is the
+                // one that stops working when it shrinks.
                 var typed = new TextBox
                 {
                     Style = (Style)FindResource("Field"),
-                    Width = 220,
+                    MinWidth = 96,
                     Text = element["value"]?.GetValue<string>() ?? "",
-                    // A hint inside a field is a hint, not a value: what
-                    // was left empty is not sent at all.
-                    Tag = text,
                 };
+                // A hint inside a field is a hint, not a value: what was
+                // left empty is not sent at all. **Through `Ui.Hint`**,
+                // which is what the field's template reads — it used to
+                // be put in `Tag`, where nothing looked for it, so a
+                // plugin's placeholder was never shown to anybody and
+                // nothing said so.
+                Styles.Ui.SetHint(typed, text);
                 var send = new Button
                 {
                     Style = (Style)FindResource("Btn"),
@@ -288,11 +298,16 @@ public partial class PluginView : UserControl
                     if (key.Key == System.Windows.Input.Key.Return)
                         await SendAsync();
                 };
-                var field = new StackPanel
+                var field = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+                field.ColumnDefinitions.Add(new ColumnDefinition
                 {
-                    Orientation = Orientation.Horizontal,
-                    Margin = new Thickness(0, 4, 0, 4),
-                };
+                    Width = new GridLength(1, GridUnitType.Star),
+                });
+                field.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = GridLength.Auto,
+                });
+                Grid.SetColumn(send, 1);
                 field.Children.Add(typed);
                 field.Children.Add(send);
                 return field;
