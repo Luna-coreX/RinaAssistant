@@ -32,10 +32,11 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from core.audit import AuditLog
+from core.audit import AuditLog, redact_args
 from core.confirmations import ConfirmationError, ConfirmationLedger
 from core.i18n import t as tr
-from core.logging_setup import get_logger, safe, security_log
+from core.logging_setup import (get_logger, safe, security_log,
+                                texts_allowed)
 from core.permissions import PERMISSIONS
 from core.tools import ToolError, UnknownTool
 from core.toolbox import default_registry
@@ -759,8 +760,15 @@ class ToolRunner:
         checked = self._registry.validate(name, args)
         confirmation = self._confirmations.issue(
             tool.name, checked, ttl=ttl, preview=preview)
+        # **Redacted, like everything else that is written down.**
+        # `core/audit.py` derived the rule and the security journal did
+        # not follow it: the very arguments the database carefully turns
+        # into lengths were written here in full — and this journal is
+        # never level-gated, so «найди в интернете ...» went into it
+        # whatever the person had chosen. Same rule, one place.
         security_log().info(
-            "Запрошено подтверждение: %s %s", tool.name, checked)
+            "Запрошено подтверждение: %s %s", tool.name,
+            redact_args(tool, checked, verbatim=texts_allowed()))
         return confirmation
 
     # ------------------------------------------------------------------
@@ -802,16 +810,25 @@ class ToolRunner:
             except ConfirmationError as e:
                 security_log().warning(
                     "Опасное действие отклонено без подтверждения: %s %s (%s)",
-                    tool.name, checked, e.code)
+                    tool.name,
+                    redact_args(tool, checked, verbatim=texts_allowed()),
+                    e.code)
                 self._write(tool, checked, source, tool.permissions, False,
                             e.code, started, confirmation_id, trace_id)
                 return ToolResult.failed(
                     tr("Это действие нужно подтвердить."), e.code)
             security_log().warning(
                 "Опасное действие подтверждено и выполняется: %s %s "
-                "(подтверждение %s)", tool.name, checked, confirmation.id)
+                "(подтверждение %s)", tool.name,
+                redact_args(tool, checked, verbatim=texts_allowed()),
+                confirmation.id)
 
-        log.debug("Вызов %s(%s) из %s", tool.name, checked, source)
+        # At DEBUG too, and that is the level a person is asked to
+        # switch on when something is wrong — so this is exactly the
+        # line that would hand over a conversation in a bug report.
+        log.debug("Вызов %s(%s) из %s", tool.name,
+                  redact_args(tool, checked, verbatim=texts_allowed()),
+                  source)
         try:
             run = self._added.get(tool.name) or IMPLEMENTATIONS[tool.name]
             result = run(self._ctx, checked)

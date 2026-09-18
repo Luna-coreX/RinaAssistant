@@ -44,6 +44,16 @@ SECURITY_FILE_NAME = "security.log"
 MAX_BYTES = 1024 * 1024
 BACKUP_COUNT = 3
 
+# The security journal is kept longer, and that is a different decision
+# from the one above. The general journal is for looking into the last
+# failure; this one is the record one goes back to — "when did this
+# machine get permission to shut itself down" is a question asked weeks
+# later. At a megabyte times three it had already rotated four times on
+# one developer's machine, which means the answer to that question was
+# thrown away to save four megabytes.
+SECURITY_MAX_BYTES = 4 * 1024 * 1024
+SECURITY_BACKUP_COUNT = 5
+
 LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR")
 DEFAULT_LEVEL = "INFO"
 _LEVEL_VALUES = {
@@ -211,7 +221,8 @@ def _setup_security_handler(formatter, trace_filter=None):
     try:
         handler = logging.handlers.RotatingFileHandler(
             os.path.join(logs_dir(), SECURITY_FILE_NAME),
-            maxBytes=MAX_BYTES, backupCount=BACKUP_COUNT, encoding="utf-8")
+            maxBytes=SECURITY_MAX_BYTES, backupCount=SECURITY_BACKUP_COUNT,
+            encoding="utf-8")
         handler.setFormatter(formatter)
         if trace_filter is not None:
             handler.addFilter(trace_filter)

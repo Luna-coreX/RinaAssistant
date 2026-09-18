@@ -690,6 +690,21 @@ class ProtocolServer:
                     # the interface in the shell, each on its own side.
                     from core import i18n
                     i18n.set_language(str(accepted["ui_language"]))
+                # **The settings that change what the program may do.**
+                # Only the reset to defaults was recorded, so switching
+                # the model to somebody else's server, letting the
+                # journal keep the texts of replies, or pointing the
+                # program at a new folder to launch things from left no
+                # trace at all — and those are the changes one goes back
+                # to the journal about. The name and the new value: these
+                # are settings, not speech, and a value one cannot see is
+                # a line that answers nothing.
+                watched = sorted(set(accepted) & settings_schema.WATCHED)
+                if watched:
+                    from core.logging_setup import security_log
+                    for key in watched:
+                        security_log().info("Настройка %s → %r",
+                                            key, accepted[key])
                 if "log_level" in accepted:
                     # The journal level could be applied on the fly
                     # (`apply_settings`), but it was called by whoever
@@ -1712,6 +1727,16 @@ class ProtocolServer:
         """
         granted = (message.type == "response"
                    and message.payload.get("granted") is True)
+        # **A permission the person gave is a security event.** The
+        # journal recorded the refusal of a dangerous tool and said
+        # nothing about the moment somebody was asked for power over
+        # the machine and said yes — which is the half one goes back to
+        # the journal for. What is written is the answer, not what was
+        # asked about: the request itself is already in the line above,
+        # and the text of it belongs to the person.
+        from core.logging_setup import security_log
+        security_log().info("Разрешение %s пользователем",
+                            "выдано" if granted else "не выдано")
         self.engine.answer_question(granted)
 
     # -- speech (4.0-E03, E04) --------------------------------------------------------
@@ -1727,6 +1752,11 @@ class ProtocolServer:
     #: and a line each would bury the journal it was meant to help.
     heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
              "recognitions": 0, "texts": 0, "dropped": 0}
+
+    #: What has already been said about the sound, so that it is not said
+    #: again every twenty seconds. See `_say_what_is_heard`.
+    _noted_stream = False
+    _noted_quiet = False
 
     #: Phrases waiting their turn, and the one thread that takes them.
     #:
@@ -1894,13 +1924,21 @@ class ProtocolServer:
         if speech.Segmenter.level(pcm) >= self.segmenter.threshold:
             self.heard["loud_frames"] += 1
 
-        # Every few seconds while nothing is being cut out — quietly, at
-        # debug. A stream that arrives and yields no phrase means the
+        # **Said when it changes, not on a timer.** This used to write a
+        # line every two hundred frames for as long as the microphone was
+        # open, and in a real journal that came to two hundred and
+        # seventy-five identical lines — the commonest entry in the file,
+        # and the one carrying the least. A person who switches DEBUG on
+        # to find out why she does not hear them then has to read past
+        # it.
+        #
+        # What is worth a line is a change of picture: sound started
+        # arriving; sound is arriving and none of it is loud enough to
+        # cut a phrase out of. A stream that yields no phrase means the
         # loudness never crossed the threshold, and that is a different
-        # complaint from silence with a different cure.
-        if self.heard["frames"] % 200 == 0 and self.heard["phrases"] == 0:
-            log.debug("Звук идёт (%d кадров), громких %d, фраз пока нет",
-                      self.heard["frames"], self.heard["loud_frames"])
+        # complaint from silence with a different cure — so the two are
+        # separate sentences and each is said once.
+        self._say_what_is_heard()
 
         phrases = self.segmenter.feed(pcm)
 
@@ -1927,6 +1965,34 @@ class ProtocolServer:
             # Already fed, piece by piece — so what goes into the queue
             # is the order to finish, not the sound a second time.
             self._queue_phrase(None if self._streaming() else phrase)
+
+    def _say_what_is_heard(self) -> None:
+        """One line per change of what the microphone is doing."""
+        loud = self.heard["loud_frames"] > 0
+        # Half a second of sound before saying anything: the first frame
+        # of a stream arrives before the person has drawn breath.
+        if self.heard["frames"] < 25:
+            return
+
+        if not self._noted_stream:
+            self._noted_stream = True
+            log.debug("Звук пошёл: %d кадров", self.heard["frames"])
+
+        # And once, when it becomes clear that sound is coming and
+        # nothing is loud enough to be a phrase. Ten seconds of that is
+        # a diagnosis, not a hiccup.
+        if (not self._noted_quiet and not loud
+                and self.heard["frames"] >= 500
+                and self.heard["phrases"] == 0):
+            self._noted_quiet = True
+            log.warning(
+                "Звук идёт, но ни один кадр не громче порога %.3f — "
+                "фраз не будет", self.segmenter.threshold)
+
+        # The other way round too: it was quiet, and now it is not.
+        if self._noted_quiet and loud:
+            self._noted_quiet = False
+            log.debug("Громкие кадры пошли: %d", self.heard["loud_frames"])
 
     def _stt_queue(self) -> "collections.deque":
         """The queue, and the thread that empties it — made on first use."""

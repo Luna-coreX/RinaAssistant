@@ -43,7 +43,19 @@ import os
 import queue
 import struct
 import threading
+import time
 from typing import Protocol
+
+from core.logging_setup import get_logger
+
+#: **There was none, and two lines called it.** `log.exception("Поток
+#: синтеза оборвался")` and the warning beside it have been in this
+#: file since `4.0b-E10` with no `log` anywhere in it — so the one
+#: thing that would have explained a broken synthesis stream raised
+#: `NameError` inside the handler meant to report the break, on a
+#: background thread, where it went to the thread hook as an unrelated
+#: crash. Found by counting which modules write to the journal at all.
+log = get_logger("speech")
 
 #: The format sound travels in between the shell and the core.
 RATE = 16000
@@ -346,14 +358,26 @@ class VoskRecogniser:
         """Open the model. Seconds, so not before the first phrase."""
         if self._model is not None:
             return True
+        # **Said out loud, both ways.** Recognition wrote nothing at all
+        # about itself — not which engine, not which model, not why it
+        # refused — and it is the subsystem whose journal gets read the
+        # most: twice a person has gone into it to find out why she does
+        # not hear them, and twice the answer had to be guessed from the
+        # lines of neighbouring modules. Loading takes seconds and
+        # happens once; a line for it is not noise.
+        started = time.monotonic()
         try:
             import vosk
 
             vosk.SetLogLevel(-1)
             self._model = vosk.Model(self.model_path)
+            log.info("Vosk: модель загружена за %.1f с — %s",
+                     time.monotonic() - started, self.model_path)
             return True
         except Exception as exc:                        # noqa: BLE001
             self._error = str(exc)
+            log.warning("Vosk: модель не загрузилась (%s): %s",
+                        self.model_path, exc)
             return False
 
     def recognise(self, pcm: bytes, language: str = "ru") -> Heard:
@@ -467,13 +491,22 @@ class WhisperRecogniser:
         """Load the model — and download it if this is the first time."""
         if self._model is not None:
             return True
+        # The first load may also be a download of several hundred
+        # megabytes, and from outside that is indistinguishable from
+        # "she has stopped answering". A line before and a line after.
+        started = time.monotonic()
+        log.info("Whisper: загружаю модель «%s»", self.size)
         try:
             import whisper
 
             self._model = whisper.load_model(self.size)
+            log.info("Whisper: модель «%s» готова за %.1f с",
+                     self.size, time.monotonic() - started)
             return True
         except Exception as exc:                        # noqa: BLE001
             self._error = str(exc)
+            log.warning("Whisper: модель «%s» не загрузилась: %s",
+                        self.size, exc)
             return False
 
     def recognise(self, pcm: bytes, language: str = "ru") -> Heard:

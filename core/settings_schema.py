@@ -166,6 +166,25 @@ CONSTRAINTS: dict[str, Constraint] = {
 }
 
 
+#: Settings whose change is a security event.
+#:
+#: Not "all of them": the volume and the accent colour in the security
+#: journal would bury the four lines that matter. These four change what
+#: the program is allowed to do or where what it says ends up — where
+#: the language model lives, whether the journal keeps the texts of
+#: replies, which folders may be launched from, and which programs are
+#: watched.
+WATCHED = frozenset({
+    "llm_url",
+    "llm_enabled",
+    "log_texts",
+    "program_folders",
+    "watch_apps",
+    "save_history",
+    "web_search_fallback",
+})
+
+
 def type_of(key: str) -> str:
     """A value's type, from its default."""
     return _TYPE_NAMES.get(type(DEFAULTS.get(key)), "string")
