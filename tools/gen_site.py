@@ -219,8 +219,7 @@ PAPERS = [
     ("changelog", "CHANGELOG.md", "Что менялось",
      "По выпускам.", "en"),
     ("plan", "docs/ROADMAP.md", "Полный план",
-     "Рубежи, блоки, задачи — вместе с причинами, по которым что-то "
-     "отложено.", "ru"),
+     "Рубежи, блоки и все задачи: размер, зависимости, состояние.", "ru"),
 ]
 
 #: Task lines of the plan: `**4.0-I01 · Сборка** — L — всё — **ВЫПОЛНЕНО**`.
@@ -256,43 +255,116 @@ def address(target, here):
     return BLOB + path + anchor
 
 
-def folded(source):
-    """The plan, with each task's explanation folded away.
+def folded(task, said):
+    """One task, and the paragraph that says what it is, folded away.
 
-    Without this the page is four thousand lines of prose and nobody
-    finds anything in it. With it the plan reads as what it is — a list
-    of tasks with their state — and opens where the reader is curious.
-    `details` does that without a line of script.
+    `said` is everything the document wrote under the task; what comes
+    back is the task line and, behind a disclosure, its first
+    paragraph. A task with nothing under it is just the line — an
+    empty disclosure is an affordance that lies.
+    """
+    if not task:
+        return []
+    first = []
+    for line in said:
+        if not line.strip():
+            if first:
+                break
+            continue
+        first.append(line)
+    if not first:
+        return ["", task, ""]
+    return ["", "::details", "::summary " + task, ""] + first + ["", "::end", ""]
+
+
+def plain(source):
+    """The plan without the workshop around it.
+
+    `ROADMAP.md` is written for whoever is building the thing: every
+    task carries the argument behind it, the edition that did not work,
+    the measurement that settled it. Four thousand lines of that is the
+    right amount in the repository and the wrong amount on a product
+    page — seven hundred kilobytes against fifteen for every other
+    document here. A reader who came to see what is planned was handed
+    a notebook.
+
+    So the page keeps what a plan is: the milestone, the block, what
+    the block is for, and every task with its size, its dependencies,
+    its state — and, behind a disclosure, the paragraph that says what
+    the task actually is. What goes is everything after that first
+    paragraph, and the headings the workshop grows inside a block —
+    `Поправка`, `Четвёртая редакция`, `Сделано`.
+
+    The first paragraph is the cut because the document is written that
+    way: it states the task, and the argument comes after it under its
+    own bold lead. `4.0-I01` opens with the decision and the three
+    files that carry it, and then spends two screens on the installer
+    that lied on its first run.
+
+    The rule is the document's own shape rather than a list of
+    exceptions, which would go stale the first time a block is added:
+    text before the first task of a section says what the section is
+    for and stays; text after a task belongs to that task. A task is
+    kept wherever it is found, including under a heading that is itself
+    dropped — `4.0b-A06` lives under `Обязательный список беты`, and
+    the task is not the heading's to take with it.
     """
     out = []
     lines = source.replace("\r\n", "\n").split("\n")
-    at = 0
-    while at < len(lines):
-        found = TASK.match(lines[at])
-        if not found:
-            out.append(lines[at])
-            at += 1
+    seen = False
+    fenced = False
+    said = []
+    for line in lines:
+        # A `#` inside a fence is a shell comment, and dropping one
+        # would be a silent hole in a code block rather than a visible
+        # one. There are none in the plan today; the reason to handle
+        # it is that there is no way to notice the day there are.
+        if line.startswith("```"):
+            fenced = not fenced
+            (out if not seen else said).append(line)
             continue
-        head = lines[at]
-        at += 1
-        body = []
-        while at < len(lines) and not (
-                TASK.match(lines[at]) or lines[at].startswith("#")
-                or re.match(r"^-{3,}\s*$", lines[at])):
-            body.append(lines[at])
-            at += 1
-        while body and not body[-1].strip():
-            body.pop()
-        if not body:
-            out.append(head)
+        if fenced:
+            (out if not seen else said).append(line)
             continue
-        out.append("::details")
-        out.append("::summary " + head)
-        out.append("")
-        out += body
-        out.append("")
-        out.append("::end")
-    return "\n".join(out)
+        if TASK.match(line):
+            out.extend(folded(seen, said))
+            seen = line
+            said = []
+            continue
+        if re.match(r"^-{3,}\s*$", line):
+            # A rule closes the block, so it closes the task under it
+            # too. Left inside, it was the whole of three disclosures:
+            # `4.0-U14`, `5.0-C06` and `V-09` are each the last task of
+            # their block and have no paragraph of their own.
+            out.extend(folded(seen, said))
+            seen = False
+            said = []
+            out.append(line)
+            continue
+        if re.match(r"^#{3,}\s", line):
+            continue
+        if line.startswith("#"):
+            out.extend(folded(seen, said))
+            seen = False
+            said = []
+            out.append(line)
+            continue
+        if seen:
+            said.append(line)
+        else:
+            out.append(line)
+    out.extend(folded(seen, said))
+
+    # Dropped paragraphs leave runs of blank lines behind, and the
+    # reader would parse those into empty paragraphs and stray rules.
+    tight = []
+    for line in out:
+        if not line.strip() and tight and not tight[-1].strip():
+            continue
+        if re.match(r"^-{3,}\s*$", line) and (not tight or tight[-1].startswith("#")):
+            continue
+        tight.append(line)
+    return "\n".join(tight)
 
 
 #: What a milestone is called on the page, where the plan's own heading
@@ -361,7 +433,7 @@ def paper(slug, title, lead, lang, source, tokens):
                            % (done, all_, escape(name))
                            for name, done, all_ in rows)
                  + "    </div>\n")
-        text = folded(text)
+        text = plain(text)
     body, contents = markdown_site.render(
         text, lambda one: address(one, source))
 
@@ -371,6 +443,17 @@ def paper(slug, title, lead, lang, source, tokens):
     said = ("Документ репозитория, страницей."
             if lang == "ru" else
             "Документ репозитория, страницей. Написан по-английски.")
+    # The plan is the one page that is not the whole document, and a
+    # page that quietly shows less than it claims is worse than a long
+    # page. It says what it left out and where that went.
+    if slug == "plan":
+        said = ("Документ репозитория, страницей — в сокращении: "
+                "разбор каждой задачи остался в источнике.")
+        whole = ("; здесь — рубежи, блоки и задачи, "
+                 "а доводы, редакции и замеры по каждой — там.")
+    else:
+        whole = ("; страница порождается из него "
+                 "и расходиться с ним не может.")
 
     return """<!DOCTYPE html>
 <html lang="{tongue}">
@@ -413,8 +496,7 @@ def paper(slug, title, lead, lang, source, tokens):
     <div class="hero-say">
       <h1>{title}</h1>
       <p class="lead">{lead}</p>
-      <p class="note">{said} Источник — <a href="{blob}{source}">{source}</a>;
-        страница порождается из него и расходиться с ним не может.</p>
+      <p class="note">{said} Источник — <a href="{blob}{source}">{source}</a>{whole}</p>
     </div>
 {strip}  </div>
 </section>
@@ -443,7 +525,7 @@ def paper(slug, title, lead, lang, source, tokens):
 </body>
 </html>
 """.format(tongue=tongue, title=escape(title), lead=escape(lead),
-           said=said, source=source, blob=BLOB, repo=REPO,
+           said=said, whole=whole, source=source, blob=BLOB, repo=REPO,
            strip=strip, rail=rail, body=body)
 
 

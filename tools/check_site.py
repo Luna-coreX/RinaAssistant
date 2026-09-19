@@ -43,6 +43,7 @@ import os
 import re
 import subprocess
 import sys
+from html import escape, unescape
 from urllib.parse import urlparse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -995,6 +996,104 @@ for name, text in written.items():
           "| никуда не ведут: " + ", ".join(sorted(set(broken))[:6]))
     check(f"{name}: чужих узлов нет", not strangers,
           "| " + ", ".join(sorted(strangers)))
+
+# The plan page is printed short: `gen_site.plain` drops the argument
+# that belongs to each task, because four thousand lines of workshop is
+# the right size in the repository and seven hundred kilobytes on a
+# product page. What it must never drop is the plan. A rule written
+# against the document's shape will meet a shape it did not expect —
+# the day a block is written differently, tasks disappear from the page
+# and the page still looks finished, which is the failure that does not
+# announce itself.
+roadmap = read(os.path.join(ROOT, "docs", "ROADMAP.md"))
+plan_page = written.get("документ plan", "")
+#
+# Each is looked for where it has to stand and not anywhere on the
+# page: nearly every task is named a second time as somebody's
+# dependency, so a search of the whole page finds `4.0b-A07` with the
+# task itself gone. That mistake has been made twice here already.
+lost = [found.group(1) for found in
+        (gen_site.TASK.match(line) for line in roadmap.split("\n"))
+        if found and "<strong>" + found.group(1) + " ·" not in plan_page]
+check("план: на странице все задачи до одной", not lost,
+      "| потеряны при сокращении: " + ", ".join(lost[:8]))
+
+# A task opens to the paragraph that says what it is. Two ways for
+# that to go wrong and look fine: the trimming flattens every task to
+# a line again, or it leaves a disclosure with nothing behind it —
+# an affordance that lies, which is worse than no affordance.
+opens = re.findall(r"<details>(.*?)</details>", plan_page, re.S)
+described = sum(1 for line in roadmap.split("\n") if gen_site.TASK.match(line))
+hollow = [one for one in opens
+          if not re.sub(r"<summary>.*?</summary>|<[^>]+>|\s", "", one, flags=re.S)]
+check("план: пункты раскрываются", len(opens) > described * 0.8,
+      "| раскрывается %d из %d задач" % (len(opens), described))
+check("план: ни одного пустого раскрытия", not hollow,
+      "| пустых: %d" % len(hollow))
+
+#
+# Asked both ways round. Missing headings mean the trimming ate the
+# plan; extra ones mean it left the workshop in — `Четвёртая редакция`,
+# `Сделано`, `Поправка: два ответа перемешивались`. Twelve of those
+# stayed behind the first time, because a rule written for `###` lets
+# `####` through and the page looks the same either way.
+titles = set(re.findall(r"<h[2-6][^>]*>(.*?)</h[2-6]>", plan_page, re.S))
+titles = {unescape(re.sub(r"<[^>]+>", "", one)).strip() for one in titles}
+should = {line.lstrip("# ").strip() for line in roadmap.split("\n")
+          if re.match(r"^#{1,2} ", line)}
+check("план: заголовки — ровно рубежи и блоки", titles == should,
+      "| нет: %s | лишние: %s"
+      % ("; ".join(sorted(should - titles)[:3]) or "—",
+         "; ".join(sorted(titles - should)[:3]) or "—"))
+
+# Two tallies stand on this page a screen apart: the strip counts the
+# task lines of the document, the summary counts the frozen snapshot.
+# They differ by two tasks that split off during the work and by the
+# beta, where the snapshot holds only the V-track — legitimately, and
+# the page now says so. What is not legitimate is the written one
+# going stale: it is typed by hand, and a number typed by hand beside
+# a number that is counted will eventually disagree with it silently.
+import check_scope
+
+tally = check_scope.counts(check_scope.current())
+stated = {stage: (int(done), int(all_)) for stage, done, all_
+          in re.findall(r"(4\.0-\w+|4\.1\+) — (\d+) из (\d+)", roadmap)}
+off = ["%s: написано %d из %d, сосчитано %d из %d"
+       % (stage, stated[stage][0], stated[stage][1], done, all_)
+       for stage, (done, all_) in sorted(tally.items())
+       if stated.get(stage) != (done, all_)]
+check("план: сводка границ сходится со снимком", not off,
+      "| " + "; ".join(off))
+
+# `человек` is the word this project uses for whoever is at the
+# keyboard — «что человек сказал», «согласие человека» — and that is
+# the product's own vocabulary. What used to stand beside it was a
+# diary: a particular person on a particular day saying a particular
+# thing to me. «Решено человеком 9 сентября», «Человек принёс
+# картинку», «человек ждал шестьдесят мегабайт». Notes from a room the
+# reader was not in read as an unfinished document, and they came back
+# twice while this was being written, because the register is natural
+# to write and invisible to reread.
+#
+# The two are told apart by who is meant and not by grammar, so this is
+# a named list and not a rule: «выбранное человеком» is the user's
+# choice and stays, «Решено человеком» was mine and goes. A form nobody
+# has written yet will get past it — what it holds is that the ones
+# already taken out do not quietly come back, which is what they do.
+DIARY = re.compile(
+    r"(?:Решено|решено|Названо|Найдено|найдено|Сказано|Замечено|замечено)"
+    r"\s+человеком"
+    r"|(?:назван|найден|принят)(?:ный|ные|ы|о|а)?\s+человеком"
+    r"|(?:обкатан|выбран)\s+человеком"
+    r"|[Рр]ешени[ея]\s+человека|[Пп]оправка\s+человека"
+    r"|(?:словам|списку|замечаниям)\s+человека"
+    r"|[Чч]еловек\s*:"
+    r"|[Чч]еловек\s+(?:сказал\s+это|принёс|ждал|жаловался)")
+for name, text in written.items():
+    bare = unescape(re.sub(r"<[^>]+>", " ", text))
+    caught = sorted({one.group(0) for one in DIARY.finditer(bare)})
+    check(f"{name}: без записок из мастерской", not caught,
+          "| " + ", ".join(caught[:4]))
 
 # ---------------------------------------------------------------------------
 # The mock-up answers out of the recorded set
