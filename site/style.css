@@ -1246,6 +1246,21 @@ tbody tr:hover td { background: color-mix(in srgb, var(--plate) 55%, transparent
 
 .paper details[open] > *:not(summary) { margin-top: var(--space-within); }
 
+/* Задача, у которой в плане нет пояснения, стоит в том же столбце.
+   Раскрывать нечего, и гнезда у неё нет: щёлкать по пустому — обещание
+   без двери. Но выпасть из колонки она не должна — среди десяти строк
+   две не по линии читаются как поломка вёрстки. */
+.paper p.task {
+  border-top: 1px solid var(--hair);
+  padding-block: var(--space-inner);
+  padding-left: 22px;
+  color: var(--ink);
+}
+
+.paper details + p.task,
+.paper p.task + details,
+.paper p.task + p.task { margin-top: 0; }
+
 /* --------------------------------------------------------------------
  * 13в. Макет программы
  *

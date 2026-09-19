@@ -1018,6 +1018,27 @@ lost = [found.group(1) for found in
 check("план: на странице все задачи до одной", not lost,
       "| потеряны при сокращении: " + ", ".join(lost[:8]))
 
+# Every check above asks about the tasks the parser found, so a task
+# the parser does not recognise is invisible to all of them. `N-` was
+# missing from the prefixes for as long as the RinaNeuro section had
+# existed: forty-six tasks were prose, ran together into one paragraph
+# on the page, and were counted by nobody. Everything was green.
+#
+# So the shape is asked about separately from the prefix: a line that
+# looks like a task has to be one, and a task has to land in a
+# milestone the strip shows.
+unseen = [one.group(1) for one in
+          (gen_site.LOOKS_LIKE_TASK.match(line) for line in roadmap.split("\n"))
+          if one and not gen_site.TASK.match("**%s · %s**"
+                                             % (one.group(1), one.group(2)))]
+check("план: разбор знает все виды задач", not unseen,
+      "| не разобраны: " + ", ".join(sorted(set(unseen))[:6]))
+
+counted = sum(all_ for _name, _done, all_ in gen_site.counted(roadmap))
+tasks = sum(1 for line in roadmap.split("\n") if gen_site.TASK.match(line))
+check("план: каждая задача попала в рубеж", counted == tasks,
+      "| задач %d, сосчитано %d" % (tasks, counted))
+
 # A task opens to the paragraph that says what it is. Two ways for
 # that to go wrong and look fine: the trimming flattens every task to
 # a line again, or it leaves a disclosure with nothing behind it —
@@ -1030,6 +1051,23 @@ check("план: пункты раскрываются", len(opens) > described 
       "| раскрывается %d из %d задач" % (len(opens), described))
 check("план: ни одного пустого раскрытия", not hollow,
       "| пустых: %d" % len(hollow))
+
+# Twenty-two tasks in the plan say nothing more about themselves, so
+# there is nothing to disclose. As bare prose among disclosures they
+# sat twenty-two pixels out of the column, and two rows off the line
+# out of ten read as broken layout rather than as "nothing to open".
+rows = len(re.findall(r"<summary>", plan_page)) \
+     + len(re.findall(r'<p class="task">', plan_page))
+check("план: каждая задача — строка списка", rows == described,
+      "| строк %d при %d задачах" % (rows, described))
+
+style = read(os.path.join(SITE, "style.css"))
+indent = dict(re.findall(r"\.paper (summary|p\.task) \{[^}]*?"
+                         r"padding-left:\s*([\w.]+)", style, re.S))
+check("план: нераскрываемая задача стоит в том же столбце",
+      indent.get("summary") and indent.get("summary") == indent.get("p.task"),
+      "| summary %s, p.task %s" % (indent.get("summary"),
+                                   indent.get("p.task")))
 
 #
 # Asked both ways round. Missing headings mean the trimming ate the

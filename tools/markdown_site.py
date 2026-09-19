@@ -260,6 +260,11 @@ def render(source, link):
                 out.append("<summary>%s</summary>" % prose(rest.strip()))
             elif word == "end":
                 out.append("</details>")
+            elif word == "task":
+                # A task the plan says nothing more about: same row, no
+                # disclosure. `details` with an empty body would be a
+                # control that opens onto nothing.
+                out.append("<p class=\"task\">%s</p>" % prose(rest.strip()))
             at += 1
             continue
 

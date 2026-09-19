@@ -223,8 +223,19 @@ PAPERS = [
 ]
 
 #: Task lines of the plan: `**4.0-I01 · Сборка** — L — всё — **ВЫПОЛНЕНО**`.
-TASK = re.compile(r"^\*\*((?:4\.0|5\.0|V)[\w.+-]*)\s*·\s*([^*]+)\*\*(.*)$")
-STAGE = re.compile(r"^#\s+(?:РУБЕЖ|ВЕРСИЯ|ТРЕК)\s+(.+)$")
+TASK = re.compile(r"^\*\*((?:4\.0|5\.0|V|N)[\w.+-]*)\s*·\s*([^*]+)\*\*(.*)$")
+
+#: Anything shaped like a task, whether or not `TASK` knows the prefix.
+#:
+#: The two are compared by `check_site.py`, and that is the only reason
+#: this exists. `N-` was missing from `TASK` for as long as the
+#: RinaNeuro section had existed: forty-six tasks were not tasks, so
+#: nothing folded them, nothing counted them, and on the page they ran
+#: together into one unreadable paragraph. Nothing went red, because
+#: every check asked about the tasks the parser had found.
+LOOKS_LIKE_TASK = re.compile(r"^\*\*([\w.+-]+)\s*·\s*([^*]+)\*\*")
+
+STAGE = re.compile(r"^#\s+(?:РУБЕЖ|ВЕРСИЯ|ТРЕК|ПРОЕКТ)\s+(.+)$")
 
 
 def address(target, here):
@@ -273,7 +284,7 @@ def folded(task, said):
             continue
         first.append(line)
     if not first:
-        return ["", task, ""]
+        return ["", "::task " + task, ""]
     return ["", "::details", "::summary " + task, ""] + first + ["", "::end", ""]
 
 
@@ -374,7 +385,8 @@ STAGE_NAMES = {"V": "голос"}
 #: Milestones run in time, not in the order the document first
 #: mentions one: the update block sits inside the port, and without
 #: this `4.0-stable` stood on the strip ahead of the beta.
-STAGE_ORDER = ["4.0-port", "4.0-beta", "4.0-stable", "4.1+", "5.0.0"]
+STAGE_ORDER = ["4.0-port", "4.0-beta", "4.0-stable", "4.1+", "5.0.0",
+               "RinaNeuro"]
 
 
 def counted(source):
