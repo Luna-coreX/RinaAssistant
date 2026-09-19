@@ -1,0 +1,1343 @@
+/* Страница продукта — оформление. Задача плана 4.0b-D01.
+ *
+ * Мир: коммутационное поле. Просверленная плита, шнур, ламповый индикатор,
+ * наборная этикетка. Значения приходят из `tokens.css`, порождённого по
+ * дизайн-системе программы (`tools/gen_site.py`); здесь — только решения.
+ * Ни одного цвета числом: `check_site.py` их запрещает, потому что цвет,
+ * набранный тут руками, разошёлся бы с программой молча.
+ *
+ * Что страница держит:
+ *
+ *   * акцент один — шнур; он значит «здесь соединение», и больше нигде;
+ *   * области разделяет волосяная линия, а не карточка;
+ *   * под страницей лежит не фон, а изнанка панели: жгут проводов, по
+ *     которому изредка проходит сигнал, и свет, идущий по плите;
+ *   * содержимое приходит и уходит вместе с прокруткой — на таймлайнах
+ *     CSS, поэтому движение привязано к пути, а не к часам;
+ *   * поставленное движение по-прежнему одно: коммутация в первом экране;
+ *   * содержимое видно по умолчанию: анимация ничего не прячет, и всё,
+ *     что она делает, отменяется `prefers-reduced-motion`;
+ *   * скриптов нет вовсе, поэтому тёмное — не настройка, а сам мир.
+ */
+
+/* --------------------------------------------------------------------
+ * 1. Мера
+ *
+ * Лестница прибора рассчитана на окно в полуметре от глаз; страницу
+ * читают дальше. Поправка одна, названная числом. У заголовков своя
+ * лестница: на странице они вывеска, а не голова раздела.
+ * -------------------------------------------------------------------- */
+:root {
+  --scale: 1.45;
+  --room: clamp(20px, 4.5vw, 64px);
+  --rhythm: clamp(56px, 8vw, 132px);
+
+  --text-meta: calc(var(--type-meta) * var(--scale));
+  --text-legend: calc(var(--type-legend) * var(--scale));
+  --text-body: calc(var(--type-body) * var(--scale));
+  --text-value: calc(var(--type-value) * var(--scale));
+  --text-lead: calc(var(--type-speech) * var(--scale));
+
+  --head-1: clamp(42px, 7vw, 96px);
+  --head-2: clamp(28px, 3.8vw, 52px);
+  --head-3: clamp(19px, 1.5vw, 24px);
+
+  /* Строка, за которой чтение сбивается. */
+  --measure: 68ch;
+
+  /* Шаг поля: радиус гнезда и расстояние между центрами. */
+  --bore: 5px;
+  --pitch: 34px;
+
+  /* Затухание по экспоненте: быстрое начало, долгий выход. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* --------------------------------------------------------------------
+ * 2. Основа и то, что рисует браузер
+ *
+ * Выделение, каретка, полоса прокрутки и рамка фокуса приезжают из
+ * браузера в чужом оформлении. Здесь они свои.
+ * -------------------------------------------------------------------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  scroll-behavior: smooth;
+  scrollbar-color: var(--rim) var(--ground);
+  scrollbar-width: thin;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: var(--text-body);
+  line-height: 1.6;
+  caret-color: var(--cord);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--cord); color: var(--ground); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--ground); }
+::-webkit-scrollbar-thumb { background: var(--rim); }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-faint); }
+
+:focus-visible {
+  outline: 2px solid var(--cord);
+  outline-offset: 3px;
+}
+
+img { max-width: 100%; height: auto; display: block; }
+
+/* Клавиатуре — путь мимо рейки. Видна только когда на ней фокус. */
+.skip {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  z-index: 20;
+  padding: var(--space-inner) var(--space-within);
+  background: var(--strip);
+  color: var(--strip-ink);
+  text-decoration: none;
+}
+
+.skip:focus { left: var(--space-inner); top: var(--space-inner); }
+
+a {
+  color: inherit;
+  text-decoration-color: var(--rim);
+  text-underline-offset: 0.24em;
+  text-decoration-thickness: 1px;
+  transition: text-decoration-color var(--motion-state) var(--ease-out),
+              color var(--motion-state) var(--ease-out);
+}
+
+a:hover { text-decoration-color: var(--cord); }
+
+/* --------------------------------------------------------------------
+ * 2а. Изнанка панели
+ *
+ * Поле гнёзд стоит в первом экране, и ниже страница кончалась обычным
+ * тёмным листом. Сначала то же поле растянули на всю страницу — и это
+ * оказалась сетка точек, та самая, что стоит фоном у каждого тёмного
+ * лендинга. Теперь под страницей то, что бывает **за** коммутатором:
+ * жгут проводов.
+ *
+ * **Жгут лежит в потоке, а не поверх него** — слой растянут от верха до
+ * низа `body` и едет вместе со страницей ровно вровень. Без таймлайнов
+ * и без скриптов: прокруточные шкалы CSS дали бы параллакс, но в панели
+ * предпросмотра `scroll()` не оживает даже у полосы под рейкой, которая
+ * на нём стоит, и делать фон страницы на непроверенном — плохая цена.
+ *
+ * **Плиткой, а не маской.** Первая редакция красила слой цветом и резала
+ * его маской из `wires.svg`. Слой длиной в документ — одиннадцать тысяч
+ * точек — растеризовался кусками: на экране оставались прямоугольники
+ * краски, а кадры шли по пять секунд. Плитка фона такого не требует:
+ * браузер повторяет маленькую картинку и рисует только видимое.
+ *
+ * Цвет из-за этого переехал внутрь `wires.svg` — и потому файл
+ * **порождается** (`gen_site.py`) из тех же `tokens.json`. Написанный
+ * руками, он был бы вторым экземпляром фирменного цвета в файле, куда
+ * никто не заглядывает.
+ *
+ * Плитка 2400 на 1400 и повторяется только вниз: по горизонтали она
+ * шире обычного окна, поэтому рисунок не читается обоями, а толщина
+ * провода не зависит от ширины окна.
+ * -------------------------------------------------------------------- */
+body { position: relative; }
+
+.loom {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("wires.svg");
+  background-repeat: repeat-y;
+  background-size: 2400px 1400px;
+  background-position: 50% 0;
+  opacity: 0.55;
+}
+
+/* Качание: провода ходят поперёк себя на четырнадцать точек за полторы
+   минуты. Этого не видно в упор и видно боковым зрением — ровно
+   столько, чтобы жгут не читался напечатанным. */
+@media (prefers-reduced-motion: no-preference) {
+  .loom { animation: loom-sway 96s var(--ease-default) infinite alternate; }
+  body::after { animation: plate-light 40s var(--ease-default) infinite; }
+}
+
+@keyframes loom-sway {
+  from { background-position: calc(50% - 14px) 0; }
+  to   { background-position: calc(50% + 14px) 0; }
+}
+
+/* Свет, проходящий по плите. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+  background-image:
+    radial-gradient(38% 42% at 50% 50%,
+      color-mix(in srgb, var(--rim) 26%, transparent) 0,
+      transparent 72%);
+  opacity: 0;
+}
+
+/* Свет входит слева снизу, уходит вправо вверх и половину круга ждёт за
+   краем: постоянно ползающее пятно стало бы фактурой, а редкое — событием. */
+@keyframes plate-light {
+  0%   { opacity: 0; transform: translate3d(-40%, 30%, 0); }
+  12%  { opacity: 0.85; }
+  46%  { opacity: 0.85; }
+  58%  { opacity: 0; transform: translate3d(45%, -28%, 0); }
+  100% { opacity: 0; transform: translate3d(45%, -28%, 0); }
+}
+
+/* --------------------------------------------------------------------
+ * 3. Набор
+ * -------------------------------------------------------------------- */
+h1, h2, h3 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  margin: 0;
+  text-wrap: balance;
+  /* Длинное слово на крупном кегле шире узкого экрана: «Документация»
+     в 62 точки выносило страницу за край на двадцать точек. */
+  overflow-wrap: break-word;
+}
+
+h1 { font-size: var(--head-1); }
+h2 { font-size: var(--head-2); }
+
+h3 {
+  font-size: var(--head-3);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+p { margin: 0; max-width: var(--measure); }
+p + p { margin-top: var(--space-within); }
+
+strong { font-weight: 500; color: var(--ink); }
+em { font-style: normal; color: var(--cord); }
+
+/* Показание: табличные цифры, чтобы значение не дёргало строку. */
+.fig {
+  font-family: var(--font-figure);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Geologica пропорциональна: в блоке кода отступы переставали
+   выстраиваться — ровно там, где читает разработчик. Показания остаются
+   ею, код набран моноширинным. */
+pre, kbd, samp {
+  font-family: ui-monospace, "Cascadia Mono", "Cascadia Code", Consolas,
+               "Liberation Mono", monospace;
+  font-size: 0.9em;
+}
+
+code {
+  font-family: var(--font-figure);
+  font-size: 0.92em;
+  font-variant-numeric: tabular-nums;
+  /* Длинная неразрывная строка вроде имени канала растягивала сетку и
+     уводила страницу API вправо на шестьдесят точек. Замерено на 390. */
+  overflow-wrap: anywhere;
+}
+
+.lead {
+  font-size: var(--text-lead);
+  line-height: 1.5;
+  max-width: 46ch;
+}
+
+.note {
+  font-size: var(--text-legend);
+  color: var(--ink-soft);
+  line-height: 1.55;
+  max-width: var(--measure);
+}
+
+.soft { color: var(--ink-soft); }
+
+/* --------------------------------------------------------------------
+ * 4. Материал: просверленное поле и плита
+ *
+ * Поле — не картинка, а рисунок из одного повторяющегося отверстия:
+ * нутро, фаска в пиксель и ничего больше.
+ * -------------------------------------------------------------------- */
+/* Поле лежит **за** содержимым, отдельным слоем.
+ *
+ * Плита — поверхность, отверстия в ней — тёмные. Первая редакция рисовала
+ * кольца прямо по земле, и во весь экран выходила не панель с гнёздами, а
+ * тёмная страница в точку: мир назывался коммутационным полем, а самого
+ * поля на снимке не было.
+ *
+ * Маска гасит плиту книзу: панель кончается, дальше земля. Непрозрачная
+ * ступень взята `currentColor` — в маске значима только альфа, а слово
+ * `black` было бы цветом, набранным руками.
+ *
+ * Первая редакция вешала поле на сам раздел и гасила маской; маска в CSS
+ * относится к элементу целиком, вместе с текстом, поэтому первый экран
+ * почти исчезал. */
+.field { position: relative; isolation: isolate; }
+
+.field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--plate);
+  background-image:
+    radial-gradient(circle at 50% 50%,
+      var(--hole) 0 var(--bore),
+      var(--rim) var(--bore) calc(var(--bore) + 1px),
+      transparent calc(var(--bore) + 1px));
+  background-size: var(--pitch) var(--pitch);
+  background-position: center;
+  /* Две маски, пересечением: книзу панель кончается, а под колонкой
+     набора её нет вовсе. Одного затухания книзу не хватило — заголовок и
+     строка легли прямо на кольца, и буква, попавшая на фаску, читалась
+     хуже остальных. Правило, которое отсюда следует: **над полем стоят
+     только полные чернила** (4.57 на фаске), мягкие — никогда (2.39). */
+  -webkit-mask-image:
+    linear-gradient(to bottom, currentColor 0 44%, transparent 86%),
+    radial-gradient(112% 52% at 27% 78%, transparent 0 44%, currentColor 84%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, currentColor 0 44%, transparent 86%),
+    radial-gradient(112% 52% at 27% 78%, transparent 0 44%, currentColor 84%);
+  mask-composite: intersect;
+}
+
+.frame {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: var(--room);
+}
+
+section {
+  padding-block: var(--rhythm);
+  border-top: 1px solid var(--hair);
+  position: relative;
+}
+
+.head {
+  max-width: var(--measure);
+  margin-bottom: calc(var(--rhythm) * 0.5);
+}
+
+.head p { margin-top: var(--space-within); }
+
+/* --------------------------------------------------------------------
+ * 5. Верхняя рейка
+ *
+ * Не поверхность, а место. Под ней — шнур, длина которого равна
+ * прокрутке: страница и есть одна длинная линия.
+ * -------------------------------------------------------------------- */
+.rail {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  border-bottom: 1px solid var(--hair);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .rail { backdrop-filter: blur(10px); }
+}
+
+.rail-in {
+  display: flex;
+  align-items: center;
+  gap: var(--space-within);
+  padding-block: var(--space-inner);
+  flex-wrap: wrap;
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-tight);
+  font-family: var(--font-display);
+  font-size: var(--text-value);
+  letter-spacing: -0.03em;
+  text-decoration: none;
+  margin-right: auto;
+}
+
+.mark img { width: 24px; height: 24px; }
+
+.rail nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-within);
+  flex-wrap: wrap;
+}
+
+.rail nav a {
+  font-size: var(--text-meta);
+  color: var(--ink-soft);
+  text-decoration: none;
+  padding-block: 4px;
+  border-bottom: 1px solid transparent;
+  transition: color var(--motion-state) var(--ease-out),
+              border-color var(--motion-state) var(--ease-out);
+}
+
+.rail nav a:hover { color: var(--ink); border-bottom-color: var(--rim); }
+.rail nav a[aria-current] { color: var(--ink); border-bottom-color: var(--cord); }
+
+.tongue {
+  display: inline-flex;
+  gap: var(--space-tight);
+  font-family: var(--font-figure);
+  font-size: var(--text-meta);
+}
+
+/* Шнур прокрутки: одна линия, длина которой равна пройденному пути. */
+.progress {
+  height: 1px;
+  background: var(--cord);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .progress {
+      animation: draw-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
+
+@keyframes draw-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+/* --------------------------------------------------------------------
+ * 6. Первый экран: коммутация
+ *
+ * Поставленное движение страницы, и единственное. Шнур прокладывается от
+ * сказанного к сделанному, надпись садится на место, лампа занимает линию
+ * и гаснет до ровного свечения. Всё читается и до анимации: она
+ * объясняет, а не открывает.
+ * -------------------------------------------------------------------- */
+.hero { border-top: 0; padding-block: clamp(44px, 8vw, 128px); }
+
+/* На странице документации первый экран — вход в текст, а не вывеска. */
+.doc-page .hero h1 { font-size: clamp(34px, 5vw, 62px); }
+.doc-page .hero { padding-block: clamp(36px, 5vw, 80px); }
+
+/* И рельеф у него свой. У лендинга верх занят рядом гнёзд, а набор идёт
+   низом — поэтому вырез там внизу. Здесь ряда гнёзд нет, набор начинается
+   сразу под рейкой, и тот же вырез промахивался: кольца шли прямо по
+   заголовку и по всем строкам вводки. Замечено на снимке. */
+.doc-page .field::before {
+  -webkit-mask-image:
+    linear-gradient(to bottom, currentColor 0 62%, transparent 94%),
+    radial-gradient(96% 62% at 26% 30%, transparent 0 46%, currentColor 86%);
+  mask-image:
+    linear-gradient(to bottom, currentColor 0 62%, transparent 94%),
+    radial-gradient(96% 62% at 26% 30%, transparent 0 46%, currentColor 86%);
+}
+
+.patch {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-within);
+  align-items: center;
+  margin-bottom: var(--rhythm);
+}
+
+.jack {
+  display: flex;
+  align-items: center;
+  gap: var(--space-inner);
+  min-width: 0;
+}
+
+/* Гнездо: нутро, фаска и то, что в нём горит. */
+.bore {
+  position: relative;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--hole);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+
+.bore::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: var(--ground);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+
+/* Лампа занятой линии. Горит ровно — это состояние, а не украшение. */
+.bore.live::after {
+  background: var(--lamp);
+  box-shadow: 0 0 10px 1px color-mix(in srgb, var(--lamp) 45%, transparent);
+}
+
+.jack-text { min-width: 0; font-size: var(--text-value); line-height: 1.35; }
+
+/* На узком экране гнездо всё равно впереди подписи: шнур идёт слева. */
+.jack-said { flex-direction: row-reverse; justify-content: flex-end; }
+
+/* Подпись гнезда — единственный текст, который стоит прямо на поле,
+   поэтому она набрана полными чернилами: мягкие на фаске дают 2.39. */
+.jack-role {
+  display: block;
+  font-family: var(--font-figure);
+  font-size: var(--text-meta);
+  color: var(--ink);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+/* Шнур. Горизонтальный на широком экране, вертикальный на узком — одна и
+   та же линия, повёрнутая вместе с компоновкой. */
+/* Ширину даёт колонка сетки, а не `width: 100%`: с ней отрицательные
+   просветы по краям не растягивали шнур, а сдвигали его целиком, и правый
+   конец не доходил до гнезда на те же 29 точек. Замерено в браузере. */
+.cord-run { position: relative; min-height: 56px; }
+
+.cord-run svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+/* Выбор варианта шнура держится на той же силе селектора, что и правило
+   выше. Первая редакция объявляла `display` у `.cord-run svg`, и оба
+   варианта рисовались поверх друг друга: вертикальный крюк поперёк
+   горизонтального провиса. Видно это стало на снимке. */
+.cord-run .cord-tall { display: block; }
+.cord-run .cord-wide { display: none; }
+
+.cord-line {
+  fill: none;
+  stroke: var(--cord);
+  stroke-width: 2;
+  stroke-linecap: round;
+  /* `non-scaling-stroke` держит толщину ровной при неравном растяжении
+     коробки — и он же считает штрих в экранных точках, а не в долях пути.
+     Поэтому `pathLength` тут не работает, и штрих взят заведомо длиннее
+     любого разумного шнура. Первая редакция ставила сюда 100 и рисовала
+     пунктир из трёх кусков; увидено на снимке. */
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 0;
+  vector-effect: non-scaling-stroke;
+}
+
+.hero-say { display: grid; gap: var(--space-within); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-inner);
+  margin-top: var(--space-tight);
+}
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-tight) var(--space-between);
+  margin: var(--space-inner) 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--font-figure);
+  font-size: var(--text-meta);
+  color: var(--ink-soft);
+}
+
+/* Разделителей нет: точка на `::before` уезжала в начало перенесённой
+   строки и читалась сиротой. Просвета хватает. */
+
+@media (prefers-reduced-motion: no-preference) {
+  .cord-line {
+    stroke-dashoffset: 2000;
+    animation: patch-in 1100ms var(--ease-out) 280ms both;
+  }
+
+  .bore.live::after {
+    animation: lamp-on var(--motion-afterglow) var(--ease-out) 1020ms both;
+  }
+
+  .jack-done .jack-text {
+    animation: seat 620ms var(--ease-out) 1020ms both;
+  }
+}
+
+@keyframes patch-in { to { stroke-dashoffset: 0; } }
+
+@keyframes lamp-on {
+  0%   { background: var(--ground);
+         box-shadow: inset 0 0 0 1px var(--rim); }
+  30%  { background: var(--lamp);
+         box-shadow: 0 0 24px 5px color-mix(in srgb, var(--lamp) 72%, transparent); }
+  100% { background: var(--lamp);
+         box-shadow: 0 0 10px 1px color-mix(in srgb, var(--lamp) 45%, transparent); }
+}
+
+@keyframes seat {
+  from { transform: translateX(-10px); opacity: 0.45; }
+  to   { transform: none; opacity: 1; }
+}
+
+/* --------------------------------------------------------------------
+ * 7. Наборная этикетка
+ *
+ * Плашка чернил с буквами цвета плиты — то же обращение отделки, каким в
+ * программе отмечено главное действие. Прописные живут только здесь и в
+ * шапках таблиц.
+ * -------------------------------------------------------------------- */
+/* Первая редакция клала ячейки гибкой строкой, и на узком экране они
+ * ложились два-плюс-три: разделители двух рядов не совпадали по вертикали,
+ * а между рядами линии не было вовсе — блок читался сломанной таблицей.
+ * Сетка с просветом в точку даёт линии в обе стороны. */
+.strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0;
+  /* Поле наборной этикетки. Разделители рисуют сами ячейки, а не
+     просвет между ними: сначала это была заливка под сеткой, видимая
+     в просветах, — и на неполном ряду она показывала серые
+     прямоугольники на месте недостающих ячеек. Полос показаний на
+     сайте уже две, на шесть и на пять, и третья будет другой. */
+  background: var(--strip);
+  color: var(--strip-ink);
+  border-radius: var(--radius-tight);
+  overflow: hidden;
+}
+
+.strip > div {
+  background: var(--strip);
+  box-shadow:
+    1px 0 0 color-mix(in srgb, var(--strip-ink) 22%, var(--strip)),
+    0 1px 0 color-mix(in srgb, var(--strip-ink) 22%, var(--strip));
+  padding: var(--space-within);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.strip b {
+  font-family: var(--font-figure);
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(22px, 2.3vw, 30px);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.strip span {
+  font-size: var(--text-meta);
+  line-height: 1.3;
+  color: color-mix(in srgb, var(--strip-ink) 75%, transparent);
+}
+
+
+/* --------------------------------------------------------------------
+ * 8. Линии: одно событие — одна полоса во всю ширину
+ * -------------------------------------------------------------------- */
+.lines { border-top: 1px solid var(--hair); }
+
+/* Каждая строка события — гнездо на панели. Мир не должен кончаться на
+   первом экране: до этой правки `field` стояло ровно один раз на страницу,
+   и со второго раздела страница переставала быть коммутаторной. */
+.line::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 1.25em;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hole);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+
+.line {
+  position: relative;
+  padding-left: 22px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-tight);
+  padding-block: var(--space-within);
+  border-bottom: 1px solid var(--hair);
+}
+
+.line-no {
+  font-family: var(--font-figure);
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+}
+
+.line-what { font-size: var(--text-value); }
+
+.line-which { color: var(--ink-soft); max-width: var(--measure); }
+
+/* Список, у которого порядок ничего не значит, номеров не носит. */
+.lines.bare .line-no { display: none; }
+
+/* Линия прочерчивается при появлении, и вместе с ней приходит сама
+   строка: два таймлайна на одном элементе, у каждого свой отрезок пути.
+   Содержимое видно и без них. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .line {
+      border-bottom-color: transparent;
+      background-image: linear-gradient(var(--hair), var(--hair));
+      background-repeat: no-repeat;
+      background-position: 0 100%;
+      background-size: 0% 1px;
+      animation: rule-in 1ms linear both, come-and-go linear both;
+      animation-timeline: view(), view();
+      animation-range: entry 6% cover 24%, entry 4% exit 96%;
+    }
+  }
+}
+
+@keyframes rule-in {
+  from { background-size: 0% 1px; }
+  to   { background-size: 100% 1px; }
+}
+
+/* --------------------------------------------------------------------
+ * 9. Плиты: что она умеет
+ *
+ * Здесь стояли развороты со снимками. Снимки показывали интерфейс двух
+ * выпусков назад, и на их место придёт работающий макет программы; пока
+ * тут плиты с набором. Каждая лежит в поле, и у каждой в углу гнездо —
+ * та же примета, что у строки события.
+ * -------------------------------------------------------------------- */
+.plates {
+  display: grid;
+  /* Две в ряд. При 300 точках их вставало три, и колонка в 336 точек
+     резала «Напоминания и шестнадцать действий системы» на пять строк;
+     при 420 вторая колонка появлялась только после 1060 точек, и на
+     ноутбуке в 900 половина ширины пустовала. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr));
+  gap: var(--space-between);
+}
+
+.plate {
+  position: relative;
+  display: grid;
+  gap: var(--space-inner);
+  align-content: start;
+  padding: var(--space-between);
+  background: var(--plate);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-max);
+  transition: border-color var(--motion-panel) var(--ease-out),
+              transform var(--motion-panel) var(--ease-out);
+}
+
+.plate > * { min-width: 0; }
+
+.plate h3 { padding-right: var(--space-between); }
+
+.plate::before {
+  content: "";
+  position: absolute;
+  top: var(--space-within);
+  right: var(--space-within);
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hole);
+  box-shadow: inset 0 0 0 1px var(--rim);
+  transition: box-shadow var(--motion-panel) var(--ease-out);
+}
+
+.plate:hover { border-color: var(--rim); transform: translateY(-2px); }
+
+/* Под курсором гнездо занято — тем же светом, каким горит лампа в первом
+   экране, и никакого другого цвета для этого не заводится. */
+.plate:hover::before {
+  box-shadow: inset 0 0 0 1px var(--cord),
+              0 0 10px color-mix(in srgb, var(--cord) 45%, transparent);
+}
+
+/* --------------------------------------------------------------------
+ * 10. Органы управления
+ *
+ * Второстепенная кнопка в покое заподлицо с землёй и обретает тело при
+ * наведении. Первичная — плашка этикетки: то же обращение, что у главного
+ * действия в программе, и второго акцента не заводит.
+ * -------------------------------------------------------------------- */
+.press {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-tight);
+  min-height: 46px;
+  padding: var(--space-inner) var(--space-within);
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-max);
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-value);
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--motion-state) var(--ease-out),
+              border-color var(--motion-state) var(--ease-out),
+              transform var(--motion-press) var(--ease-out);
+}
+
+.press:hover { background: var(--plate); border-color: var(--ink-faint); }
+.press:active { background: var(--plate-low); transform: translateY(1px); }
+
+.press.primary {
+  background: var(--strip);
+  border-color: var(--strip);
+  color: var(--strip-ink);
+  font-weight: 500;
+}
+
+.press.primary:hover {
+  background: color-mix(in srgb, var(--strip) 86%, var(--cord));
+  border-color: color-mix(in srgb, var(--strip) 86%, var(--cord));
+}
+
+/* --------------------------------------------------------------------
+ * 11. Половины, колодцы, набор команд
+ * -------------------------------------------------------------------- */
+.halves, .take {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--space-between);
+}
+
+.well {
+  display: grid;
+  gap: var(--space-within);
+  align-content: start;
+  padding: var(--space-between);
+  background: var(--plate);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-max);
+}
+
+ul.plain {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-inner);
+  max-width: var(--measure);
+}
+
+ul.plain li { position: relative; padding-left: var(--space-within); }
+
+ul.plain li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.66em;
+  width: 7px;
+  height: 1px;
+  background: var(--ink-faint);
+}
+
+ul.plain.wired li::before { background: var(--cord); }
+
+pre {
+  margin: 0;
+  max-width: 100%;
+  padding: var(--space-within);
+  background: var(--hole);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-tight);
+  overflow-x: auto;
+  line-height: 1.75;
+  font-size: var(--text-legend);
+  color: var(--ink);
+}
+
+pre .cmd { color: var(--cord); }
+pre .rem { color: var(--ink-faint); }
+
+/* Отступы между соседями — правилами соседства, а не атрибутом `style`.
+ * Политика ответов (`_headers`) запрещает inline-стили: `style-src 'self'`
+ * не пускает атрибут `style`, и на живом хостинге все такие поля просто
+ * пропали бы, а локально всё выглядело бы верно. */
+.lines + .hatched { margin-top: var(--space-between); }
+.lines + .actions { margin-top: var(--space-between); }
+.halves + .lines { margin-top: var(--rhythm); }
+.hero-say + .strip { margin-top: var(--rhythm); }
+
+/* Штриховка необратимого — тот же узор, которым метит программа. */
+.hatched {
+  padding: var(--space-within);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-tight);
+  background-color: var(--plate);
+  background-image: repeating-linear-gradient(
+    var(--hatch-angle),
+    color-mix(in srgb, var(--ink) calc(var(--hatch-opacity) * 100%), transparent) 0,
+    color-mix(in srgb, var(--ink) calc(var(--hatch-opacity) * 100%), transparent) var(--hatch-line),
+    transparent var(--hatch-line),
+    transparent var(--hatch-gap));
+  font-size: var(--text-legend);
+  max-width: var(--measure);
+}
+
+/* --------------------------------------------------------------------
+ * 12. Подвал
+ * -------------------------------------------------------------------- */
+footer {
+  border-top: 1px solid var(--hair);
+  padding-block: var(--rhythm);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-within) var(--space-between);
+  align-items: baseline;
+  font-size: var(--text-meta);
+  color: var(--ink-soft);
+}
+
+footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-within);
+  margin-left: auto;
+}
+
+/* --------------------------------------------------------------------
+ * 13. Документация: тот же мир, но здесь читают
+ * -------------------------------------------------------------------- */
+.doc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-between);
+  padding-block: var(--rhythm);
+}
+
+.doc-rail { align-self: start; }
+
+.doc-rail ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-tight);
+  font-size: var(--text-legend);
+  border-left: 1px solid var(--hair);
+}
+
+.doc-rail li {
+  position: relative;
+  padding-left: calc(var(--space-inner) + 12px);
+}
+
+.doc-rail li::before {
+  content: "";
+  position: absolute;
+  left: var(--space-inner);
+  top: 0.55em;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--hole);
+  box-shadow: inset 0 0 0 1px var(--rim);
+}
+
+.doc-rail a { color: var(--ink-soft); text-decoration: none; }
+.doc-rail a:hover { color: var(--ink); }
+
+.doc-body { display: grid; gap: var(--rhythm); min-width: 0; }
+
+/* Элемент сетки по умолчанию не уже своего содержимого; без этого
+   широкая таблица или строка кода раздвигает колонку. */
+.doc-body > *, .doc-body section > *,
+.well > *, .hero-say > * { min-width: 0; }
+
+.doc-body h2 { font-size: clamp(25px, 2.6vw, 34px); }
+
+.doc-body section {
+  border-top: 0;
+  padding-block: 0;
+  display: grid;
+  gap: var(--space-within);
+  scroll-margin-top: calc(var(--space-between) * 2.5);
+}
+
+.doc-body h3 { margin-top: var(--space-inner); }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-legend);
+}
+
+thead th {
+  text-align: left;
+  font-family: var(--font-figure);
+  font-weight: 500;
+  font-size: var(--text-meta);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-soft);
+  padding: var(--space-tight) var(--space-inner) var(--space-tight) 0;
+  border-bottom: 1px solid var(--rim);
+}
+
+tbody td {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  padding: var(--space-inner) var(--space-inner) var(--space-inner) 0;
+  border-bottom: 1px solid var(--hair);
+  color: var(--ink-soft);
+}
+
+tbody td:first-child {
+  color: var(--ink);
+  font-family: var(--font-figure);
+}
+
+tbody tr:hover td { background: color-mix(in srgb, var(--plate) 55%, transparent); }
+
+.no, .yes {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: var(--radius-tight);
+  font-size: var(--text-meta);
+  white-space: nowrap;
+  font-family: var(--font-figure);
+}
+
+.no { background: var(--plate); color: var(--ink-soft); }
+
+.yes {
+  background: color-mix(in srgb, var(--lamp) 16%, transparent);
+  color: var(--lamp);
+}
+
+/* --------------------------------------------------------------------
+ * 13а. Приход и уход
+ *
+ * Блок проявляется, входя в окно, и гаснет, уходя за верхний край.
+ * Считает это браузер по таймлайну прокрутки: движение привязано к
+ * пройденному пути, поэтому оно одинаково при колесе, полосе и клавише
+ * PageDown, и ни одного скрипта для него не нужно.
+ *
+ * Под `@supports`, и это существенно. В браузере без таймлайнов правило
+ * не применяется целиком, и страница остаётся просто видимой: прятать
+ * содержимое ради анимации нельзя, оно тут главное.
+ * -------------------------------------------------------------------- */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .head,
+    .strip > div,
+    .plate,
+    .well,
+    .hatched,
+    .lines + .actions {
+      animation: come-and-go linear both;
+      animation-timeline: view();
+      animation-range: entry 4% exit 96%;
+    }
+
+    /* Ячейки этикетки входят слева направо: у каждой свой отрезок пути,
+       сдвинутый на четыре сотых. Задержкой этого не сделать — у таймлайна
+       прокрутки нет часов, и `animation-delay` он не читает. */
+    .strip > div:nth-child(2) { animation-range: entry 8% exit 96%; }
+    .strip > div:nth-child(3) { animation-range: entry 12% exit 96%; }
+    .strip > div:nth-child(4) { animation-range: entry 16% exit 96%; }
+    .strip > div:nth-child(5) { animation-range: entry 20% exit 96%; }
+    .strip > div:nth-child(6) { animation-range: entry 24% exit 96%; }
+
+    /* Показание выкатывается снизу, как на счётчике: ячейка режет по
+       краю, и видно только то, что уже встало на место. */
+    .strip > div { overflow: hidden; }
+
+    .strip b {
+      animation: figure-roll linear both;
+      animation-timeline: view();
+      animation-range: entry 6% entry 92%;
+    }
+
+    /* Плиты в ряду сдвинуты между собой, чтобы ряд приходил наискось,
+       а не полкой. */
+    .plates .plate:nth-child(2n) { animation-range: entry 9% exit 96%; }
+  }
+}
+
+/* Раздел подключают: по его верхней линии проходит шнур и гаснет,
+   оставляя волосяную. Это то же самое действие, что показано в первом
+   экране, только растянутое на всю страницу — других значений у
+   сигнального цвета на странице нет. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* Шкалу объявляет сам раздел, а шнур её только читает. Со шкалой
+       `view()` на самом шнуре путь равнялся его высоте — одной точке, —
+       и он успевал прочертиться за один кадр у нижнего края экрана,
+       где его никто не видел. Здесь путь считается по разделу, а
+       отрезок задан в точках, чтобы не зависеть от его высоты: разделы
+       на странице от трёх экранов до половины. */
+    main:not(.doc-body) > section:not(.hero) { view-timeline-name: --section-run; }
+
+    /* Только разделы страницы продукта. На странице документации
+       разделы лежат в `main.doc-body`, верхней линии у них нет, и шнур
+       прочертился бы поперёк текста. */
+    main:not(.doc-body) > section:not(.hero)::after {
+      content: "";
+      position: absolute;
+      top: -1px;
+      left: 0;
+      width: 100%;
+      height: 1px;
+      background: var(--cord);
+      transform-origin: 0 50%;
+      transform: scaleX(0);
+      pointer-events: none;
+      animation: patch-line linear both;
+      animation-timeline: --section-run;
+      animation-range: cover 0 cover 440px;
+    }
+  }
+}
+
+@keyframes patch-line {
+  0%   { opacity: 1; transform: scaleX(0); }
+  62%  { opacity: 1; transform: scaleX(1); }
+  100% { opacity: 0; transform: scaleX(1); }
+}
+
+@keyframes come-and-go {
+  0%   { opacity: 0; transform: translateY(20px); }
+  16%  { opacity: 1; transform: none; }
+  84%  { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-12px); }
+}
+
+@keyframes figure-roll {
+  0%   { opacity: 0; transform: translateY(0.9em); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* --------------------------------------------------------------------
+ * 13б. Опубликованный документ
+ *
+ * Страницы `/docs/*` порождаются из `.md` того же дерева
+ * (`tools/gen_site.py`), поэтому их разметка плоская: заголовки, абзацы
+ * и списки идут потоком, без секций-обёрток. Отсюда отступы соседством,
+ * а не сеткой.
+ *
+ * Своих украшений у документа нет ни одного: те же чернила, та же
+ * лестница просветов, те же таблицы, что у страницы API. Документ,
+ * который на сайте выглядит иначе, чем остальной сайт, читается
+ * вставкой из чужого места — а он и есть это место, просто показанный
+ * как следует.
+ * -------------------------------------------------------------------- */
+.paper { display: block; }
+
+.paper > * + * { margin-top: var(--space-within); }
+
+.paper h2 {
+  margin-top: var(--rhythm);
+  font-size: clamp(25px, 2.6vw, 34px);
+  scroll-margin-top: calc(var(--space-between) * 2.5);
+}
+
+.paper h3 {
+  margin-top: var(--space-between);
+  scroll-margin-top: calc(var(--space-between) * 2.5);
+}
+
+.paper h4 {
+  margin-top: var(--space-between);
+  font-family: var(--font-ui);
+  font-size: var(--text-value);
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.paper > h2:first-child,
+.paper > h3:first-child { margin-top: 0; }
+
+/* Абзац из одного жирного предложения — зачин раздела, а не утверждение
+   посреди потока; документы пользуются им именно так. */
+.paper .lead-in { color: var(--ink); }
+
+.paper hr.seam {
+  border: 0;
+  border-top: 1px solid var(--hair);
+  margin-block: var(--space-between);
+}
+
+.paper blockquote {
+  margin: 0;
+  padding-left: var(--space-within);
+  border-left: 1px solid var(--rim);
+  color: var(--ink-soft);
+}
+
+/* Задача плана свёрнута: сам план — четыре тысячи строк, и списком
+   задач он читается, а сплошным текстом нет. `details` делает это без
+   единой строки скрипта. */
+.paper details {
+  border-top: 1px solid var(--hair);
+  padding-block: var(--space-inner);
+}
+
+.paper details + details { margin-top: 0; }
+
+.paper summary {
+  position: relative;
+  padding-left: 22px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--ink);
+}
+
+.paper summary::-webkit-details-marker { display: none; }
+
+/* Гнездо вместо треугольника: открытая задача — занятая линия. */
+.paper summary::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.45em;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--hole);
+  box-shadow: inset 0 0 0 1px var(--rim);
+  transition: box-shadow var(--motion-state) var(--ease-out);
+}
+
+.paper details[open] summary::before {
+  box-shadow: inset 0 0 0 1px var(--cord),
+              0 0 10px color-mix(in srgb, var(--cord) 45%, transparent);
+}
+
+.paper summary:hover { color: var(--ink); }
+.paper summary:hover::before { box-shadow: inset 0 0 0 1px var(--ink-faint); }
+
+.paper details[open] > *:not(summary) { margin-top: var(--space-within); }
+
+/* --------------------------------------------------------------------
+ * 14. Ширина
+ * -------------------------------------------------------------------- */
+@media (min-width: 900px) {
+  .patch {
+    grid-template-columns: minmax(0, 1fr) minmax(150px, 0.85fr) minmax(0, 1fr);
+    gap: var(--space-between);
+  }
+
+  /* Шнур занимает и просветы по краям — иначе он висит между подписями,
+     а соединять должен гнёзда. */
+  .cord-run {
+    min-height: 132px;
+    margin-inline: calc(var(--space-between) * -1 + 3px);
+  }
+
+  .cord-run .cord-tall { display: none; }
+  .cord-run .cord-wide { display: block; }
+
+  /* Гнёзда повёрнуты друг к другу: подписи наружу, гнёзда внутрь. */
+  .jack-said { flex-direction: row; justify-content: flex-end; text-align: right; }
+
+  .line {
+    grid-template-columns: 5ch minmax(0, 16ch) minmax(0, 1fr);
+    gap: var(--space-between);
+    align-items: baseline;
+  }
+
+  /* У списка рубежей в первой колонке не номер, а имя рубежа:
+     «4.0 Stable» в пять знаков не помещается и переносится по слову. */
+  .lines.stages .line {
+    grid-template-columns: 11ch minmax(0, 14ch) minmax(0, 1fr);
+  }
+
+  /* Список без номеров занимает две колонки. С тремя `line-what` попадал
+     в первую, шириной в пять знаков под номер, а пояснение — во вторую,
+     шириной в шестнадцать: «Как писать плагины» вставало в четыре строки
+     по слову, а правая половина раздела пустовала. Видно это было только
+     на широком экране и только в разделах без номеров — то есть в трёх
+     последних, куда доходят не все. */
+  .lines.bare .line {
+    grid-template-columns: minmax(0, 22ch) minmax(0, 1fr);
+  }
+
+  .doc { grid-template-columns: 220px minmax(0, 1fr); gap: var(--rhythm); }
+  .doc-rail { position: sticky; top: calc(var(--space-between) * 2.4); }
+}
+
+@media (max-width: 899px) {
+  /* Узкий экран: шнур идёт вертикально и ровно по центрам гнёзд —
+     коробка шириной в гнездо, путь по её середине. Со сдвигом на
+     восемнадцать точек он висел правее обоих и читался случайной
+     чертой. */
+  .cord-run { min-height: 68px; width: 38px; }
+
+  /* Панель кончается выше: на узком экране под ней сразу начинается
+     текст, и поле не должно идти под всей строкой. */
+  .field::before {
+    -webkit-mask-image:
+      linear-gradient(to bottom, currentColor 0 26%, transparent 60%),
+      radial-gradient(140% 46% at 40% 70%, transparent 0 40%, currentColor 82%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+      linear-gradient(to bottom, currentColor 0 26%, transparent 60%),
+      radial-gradient(140% 46% at 40% 70%, transparent 0 40%, currentColor 82%);
+    mask-composite: intersect;
+  }
+
+  /* Страница документации получает свой рельеф **и здесь**, а не только
+     в широком правиле: `.doc-page .field::before` — два класса, правило
+     выше — один, и без этой пары узкое правило до документации просто не
+     доходило бы. Сегодня это незаметно, потому что набор у неё вверху на
+     обеих ширинах; заметно стало бы при следующей правке. */
+  .doc-page .field::before {
+    -webkit-mask-image:
+      linear-gradient(to bottom, currentColor 0 58%, transparent 92%),
+      radial-gradient(124% 54% at 32% 34%, transparent 0 44%, currentColor 84%);
+    mask-image:
+      linear-gradient(to bottom, currentColor 0 58%, transparent 92%),
+      radial-gradient(124% 54% at 32% 34%, transparent 0 44%, currentColor 84%);
+  }
+  .patch { gap: var(--space-inner); }
+}
+
+/* --------------------------------------------------------------------
+ * 15. Меньше движения
+ * -------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+}

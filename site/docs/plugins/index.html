@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Как писать плагины — Rina Assistant</title>
+<meta name="description" content="Подробное руководство; краткая опора — на странице API.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Как писать плагины — Rina Assistant">
+<meta property="og:description" content="Подробное руководство; краткая опора — на странице API.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по docs/plugins/WRITING-PLUGINS.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Как писать плагины</h1>
+      <p class="lead">Подробное руководство; краткая опора — на странице API.</p>
+      <p class="note">Документ репозитория, страницей. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/WRITING-PLUGINS.md">docs/plugins/WRITING-PLUGINS.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#glavnoe-pravilo">Главное правило</a></li>
+      <li><a href="#samyy-malenkiy-plagin">Самый маленький плагин</a></li>
+      <li><a href="#instrument">Инструмент</a></li>
+      <li><a href="#razresheniya">Разрешения</a></li>
+      <li><a href="#stranica">Страница</a></li>
+      <li><a href="#nastroyki-plagina">Настройки плагина</a></li>
+      <li><a href="#chto-dostupno-cherez-self-ctx">Что доступно через self.ctx</a></li>
+      <li><a href="#zhiznennyy-cikl">Жизненный цикл</a></li>
+      <li><a href="#plagin-zhivet-v-svoem-processe">Плагин живёт в своём процессе</a></li>
+      <li><a href="#sovmestimost">Совместимость</a></li>
+      <li><a href="#kak-proverit-chto-poluchilos">Как проверить, что получилось</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>Задача плана <code>4.0-I05</code>. Решение об API — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0010-plugin-api.md">ADR 0010</a>.</p>
+<p>Плагин — папка в <code>plugins/</code> с двумя файлами: <code>plugin.json</code> и <code>main.py</code>.</p>
+<hr class="seam">
+<h2 id="glavnoe-pravilo">Главное правило</h2>
+<p class="lead-in"><strong>Плагин объявляет, а не делает.</strong></p>
+<p>Он объявляет три вещи, и все три — данными:</p>
+<ul class="plain"><li><strong>инструменты</strong> — что он умеет; уходят в реестр ядра и получают там разрешения, подтверждения и журнал наравне со встроенными;</li><li><strong>страницу</strong> — как он выглядит; описанием, без виджетов;</li><li><strong>разрешения</strong> — что ему нужно от машины; списком в манифесте, до первого запуска.</li></ul>
+<p>Почему так. Ядро спрашивает у человека согласие на «запуск программ» и отказывает без него. Плагин, зовущий <code>subprocess</code> сам, обошёл бы это — и тогда согласие человека было бы самообманом.</p>
+<hr class="seam">
+<h2 id="samyy-malenkiy-plagin">Самый маленький плагин</h2>
+<p><code>plugins/greeter/plugin.json</code>:</p>
+<pre>{
+  &quot;id&quot;: &quot;greeter&quot;,
+  &quot;name&quot;: &quot;Приветствие&quot;,
+  &quot;version&quot;: &quot;1.0.0&quot;,
+  &quot;api_version&quot;: 4,
+  &quot;description&quot;: &quot;Отвечает на «привет»&quot;,
+  &quot;permissions&quot;: []
+}</pre>
+<p><code>plugins/greeter/main.py</code>:</p>
+<pre>from plugins.api import Plugin
+
+
+class GreeterPlugin(Plugin):
+    def on_command(self, text):
+        if &quot;привет&quot; in text.lower():
+            self.ctx.respond(&quot;Привет! Чем помочь?&quot;)
+            return True
+        return False</pre>
+<p><code>on_command</code> возвращает <code>True</code>, если фразу взял. Вернул <code>False</code> — фраза идёт дальше по конвейеру.</p>
+<p>Больше ничего не нужно: ни инструментов, ни страницы, ни разрешений. Объявлять инструмент ради «привет» незачем, и API этого не требует.</p>
+<hr class="seam">
+<h2 id="instrument">Инструмент</h2>
+<p>Инструмент — это то, что зовёт <strong>ядро</strong>, когда решит, что человек попросил именно это. Плагин не решает, когда его инструменту работать.</p>
+<pre>from core.tools import Param
+from plugins.api import Plugin, PluginTool
+
+
+class DicePlugin(Plugin):
+    def tools(self):
+        return [PluginTool(
+            name=&quot;roll&quot;,
+            description=&quot;Бросить кубик&quot;,
+            params=(Param(&quot;faces&quot;, &quot;integer&quot;, required=False, default=6),),
+            returns=&quot;Выпавшее число&quot;,
+            run=self._roll,
+        )]
+
+    def _roll(self, args):
+        import random
+        return random.randint(1, args[&quot;faces&quot;])</pre>
+<p>Имя внутри плагина короткое: ядро само добавит префикс <code>plugin.dice.</code>, чтобы два плагина с инструментом <code>roll</code> не спорили за одно имя.</p>
+<p>Аргументы описываются теми же <code>Param</code>, что у встроенных инструментов, и проверяются реестром — разбирать и доверять плагину не приходится.</p>
+<hr class="seam">
+<h2 id="razresheniya">Разрешения</h2>
+<p>Каталог разрешений <strong>один</strong> — тот же, что у ядра (<code>core/permissions.py</code>). Второй, «для плагинов», означал бы два языка об одном и том же.</p>
+<p>Но доступно из него не всё. Никогда не выдаются:</p>
+<ul class="plain"><li><code>system.power</code> — выключение и перезагрузка;</li><li><code>files.write</code> — запись файлов;</li><li><code>screen.read</code>, <code>input.synthesize</code> — зарезервированы под 5.0.</li></ul>
+<p>Инструмент, просящий недоступное, <strong>не заводится вовсе</strong>. Он всё равно отказал бы, но уже после того, как человек его увидел и позвал.</p>
+<p>Опасное разрешение обязано требовать подтверждения:</p>
+<pre>PluginTool(name=&quot;clear&quot;, description=&quot;Стереть заметки&quot;,
+           permissions=(&quot;plugin.state&quot;,), confirm_required=True,
+           run=self._clear)</pre>
+<hr class="seam">
+<h2 id="stranica">Страница</h2>
+<p>Плагин описывает страницу списком элементов, а рисует их оболочка. Поэтому плагин не импортирует ни Qt, ни WPF — и не пришлось переписывать ни одного плагина, когда оболочка сменилась целиком.</p>
+<pre>from plugins.page_spec import Card, Title, Note, Items, Button, Row
+
+
+class NotesPlugin(Plugin):
+    page_title = &quot;Заметки&quot;      # как назвать раздел в колонке
+
+    def page(self):
+        notes = self.ctx.get_setting(&quot;items&quot;, []) or []
+        return [
+            Card([
+                Title(&quot;Мои заметки&quot;),
+                Note(f&quot;Всего: {len(notes)}&quot;),
+                Items(notes) if notes else Note(&quot;Пока пусто&quot;),
+            ], title=&quot;Заметки&quot;),
+            Row([
+                Button(&quot;Очистить&quot;, action=&quot;clear&quot;, variant=&quot;danger&quot;),
+                Button(&quot;Обновить&quot;, action=&quot;refresh&quot;),
+            ]),
+        ]
+
+    def on_action(self, action, value=None):
+        if action == &quot;clear&quot;:
+            self.ctx.set_setting(&quot;items&quot;, [])</pre>
+<p>После действия страница пересобирается сама: плагин описывает своё текущее состояние, а не следит за синхронизацией виджетов.</p>
+<p><strong>Схема семантическая, а не визуальная.</strong> Говорите «предупреждение», а не «оранжевая рамка»; «карточка», а не «скруглить восемь пикселей». Полей о внешности здесь нет и не будет: цвет, отступ и шрифт знает тот, кто рисует.</p>
+<p>Все виды элементов — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/PAGE-SCHEMA-v2.md">PAGE-SCHEMA-v2</a>.</p>
+<hr class="seam">
+<h2 id="nastroyki-plagina">Настройки плагина</h2>
+<p>Тоже описанием — панель строит оболочка:</p>
+<pre>from plugins.settings_spec import Toggle, Text, Slider
+
+
+def settings_schema(self):
+    return [
+        Text(&quot;prefix&quot;, &quot;Приставка&quot;, default=&quot;•&quot;),
+        Toggle(&quot;timestamps&quot;, &quot;Ставить время&quot;, default=True),
+        Slider(&quot;limit&quot;, &quot;Сколько хранить&quot;, min=10, max=500, default=100),
+    ]</pre>
+<p>Значения хранит <strong>ядро</strong>, а не плагин: где они лежат — не его дело, и заодно они переживают его собственное падение.</p>
+<hr class="seam">
+<h2 id="chto-dostupno-cherez-self-ctx">Что доступно через <code>self.ctx</code></h2>
+<table><thead><tr><th>Метод</th><th>Что делает</th></tr></thead><tbody><tr><td><code>respond(text)</code></td><td>Рина скажет и покажет текст</td></tr><tr><td><code>log(message)</code></td><td>строка в журнал плагина</td></tr><tr><td><code>get_setting(key, default)</code></td><td>своя настройка</td></tr><tr><td><code>set_setting(key, value)</code></td><td>записать свою настройку</td></tr><tr><td><code>notify(title, message)</code></td><td>уведомление</td></tr></tbody></table>
+<p>Всё. Ни запуска программ, ни доступа к соседям, ни файловой системы: то, что плагин умеет делать с миром, объявлено инструментами и проходит через реестр.</p>
+<hr class="seam">
+<h2 id="zhiznennyy-cikl">Жизненный цикл</h2>
+<pre>    обнаружен  →  включён  →  работает  →  выключен
+    (манифест     (процесс    (on_command,  (процесс
+     прочитан,     поднят,     tools, page)  убит,
+     код НЕ         on_enable)               инструменты
+     запущен)                                сняты)</pre>
+<p>Код плагина запускается при <strong>включении</strong>, а не при обнаружении: иначе сбойный плагин мешал бы уже старту Рины.</p>
+<p>Хуки все необязательны: <code>on_enable</code>, <code>on_disable</code>, <code>on_command</code>, <code>on_event</code>, <code>tools</code>, <code>page</code>, <code>on_action</code>, <code>settings_schema</code>.</p>
+<hr class="seam">
+<h2 id="plagin-zhivet-v-svoem-processe">Плагин живёт в своём процессе</h2>
+<p>С <code>4.0-H07</code> каждый плагин — отдельный процесс. Ошибку можно поймать, бесконечный цикл — нельзя: плагин, ушедший в <code>while True</code>, забирал бы поток ядра и Рина замолкала бы целиком.</p>
+<p>Что из этого следует для автора:</p>
+<ul class="plain"><li><strong>у вызова есть срок.</strong> Не ответили за десять секунд — плагин считается сбойным и убивается. Долгую работу делайте в потоке и отвечайте сразу;</li><li><strong>не печатайте в <code>stdout</code>.</strong> Там наш провод. <code>print</code> испортит кадр посреди сообщения — пользуйтесь <code>self.ctx.log</code>;</li><li><strong>состояние не переживает выключение.</strong> Всё, что должно жить, кладите в свои настройки.</li></ul>
+<p><strong>И честно о границе.</strong> Отдельный процесс — не песочница. Плагин идёт тем же интерпретатором с теми же правами: разрешения честны в отношении объявленных инструментов и ничего не обещают в отношении Python. Ставить чужой плагин — решение того же уровня, что запустить скачанную программу. Записано в <a href="/docs/threats/">модели угроз</a>, угроза T-06.</p>
+<hr class="seam">
+<h2 id="sovmestimost">Совместимость</h2>
+<p>Манифест указывает <code>api_version</code>. Текущая — <strong>4</strong>; ядро загружает только её.</p>
+<p>Плагин версий 1–3 не загрузится, и человеку будет сказано, почему: причина, нужная версия и что делать. Молчаливое «плагин просто не работает» выглядит как поломка Рины, а не как устаревший плагин.</p>
+<p>Что убрано в 4: <code>create_page()</code> и <code>open_window()</code>. Готовый виджет привязывал ядро к конкретной оболочке — это был прямой блокер разделения процессов.</p>
+<hr class="seam">
+<h2 id="kak-proverit-chto-poluchilos">Как проверить, что получилось</h2>
+<pre>python tools/test_plugins.py</pre>
+<p>Проверка поднимает настоящий менеджер, ставит плагин, включает, спрашивает страницу, жмёт кнопку и убеждается, что сосед цел, когда один плагин завис.</p>
+<p>Три примера в дереве, от меньшего к большему: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/plugins/greeter"><code>plugins/greeter/</code></a> — только <code>on_command</code>; <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/plugins/dice"><code>plugins/dice/</code></a> — инструмент с аргументом; <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/plugins/notes"><code>plugins/notes/</code></a> — страница, настройки, инструмент.</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/WRITING-PLUGINS.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

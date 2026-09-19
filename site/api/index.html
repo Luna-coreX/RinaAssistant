@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rina Assistant — документация API: плагины и протокол</title>
+<meta name="description" content="Две открытые поверхности Рины: плагинное API версии 4 — манифест, хуки, инструменты, разрешения, словарь страницы — и протокол «оболочка ↔ ядро» версии 1 с машиночитаемым контрактом.">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="alternate" hreflang="ru" href="/api/">
+<link rel="alternate" hreflang="en" href="/en/api/">
+<link rel="alternate" hreflang="x-default" href="/api/">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="Rina Assistant — документация API">
+<meta property="og:description" content="Плагинное API версии 4 и протокол версии 1: манифест, хуки, разрешения, словарь страницы, каналы и конверт.">
+<meta property="og:image" content="../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="doc-page">
+<!--
+  THESIS: Фраза соединяется с действием, и соединение видно. Отказ от
+  тёмного лендинга с градиентным героем и рядом стеклянных карточек.
+  OWN-WORLD: Коммутационное поле. Просверленная плита, шнур сигнального
+  цвета, ламповый индикатор, инвертированная наборная этикетка. Ни
+  карточек, ни градиентного текста, ни размытия как украшения.
+  STORY: Разработчик находит обе открытые поверхности, видит границы прав
+  и пишет плагин, не читая исходников ядра.
+  FIRST VIEWPORT: Заголовок, строка о двух поверхностях и полоса
+  показаний API; слева — рейка разделов, которая едет вместе с чтением.
+  FORM: «Коммутаторная», кандидат 4 из семи, seed a2a26a10.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with
+  the finish review, the verdict, and DESIGN.md
+-->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#features">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#download">Установка</a>
+      <a href="/api/" aria-current="page">Разработчику</a>
+      <span class="tongue"><a href="/api/" aria-current="page">RU</a><a href="/en/api/" lang="en">EN</a></span>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Документация API</h1>
+      <p class="lead">У Рины две открытые поверхности. Одна — для плагина, который живёт
+        внутри и объявляет, что умеет. Вторая — протокол между ядром и оболочкой: по нему
+        можно написать свою оболочку целиком.</p>
+      <div class="actions">
+        <a class="press primary" href="#plugin">Плагинное API</a>
+        <a class="press" href="#protocol">Протокол</a>
+      </div>
+    </div>
+    <div class="strip">
+      <div><b>4</b><span>версия плагинного API; младше четвёртой не загружается</span></div>
+      <div><b>13</b><span>видов элемента на странице плагина</span></div>
+      <div><b>11</b><span>разрешений в каталоге, четыре плагину не выдаются</span></div>
+      <div><b>66</b><span>методов в контракте протокола</span></div>
+      <div><b>23</b><span>события</span></div>
+      <div><b>30</b><span>именованных ошибок</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#start">С чего начать</a></li>
+      <li><a href="#plugin">Плагин: манифест</a></li>
+      <li><a href="#hooks">Плагин: хуки</a></li>
+      <li><a href="#tools">Плагин: инструменты</a></li>
+      <li><a href="#permissions">Разрешения</a></li>
+      <li><a href="#page">Словарь страницы</a></li>
+      <li><a href="#settings">Настройки</a></li>
+      <li><a href="#example">Пример целиком</a></li>
+      <li><a href="#compat">Совместимость</a></li>
+      <li><a href="#protocol">Протокол: каналы</a></li>
+      <li><a href="#envelope">Протокол: конверт</a></li>
+      <li><a href="#contract">Протокол: контракт</a></li>
+      <li><a href="#limits">Чего не даётся никогда</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body" id="content">
+    <section id="start">
+      <h2>С чего начать</h2>
+      <p>Если вы хотите <strong>добавить Рине умение</strong> — команду, вкладку, плитку на
+        главный экран, — вам нужно плагинное API. Плагин это папка в <code>plugins/</code> с
+        манифестом <code>plugin.json</code> и модулем <code>main.py</code>, где лежит класс —
+        наследник <code>Plugin</code>.</p>
+      <p>Если вы хотите <strong>заменить оболочку</strong> — написать свой интерфейс, свой
+        голосовой клиент, свою интеграцию, — вам нужен протокол. Ядро запускается отдельным
+        процессом и говорит по именованному каналу; всё, что умеет программа, выражено
+        методами и событиями.</p>
+      <p class="note">Главное правило обеих поверхностей одно: <strong>плагин
+        объявляет</strong>. Он отдаёт описание своих инструментов и своей страницы, а решает,
+        когда их вызвать и показать, ядро. Поэтому оболочку можно переписать целиком: в
+        плагине нет ни строчки её кода — ни виджетов, ни разметки, ни обращений к окну.</p>
+    </section>
+
+    <section id="plugin">
+      <h2>Манифест плагина</h2>
+      <p>Девять полей; обязательны первые два.</p>
+      <table>
+        <thead><tr><th>Поле</th><th>Смысл</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>Имя папки и префикс инструментов: <code>plugin.&lt;id&gt;.&lt;имя&gt;</code>.</td></tr>
+          <tr><td>name</td><td>Как плагин называется в интерфейсе.</td></tr>
+          <tr><td>version</td><td>Ваша версия плагина.</td></tr>
+          <tr><td>author</td><td>Кто написал.</td></tr>
+          <tr><td>description</td><td>Одна строка о том, что он делает.</td></tr>
+          <tr><td>entry</td><td>Имя класса. Если пусто — берётся первый наследник <code>Plugin</code>.</td></tr>
+          <tr><td>icon</td><td>Опознавательный знак среди других плагинов.</td></tr>
+          <tr><td>api_version</td><td>Версия API, под которую написан плагин. Сейчас — 4.</td></tr>
+          <tr><td>permissions</td><td>Что плагин просит у машины. Имена — из общего каталога.</td></tr>
+        </tbody>
+      </table>
+<pre>{
+  <span class="cmd">"id"</span>: "weather",
+  <span class="cmd">"name"</span>: "Погода",
+  <span class="cmd">"version"</span>: "1.0.0",
+  <span class="cmd">"author"</span>: "Вы",
+  <span class="cmd">"description"</span>: "Говорит погоду и показывает её плиткой",
+  <span class="cmd">"entry"</span>: "WeatherPlugin",
+  <span class="cmd">"icon"</span>: "W",
+  <span class="cmd">"api_version"</span>: 4,
+  <span class="cmd">"permissions"</span>: ["network.external"]
+}</pre>
+    </section>
+
+    <section id="hooks">
+      <h2>Хуки</h2>
+      <p>Все необязательны. Не переопределили — Рина ведёт себя так, будто хука нет.</p>
+      <table>
+        <thead><tr><th>Хук</th><th>Когда вызывается</th></tr></thead>
+        <tbody>
+          <tr><td>on_enable</td><td>Плагин включили. Здесь заводят своё: расписание, кэш, соединение.</td></tr>
+          <tr><td>on_disable</td><td>Выключили. Здесь всё заведённое закрывают.</td></tr>
+          <tr><td>on_command</td><td>Пришла фраза. Вернули <code>True</code> — она ваша, дальше её никто не разбирает.</td></tr>
+          <tr><td>on_event</td><td>Произошло событие ядра: имя и данные.</td></tr>
+          <tr><td>tools</td><td>Список <code>PluginTool</code> — что плагин умеет. Читается при включении.</td></tr>
+          <tr><td>page</td><td>Описание собственной вкладки списком элементов. Пусто — вкладки нет.</td></tr>
+          <tr><td>home</td><td>Описание плитки на главном экране. Пусто — и это верный ответ для большинства.</td></tr>
+          <tr><td>on_action</td><td>Нажали кнопку на вашей странице. После вызова страница перерисовывается сама.</td></tr>
+          <tr><td>settings_schema</td><td>Описание своих настроек; панель Рина соберёт сама.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Плитка на главном экране рисуется часто и должна быть короткой: соберите
+        её из того, что уже знаете, а в сеть ходите по своему расписанию и отвечайте из
+        памяти. Растущая плитка — это страница, а место для страницы уже есть.</p>
+      <h3>Два поля класса</h3>
+      <table>
+        <thead><tr><th>Поле</th><th>Что задаёт</th></tr></thead>
+        <tbody>
+          <tr><td>page_title</td><td>Заголовок вкладки. Не задали — берётся имя из манифеста.</td></tr>
+          <tr><td>page_icon</td><td>Значок вкладки. Не задали — берётся значок из манифеста.</td></tr>
+        </tbody>
+      </table>
+      <h3>Через <code>self.ctx</code> доступны службы приложения</h3>
+      <table>
+        <thead><tr><th>Метод</th><th>Что делает</th></tr></thead>
+        <tbody>
+          <tr><td>respond</td><td>Рина скажет и покажет текст.</td></tr>
+          <tr><td>log</td><td>Пишет в журнал плагина.</td></tr>
+          <tr><td>get_setting</td><td>Читает вашу настройку.</td></tr>
+          <tr><td>set_setting</td><td>Пишет вашу настройку.</td></tr>
+          <tr><td>notify</td><td>Уведомление из трея: заголовок и текст.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="tools">
+      <h2>Инструменты</h2>
+      <p>Инструмент — это то, что плагин <em>умеет</em>. Он попадает в общий реестр ядра под
+        именем <code>plugin.&lt;id&gt;.&lt;имя&gt;</code> и получает там ровно те же ворота,
+        что и встроенный: проверку разрешений, подтверждение необратимого и запись в журнал
+        с указанием, какой плагин это начал.</p>
+      <table>
+        <thead><tr><th>Поле</th><th>Смысл</th></tr></thead>
+        <tbody>
+          <tr><td>name</td><td>Короткое имя внутри плагина; префикс ядро добавит само.</td></tr>
+          <tr><td>summary</td><td>Одна строка: что инструмент делает.</td></tr>
+          <tr><td>run</td><td>Функция, которую вызовет ядро. Плагин её сам не зовёт.</td></tr>
+          <tr><td>params</td><td>Аргументы — тем же <code>Param</code>, что у встроенных.</td></tr>
+          <tr><td>permissions</td><td>Что должно быть разрешено. Пусто — ничего.</td></tr>
+          <tr><td>confirm_required</td><td>Спрашивать человека при каждом вызове.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Разрешения проверяются <strong>до</strong> регистрации: то, на что плагин
+        не имеет права, ему не выдаётся, и сам инструмент не создаётся. Инструмент без нужного
+        разрешения всё равно отказал бы — но уже после того, как человек его увидел и позвал.</p>
+    </section>
+
+    <section id="permissions">
+      <h2>Разрешения</h2>
+      <p>Каталог один — общий для ядра и для плагина. Второй каталог «для плагинов» означал бы
+        два языка об одном и том же и неизбежное расхождение: «сеть» здесь и «интернет» там.
+        Но доступно из него не всё.</p>
+      <table>
+        <thead><tr><th>Имя</th><th>Что разрешает</th><th>Плагину</th></tr></thead>
+        <tbody>
+          <tr><td>process.launch</td><td>Открывать приложения и папки, которые вы называете.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>system.media</td><td>Менять громкость и управлять плеером.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>system.lock</td><td>Блокировать рабочий стол по команде.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>system.power</td><td>Выключать, перезагружать и усыплять компьютер.</td><td><span class="no">никогда</span></td></tr>
+          <tr><td>screen.capture</td><td>Делать снимок экрана и сохранять его.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>network.local</td><td>Спрашивать языковую модель на этом компьютере.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>network.external</td><td>Обращаться к службам вне этого компьютера.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>files.read</td><td>Читать файлы, которые вы указали.</td><td><span class="yes">выдаётся</span></td></tr>
+          <tr><td>files.write</td><td>Создавать и изменять файлы.</td><td><span class="no">никогда</span></td></tr>
+          <tr><td>screen.read</td><td>Видеть, что происходит на экране. Заведено заранее, к 5.0.</td><td><span class="no">никогда</span></td></tr>
+          <tr><td>input.synthesize</td><td>Нажимать и печатать от вашего имени. Заведено заранее, к 5.0.</td><td><span class="no">никогда</span></td></tr>
+        </tbody>
+      </table>
+      <p class="note">Четыре запрета не про недоверие к вам, а про то, чего плагин не должен
+        мочь по устройству: выключать компьютер по решению чужого кода — не то, ради чего
+        ставят плагин погоды, а запись файлов означала бы чужое имя в папках человека.
+        Последние два относятся к 5.0 и пока не висят ни на одном инструменте.</p>
+      <p class="note">Отказ здесь — это ответ: человек видит, что именно плагину
+        не выдали, и почему.</p>
+    </section>
+
+    <section id="page">
+      <h2>Словарь страницы</h2>
+      <p>Страница плагина описывается <em>данными</em>. Виджетов нет, разметки нет: вы
+        возвращаете список элементов, а рисует их оболочка — та, которая сейчас установлена.
+        Схема второй версии, тринадцать видов.</p>
+      <table>
+        <thead><tr><th>Вид</th><th>Что это</th></tr></thead>
+        <tbody>
+          <tr><td>title</td><td>Заголовок раздела.</td></tr>
+          <tr><td>text</td><td>Обычный текст.</td></tr>
+          <tr><td>note</td><td>Пояснение помельче и потише.</td></tr>
+          <tr><td>items</td><td>Список строк.</td></tr>
+          <tr><td>button</td><td>Кнопка с действием; нажатие придёт в <code>on_action</code>.</td></tr>
+          <tr><td>input</td><td>Поле ввода с подсказкой и кнопкой.</td></tr>
+          <tr><td>table</td><td>Таблица со строками и, если нужно, шапкой.</td></tr>
+          <tr><td>progress</td><td>Полоса выполнения от нуля до единицы.</td></tr>
+          <tr><td>badge</td><td>Короткая метка состояния.</td></tr>
+          <tr><td>divider</td><td>Разделитель.</td></tr>
+          <tr><td>card</td><td>Контейнер с заголовком.</td></tr>
+          <tr><td>group</td><td>Группа элементов.</td></tr>
+          <tr><td>row</td><td>Ряд: элементы в строку.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Незнакомый вид оболочка показывает заметно и с именем: плагин может быть
+        собран под схему новее, и молчаливый пропуск сделал бы часть его страницы невидимой
+        без следа.</p>
+    </section>
+
+    <section id="settings">
+      <h2>Настройки</h2>
+      <p>Тем же способом: вы описываете поля, панель Рина строит сама. Четыре вида.</p>
+      <table>
+        <thead><tr><th>Вид</th><th>Что это</th></tr></thead>
+        <tbody>
+          <tr><td>toggle</td><td>Переключатель: да или нет.</td></tr>
+          <tr><td>text</td><td>Строка.</td></tr>
+          <tr><td>choice</td><td>Выбор из набора.</td></tr>
+          <tr><td>slider</td><td>Число в границах, с шагом.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="example">
+      <h2>Пример целиком</h2>
+      <p>Плагин, который объявляет один инструмент, отвечает на фразу и показывает свою
+        страницу. <code>main.py</code> рядом с манифестом из первого раздела.</p>
+<pre><span class="rem"># plugins/weather/main.py</span>
+<span class="cmd">from</span> plugins.api <span class="cmd">import</span> Plugin, PluginTool
+<span class="cmd">from</span> plugins.page_spec <span class="cmd">import</span> Title, Text, Note, Button
+<span class="cmd">from</span> plugins.settings_spec <span class="cmd">import</span> Text <span class="cmd">as</span> TextField, Toggle
+
+
+<span class="cmd">class</span> WeatherPlugin(Plugin):
+
+    <span class="cmd">def</span> on_enable(self):
+        self.log(<span class="rem">"погода включена"</span>)
+
+    <span class="cmd">def</span> tools(self):
+        <span class="cmd">return</span> [PluginTool(
+            name=<span class="rem">"current"</span>,
+            summary=<span class="rem">"Сообщает погоду в выбранном городе"</span>,
+            run=self._current,
+            permissions=(<span class="rem">"network.external"</span>,),
+        )]
+
+    <span class="cmd">def</span> _current(self, args):
+        city = self.setting(<span class="rem">"city"</span>, <span class="rem">"Москва"</span>)
+        <span class="cmd">return</span> {<span class="rem">"text"</span>: f<span class="rem">"В городе {city} сейчас ясно"</span>}
+
+    <span class="cmd">def</span> on_command(self, text):
+        <span class="cmd">if</span> <span class="rem">"погода"</span> <span class="cmd">not in</span> text.lower():
+            <span class="cmd">return</span> <span class="cmd">False</span>
+        self.respond(self._current({})[<span class="rem">"text"</span>])
+        <span class="cmd">return</span> <span class="cmd">True</span>
+
+    <span class="cmd">def</span> page(self):
+        <span class="cmd">return</span> [
+            Title(<span class="rem">"Погода"</span>),
+            Text(f<span class="rem">"Город: {self.setting('city', 'Москва')}"</span>),
+            Note(<span class="rem">"Обновляется по запросу, не чаще раза в десять минут."</span>),
+            Button(<span class="rem">"Обновить"</span>, action=<span class="rem">"refresh"</span>),
+        ]
+
+    <span class="cmd">def</span> on_action(self, action, value=<span class="cmd">None</span>):
+        <span class="cmd">if</span> action == <span class="rem">"refresh"</span>:
+            self.respond(self._current({})[<span class="rem">"text"</span>])
+
+    <span class="cmd">def</span> settings_schema(self):
+        <span class="cmd">return</span> [
+            TextField(<span class="rem">"city"</span>, <span class="rem">"Город"</span>, default=<span class="rem">"Москва"</span>),
+            Toggle(<span class="rem">"speak"</span>, <span class="rem">"Говорить вслух"</span>, default=<span class="cmd">True</span>),
+        ]</pre>
+      <p class="note">Папку кладут в <code>plugins/</code>. При установке проверяется имя, папка
+        обязана лечь внутрь <code>plugins/</code>, имена устройств Windows отвергаются, а
+        замена уже стоящего плагина принудительно выключается.</p>
+    </section>
+
+    <section id="compat">
+      <h2>Совместимость</h2>
+      <p>Манифест называет версию API, под которую написан плагин. Загружается диапазон от
+        четвёртой до четвёртой: младшая граница совпадает с текущей нарочно — плагин, который
+        отдаёт готовый виджет, не может быть «поддержан частично», потому что оболочка на C#
+        не нарисует Python-виджет никак.</p>
+      <p>Несовпадение не молчит. Человеку называют причину, версию и что делать: обновить Рину,
+        если плагин новее, или обновить плагин, если он старше. Молчаливое «плагин просто не
+        работает» выглядит поломкой Рины, хотя устарел плагин.</p>
+    </section>
+
+    <section id="protocol">
+      <h2>Протокол: каналы</h2>
+      <p>Оболочка — процесс на C#: окно, устройства вывода, запуск программ. Ядро — процесс на
+        Python: решения. Оболочка запускает ядро, следит за ним и перезапускает; ядро
+        подключается клиентом.</p>
+      <table>
+        <thead><tr><th>Канал</th><th>Имя</th><th>Содержимое</th></tr></thead>
+        <tbody>
+          <tr><td>управляющий</td><td><code>\\.\pipe\rina.&lt;session&gt;.control</code></td><td>сообщения JSON</td></tr>
+          <tr><td>данных</td><td><code>\\.\pipe\rina.&lt;session&gt;.data</code></td><td>двоичные кадры</td></tr>
+        </tbody>
+      </table>
+      <p>Каналы раздельные, чтобы всплеск звука не задерживал управляющее сообщение за собой.
+        Кадр управляющего канала — четыре байта длины и полезная нагрузка JSON в UTF-8, предел
+        одного сообщения 1 МиБ. Кадр данных — длина, номер потока, порядковый номер и байты,
+        предел 256 КиБ.</p>
+      <p class="note">Двоичные данные <strong>никогда</strong> не кодируются внутри JSON: base64
+        раздувает объём на треть и заставляет звук делить очередь с управлением.</p>
+    </section>
+
+    <section id="envelope">
+      <h2>Протокол: конверт</h2>
+      <p>Девять полей, и они есть в каждом сообщении управляющего канала без исключений.</p>
+      <table>
+        <thead><tr><th>Поле</th><th>Смысл</th></tr></thead>
+        <tbody>
+          <tr><td>v</td><td>Версия протокола — наибольшая общая, выбранная при рукопожатии.</td></tr>
+          <tr><td>type</td><td><code>request</code>, <code>response</code>, <code>event</code> или <code>error</code>.</td></tr>
+          <tr><td>id</td><td>Идентификатор сообщения, уникальный в пределах сессии.</td></tr>
+          <tr><td>method</td><td>Имя метода или события — для запроса и события.</td></tr>
+          <tr><td>correlation_id</td><td>Идентификатор запроса — для ответа и ошибки.</td></tr>
+          <tr><td>stream_id</td><td>Поток, к которому относится сообщение, если относится.</td></tr>
+          <tr><td>timestamp</td><td>Время отправки, секунды с эпохи.</td></tr>
+          <tr><td>trace_id</td><td>Сквозная трассировка.</td></tr>
+          <tr><td>payload</td><td>Содержимое; пустой объект, если сказать нечего.</td></tr>
+        </tbody>
+      </table>
+<pre>{
+  <span class="cmd">"v"</span>: 1,
+  <span class="cmd">"type"</span>: "request",
+  <span class="cmd">"id"</span>: "s-0042",
+  <span class="cmd">"method"</span>: "command.handle",
+  <span class="cmd">"timestamp"</span>: 1756750000.123,
+  <span class="cmd">"trace_id"</span>: "t-8f21",
+  <span class="cmd">"payload"</span>: {"text": "запусти телеграм", "source": "typed"}
+}</pre>
+      <p class="note">Неизвестный метод в запросе — ошибка <code>protocol.unknown_method</code>.
+        Неизвестное событие получатель молча игнорирует. Асимметрия намеренная: пропущенный
+        запрос — потерянное действие, пропущенное событие — потерянное уведомление.</p>
+    </section>
+
+    <section id="contract">
+      <h2>Протокол: контракт</h2>
+      <p>Всё, что можно попросить и услышать, лежит машиночитаемо —
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/contract-v1.json">contract-v1.json</a>.
+        По нему сверяются обе стороны: C#-часть протокола порождается из него же.</p>
+      <table>
+        <thead><tr><th>Чего</th><th>Сколько</th><th>Например</th></tr></thead>
+        <tbody>
+          <tr><td>методов</td><td>66</td><td><code>command.handle</code>, <code>apps.launch</code>, <code>reminders.add</code></td></tr>
+          <tr><td>событий</td><td>23</td><td><code>listening.started</code>, <code>assistant.response</code>, <code>reminder.fired</code></td></tr>
+          <tr><td>ошибок</td><td>30</td><td><code>permission.denied</code>, <code>app.not_found</code>, <code>confirmation.required</code></td></tr>
+          <tr><td>возможностей</td><td>19</td><td><code>audio.input</code>, <code>reminders</code>, <code>plugins</code></td></tr>
+          <tr><td>видов потока</td><td>3</td><td><code>audio.input</code>, <code>audio.output</code>, <code>screen.frame</code></td></tr>
+        </tbody>
+      </table>
+      <p>Первое сообщение сессии — рукопожатие: стороны называют поддерживаемые версии и свои
+        возможности и выбирают наибольшую общую версию. До него любой другой метод отвечает
+        ошибкой <code>protocol.not_ready</code>.</p>
+      <p class="note">Половина описанного в 4.0 не используется, и это сделано намеренно:
+        добавить потом стоит переписывания обеих сторон, а заложить сейчас — абзаца в
+        документе. Полный текст —
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/PROTOCOL-v1.md">PROTOCOL-v1.md</a>.</p>
+    </section>
+
+    <section id="limits">
+      <h2>Чего не даётся никогда</h2>
+      <p>Отдельный процесс — <strong>не песочница</strong>, и говорить об этом надо прямо. Тот
+        же интерпретатор, те же права пользователя; <code>subprocess</code> внутри плагина
+        работает. У плагина отняли доступ к <em>приложению</em>; доступ к машине
+        у него и не отнимали.</p>
+      <div class="hatched">Что разделение действительно даёт: инструменты плагина идут в тот же
+        реестр и получают те же ворота; часть разрешений не выдаётся никогда, а инструмент,
+        просящий такое, не заводится вовсе; обратиться к ядру плагин может ровно за двумя
+        вещами; у вызова есть срок, не ответивший убивается, а сосед остаётся цел.</div>
+      <p class="note">Поэтому ставьте плагины так же, как ставите любой другой код: глядя, чей
+        он. Полное описание границ —
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/SECURITY.md">SECURITY.md</a>
+        и <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/security/THREAT-MODEL.md">модель угроз</a>.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry · <span class="fig">4.0.0-beta</span></span>
+  <span class="note">Страница не выполняет скриптов и не ставит счётчиков.</span>
+  <nav>
+    <a href="/">О продукте</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/WRITING-PLUGINS.md">Руководство</a>
+    <a href="/en/api/" lang="en">English</a>
+  </nav>
+</footer>
+
+</body>
+</html>

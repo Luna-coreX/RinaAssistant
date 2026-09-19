@@ -332,6 +332,34 @@ try:
 except subprocess.TimeoutExpired:
     check("набор ответил, сколько в нём проверок", False, "| не дождались")
 
+# The size of the golden set, and it had rotted the same way as the rest:
+# the README said 112 recorded utterances while the set held 134. The
+# sentence is the one that tells a reader how firmly the behaviour is
+# pinned down — that is, exactly the sentence a reader has no way of
+# checking.
+with io.open(os.path.join(ROOT, "docs", "golden", "utterances.json"),
+             encoding="utf-8") as handle:
+    recorded = len(json.load(handle)["cases"])
+sessions = len(os.listdir(os.path.join(ROOT, "docs", "golden", "sessions")))
+
+# Both numbers are named twice in the README, and **every** mention is
+# compared rather than any one of them. Breaking this check the first time
+# only updated one of the two places and it stayed green — which is the
+# half-done edit this whole section exists to catch.
+said_cases = set(re.findall(r"(\d+) recorded utterances", readme))
+said_cases |= set(re.findall(r"golden set of (\d+) utterances", readme))
+check(f"записанных фраз в README столько же, сколько в наборе ({recorded})",
+      said_cases == {str(recorded)},
+      f"| README называет {sorted(said_cases) or 'ничего'}")
+
+said_sessions = {one.lower()
+                 for one in re.findall(r"(\w+) recorded sessions", readme)}
+wanted_sessions = str(WORDS.get(sessions, sessions)).lower()
+check(f"и записанных сеансов ({sessions})",
+      said_sessions == {wanted_sessions},
+      f"| ждали «{wanted_sessions} recorded sessions», "
+      f"нашли {sorted(said_sessions) or 'ничего'}")
+
 # Every screenshot the README points at exists. A picture that does not open
 # is a broken promise on the page that makes the first impression.
 missing = [name for name in re.findall(r'src="(docs/screens/[^"]+)"', readme)
@@ -438,6 +466,74 @@ if os.path.exists(triage):
     check("и обещает срок, а не «когда-нибудь»",
           "в течение недели" in order)
     check("README ведёт к нему", "docs/TRIAGE.md" in readme)
+
+# ---------------------------------------------------------------------------
+# The engines the README names, against the engines the settings offer
+# ---------------------------------------------------------------------------
+#
+# The README listed five recognisers — «disabled, Google, Vosk, Whisper,
+# PocketSphinx» — and the settings offer three. Google and PocketSphinx
+# open a microphone of their own and were dropped in 4.0 (`4.0-E05`); the
+# sentence stayed. The same sentence stood on the product page, and both
+# were written from the same memory of the 3.1 list.
+#
+# The page is now checked (`tools/check_site.py`); this is the other half.
+print()
+print("=== движки в README против настроек ===")
+
+sys.path.insert(0, ROOT)
+import core.settings_schema as settings_schema
+
+#: Engine key -> the word the README uses for it.
+#:
+#: The README writes for a developer and the settings for whoever is
+#: choosing, so the words differ on purpose. A key missing from here is
+#: reported as missing from here.
+README_WORDS = {
+    "silent": "silent",
+    "pyttsx3": "pyttsx3",
+    "edge": "Edge Neural TTS",
+    "gtts": "gTTS",
+    "piper": "Piper",
+    "vosk": "Vosk",
+    "whisper": "Whisper",
+    "disabled": "disabled",
+}
+
+#: Setting -> what the report calls it, and the words its list sits between.
+SPOKEN = {
+    "tts_engine": ("речь", "**Text to speech:**", "."),
+    "stt_engine": ("слух", "**Speech to text:**", "—"),
+}
+
+for key, (what, opens, closes) in SPOKEN.items():
+    offered = [one["value"] for one in settings_schema.options_for(key, {})]
+    unknown = [one for one in offered if one not in README_WORDS]
+    check(f"{what}: у каждого движка есть слово для README", not unknown,
+          f"| нет в таблице: {unknown} — допишите слово" if unknown else "")
+    if unknown:
+        continue
+    line = next((one for one in readme.splitlines()
+                 if one.strip().startswith(opens)), "")
+    check(f"{what}: список в README на месте", bool(line),
+          f"| строки, начинающейся с «{opens}», нет" if not line else "")
+    if not line:
+        continue
+    # The parentheses go first, before anything else is done: in
+    # "Edge Neural TTS (online, best quality)" the comma sits inside the
+    # aside and tore the list apart, and the full stop in "(needs an
+    # `.onnx` model)" cut it off halfway.
+    plain = re.sub(r"\([^)]*\)", "", line.strip()[len(opens):])
+    cut = plain.find(closes)
+    if cut >= 0:
+        plain = plain[:cut]
+    # As sets: the order in the sentence is a matter of reading, the
+    # membership is a matter of the settings.
+    said = {one.strip().strip("`. ") for one in plain.split(",")
+            if one.strip(". ")}
+    want = {README_WORDS[one] for one in offered}
+    check(f"{what}: те же движки, что в настройках", said == want,
+          f"| README: {sorted(said)} | настройки: {sorted(want)}")
 
 print()
 print("ИТОГО ошибок:", fails)

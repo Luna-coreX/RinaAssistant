@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Что менялось — Rina Assistant</title>
+<meta name="description" content="По выпускам.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Что менялось — Rina Assistant">
+<meta property="og:description" content="По выпускам.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по CHANGELOG.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Что менялось</h1>
+      <p class="lead">По выпускам.</p>
+      <p class="note">Документ репозитория, страницей. Написан по-английски. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/CHANGELOG.md">CHANGELOG.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#unreleased">Unreleased</a></li>
+      <li><a href="#3-1-0-2026-09-01">3.1.0 — 2026-09-01</a></li>
+      <li><a href="#3-0-0-2026-08-30">3.0.0 — 2026-08-30</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>All notable changes to Rina Assistant. Releases before 3.0.0 are documented on the <a href="https://github.com/Luna-coreX/RinaAssistant/releases">releases page</a>.</p>
+<hr class="seam">
+<h2 id="unreleased">Unreleased</h2>
+<h3 id="fixed">Fixed</h3>
+<p><strong>&quot;Убавь громкость&quot; made it louder.</strong> System phrases are matched in one pass, longest first, with a fuzzy fallback for misrecognition. &quot;Убавь громкость&quot; scores 0.875 against &quot;прибавь громкость&quot; — above the 0.82 threshold — and the latter is two characters longer, so it was tested first and won. Matching is now two passes: exact containment first, approximate only afterwards. An exact phrase must beat an approximate one whatever its length.</p>
+<p>Found by the new golden-utterance set on its first run, which is precisely what that set exists for. All 53 system phrases now resolve to their own action, and the pair is kept as a regression case.</p>
+<h3 id="licence">Licence</h3>
+<p><strong>The project moved from MIT to the Apache License 2.0.</strong> The reasoning is in <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0001-license-and-contributions.md">ADR 0001</a>; in short, Apache-2.0 gives everything MIT gave and adds two things this project needs — an explicit patent grant, and protection of the name, so a fork inherits the code but not the right to call itself Rina.</p>
+<p>The change was made now because it could be: every commit so far is by one author, who could therefore relicense unilaterally. That stops being true the moment outside code is merged.</p>
+<p><strong>This is not retroactive.</strong> Releases up to and including 3.1.0 went out under MIT, and copies obtained under those terms keep them.</p>
+<p><strong>Contributions need no agreement to sign.</strong> Apache-2.0 section 5 licenses a submitted contribution under the same terms by default, which is the job a CLA would otherwise do. Added <code>CONTRIBUTING.md</code> describing this, <code>NOTICE</code> for attribution, and <code>docs/adr/</code> for decision records.</p>
+<hr class="seam">
+<h2 id="3-1-0-2026-09-01">3.1.0 — 2026-09-01</h2>
+<p>An intermediate release between 3.0.0 and the 4.0.0 split. It adds one new behaviour — the application now keeps a log — and otherwise closes findings from two audits, mine and an external review, preparing the ground for moving the core into its own process.</p>
+<h3 id="highlights">Highlights</h3>
+<ul class="plain"><li><strong>Logs.</strong> Levels, rotation, and a separate security log. Message texts are never written unless you explicitly ask for them.</li><li><strong>No shell, no bare names.</strong> The last <code>shell=True</code> is gone; programs are launched by absolute path.</li><li><strong>Speech no longer overlaps itself.</strong> One playback queue, one temporary file per answer.</li><li><strong>Commands left the interface thread.</strong> Typing a command no longer freezes the window while the model thinks.</li><li><strong>Nothing gets stuck.</strong> Test buttons, recognition failures and the command pipeline report what happened instead of going quiet.</li></ul>
+<hr class="seam">
+<h3 id="observability">Observability</h3>
+<p><strong>Logging with levels.</strong> New <code>core/logging_setup.py</code> — <code>DEBUG</code> / <code>INFO</code> / <code>WARNING</code> / <code>ERROR</code>, rotating files (1 MB × 3) under <code>%APPDATA%/RinaAssistant/logs/</code>, level selectable in <strong>Settings → Diagnostics</strong>. Uncaught exceptions are recorded, including those in background threads — which previously killed the thread in silence and left the user looking at an action that simply never happened.</p>
+<p><strong>Message texts stay private.</strong> Only their length is logged unless &quot;Log message texts&quot; is deliberately switched on, so a log can be attached to a bug report without disclosing conversations. When the setting is on, the log says so on its first line.</p>
+<p><strong>A separate security log.</strong> <code>security.log</code> records what both audits had to reconstruct by hand: plugin installs and replacements, rejected plugin names, command imports (how many accepted, how many discarded), execution of power actions, requests to a non-local model address, and refusal of a dangerous action at the confirmation prompt.</p>
+<hr class="seam">
+<h3 id="security">Security</h3>
+<p><strong>The last <code>shell=True</code> is gone.</strong> It lived in <code>voice/commands.py</code>, launching <code>discord</code>, <code>calc</code>, <code>notepad</code>, <code>explorer</code> and <code>start chrome</code> by bare name through the command interpreter. No user input reached it, so this was not command injection — but Windows searches the current directory, so a file placed next to the application would have run instead. Programs are now resolved to an absolute path (System32 → <code>%SystemRoot%</code> → PATH) and started without a shell. Verified by planting a decoy <code>notepad.exe</code> in the working directory: the real one still wins.</p>
+<p><strong>The browser fallback works again.</strong> <code>start chrome</code> could not survive removing the shell; if Chrome is not found, the default browser opens instead of nothing happening.</p>
+<p><strong>Store apps report honestly.</strong> Launching a UWP app always returned success, because <code>explorer.exe</code> says nothing about what became of <code>shell:AppsFolder\&lt;id&gt;</code> — and waiting for it is unsafe, since it becomes the desktop shell process when not already running. The identifier is now checked against the index before launching, and an unknown one fails without spawning anything.</p>
+<p><strong>A vanished program says so.</strong> Command targets and index entries are checked for existence before launching, and the answer names the cause — &quot;Не нашла «foo.exe» — программу удалили или перенесли&quot; — instead of &quot;Не получилось выполнить команду&quot;. Bare names such as <code>discord</code> are deliberately left alone: Windows resolves them through the App Paths registry, and that is a legitimate way to write a command.</p>
+<p><strong><code>SECURITY.md</code>.</strong> Private reporting through GitHub Security Advisories, plus an explicit description of the trust boundaries — most importantly that <strong>a plugin is ordinary Python with the application&#x27;s rights, and there is no sandbox</strong>. Installing one is as consequential as running a downloaded program.</p>
+<hr class="seam">
+<h3 id="reliability">Reliability</h3>
+<p><strong>Speech no longer overlaps itself.</strong> Playback went through no queue and three fixed temporary filenames (<code>rina_gtts.mp3</code>, <code>rina_edge.mp3</code>, <code>rina_piper.wav</code>), so two answers in quick succession overwrote each other&#x27;s file and played at the same time. There is now a single playback worker, one uniquely named file per synthesis, deletion after playback, and a failed file no longer kills the worker.</p>
+<p><strong>The microphone no longer hears Rina.</strong> <code>_speaking</code> was one flag for the whole core, so with two overlapping answers the first to finish cleared it and the microphone opened under speech that was still playing. It is now a counter: the flag holds until the last speaker finishes.</p>
+<p><strong>Default settings are copied properly.</strong> <code>dict(DEFAULTS)</code> is a shallow copy, and more than a dozen defaults are mutable — <code>plugin_settings</code>, <code>wake_words</code>, <code>action_hotkeys</code>, <code>app_aliases</code>, <code>program_folders</code>, <code>custom_commands</code>. Changing a plugin setting wrote into the module-level defaults, so &quot;reset&quot; restored the already-modified value rather than the factory one.</p>
+<p><strong>Stores no longer lose writes.</strong> History, reminders, usage statistics and user commands all used read-modify-write: two threads read the same state and the second overwrote the first. All of them now run under one store-wide lock. Under load — four threads writing at once — 160 of 160 history entries, 60 of 60 reminders, and exactly 200 of 200 counter increments survive.</p>
+<p><strong>Test buttons come back.</strong> <code>MicTester._worker</code> had no <code>try/finally</code>: an exception left the button greyed out until restart. The model&#x27;s &quot;Check connection&quot; button had the same shape, and <code>http.client.HTTPException</code> — which does not inherit from <code>OSError</code> — escaped the request handler entirely. Both now report the cause and return to a usable state.</p>
+<p><strong>Recognition failures are visible.</strong> <code>_listen_worker</code> had a <code>finally</code> but no <code>except</code>, so a failing engine cleared the indicator and killed the thread without a word.</p>
+<hr class="seam">
+<h3 id="responsiveness">Responsiveness</h3>
+<p><strong>Commands run off the interface thread.</strong> Typed commands drove the entire pipeline in the GUI thread; with the language model enabled, that is several seconds of a frozen window. Commands now go through a single queue inside the core — the window stays live, ordering is preserved, and an exception in one command no longer strands every command behind it. Always-listen still waits for completion, because it must not listen while Rina is answering.</p>
+<p><strong>Hotkeys fire once.</strong> Holding a combination produces key auto-repeat, and every repeat was reported as a fresh activation. A 300 ms suppression window per combination fixes it.</p>
+<p><strong>Theme switching is safe.</strong> Pages were destroyed from inside the theme-change signal handler — while that signal was still being delivered to those same pages. The rebuild is now deferred to the next event-loop turn and guarded against re-entry. The tray menu is rebuilt on theme and language change instead of keeping the old palette and the old language, and its old actions are released rather than accumulated.</p>
+<p><strong>Plugins load after Qt exists.</strong> <code>plugin_manager.discover()</code> ran before <code>QApplication</code> was constructed. It only reads manifests today, but it also loads the code of enabled plugins — and a plugin touching Qt at that moment would have crashed the launch with nothing to tell the user.</p>
+<hr class="seam">
+<h3 id="parsing">Parsing</h3>
+<p><strong>Compound durations.</strong> &quot;Поставь таймер на 1 час 30 минут&quot; was read as one hour, and the user found out ninety minutes later. All number-unit pairs are now summed: 5400 seconds for that phrase, 8130 for &quot;2 часа 15 минут 30 секунд&quot;.</p>
+<p><strong>Percentages only when asked.</strong> Percentage parsing ran before the check that the phrase was addressed to the calculator at all, so ordinary speech containing &quot;20 процентов от 3000&quot; was answered with arithmetic. It now follows the same admission rule as the rest of the calculator: an explicit trigger, or a phrase that is nothing but the expression.</p>
+<hr class="seam">
+<h3 id="decisions">Decisions</h3>
+<p><strong>Plugin trust boundary (ADR).</strong> Recorded for 4.0.0 as <code>4.0-H07</code>: a plugin gets its own process and speaks to the core over the same protocol as the shell. It lands there rather than in 5.0.0 because <code>H03</code> rewrites the Plugin API from scratch anyway, <code>D02</code> designs the protocol anyway, and <code>C04</code> builds the permission catalogue anyway — so a plugin becomes one more protocol client instead of a separate mechanism. Deferring would mean changing the Plugin API twice and migrating the bundled plugins twice. A full sandbox with resource limits was rejected as a separate research task: in-process sandboxing does not exist in Python, and OS-level limits can be layered on top of <code>H07</code> later if needed.</p>
+<hr class="seam">
+<h3 id="deliberately-not-done">Deliberately not done</h3>
+<ul class="plain"><li><strong>Moving all storage to SQLite</strong>, as the external review proposed. 5.0.0 introduces SQLite for memory and 4.0.0 migrates user data; doing that migration twice buys nothing. The races are fixed with a lock instead.</li><li><strong>An allow-list of directories for command targets.</strong> It would break portable programs, which is the case the mechanism was built for. Imported commands remain sanitised and disabled.</li><li><strong>Schema validation of event payloads.</strong> That is <code>4.0-D02</code> and <code>4.0-D04</code>. Wrapping every event in a version envelope is the wrong shape: the version is agreed once at handshake, and plugins do not subscribe to the event bus at all.</li></ul>
+<hr class="seam">
+<h3 id="verification">Verification</h3>
+<ul class="plain"><li><strong>Block tests:</strong> security 26 checks, reliability 27, responsiveness 15, parsing 24, security log 12 — all passing.</li><li><strong>Regression:</strong> command pipeline, reminders, plugins, import/export, all 5 languages, all 5 themes — 0 failures.</li><li><strong>Translations:</strong> 0 untranslated strings.</li></ul>
+<h3 id="on-the-external-review">On the external review</h3>
+<p>An external audit of 3.0.0 was reviewed alongside my own. Of its twelve findings, two were confirmed and are fixed here (the speech queue and the hotkey debounce), two were real but attributed to the wrong file, three were already fixed in 3.0.0, and the rest did not match the code — including a quoted fragment of <code>settings_store.py</code> that does not exist, and a claim of <code>shell=True</code> in <code>voice/system_control.py</code>, which contains none. Checking that particular claim is what surfaced the real <code>shell=True</code> in <code>voice/commands.py</code>. Its recommendations section was considerably stronger than its findings: the logging work and <code>SECURITY.md</code> in this release come from it.</p>
+<hr class="seam">
+<h2 id="3-0-0-2026-08-30">3.0.0 — 2026-08-30</h2>
+<p>The largest release so far. Rina&#x27;s brain was pulled out of the interface and now runs on its own; free-form questions can be answered by a local language model; and a full security and crash audit closed a set of issues, two of which could destroy data or run someone else&#x27;s code.</p>
+<h3 id="highlights-2">Highlights</h3>
+<ul class="plain"><li><strong>Headless core.</strong> All command handling moved into <code>core/</code>, which imports no Qt at all. The window is now a thin shell subscribed to events.</li><li><strong>AI answers.</strong> Anything Rina can&#x27;t parse can be answered by a local Ollama model instead of &quot;Sorry, I didn&#x27;t understand.&quot;</li><li><strong>Security audit.</strong> Two critical plugin vulnerabilities fixed, plus untrusted text no longer rendered as markup, and imported commands can no longer arrive pre-armed.</li><li><strong>Crash audit.</strong> ~600 hostile inputs, corrupted data files and concurrent access: 30 failures found, 0 remaining.</li></ul>
+<hr class="seam">
+<h3 id="architecture-the-headless-core">Architecture: the headless core</h3>
+<p>Rina used to think inside <code>voice/service.py</code>, which was a <code>QObject</code>. Recognition, parsing, launching and speaking were all entangled with the widget tree, so none of it could run — or be tested — without a window on screen.</p>
+<ul class="plain"><li><strong><code>core/engine.py</code></strong> — the whole pipeline: pending questions → plugins → user commands → reminders → system control → app launcher → built-ins → language model → web fallback. <strong>Zero Qt imports.</strong></li><li><strong><code>core/events.py</code></strong> — a small synchronous event bus. The core announces what happened; it never touches a widget.</li><li><strong><code>core/protocol.py</code></strong> — every event and its payload declared in one place, with a <code>PROTOCOL_VERSION</code>. Payloads are plain JSON-serialisable values, so this contract becomes an IPC protocol unchanged when the shell moves to another process or another language.</li><li><strong><code>voice/service.py</code></strong> — reduced from ~700 lines of logic to a Qt adapter that forwards core events to signals. <strong>−538 lines.</strong></li></ul>
+<p>Practical consequences today: the core can be driven headless in tests, the shell can be replaced without touching behaviour, and a background thread can no longer accidentally call into Qt.</p>
+<hr class="seam">
+<h3 id="ai-answers-via-ollama">AI answers via Ollama</h3>
+<p>When no handler claims a phrase, Rina can now ask a local model.</p>
+<ul class="plain"><li><strong>Local by design.</strong> Requests go only to the address in settings (<code>localhost:11434</code> by default). Nothing leaves the machine; if you point it elsewhere, the settings page says so plainly.</li><li><strong>No new dependencies.</strong> Ollama speaks HTTP, so <code>urllib</code> is enough.</li><li><strong>Conversational.</strong> The last 6 exchanges are sent as context, so follow-up questions work.</li><li><strong>Spoken-answer persona.</strong> The default prompt asks for one or two sentences, no lists, no markup, in the speaker&#x27;s language — the answer is read aloud.</li><li><strong>New <code>THINKING</code> event.</strong> The interface shows an indicator instead of going silent for several seconds.</li><li><strong>Settings → AI.</strong> Enable, server address, model picker (populated from the server), custom persona, timeout, and a &quot;Check connection&quot; button.</li></ul>
+<p>Disabled by default. With it off, the pipeline behaves exactly as in 2.5.0.</p>
+<hr class="seam">
+<h3 id="security-2">Security</h3>
+<p>Every issue below was reproduced in a sandbox before being fixed, not inferred from reading the code.</p>
+<h4 id="critical">Critical</h4>
+<p><strong>Plugin installation could delete the application.</strong> A <code>plugin.json</code> declaring <code>&quot;id&quot;: &quot;..&quot;</code> escaped the plugins folder, and the overwrite step then removed the application root — <code>main.py</code>, <code>core/</code>, every plugin. Fixed in three layers: plugin ids are validated against a strict whitelist, the resulting path is re-checked <strong>after</strong> joining to confirm it is a direct child of the plugins folder, and nothing is removed unless the target actually contains a <code>plugin.json</code>.</p>
+<p><strong>A plugin could run without being enabled.</strong> An archive reusing the id of an already-enabled plugin replaced it, and its code executed <strong>immediately</strong> during the automatic re-scan — while the interface still said &quot;Enable it below.&quot; Replacing a plugin now forces it back to disabled, and the confirmation message says a plugin was replaced.</p>
+<p><strong>Folder names are now authoritative.</strong> <code>discover()</code> used to trust the <code>id</code> inside the manifest, so a manifest could claim another plugin&#x27;s identity and inherit its stored settings. The folder name wins.</p>
+<h4 id="high">High</h4>
+<p><strong>Untrusted text is no longer rendered as markup.</strong> Qt labels interpret HTML by default and <code>setTextFormat</code> was never called, so a model reply, a recognised phrase, plugin output or a plugin manifest containing <code>&lt;img src=&quot;file://some-host/x&quot;&gt;</code> would make Windows reach out to that host over SMB. All externally-sourced text — history, toasts, plugin pages, plugin cards — is now explicitly plain text.</p>
+<p><strong>Imported commands can no longer arrive armed.</strong> Command files were validated only by their envelope; <code>type</code>, <code>target</code> and <code>enabled</code> were trusted verbatim, so a shared file could plant an enabled command pointing at an arbitrary executable or UNC path. Imported entries are now reduced to known fields, checked against the known command and system-action types, capped (500 commands, 20 triggers, 200 characters each, minimum 2), and <strong>always imported disabled</strong>.</p>
+<p><strong>System binaries are launched by absolute path.</strong> <code>shutdown.exe</code> and <code>rundll32.exe</code> were invoked by bare name, and Windows&#x27; search order includes the current directory — a file dropped there would run instead. Resolved through <code>%SystemRoot%\System32</code> now.</p>
+<h4 id="medium">Medium</h4>
+<ul class="plain"><li>The Ollama address was accepted as free text; it is now required to be <code>http</code>/<code>https</code> with a host, responses are capped at 4 MB, and a non-local address is flagged in settings.</li><li>Removed a dead <code>dispatch_user_command</code> path that <strong>skipped the confirmation prompt</strong> for destructive actions.</li></ul>
+<hr class="seam">
+<h3 id="reliability-2">Reliability</h3>
+<p><strong>Settings could be lost, and could kill the reminder scheduler.</strong> <code>save()</code> iterated the live dirty-key set while another thread modified it, raising <code>RuntimeError: Set changed size during iteration</code>. The store is now guarded by a lock and snapshots the set before writing.</p>
+<p><strong>Vosk speech recognition never worked.</strong> A missing <code>import os</code> made the model loader raise <code>NameError</code> on the first phrase for anyone who installed Vosk.</p>
+<p><strong>Corrupted data no longer breaks a whole tab.</strong> History and reminder stores now normalise and drop malformed records instead of propagating them into the interface.</p>
+<p><strong>Absurd dates are no longer permanent.</strong> &quot;Remind me in 99999999999999999999 minutes&quot; produced an entry that broke the Reminders tab on every launch and could not be deleted. Durations are now bounded, dates are clamped to ten years out, and unformattable timestamps degrade to <code>—</code>.</p>
+<p><strong>Duplicate command execution.</strong> Toggling always-listen twice left two microphone threads running, so a single phrase was handled twice. Each run now owns its own stop signal.</p>
+<p><strong>Interface freezes.</strong> The full application scan — including a PowerShell call for Store apps — ran on the interface thread when opening the command editor. It now reads the cached index and refreshes in the background.</p>
+<p><strong>Screenshots crashed from the wrong thread.</strong> Screen capture is a Qt operation and was being called from the worker; it now travels to the shell as a window action and is taken on the interface thread.</p>
+<p>Also fixed: a failed system action reported success inside sequences; a malformed <code>format</code> field escaped the import handler as an unhandled <code>ValueError</code>; the &quot;Refresh applications&quot; button could stay disabled after a failed scan.</p>
+<hr class="seam">
+<h3 id="interface">Interface</h3>
+<ul class="plain"><li>New <strong>AI</strong> section in Settings with a live connection check.</li><li>History messages measure their own wrapped height, so long replies are no longer clipped.</li><li>Plugin cards and plugin-authored pages render text safely (see above).</li><li>Documentation strings corrected where they had drifted from the code (event contract, reminder scheduler).</li></ul>
+<hr class="seam">
+<h3 id="housekeeping">Housekeeping</h3>
+<ul class="plain"><li>Removed the empty <code>ui/</code> package left over from 1.0.0; the build spec now ships <code>core/</code>.</li><li>README rewritten from scratch for the current application, with screenshots.</li></ul>
+<hr class="seam">
+<h3 id="verification-2">Verification</h3>
+<ul class="plain"><li><strong>Crash test:</strong> ~600 hostile inputs (empty, 10 000 characters, emoji, control and RTL characters, <code>../..</code>, UNC paths, division by zero, <code>2**2**2**2**2</code>, &quot;at 99:99&quot;), corrupted data files, answers with no question pending, and 4 concurrent threads — <strong>30 failures → 0</strong>.</li><li><strong>Security probes:</strong> path traversal 0 failures; plugin replacement no longer executes on discovery.</li><li><strong>Regression:</strong> command pipeline, reminders, plugins, import/export, all 5 languages, all 5 themes — <strong>0 failures</strong>.</li><li><strong>Translations:</strong> 0 untranslated strings.</li></ul>
+<hr class="seam">
+<h3 id="known-limitations">Known limitations</h3>
+<ul class="plain"><li>Typed commands still run the pipeline on the interface thread; the worst stall (the application scan) is gone, but launching still happens there.</li><li>Overlapping speech replies share one busy flag, and gTTS/Piper use fixed temporary filenames — two answers in quick succession can interfere.</li><li>History, reminders and usage statistics still use read-modify-write updates.</li><li>&quot;1 hour 30 minutes&quot; is parsed as one hour; only the first unit is read.</li></ul>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/CHANGELOG.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

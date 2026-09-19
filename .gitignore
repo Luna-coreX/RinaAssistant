@@ -143,8 +143,10 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# mkdocs documentation — не используется; `/site` здесь стоял из
+# шаблона и прятал страницу продукта (`4.0b-D01`), которая лежит ровно
+# там. Исключение снято; проверка `tools/check_site.py` следит, чтобы оно
+# не вернулось.
 
 # mypy
 .mypy_cache/

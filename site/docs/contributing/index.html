@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Участие — Rina Assistant</title>
+<meta name="description" content="Как прислать правку; соглашение подписывать не нужно.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Участие — Rina Assistant">
+<meta property="og:description" content="Как прислать правку; соглашение подписывать не нужно.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по CONTRIBUTING.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Участие</h1>
+      <p class="lead">Как прислать правку; соглашение подписывать не нужно.</p>
+      <p class="note">Документ репозитория, страницей. Написан по-английски. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/CONTRIBUTING.md">CONTRIBUTING.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#licensing-of-contributions">Licensing of contributions</a></li>
+      <li><a href="#before-you-write-code">Before you write code</a></li>
+      <li><a href="#what-the-code-looks-like">What the code looks like</a></li>
+      <li><a href="#checking-your-change">Checking your change</a></li>
+      <li><a href="#reporting-bugs">Reporting bugs</a></li>
+      <li><a href="#code-of-conduct">Code of conduct</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#translations">Translations</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>Thanks for looking. This is a personal project maintained by one person, so response times vary — but issues and pull requests are read and taken seriously.</p>
+<h2 id="licensing-of-contributions">Licensing of contributions</h2>
+<p>The project is licensed under the <strong>Apache License 2.0</strong> (see <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/LICENSE"><code>LICENSE</code></a>).</p>
+<p>Anything you submit for inclusion is licensed under those same terms, unless you say otherwise when you submit it. That is section 5 of the licence itself, so <strong>there is no separate agreement to sign</strong> — no CLA, no paperwork. Opening a pull request is enough.</p>
+<p>Please only submit work you have the right to submit. Do not paste code from a project under an incompatible licence, and if a change is substantially derived from something else, say where it came from.</p>
+<h2 id="before-you-write-code">Before you write code</h2>
+<p><strong>Open an issue first for anything non-trivial.</strong> The project follows a written plan (<a href="/docs/plan/"><code>docs/ROADMAP.md</code></a>), and some things that look like obvious improvements are deliberately scheduled for later or deliberately excluded. A short conversation beforehand saves you from work that cannot be merged.</p>
+<p>Small, self-evident fixes — a crash, a typo, a wrong translation — need no ceremony. Just send them.</p>
+<h2 id="what-the-code-looks-like">What the code looks like</h2>
+<p>Read a neighbouring file before writing a new one. A few things are consistent throughout and worth matching:</p>
+<ul class="plain"><li><strong>Comments explain why, not what.</strong> The code already says what it does. Comments carry the reason a thing is done a particular way — usually the problem that made the obvious approach wrong.</li><li><strong><code>core/</code> must not import Qt.</strong> The core is headless on purpose: it is being prepared to run as a separate process. If your change needs the core to reach the interface, it should emit an event instead (<code>core/protocol.py</code> lists them).</li><li><strong>Text from outside is not markup.</strong> Anything originating from a model, a plugin, a file, or speech recognition is rendered as plain text. There is a reason: see <a href="/docs/security/"><code>SECURITY.md</code></a>.</li><li><strong>User-visible strings go through a translation, and which one depends on the side.</strong> Rina&#x27;s own lines belong to the core: <code>t()</code>, with an English entry in <code>core/i18n.py</code> and the other languages in <code>core/i18n_langs.py</code>. The words of the interface belong to the shell: <code>S(&quot;…&quot;)</code> in C#, <code>{loc:S &#x27;…&#x27;}</code> in XAML, and the key goes into <code>shell/Rina.Shell/Strings/interface.json</code>. Then run <code>python tools/gen_shell_strings.py</code>. <code>tools/check_strings.py</code> will tell you if you put one on the wrong side.</li><li><strong>Dangerous actions ask first.</strong> Anything that shuts down, deletes, or acts on the user&#x27;s behalf goes through the confirmation path rather than around it.</li></ul>
+<h2 id="checking-your-change">Checking your change</h2>
+<p>There is a suite. Run it:</p>
+<pre>python tools/regress.py          # 65 checks, about four minutes
+python tools/regress.py --list   # what they are</pre>
+<p>It covers the core, the shell (which it launches and drives), the drawn window against the design tokens, and the documents against the code. A failure prints the red lines of whatever fell over, so you are not left guessing which of the sixty-five it was.</p>
+<p>Beyond that, before opening a pull request:</p>
+<ul class="plain"><li>Launch the application and exercise the path you changed.</li><li>If you touched the command pipeline, try a handful of awkward phrasings, not just the happy one.</li><li>If you touched anything that reads stored data, try it with that data missing and with it corrupted.</li></ul>
+<p>Say in the pull request what you actually ran. &quot;I tested it&quot; is less useful than &quot;I launched it, set a timer, and restarted to check it survived&quot;.</p>
+<h3 id="if-you-add-a-check-break-it">If you add a check, break it</h3>
+<p>The one habit worth copying from this repository: after writing a check, <strong>make the thing it guards wrong on purpose and watch the check go red.</strong></p>
+<p>It is not ceremony. A check that measures the mechanism rather than the outcome always agrees with whoever wrote it, and there is no way to tell one from the other by reading. Breaking it is the only way to find out — and in this project it has caught, among others: a check that watched the sentence formatter instead of the deed, a check that asked whether a word occurred anywhere in a file, and a check that could not fail because it compared a value with the default it had just been reset to.</p>
+<p>Two things to watch for while doing it. Confirm the broken version actually <strong>built</strong> — a compile error looks like &quot;the check did not fail&quot;. And confirm the restored version is green again: stale bytecode has survived a restore here more than once.</p>
+<h2 id="reporting-bugs">Reporting bugs</h2>
+<p>Include the version, your Windows version, what you said or typed, and what happened instead. A log helps: <code>%APPDATA%/RinaAssistant/logs/</code>. <strong>Message texts are not written to it</strong> unless you switched that on in Settings → Privacy, so it is normally safe to attach — but skim it first if you are unsure. Better still: <strong>About → Diagnostics → Collect</strong> gathers the logs of both halves, the versions and the state of the link, and says inside exactly what it left out.</p>
+<h2 id="code-of-conduct">Code of conduct</h2>
+<p>Short version: be decent. The long version is in <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/CODE_OF_CONDUCT.md"><code>CODE_OF_CONDUCT.md</code></a>, and it applies to issues, pull requests and anywhere else this project is discussed.</p>
+<h2 id="security">Security</h2>
+<p>Do not report vulnerabilities in public issues. <a href="/docs/security/"><code>SECURITY.md</code></a> explains where they go and describes the trust boundaries — worth reading before you conclude that something is a vulnerability, since a few sharp edges are documented and deliberate.</p>
+<h2 id="translations">Translations</h2>
+<p>Five languages are supported. Russian is the source; English is complete; Ukrainian, Spanish and German are partial. Filling gaps is genuinely useful and needs no discussion beforehand — the untranslated strings are the ones missing from <code>core/i18n_langs.py</code>.</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/CONTRIBUTING.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

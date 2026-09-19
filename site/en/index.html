@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rina Assistant — a voice assistant for Windows that stays on your machine</title>
+<meta name="description" content="Rina opens your programs, keeps timers, controls the system and answers questions — by voice or by typing. No account, no cloud, no telemetry. Open source, Apache-2.0.">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<link rel="alternate" hreflang="ru" href="/">
+<link rel="alternate" hreflang="en" href="/en/">
+<link rel="alternate" hreflang="x-default" href="/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Rina Assistant — a voice assistant for Windows">
+<meta property="og:description" content="Opens your programs, keeps timers, controls the system and answers — entirely on your own machine.">
+<meta property="og:image" content="../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+<!--
+  THESIS: Фраза соединяется с действием, и соединение видно. Отказ от
+  тёмного лендинга с градиентным героем и рядом стеклянных карточек.
+  OWN-WORLD: Коммутационное поле. Просверленная плита, шнур сигнального
+  цвета, ламповый индикатор, инвертированная наборная этикетка. Ни
+  карточек, ни градиентного текста, ни размытия как украшения.
+  STORY: Посетитель видит, что сказанное становится проверенным действием
+  на его машине; верит числам, потому что они сверены с кодом; ставит.
+  FIRST VIEWPORT: Во весь экран поле гнёзд; слева гнездо с произнесённой
+  фразой, справа — с результатом, между ними шнур, который прокладывается
+  и зажигает лампу. Ниже слева заголовок, строка и одна первичная кнопка.
+  FORM: «Коммутаторная», кандидат 4 из семи, seed a2a26a10.
+  MOTION: Плита живёт под всей страницей, по ней проходит свет. Содержимое
+  приходит и уходит вместе с прокруткой. Всё на CSS: скриптов на странице
+  нет, и это её обещание о себе.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with
+  the finish review, the verdict, and DESIGN.md
+-->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">Skip to content</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/en/"><img src="../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="#capabilities">What she does</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#download">Install</a>
+      <a href="api/">Developers</a>
+      <span class="tongue"><a href="/" lang="ru">RU</a><a href="/en/" aria-current="page">EN</a></span>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<main id="content">
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="patch">
+      <div class="jack jack-said">
+        <span class="jack-text"><span class="jack-role">said, in Russian</span>“открой блокнот”</span>
+        <span class="bore"></span>
+      </div>
+      <div class="cord-run">
+        <svg class="cord-tall" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <path class="cord-line" d="M 50 0 C 24 34, 76 66, 50 100"></path>
+        </svg>
+        <svg class="cord-wide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <path class="cord-line" d="M 0 50 C 26 104, 74 104, 100 50"></path>
+        </svg>
+      </div>
+      <div class="jack jack-done">
+        <span class="bore live"></span>
+        <span class="jack-text"><span class="jack-role">done</span>Notepad is open</span>
+      </div>
+    </div>
+
+    <div class="hero-say">
+      <h1>Say it, and it happens.</h1>
+      <p class="lead">Opens your programs, keeps timers, controls the system and answers
+        questions. Entirely on your own machine: no account, no cloud, no telemetry.</p>
+      <div class="actions">
+        <a class="press primary" href="#download">Running in five minutes</a>
+        <a class="press" href="api/">API documentation</a>
+      </div>
+      <ul class="facts">
+        <li>Windows 10 and 11</li>
+        <li>spoken to in Russian</li>
+        <li>4.0.0-beta</li>
+        <li>Apache-2.0</li>
+        <li>no account</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section id="readings">
+  <div class="frame">
+    <div class="head">
+      <h2>Numbers you can check</h2>
+      <p class="note">Every one of them is compared with the code on each run of the
+        check suite.</p>
+    </div>
+    <div class="strip">
+      <div><b>16</b><span>system actions</span></div>
+      <div><b>13</b><span>kinds of step in a command</span></div>
+      <div><b>6</b><span>plugins in the box</span></div>
+      <div><b>5</b><span>interface languages</span></div>
+      <div><b>134</b><span>recorded parsing utterances</span></div>
+      <div><b>75</b><span>checks in the suite</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="frame">
+    <div class="head">
+      <h2>What happens between the phrase and the action</h2>
+      <p class="lead">Five steps, and at any of them Rina may stop and ask.
+        None of them leaves your machine.</p>
+    </div>
+
+    <div class="lines">
+      <div class="line">
+        <span class="line-no">01</span>
+        <span class="line-what">Heard</span>
+        <span class="line-which">The segmenter cuts the phrase away from the silence and
+          recognition turns it into text. Vosk and Whisper work offline.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">02</span>
+        <span class="line-what">Parsed</span>
+        <span class="line-which">Parsing looks for the intent and its arguments: which
+          program, how many minutes, what to say. What it does not recognise goes to a web
+          search or to the local model.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">03</span>
+        <span class="line-what">Asked</span>
+        <span class="line-which">Several matches, an unsigned program, anything
+          irreversible: each one produces a question describing what will happen.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">04</span>
+        <span class="line-what">Done</span>
+        <span class="line-which">The tool is called through the core's single registry,
+          where its permissions are checked. The machine is touched by the shell.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">05</span>
+        <span class="line-what">Recorded</span>
+        <span class="line-which">The journal takes the call: which tool, which arguments,
+          what came of it. Free text is replaced by its length.</span>
+      </div>
+    </div>
+
+    <div class="hatched">The irreversible is marked with hatching — the same hatching
+      the program uses. There is no red in the palette at all.</div>
+  </div>
+</section>
+
+<section id="capabilities">
+  <div class="frame">
+    <div class="head">
+      <h2>What she does</h2>
+      <p class="lead">Works by voice from the first launch, with nothing to set
+        up. The interface has five languages; she is spoken to in Russian.</p>
+    </div>
+
+    <div class="plates">
+      <article class="plate">
+        <h3>She finds your programs herself</h3>
+        <p>The index is built from Start menu shortcuts, the registry, Store apps and
+          any portable folders you point her at.</p>
+        <p class="note">“Открой телеграм” finds Telegram: Cyrillic is matched loosely
+          against Latin. Your answer to a clarifying question becomes an alias.</p>
+      </article>
+
+      <article class="plate">
+        <h3>A command is a graph</h3>
+        <p>Steps are nodes with wires between them; a simple command is a graph of one
+          node. Six kinds of action and seven kinds of step: pause, repeat, condition,
+          stop, calling another command, remembering a value.</p>
+        <p class="note">Anything brought from another machine arrives
+          <strong>switched off</strong>.</p>
+      </article>
+
+      <article class="plate">
+        <h3>Voice both ways</h3>
+        <p>The answer is synthesised sentence by sentence and starts sounding before it is
+          finished. A new phrase cuts the previous one off, so you can interrupt with
+          a word.</p>
+        <p class="note">Speech: silent, pyttsx3, Edge Neural TTS, gTTS, Piper. Hearing:
+          off, Vosk, Whisper — an engine that opens the microphone itself is not offered
+          here, because the sound arrives from the shell.</p>
+      </article>
+
+      <article class="plate">
+        <h3>Reminders and sixteen system actions</h3>
+        <p>“Поставь таймер на десять минут”, “напомни через полчаса позвонить маме”. They
+          fire from a background scheduler, with the window closed and from the tray.</p>
+        <p class="note">Volume, skip and pause, lock, screenshot, sleep, restart, shut
+          down — and the ones that move her own window.</p>
+      </article>
+
+      <article class="plate">
+        <h3>Plugins, each in its own process</h3>
+        <p>A plugin declares tools, settings and a section; the core checks its
+          permissions, the same ones the built-in tools get.</p>
+        <p class="note">Six ship with her: Clock, Dice, Greeter, Notes, Convert and Rates.
+          <span data-plugin-page="notes">Notes</span> has a section of its own,
+          <span data-plugin-home="convert">Convert</span> and
+          <span data-plugin-home="rates">Rates</span> put a tile on the home screen, and the
+          rest answer by voice. A seventh rides along as a sample for people writing
+          plugins; how to write your own is <a href="api/">on the developer page</a>.</p>
+      </article>
+
+      <article class="plate">
+        <h3>Three finishes, five languages</h3>
+        <p>Silver, black and graphite, with a choice of accent. Русский, English,
+          Українська, Español, Deutsch. A floating command line over your windows, a tray
+          icon, autostart, hotkeys.</p>
+        <p class="note">Colour, size and motion are set by values in the
+          <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/design/SYSTEM.md">design system</a>,
+          and the window is compared against them pixel by pixel.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="privacy">
+  <div class="frame">
+    <div class="head">
+      <h2>Nothing leaves until you ask for it</h2>
+      <p class="lead">There is no account. There is no telemetry. There is nothing
+        to collect.</p>
+    </div>
+
+    <div class="halves">
+      <div class="well">
+        <h3>Never leaves</h3>
+        <ul class="plain">
+          <li>The recorded audio and the recognised text: Vosk and Whisper do their
+            counting on your machine.</li>
+          <li>The contents of your files, notes and conversation history.</li>
+          <li>Paths on your disk, program names, tokens and passwords.</li>
+          <li>The fact that you launched something at all.</li>
+        </ul>
+        <p class="note">A diagnostic package is collected only when you ask for it, is
+          anonymised, and says inside what it left out.</p>
+      </div>
+      <div class="well">
+        <h3>Leaves when you ask for it</h3>
+        <ul class="plain wired">
+          <li>Edge Neural TTS and gTTS: the phrase to be spoken.</li>
+          <li>Web search for an unrecognised phrase: the phrase itself; asking for music
+            opens a YouTube search.</li>
+          <li>The local model: the question goes to the address in settings, by default
+            <code>http://localhost:11434</code>.</li>
+          <li>Downloading models: whichever you picked in the wizard — Vosk from
+            alphacephei.com, Whisper and Piper from huggingface.co.</li>
+          <li>Checking for updates: a request to api.github.com when you press
+            “Check”.</li>
+          <li>The Rates plugin: a request to the central bank's website; the weather sample,
+            if you switch it on, to open-meteo.com.</li>
+        </ul>
+        <p class="note">You are the one who switches each of these on, and the
+          settings label it — including a warning when the model's address turns out
+          not to be local.</p>
+      </div>
+    </div>
+
+    <div class="lines bare">
+      <div class="line">
+        <span class="line-what">“What Rina knows about me”</span>
+        <span class="line-which" data-knows="inventory">A page inside the program: learned words,
+          conversation history, reminders, to-dos, your own commands, command statistics,
+          plugins, program search folders and changed settings — and beside them a button to
+          forget it. All of it, or one at a time.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/security/THREAT-MODEL.md">Threat model</a></span>
+        <span class="line-which">Six surfaces, twenty-two threats, and for each of them
+          a written <strong>residual risk</strong>.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="frame">
+    <div class="head">
+      <h2>Five minutes and no questions about privileges</h2>
+      <p class="lead">Rina installs into your user profile. She needs no access to system
+        folders.</p>
+    </div>
+
+    <div class="take">
+      <div class="well">
+        <h3>A ready installer</h3>
+        <p><strong>There has been no release yet.</strong> The beta is being built; as soon
+          as the installer is out, the link will appear here and on the
+          <a href="https://github.com/Luna-coreX/RinaAssistant/releases">releases page</a>.</p>
+        <p class="note">It does not touch <code>PATH</code> or register the Python it
+          brings, does not ask for administrator rights, installs no service and switches
+          on no autostart: autostart is a setting inside the program.</p>
+      </div>
+      <div class="well">
+        <h3>From source, right now</h3>
+        <p class="note">You need Windows, Python 3.10 or newer, and .NET 9.</p>
+<pre><span class="cmd">git clone</span> https://github.com/Luna-coreX/RinaAssistant.git
+<span class="cmd">cd</span> RinaAssistant
+<span class="cmd">pip install</span> -r requirements.txt
+<span class="cmd">dotnet run</span> --project shell/Rina.Shell</pre>
+        <p class="note">The shell starts the core itself. On the first launch a short
+          wizard asks which voice and which recognition you want, and downloads only those.</p>
+        <p>Then say it — or type it: <em>“открой блокнот”</em>,
+          <em>“поставь таймер на 5 минут”</em>, <em>“сколько будет 17 на 23”</em>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="price">
+  <div class="frame">
+    <div class="head">
+      <h2>What is free and what may cost money later</h2>
+      <p class="lead">Written down now, while there is nothing paid.</p>
+    </div>
+    <div class="lines bare">
+      <div class="line">
+        <span class="line-what">The beta is free</span>
+        <span class="line-which">All of it. There is no payment code in the program at
+          all.</span>
+      </div>
+      <div class="line">
+        <span class="line-what">The local base stays free</span>
+        <span class="line-which">Voice, launching programs, commands, reminders, plugins,
+          the local model, the privacy page. All of it is under Apache-2.0, and a copy you
+          have cannot have its licence taken back.</span>
+      </div>
+      <div class="line">
+        <span class="line-what">What may cost money later is what gets added</span>
+        <span class="line-which">Most likely the things that cost money to run: a service
+          on a server, a connector to a paid third-party service.</span>
+      </div>
+      <div class="line">
+        <span class="line-what">What stays open</span>
+        <span class="line-which">Handling sound and your data, launching programs safely,
+          confirming the dangerous, the security journal, the protocol and the base
+          functionality.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="docs">
+  <div class="frame">
+    <div class="head">
+      <h2>Documentation</h2>
+      <p class="note">Each document has a page of its own here, generated
+        from the file in the repository, which it links back to. A
+        <span class="no">RU</span> mark means the document is written in
+        Russian. For people writing a plugin or their own shell, there is the
+        <a href="api/">API page</a>.</p>
+    </div>
+    <div class="lines bare">
+      <div class="line">
+        <span class="line-what"><a href="/docs/readme/">README</a></span>
+        <span class="line-which">What this is, how to install it, what is inside.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/architecture/">Architecture</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">Two processes, the protocol between them, who decides
+          what.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/plugins/">Writing plugins</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">The long guide; the short reference is on the API
+          page.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/design/">Design system</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">Finishes, colour, type and motion, with their values.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/security/">Security</a></span>
+        <span class="line-which">Trust boundaries and where to take a vulnerability.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/threats/">Threat model</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">Surfaces, threats, residual risk.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/debugging/">Debugging</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">How to debug two programs at once.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/contributing/">Contributing</a></span>
+        <span class="line-which">How to send a change; there is no agreement to sign.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/triage/">Triage</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">Who reads it, in what time, and the four outcomes.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/changelog/">Changelog</a></span>
+        <span class="line-which">By release.</span>
+      </div>
+      <div class="line">
+        <span class="line-what"><a href="/docs/plan/">The full plan</a> <span class="no" data-tongue="ru">RU</span></span>
+        <span class="line-which">Milestones, blocks and tasks; the reasoning
+          behind each one is folded away and opens on a click.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="plans">
+  <div class="frame">
+    <div class="head">
+      <h2>What comes next</h2>
+      <p class="lead">The plan is open in full, together with the reasons something has
+        been put off.</p>
+    </div>
+    <div class="lines stages">
+      <div class="line">
+        <span class="line-no">4.0-port</span>
+        <span class="line-what">The split</span>
+        <span class="line-which" data-plan="4.0-E01 4.0-F01 4.0-D01 4.0-I01">Closed. The
+          core became a service of its own, the shell and the system layer were rewritten
+          in C#, a protocol runs between them, and the interface was designed again.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">4.0-beta</span>
+        <span class="line-what">Open beta</span>
+        <span class="line-which" data-plan="4.0b-D01 4.0b-D02 4.0b-C04">Now. The installer
+          and this page, privacy and explainability. Checking the thing that matters:
+          whether the program is useful, and on which real scenarios.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">4.0 Stable</span>
+        <span class="line-what">Release</span>
+        <span class="line-which" data-plan="4.0-U06 4.0-U07 4.0-U13 4.0s-S1 4.0s-S2">Update
+          channels, signed releases and metadata, an update server of our own. Voice: the
+          model's answer as a stream, and RVC on top of Edge.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">4.1+</span>
+        <span class="line-what">Later</span>
+        <span class="line-which" data-plan="4.0-U12 4.0-U14">Rolling a version back,
+          certificate pinning and delivery over a CDN.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">5.0.0</span>
+        <span class="line-what">Platform</span>
+        <span class="line-which" data-plan="5.0-A04 5.0-B01 5.0-D06">Speech starts sounding
+          while the answer is still being made, and you can cut in. Long memory. Control of
+          the computer under detailed permissions.</span>
+      </div>
+      <div class="line">
+        <span class="line-no">—</span>
+        <span class="line-what">What is not here yet</span>
+        <span class="line-which" data-plan="4.0b-C04 4.0b-D02 4.0b-D05">A video of her
+          working and a published installer. Telemetry will appear only with explicit
+          consent and switched off by default, or it will not appear at all.</span>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="press" href="/docs/plan/">The full plan</a>
+      <a class="press" href="https://github.com/Luna-coreX/RinaAssistant/issues">Report a fault</a>
+      <a class="press" href="https://github.com/Luna-coreX/RinaAssistant/discussions">Ask a question</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry · <span class="fig">4.0.0-beta</span></span>
+  <span class="note">This page runs no scripts and sets no counters.</span>
+  <nav>
+    <a href="api/">Developers</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Repository</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/releases">Releases</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/LICENSE">Licence</a>
+    <a href="/" lang="ru">Русский</a>
+  </nav>
+</footer>
+
+</body>
+</html>

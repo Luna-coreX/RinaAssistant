@@ -215,7 +215,13 @@ class Plugin:
 
     def home(self):
         """
-        Describe a tile for the home screen (API v5, `4.0b-A07`).
+        Describe a tile for the home screen (API v4, `4.0b-A07`).
+
+        The line above said "API v5" for two releases while `API_VERSION`
+        stood at 4 and every bundled plugin declared 4 and drew a tile —
+        that is, it named a version that has never existed. Found by the
+        page that documents this API, which asks the class rather than the
+        prose.
 
         The same elements as `page`, and the same rule: you say what, the
         application decides how. `[]` or `None` means no tile — and that is

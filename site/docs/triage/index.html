@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Разбор входящего — Rina Assistant</title>
+<meta name="description" content="Кто читает, в какой срок и какие четыре исхода.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Разбор входящего — Rina Assistant">
+<meta property="og:description" content="Кто читает, в какой срок и какие четыре исхода.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по docs/TRIAGE.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Разбор входящего</h1>
+      <p class="lead">Кто читает, в какой срок и какие четыре исхода.</p>
+      <p class="note">Документ репозитория, страницей. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/TRIAGE.md">docs/TRIAGE.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#kuda-chto-idet">Куда что идёт</a></li>
+      <li><a href="#sroki">Сроки</a></li>
+      <li><a href="#chto-proishodit-s-zadachey">Что происходит с задачей</a></li>
+      <li><a href="#chto-delaetsya-do-otveta">Что делается до ответа</a></li>
+      <li><a href="#chto-ne-razbiraetsya">Что не разбирается</a></li>
+      <li><a href="#ogovorka">Оговорка</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>Канал без порядка разбора — это не канал, а свалка: письма приходят, никто не отвечает, и через месяц открывший задачу человек делает единственный доступный ему вывод. Здесь записано, что происходит с входящим и в какие сроки, чтобы обещание было проверяемым.</p>
+<p>Это документ для того, кто разбирает, но он открыт нарочно: человек, написавший в понедельник и не получивший ответа в среду, должен иметь возможность посмотреть, нормально это или нет.</p>
+<hr class="seam">
+<h2 id="kuda-chto-idet">Куда что идёт</h2>
+<table><thead><tr><th>Что это</th><th>Куда</th></tr></thead><tbody><tr><td>Уязвимость</td><td><a href="https://github.com/Luna-coreX/RinaAssistant/security/advisories/new">Security Advisories</a> — закрытым каналом</td></tr><tr><td>Что-то сломалось</td><td>Issues, форма «Что-то сломалось»</td></tr><tr><td>Чего-то не хватает</td><td>Issues, форма «Предложение»</td></tr><tr><td>«Как сделать…», «а работает ли с…»</td><td><a href="https://github.com/Luna-coreX/RinaAssistant/discussions">Discussions</a></td></tr><tr><td>Нарушение кодекса</td><td>Письмом: lunadevosx.core@gmail.com</td></tr></tbody></table>
+<p><strong>Почему Discussions, а не Discord.</strong> Вопрос, заданный в чате, отвечается один раз и тонет; заданный на форуме — находится поиском следующим, у кого он же. При одном сопровождающем это разница между «ответил сто раз» и «ответил однажды». Discord предполагает присутствие, которого в личном проекте не бывает, и его молчание читается хуже, чем молчание форума.</p>
+<hr class="seam">
+<h2 id="sroki">Сроки</h2>
+<p>Одно лицо, не компания. Обещается то, что можно выдержать:</p>
+<ul class="plain"><li><strong>Уязвимость</strong> — подтверждение получения в течение нескольких дней.</li><li><strong>Всё остальное</strong> — прочитано в течение недели. Прочитано, а не решено.</li></ul>
+<p>Ответ «прочитал, займусь не скоро» — это ответ. Молчание — нет.</p>
+<hr class="seam">
+<h2 id="chto-proishodit-s-zadachey">Что происходит с задачей</h2>
+<p>Четыре исхода, и каждый называется вслух:</p>
+<p><strong>Берётся.</strong> Метка <code>bug</code> или <code>idea</code> остаётся, задача попадает в план или делается сразу. Если идея попадает в план — в задаче появляется ссылка на пункт: человек должен видеть, куда его предложение делось.</p>
+<p><strong>Уже есть.</strong> Ссылка на существующую задачу, эта закрывается. Дубликат — не упрёк: две записи об одном означают, что первую не нашли поиском, и иногда это повод переназвать первую.</p>
+<p><strong>Так задумано.</strong> Метка <code>by-design</code>, и <strong>обязательно ссылка на место, где это решено</strong> — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr">ADR</a>, <a href="/docs/plan/">план</a>, <a href="/docs/threats/">модель угроз</a>, <a href="/docs/design/">дизайн-система</a>. Закрытие «так задумано» без ссылки — это «потому что я так сказал», и оно отваживает ровно тех, кто дал себе труд разобраться.</p>
+<p><strong>Не будет.</strong> Метка <code>wontfix</code> и причина. Причина бывает и такой: «не укладываюсь». Это честнее, чем оставить задачу открытой на год.</p>
+<p>Задача, висящая без ответа, — пятый исход, который здесь не предусмотрен.</p>
+<hr class="seam">
+<h2 id="chto-delaetsya-do-otveta">Что делается до ответа</h2>
+<p>Три вопроса, по порядку:</p>
+<ol><li><strong>Воспроизводится?</strong> Если в отчёте не хватает данных — спросить сразу и конкретно, а не «пришлите подробности». Форма спрашивает версию, Windows, сказанное дословно и диагностический пакет; если чего-то нет, значит спрашивать надо именно это.</li><li><strong>Есть ли уже проверка, которая должна была это поймать?</strong> Если есть и она зелёная — <strong>она измеряет не то</strong>, и это находка ценнее самой поломки. Если нет — её надо написать вместе с исправлением.</li><li><strong>Это поломка или граница?</strong> Часть острых углов здесь намеренна и описана в <a href="/docs/security/">SECURITY.md</a> и модели угроз. Различие объясняется, а не отмахивается.</li></ol>
+<hr class="seam">
+<h2 id="chto-ne-razbiraetsya">Что не разбирается</h2>
+<ul class="plain"><li>Правки, присланные без задачи и меняющие больше пары строк, — сначала разговор (<a href="/docs/contributing/">CONTRIBUTING.md</a> объясняет почему).</li><li>Просьбы добавить то, что план называет исключённым, без возражения по существу записанной причины.</li><li>Отчёты о поведении версий до 4.0: та программа была одним процессом и больше не собирается.</li></ul>
+<hr class="seam">
+<h2 id="ogovorka">Оговорка</h2>
+<p>Всё вышеописанное держится на одном человеке и его свободном времени. Сроки — намерение, а не обязательство, и если они перестанут выдерживаться, честнее будет исправить этот документ, чем делать вид, что он соблюдается.</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/TRIAGE.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

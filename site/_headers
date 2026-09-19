@@ -1,0 +1,26 @@
+# Заголовки ответов Cloudflare Pages. Задача плана 4.0b-D01.
+#
+# Страница обещает локальность — и первое, чем это обещание проверяют,
+# открыв её, это панель разработчика в браузере. Политика ниже запрещает
+# всё, чего на странице нет: скрипты, кадры, чужие узлы, формы. Запрет
+# здесь не для красоты: `check_site.py` следит за разметкой, а этот файл
+# — за тем, что даже случайно вставленный чужой адрес не сработает.
+#
+# `default-src 'none'` — запрещено всё, и ниже перечислено ровно то, что
+# странице действительно нужно: свои картинки, свой стиль, свои шрифты.
+
+/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+
+# Шрифты и снимки порождены из хранилища и меняются вместе с выпуском,
+# а не сами по себе.
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/shots/*
+  Cache-Control: public, max-age=604800

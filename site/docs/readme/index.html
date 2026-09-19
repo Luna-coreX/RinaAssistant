@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>README — Rina Assistant</title>
+<meta name="description" content="Что это, как поставить, что внутри.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="README — Rina Assistant">
+<meta property="og:description" content="Что это, как поставить, что внутри.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по README.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>README</h1>
+      <p class="lead">Что это, как поставить, что внутри.</p>
+      <p class="note">Документ репозитория, страницей. Написан по-английски. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/README.md">README.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#say-it-and-it-happens">Say it, and it happens</a></li>
+      <li><a href="#try-it-in-five-minutes">Try it in five minutes</a></li>
+      <li><a href="#what-it-looks-like">What it looks like</a></li>
+      <li><a href="#what-is-new-in-4-0">What is new in 4.0</a></li>
+      <li><a href="#what-it-does">What it does</a></li>
+      <li><a href="#architecture">Architecture</a></li>
+      <li><a href="#project-structure">Project structure</a></li>
+      <li><a href="#installation-in-more-detail">Installation, in more detail</a></li>
+      <li><a href="#development">Development</a></li>
+      <li><a href="#what-this-costs">What this costs</a></li>
+      <li><a href="#roadmap">Roadmap</a></li>
+      <li><a href="#security">Security</a></li>
+      <li><a href="#contributing-and-feedback">Contributing and feedback</a></li>
+      <li><a href="#changelog">Changelog</a></li>
+      <li><a href="#license">License</a></li>
+      <li><a href="#links">Links</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>A desktop voice assistant for Windows — launches your apps, keeps your timers, and answers when asked.</p>
+<p>Version 4.0.0-port · Windows · Python 3.10+ · .NET 9 · Apache-2.0</p>
+<hr class="seam">
+<h2 id="say-it-and-it-happens">Say it, and it happens</h2>
+<p><strong>Rina Assistant</strong> listens, works out what you asked for, and does it: opens the program you named even if you named it in the wrong alphabet, sets a timer, changes the volume, does the arithmetic, searches the web, or — if you switch it on — answers with a language model running on your own machine.</p>
+<p><strong>Everything runs on your computer.</strong> No account, no cloud service, no telemetry. There is a page inside the program that lists every single thing it has remembered about you, and a button to make it forget any of it.</p>
+<p>She is one shape when waiting, another when listening, another when answering — the window says what is happening without a word for it.</p>
+<hr class="seam">
+<h2 id="try-it-in-five-minutes">Try it in five minutes</h2>
+<p>Requires <strong>Windows</strong>, <strong>Python 3.10+</strong> and <strong>.NET 9</strong>.</p>
+<pre>git clone https://github.com/Luna-coreX/RinaAssistant.git
+cd RinaAssistant
+pip install -r requirements.txt
+dotnet run --project shell/Rina.Shell</pre>
+<p>The shell starts the core itself — you never run it separately. On the first launch a short wizard asks which voice and which recognition you want and downloads only those.</p>
+<p>Then say — or type — <strong>«открой блокнот»</strong>, <strong>«поставь таймер на 5 минут»</strong>, <strong>«сколько будет 17 на 23»</strong>.</p>
+<hr class="seam">
+<h2 id="what-it-looks-like">What it looks like</h2>
+<table><thead><tr><th></th><th></th></tr></thead><tbody><tr><td>&lt;img src=&quot;docs/screens/commands.png&quot; width=&quot;420&quot;&gt;</td><td>&lt;img src=&quot;docs/screens/privacy.png&quot; width=&quot;420&quot;&gt;</td></tr><tr><td><strong>Commands</strong> — your own, grouped by kind; the built-in ones folded away</td><td><strong>What Rina knows about me</strong> — every stored thing, and a way to forget it</td></tr><tr><td>&lt;img src=&quot;docs/screens/dialog.png&quot; width=&quot;420&quot;&gt;</td><td>&lt;img src=&quot;docs/screens/reminders.png&quot; width=&quot;420&quot;&gt;</td></tr><tr><td><strong>Dialogue</strong> — the conversation, with who said what and when</td><td><strong>Reminders</strong> — timers, alarms, and reminders tied to a program</td></tr><tr><td>&lt;img src=&quot;docs/screens/plugins.png&quot; width=&quot;420&quot;&gt;</td><td>&lt;img src=&quot;docs/screens/settings.png&quot; width=&quot;420&quot;&gt;</td></tr><tr><td><strong>Plugins</strong> — install, switch on, each with a page of its own</td><td><strong>Settings</strong> — the core sends the meaning, the shell decides the look</td></tr></tbody></table>
+<hr class="seam">
+<h2 id="what-is-new-in-4-0">What is new in 4.0</h2>
+<p><strong>Rina became two programs.</strong> The core on Python thinks; the shell on C# (WPF) shows and touches the machine. Between them — a protocol with two channels.</p>
+<p>This is not a rearrangement of folders. It is what makes the rest possible:</p>
+<ul class="plain"><li>the core runs <strong>headless</strong> — no window, no Qt, no interface library at all;</li><li>a plugin that hangs no longer takes Rina with it: each lives in its own process;</li><li>the interface was <strong>designed anew</strong> rather than ported, because the shell is new code regardless.</li></ul>
+<p>No new user-facing capabilities: the 4.0-port boundary forbids losing behaviour and does not ask for more. What behaviour existed is pinned by 134 recorded utterances and seven recorded sessions.</p>
+<p>See <a href="/docs/architecture/"><code>docs/ARCHITECTURE.md</code></a>.</p>
+<hr class="seam">
+<h2 id="what-it-does">What it does</h2>
+<h3 id="launching-applications">Launching applications</h3>
+<p>Rina indexes what is actually installed on the machine — Start Menu shortcuts, the registry, Store (UWP) apps, and any portable folders you point her at. You do not register programs by hand.</p>
+<ul class="plain"><li><strong>Type it however you speak it.</strong> &quot;Открой телеграм&quot; finds <em>Telegram</em>; Cyrillic input is transliterated and matched fuzzily, so near-misses and mishearings still land.</li><li><strong>Ambiguity is asked about, not guessed.</strong> Several matches produce a question, and your answer is remembered as an alias for next time.</li><li><strong>Unsigned programs are asked about once.</strong> The question shows everything you could decide by: the name, the full path, where the index found it.</li></ul>
+<h3 id="voice">Voice</h3>
+<p>Speech synthesis and recognition are pluggable — pick what suits the machine.</p>
+<p><strong>Text to speech:</strong> silent (text only), <code>pyttsx3</code> (offline, system voices), Edge Neural TTS (online, best quality), gTTS (online), Piper (offline neural, needs an <code>.onnx</code> model).</p>
+<p><strong>Speech to text:</strong> disabled, Vosk (offline), Whisper (offline) — and only those. An engine that opens a microphone of its own is not offered here: the sound arrives from the shell (<code>4.0-E05</code>).</p>
+<p>The models live in the core, the microphone and the speaker in the shell — the sound travels between them over a channel of its own, so a second of speech never queues behind a button press.</p>
+<h3 id="commands-assembled-as-a-graph">Commands, assembled as a graph</h3>
+<p>A command is a <strong>graph</strong>: steps stand as nodes with wires between them, and a simple command is a graph of one node. Six kinds of thing can happen — launch an app, open a folder, open a website, say something, run a system action, run a sequence — and seven more exist only as steps inside one: wait, repeat N times, repeat while, if/else, stop the scenario, call another command, remember a value.</p>
+<p>Conditions can ask about the world as well as the clock: which program is in front, whether one is running, whether a file exists, whether Ollama answers, the time, the day, a value you set earlier in the same run.</p>
+<p>Nodes are dragged onto the ports between other nodes, and «Проверить» runs the graph without saving it — lighting each step green as it goes and red where it stops.</p>
+<p>Commands can be exported and imported between machines; anything imported arrives <strong>disabled</strong>, so nothing runs before you have looked at it.</p>
+<h3 id="reminders">Reminders</h3>
+<p>Timers, alarms and reminders in plain language — &quot;поставь таймер на 10 минут&quot;, &quot;напомни через полчаса позвонить маме&quot;, &quot;разбуди в 7:30&quot;. They survive restarts and fire from a background scheduler, with the window closed and from the tray.</p>
+<h3 id="system-control">System control</h3>
+<p>Sixteen actions: volume up/down/mute, media next/previous/play-pause, lock, screenshot, sleep, restart, shutdown, and the ones that move Rina&#x27;s own window. Destructive ones always ask first, and the question shows <strong>what will happen</strong> rather than the action&#x27;s name — a single misheard phrase can never power off the machine.</p>
+<h3 id="answers">Answers</h3>
+<ul class="plain"><li><strong>Arithmetic</strong> is evaluated from a parsed expression tree, never with <code>eval</code>.</li><li><strong>Unrecognised phrases</strong> fall back to a web search.</li><li><strong>Optional local model.</strong> With Ollama installed, anything unparsed can be answered by a model on your own computer. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local.</li></ul>
+<h3 id="plugins">Plugins</h3>
+<p>Plugins add commands, settings and their own section in the column. A plugin <strong>declares</strong> rather than does: its tools go into the core&#x27;s registry and get the same gates as the built-in ones — permissions, confirmation of the irreversible, an entry in the journal.</p>
+<p>Pages are <strong>declarative</strong>: a plugin describes its interface as data and never touches the UI toolkit. That is why not one bundled plugin had to be rewritten when the entire shell changed language.</p>
+<p>See <a href="/docs/plugins/"><code>docs/plugins/WRITING-PLUGINS.md</code></a>.</p>
+<h3 id="interface">Interface</h3>
+<p>Three finishes (silver, black and graphite) with a choice of accent, five interface languages (Русский, English, Українська, Español, Deutsch), a floating command bar, tray integration, autostart, global hotkeys, and a full history with export.</p>
+<p>The design is a document, not a mood: <a href="/docs/design/"><code>docs/design/SYSTEM.md</code></a>. Every colour pair is checked for contrast, and the drawn window is compared with the tokens pixel by pixel.</p>
+<hr class="seam">
+<h2 id="architecture">Architecture</h2>
+<pre>     shell/Rina.Shell (C#, WPF)      windows, microphone, speaker,
+              │                      app index, process launching,
+              │                      signatures, tray, hotkeys
+     ┌────────┴────────┐
+     │  control (JSON) │             commands, settings, events,
+     │  data (bytes)   │             permissions, audio both ways
+     └────────┬────────┘
+              │
+     core/ + voice/ (Python)         parsing, tool registry, permissions,
+                                     confirmations, recognition, synthesis,
+                                     reminders, storage, Rina&#x27;s own words
+              │
+     plugins/ (Python)               one process per plugin</pre>
+<p>Three boundaries explain nearly everything else:</p>
+<ul class="plain"><li><strong>the core decides, the shell shows</strong> (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0006-settings-ownership.md">ADR 0006</a>);</li><li><strong>the machine is touched by the shell</strong> (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0009-system-layer.md">ADR 0009</a>) — the core cannot launch a program, it can ask;</li><li><strong>interface words belong to the shell, Rina&#x27;s lines to the core</strong> (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0007-localisation.md">ADR 0007</a>).</li></ul>
+<p>Everything that changes the world goes through one registry (<code>core/toolrunner.py</code>), and that is an invariant checked across every file of the core, not a convention.</p>
+<hr class="seam">
+<h2 id="project-structure">Project structure</h2>
+<pre>RinaAssistant/
+│
+├── core/         headless core: engine, router, registry, protocol, storage
+│   └── wire/     the protocol: envelope, handshake, events, channels, errors
+├── voice/        speech, recognition, reminders, user commands, app index
+├── plugins/      plugin API, manager, plugin process, six bundled plugins and an API sample
+├── shell/
+│   ├── Rina.Shell/     window, pages, styles, system layer (C#, WPF)
+│   └── Rina.Protocol/  the client half of the protocol (C#)
+├── tools/        checks, runners, generators
+├── docs/         plan, specification, decisions, design system, guides
+├── archive/      the 3.1.0 single-process application, kept for reference
+│
+└── rina_core.py  the core&#x27;s entry point</pre>
+<p>The 3.1.0 application is in <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/archive/README.md"><code>archive/</code></a> and no longer runs from the tree: it was one process with the interface and the core in shared memory, and 4.0 replaced it with two programs. It is kept because the port promised not to lose behaviour, and reading how something worked is cheaper than reconstructing it from the log.</p>
+<hr class="seam">
+<h2 id="installation-in-more-detail">Installation, in more detail</h2>
+<p>The short version is at the top. What is worth knowing beyond it:</p>
+<p>The shell takes the Python from the project&#x27;s environment if there is one, and only then whatever is in <code>PATH</code>. The voices and the recognition models are installed <strong>in the environment</strong>, so a core started with &quot;just python&quot; comes up and honestly reports that it has no engines.</p>
+<p>Voice engines are optional and listed in <code>requirements.txt</code>. The first-run wizard installs the ones you pick; you can also install them by hand. Some (Vosk, Piper) need a model file, which the wizard downloads.</p>
+<h3 id="optional-local-ai-answers">Optional: local AI answers</h3>
+<p>Install <a href="https://ollama.com">Ollama</a>, pull a model, then enable it in <strong>Settings</strong>:</p>
+<pre>ollama pull llama3.1:8b</pre>
+<p>Rina talks to <code>http://localhost:11434</code> by default and warns you plainly if you point her anywhere that is not local.</p>
+<hr class="seam">
+<h2 id="development">Development</h2>
+<pre>python tools/regress.py          # 75 checks, about five minutes
+python tools/regress.py --list   # what they are</pre>
+<p>Behaviour is pinned by a golden set of 134 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.</p>
+<p>How to debug two processes at once — <a href="/docs/debugging/"><code>docs/DEBUGGING.md</code></a>.</p>
+<hr class="seam">
+<h2 id="what-this-costs">What this costs</h2>
+<p class="lead-in"><strong>Nothing, and the part you are using now will go on costing nothing.</strong></p>
+<p>Said once, plainly, because the alternative is saying it later and having it read as a change of mind:</p>
+<ul class="plain"><li><strong>The beta is free.</strong> All of it. Nothing is held back behind a plan, and there is no payment code in the program to hold anything back with.</li><li><strong>The local base stays free.</strong> Everything that runs on your machine — voice in and out, launching programs, commands, reminders, plugins, the local model, the privacy page — is the product, not a trial of it. It is Apache-2.0, and a licence cannot be taken back from a copy you already have.</li><li><strong>Some advanced capabilities may be paid later.</strong> Most likely candidates are things that cost money to run — a service on somebody&#x27;s server, a connector to a paid third party. If that happens it will be <em>additional</em>, and this list is the promise it will be measured against.</li></ul>
+<p><strong>What is open stays open</strong>, and that is decided rather than hoped: the code that handles audio and your data, the safe launching of programs, the confirmation of dangerous actions, the security journal, the protocol, and the base functionality. What could reasonably close later is a licence server, billing, and paid connectors — none of which is on your computer.</p>
+<p>There is no telemetry, no account, and nothing to opt out of.</p>
+<hr class="seam">
+<h2 id="roadmap">Roadmap</h2>
+<p><strong>4.0.0-port — separation and redesign.</strong> Nearly complete: the core is a standalone service, the shell and system layer are C#, the protocol is between them, the interface is redesigned. What remains is the installer.</p>
+<p><strong>4.0-beta — public free beta.</strong> Whether the product is useful, and real scenarios.</p>
+<p><strong>5.0.0 — platform.</strong> End-to-end streaming (speech starts while the answer is still being generated, and can be interrupted), persistent memory, controlling the computer under granular permissions.</p>
+<p>Full plan: <a href="/docs/plan/"><code>docs/ROADMAP.md</code></a>.</p>
+<hr class="seam">
+<h2 id="security">Security</h2>
+<p>What we defend against, from whom, and with what — <a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>. Six surfaces, twenty-two threats, and for each of them the <strong>residual risk</strong> written down, because a defence without one has stopped being thought about. The sweep that walks that document rather than a list somebody maintains is <code>tools/test_security.py</code>.</p>
+<p>Reporting a vulnerability: <a href="/docs/security/"><code>SECURITY.md</code></a>.</p>
+<hr class="seam">
+<h2 id="contributing-and-feedback">Contributing and feedback</h2>
+<p>Issues and pull requests are welcome — see <a href="/docs/contributing/"><code>CONTRIBUTING.md</code></a>.</p>
+<ul class="plain"><li><strong>Something broke</strong> or <strong>something is missing</strong> — <a href="https://github.com/Luna-coreX/RinaAssistant/issues">Issues</a>; the forms ask for what is actually needed to look into it.</li><li><strong>A question, or &quot;does it work with…&quot;</strong> — <a href="https://github.com/Luna-coreX/RinaAssistant/discussions">Discussions</a>.</li><li><strong>A vulnerability</strong> — not in public: <a href="/docs/security/"><code>SECURITY.md</code></a>.</li></ul>
+<p>What happens to something once it arrives — who reads it, in what time, and what the four possible outcomes are — is written down in <a href="/docs/triage/"><code>docs/TRIAGE.md</code></a>, so that &quot;no answer yet&quot; can be told from &quot;nobody is reading&quot;. When reporting a bug, attach a diagnostic package: <strong>About → Diagnostics → Collect</strong>. It gathers the logs of both layers, the versions and the state of the link, and says inside exactly what it left out.</p>
+<hr class="seam">
+<h2 id="changelog">Changelog</h2>
+<p>See <a href="/docs/changelog/"><code>CHANGELOG.md</code></a>.</p>
+<hr class="seam">
+<h2 id="license">License</h2>
+<p>Apache License 2.0 — see <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/LICENSE"><code>LICENSE</code></a> and <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/NOTICE"><code>NOTICE</code></a>.</p>
+<p>Releases up to and including 3.1.0 were published under the MIT licence; copies obtained under those terms keep them. Contributions are accepted under Apache-2.0 with no separate agreement — see <a href="/docs/contributing/"><code>CONTRIBUTING.md</code></a> and <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0001-license-and-contributions.md">ADR 0001</a>.</p>
+<hr class="seam">
+<h2 id="links">Links</h2>
+<ul class="plain"><li><strong>NeuroSync Foundry</strong> — <a href="/">https://neurosync-foundry-portal.pages.dev/</a></li><li><strong>Repository</strong> — <a href="https://github.com/Luna-coreX/RinaAssistant">https://github.com/Luna-coreX/RinaAssistant</a></li><li><strong>Issues</strong> — <a href="https://github.com/Luna-coreX/RinaAssistant/issues">https://github.com/Luna-coreX/RinaAssistant/issues</a></li></ul>
+<p>Made with Python and C#</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/README.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

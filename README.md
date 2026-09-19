@@ -76,7 +76,7 @@ This is not a rearrangement of folders. It is what makes the rest possible:
 - a plugin that hangs no longer takes Rina with it: each lives in its own process;
 - the interface was **designed anew** rather than ported, because the shell is new code regardless.
 
-No new user-facing capabilities: the 4.0-port boundary forbids losing behaviour and does not ask for more. What behaviour existed is pinned by 112 recorded utterances and seven recorded sessions.
+No new user-facing capabilities: the 4.0-port boundary forbids losing behaviour and does not ask for more. What behaviour existed is pinned by 134 recorded utterances and seven recorded sessions.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -98,7 +98,7 @@ Speech synthesis and recognition are pluggable — pick what suits the machine.
 
 **Text to speech:** silent (text only), `pyttsx3` (offline, system voices), Edge Neural TTS (online, best quality), gTTS (online), Piper (offline neural, needs an `.onnx` model).
 
-**Speech to text:** disabled, Google, Vosk (offline), Whisper (offline), PocketSphinx.
+**Speech to text:** disabled, Vosk (offline), Whisper (offline) — and only those. An engine that opens a microphone of its own is not offered here: the sound arrives from the shell (`4.0-E05`).
 
 The models live in the core, the microphone and the speaker in the shell — the sound travels between them over a channel of its own, so a second of speech never queues behind a button press.
 
@@ -189,7 +189,7 @@ RinaAssistant/
 ├── core/         headless core: engine, router, registry, protocol, storage
 │   └── wire/     the protocol: envelope, handshake, events, channels, errors
 ├── voice/        speech, recognition, reminders, user commands, app index
-├── plugins/      plugin API, manager, plugin process, three bundled plugins
+├── plugins/      plugin API, manager, plugin process, six bundled plugins and an API sample
 ├── shell/
 │   ├── Rina.Shell/     window, pages, styles, system layer (C#, WPF)
 │   └── Rina.Protocol/  the client half of the protocol (C#)
@@ -236,11 +236,11 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 73 checks, about five minutes
+python tools/regress.py          # 75 checks, about five minutes
 python tools/regress.py --list   # what they are
 ```
 
-Behaviour is pinned by a golden set of 112 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
+Behaviour is pinned by a golden set of 134 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
 
 How to debug two processes at once — [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
 

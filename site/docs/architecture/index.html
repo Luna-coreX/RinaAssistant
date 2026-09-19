@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Архитектура — Rina Assistant</title>
+<meta name="description" content="Два процесса, протокол между ними, кто что решает.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Архитектура — Rina Assistant">
+<meta property="og:description" content="Два процесса, протокол между ними, кто что решает.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по docs/ARCHITECTURE.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Архитектура</h1>
+      <p class="lead">Два процесса, протокол между ними, кто что решает.</p>
+      <p class="note">Документ репозитория, страницей. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/ARCHITECTURE.md">docs/ARCHITECTURE.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#shema-sloev">Схема слоёв</a></li>
+      <li><a href="#gde-chto-lezhit">Где что лежит</a></li>
+      <li><a href="#tri-granicy-kotorye-vse-obyasnyayut">Три границы, которые всё объясняют</a></li>
+      <li><a href="#edinstvennyy-put-ispolneniya">Единственный путь исполнения</a></li>
+      <li><a href="#chetyre-versii-a-ne-odna">Четыре версии, а не одна</a></li>
+      <li><a href="#protokol-korotko">Протокол, коротко</a></li>
+      <li><a href="#chto-chitat-dalshe">Что читать дальше</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<p>Задача плана <code>4.0-I05</code>.</p>
+<p>Рина — <strong>две программы</strong>, а не одна. Ядро на Python думает, оболочка на C# показывает и трогает машину. Между ними протокол.</p>
+<p>Это главное, что нужно знать, прежде чем читать код: почти каждое «почему так странно» отсюда и следует.</p>
+<hr class="seam">
+<h2 id="shema-sloev">Схема слоёв</h2>
+<pre>        ┌─────────────────────────────────────────────┐
+        │                  человек                    │
+        └──────────────────────┬──────────────────────┘
+                               │ голос, клавиатура, мышь
+        ┌──────────────────────▼──────────────────────┐
+        │  ОБОЛОЧКА — shell/Rina.Shell (C#, WPF)      │
+        │                                             │
+        │  окна и страницы      микрофон и динамик    │
+        │  трей, хоткеи         индекс программ       │
+        │  запуск процессов     подписи, доверие      │
+        │  слова интерфейса     журнал запусков       │
+        └──────────────────────┬──────────────────────┘
+                               │
+                  ┌────────────┴────────────┐
+                  │  управляющий канал JSON │  команды, настройки,
+                  │  канал данных (байты)   │  события, разрешения
+                  └────────────┬────────────┘  звук в обе стороны
+                               │
+        ┌──────────────────────▼──────────────────────┐
+        │  ЯДРО — core/ + voice/ (Python)             │
+        │                                             │
+        │  разбор фразы          реестр инструментов  │
+        │  диалог и вопросы      разрешения           │
+        │  распознавание, синтез подтверждения        │
+        │  напоминания           журнал вызовов       │
+        │  реплики Рины          хранилище            │
+        └──────────────────────┬──────────────────────┘
+                               │  свой процесс на плагин
+        ┌──────────────────────▼──────────────────────┐
+        │  ПЛАГИНЫ — plugins/ (Python, по процессу)   │
+        └─────────────────────────────────────────────┘</pre>
+<p>Стрелки идут в обе стороны. Оболочка спрашивает ядро («вот фраза»), но и ядро спрашивает оболочку («запусти это», «спроси человека», «прибавь громкость») — см. <code>core/wire/server.py</code>.</p>
+<hr class="seam">
+<h2 id="gde-chto-lezhit">Где что лежит</h2>
+<table><thead><tr><th>Каталог</th><th>Что там</th></tr></thead><tbody><tr><td><code>core/</code></td><td>ядро без Qt: разбор, исполнение, хранилище, протокол</td></tr><tr><td><code>core/wire/</code></td><td>протокол: конверт, рукопожатие, события, каналы, ошибки</td></tr><tr><td><code>voice/</code></td><td>распознавание, синтез, напоминания, свои команды, индекс 3.1.0</td></tr><tr><td><code>plugins/</code></td><td>API плагинов, менеджер, процесс плагина, три демонстрационных</td></tr><tr><td><code>shell/Rina.Shell/</code></td><td>окно, страницы, стили, системный слой</td></tr><tr><td><code>shell/Rina.Protocol/</code></td><td>клиентская половина протокола на C#</td></tr><tr><td><code>tools/</code></td><td>проверки, прогонщики, порождатели</td></tr><tr><td><code>docs/</code></td><td>план, спецификация, решения, дизайн-система, эта папка</td></tr></tbody></table>
+<hr class="seam">
+<h2 id="tri-granicy-kotorye-vse-obyasnyayut">Три границы, которые всё объясняют</h2>
+<h3 id="yadro-reshaet-obolochka-pokazyvaet">Ядро решает, оболочка показывает</h3>
+<p>Записано в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0006-settings-ownership.md">ADR 0006</a>. Ядро владеет <strong>смыслом</strong>: какой у настройки тип, что она принимает, от чего зависит, чем опасна. Оболочка владеет <strong>видом</strong>: подписями, порядком, секциями.</p>
+<p>Граница проходит не между «формой» и «значениями», а между смыслом и видом. Поэтому ядро не знает слова «Слова активации», а оболочка не знает, что <code>llm_model</code> бессмысленна при выключенной модели.</p>
+<h3 id="mashinu-trogaet-obolochka">Машину трогает оболочка</h3>
+<p>Записано в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0009-system-layer.md">ADR 0009</a>. Ядро решает, <strong>что</strong> сделать; трогает систему оболочка. Перечислить установленные программы — факт об операционной системе, и это её дело. Понять, что «телеграм» это Telegram, — суждение о намерении человека, и это дело ядра.</p>
+<p>Отсюда следствие, которое удивляет при чтении: ядро <strong>не умеет</strong> запускать программы и выключать компьютер. Оно умеет об этом попросить.</p>
+<h3 id="slova-interfeysa-v-obolochke-repliki-riny-v-yadre">Слова интерфейса — в оболочке, реплики Рины — в ядре</h3>
+<p>Записано в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0007-localisation.md">ADR 0007</a>. «Настройки» — слово интерфейса, живёт в <code>interface.json</code>. «Запускаю Telegram» — реплика Рины, живёт в <code>core/i18n.py</code>. Настройка языка одна, применяют её обе стороны, и каждая — у себя.</p>
+<hr class="seam">
+<h2 id="edinstvennyy-put-ispolneniya">Единственный путь исполнения</h2>
+<p>Всё, что меняет мир, проходит через реестр инструментов (<code>core/toolrunner.py</code>). Каждый вызов идёт через четверо ворот в неизменном порядке:</p>
+<pre>   существует ли инструмент   →  годятся ли аргументы
+                              →  подтверждено ли опасное
+                              →  и лишь потом исполнение</pre>
+<p>Это не стиль, а инвариант: <code>tools/test_invariants.py</code> проверяет по всем файлам ядра, что побочные эффекты выполняются только внутри <code>toolrunner.py</code>. Пока побочный эффект можно вызвать напрямую, любые ворота перед ним держатся на дисциплине.</p>
+<p>Плагин подчиняется тому же правилу: он <strong>объявляет</strong> инструменты, а зовёт их ядро (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0010-plugin-api.md">ADR 0010</a>).</p>
+<hr class="seam">
+<h2 id="chetyre-versii-a-ne-odna">Четыре версии, а не одна</h2>
+<p>Записано в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0004-versioning-and-compatibility.md">ADR 0004</a>. Оболочка, ядро, протокол и схема данных на диске обновляются порознь, поэтому вопрос «какая у меня версия» без уточнения «чего» не имеет одного ответа. Все четыре показаны в разделе «О программе».</p>
+<hr class="seam">
+<h2 id="protokol-korotko">Протокол, коротко</h2>
+<p>Полностью — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/PROTOCOL-v1.md"><code>docs/protocol/PROTOCOL-v1.md</code></a>.</p>
+<p><strong>Два канала.</strong> Управляющий несёт JSON, канал данных — байты с коротким двоичным заголовком. Звук не кодируется внутри JSON: пока едет секунда речи, нажатие кнопки ждало бы в той же очереди.</p>
+<p><strong>Конверт в каждом сообщении.</strong> Тип, номер, метод, версия, трассировка. Незнакомые поля конверта пропускаются молча — иначе ступенчатое обновление невозможно.</p>
+<p><strong>Кредит вместо надежды.</strong> Приёмник объявляет, сколько байт готов принять; отправитель не имеет права держать в полёте больше. Начальный кредит — ноль.</p>
+<p><strong>Ответ на команду — «принято», а не результат.</strong> Сам ответ приходит событием <code>assistant.response</code>, когда появится: команда может думать секундами и сказать по дороге несколько вещей.</p>
+<p><strong>Обрыв — это смерть оболочки, и ядро завершается.</strong> Процесс, переживший свою оболочку, — это процесс, который никто не закроет.</p>
+<hr class="seam">
+<h2 id="chto-chitat-dalshe">Что читать дальше</h2>
+<table><thead><tr><th>Вопрос</th><th>Куда</th></tr></thead><tbody><tr><td>Как это выглядит и почему</td><td><a href="/docs/design/"><code>docs/design/SYSTEM.md</code></a></td></tr><tr><td>Как написать плагин</td><td><a href="/docs/plugins/"><code>docs/plugins/WRITING-PLUGINS.md</code></a></td></tr><tr><td>Как отлаживать</td><td><a href="/docs/debugging/"><code>docs/DEBUGGING.md</code></a></td></tr><tr><td>От чего защищаемся</td><td><a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a></td></tr><tr><td>Почему так, а не иначе</td><td><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr"><code>docs/adr/</code></a></td></tr><tr><td>Что дальше</td><td><a href="/docs/plan/"><code>docs/ROADMAP.md</code></a></td></tr></tbody></table>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/ARCHITECTURE.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

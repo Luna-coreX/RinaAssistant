@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rina Assistant — API documentation: plugins and protocol</title>
+<meta name="description" content="Rina's two open surfaces: the plugin API version 4 — manifest, hooks, tools, permissions, page vocabulary — and the shell-to-core protocol version 1 with its machine-readable contract.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<link rel="alternate" hreflang="ru" href="/api/">
+<link rel="alternate" hreflang="en" href="/en/api/">
+<link rel="alternate" hreflang="x-default" href="/api/">
+<meta property="og:type" content="article">
+<meta property="og:locale" content="en_GB">
+<meta property="og:title" content="Rina Assistant — API documentation">
+<meta property="og:description" content="Plugin API version 4 and protocol version 1: manifest, hooks, permissions, page vocabulary, channels and envelope.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!--
+  THESIS: Фраза соединяется с действием, и соединение видно. Отказ от
+  тёмного лендинга с градиентным героем и рядом стеклянных карточек.
+  OWN-WORLD: Коммутационное поле. Просверленная плита, шнур сигнального
+  цвета, ламповый индикатор, инвертированная наборная этикетка. Ни
+  карточек, ни градиентного текста, ни размытия как украшения.
+  STORY: Разработчик находит обе открытые поверхности, видит границы прав
+  и пишет плагин, не читая исходников ядра.
+  FIRST VIEWPORT: Заголовок, строка о двух поверхностях и полоса
+  показаний API; слева — рейка разделов, которая едет вместе с чтением.
+  FORM: «Коммутаторная», кандидат 4 из семи, seed a2a26a10.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with
+  the finish review, the verdict, and DESIGN.md
+-->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">Skip to content</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/en/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/en/#features">How it works</a>
+      <a href="/en/#privacy">Privacy</a>
+      <a href="/en/#download">Install</a>
+      <a href="/en/api/" aria-current="page">Developers</a>
+      <span class="tongue"><a href="/api/" lang="ru">RU</a><a href="/en/api/" aria-current="page">EN</a></span>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>API documentation</h1>
+      <p class="lead">Rina has two open surfaces. One is for a plugin, which lives inside her
+        and declares what it can do. The other is the protocol between the core and the shell:
+        with it you can write a shell of your own, whole.</p>
+      <div class="actions">
+        <a class="press primary" href="#plugin">Plugin API</a>
+        <a class="press" href="#protocol">Protocol</a>
+      </div>
+    </div>
+    <div class="strip">
+      <div><b>4</b><span>the plugin API version; older than four does not load</span></div>
+      <div><b>13</b><span>kinds of element on a plugin's page</span></div>
+      <div><b>11</b><span>permissions in the catalogue; four are never given to a plugin</span></div>
+      <div><b>66</b><span>methods in the protocol contract</span></div>
+      <div><b>23</b><span>events</span></div>
+      <div><b>30</b><span>named errors</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Sections">
+    <ol>
+      <li><a href="#start">Where to start</a></li>
+      <li><a href="#plugin">Plugin: manifest</a></li>
+      <li><a href="#hooks">Plugin: hooks</a></li>
+      <li><a href="#tools">Plugin: tools</a></li>
+      <li><a href="#permissions">Permissions</a></li>
+      <li><a href="#page">Page vocabulary</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#example">A whole example</a></li>
+      <li><a href="#compat">Compatibility</a></li>
+      <li><a href="#protocol">Protocol: channels</a></li>
+      <li><a href="#envelope">Protocol: envelope</a></li>
+      <li><a href="#contract">Protocol: contract</a></li>
+      <li><a href="#limits">What is never granted</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body" id="content">
+    <section id="start">
+      <h2>Where to start</h2>
+      <p>If you want to <strong>give Rina a new skill</strong> — a command, a tab, a tile on the
+        home screen — you need the plugin API. A plugin is a folder in <code>plugins/</code>
+        with a <code>plugin.json</code> manifest and a <code>main.py</code> holding a class that
+        inherits from <code>Plugin</code>.</p>
+      <p>If you want to <strong>replace the shell</strong> — write your own interface, your own
+        voice client, your own integration — you need the protocol. The core runs as a separate
+        process and speaks over a named pipe; everything the program can do is expressed as
+        methods and events.</p>
+      <p class="note">The governing rule of both surfaces is the same: <strong>a
+        plugin declares</strong>. It hands over a description of its tools and of its page,
+        and the core decides when to call and when to show them. That is why the shell can be
+        rewritten whole: a plugin holds no line of its code — no widgets, no markup, no calls
+        into the window.</p>
+    </section>
+
+    <section id="plugin">
+      <h2>The manifest</h2>
+      <p>Nine fields; the first two are required.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>The folder's name and the tools' prefix: <code>plugin.&lt;id&gt;.&lt;name&gt;</code>.</td></tr>
+          <tr><td>name</td><td>What the plugin is called in the interface.</td></tr>
+          <tr><td>version</td><td>Your plugin's version.</td></tr>
+          <tr><td>author</td><td>Who wrote it.</td></tr>
+          <tr><td>description</td><td>One line on what it does.</td></tr>
+          <tr><td>entry</td><td>The class name. Left empty, the first subclass of <code>Plugin</code> is taken.</td></tr>
+          <tr><td>icon</td><td>Its mark among other plugins.</td></tr>
+          <tr><td>api_version</td><td>The API version the plugin is written for. Currently 4.</td></tr>
+          <tr><td>permissions</td><td>What the plugin asks of the machine. The names come from the shared catalogue.</td></tr>
+        </tbody>
+      </table>
+<pre>{
+  <span class="cmd">"id"</span>: "weather",
+  <span class="cmd">"name"</span>: "Weather",
+  <span class="cmd">"version"</span>: "1.0.0",
+  <span class="cmd">"author"</span>: "You",
+  <span class="cmd">"description"</span>: "Tells the weather and shows it as a tile",
+  <span class="cmd">"entry"</span>: "WeatherPlugin",
+  <span class="cmd">"icon"</span>: "W",
+  <span class="cmd">"api_version"</span>: 4,
+  <span class="cmd">"permissions"</span>: ["network.external"]
+}</pre>
+    </section>
+
+    <section id="hooks">
+      <h2>Hooks</h2>
+      <p>All of them are optional. Leave one alone and Rina behaves as if it did not exist.</p>
+      <table>
+        <thead><tr><th>Hook</th><th>When it is called</th></tr></thead>
+        <tbody>
+          <tr><td>on_enable</td><td>The plugin was switched on. Set up your own things here: a schedule, a cache, a connection.</td></tr>
+          <tr><td>on_disable</td><td>Switched off. Close here whatever you opened.</td></tr>
+          <tr><td>on_command</td><td>A phrase arrived. Return <code>True</code> and it is yours; nobody parses it further.</td></tr>
+          <tr><td>on_event</td><td>An event of the core happened: a name and some data.</td></tr>
+          <tr><td>tools</td><td>A list of <code>PluginTool</code> — what the plugin can do. Read when it is enabled.</td></tr>
+          <tr><td>page</td><td>A description of your own tab as a list of elements. Empty means no tab.</td></tr>
+          <tr><td>home</td><td>A description of a tile for the home screen. Empty — and that is the right answer for most.</td></tr>
+          <tr><td>on_action</td><td>A button on your page was pressed. The page is rebuilt afterwards by itself.</td></tr>
+          <tr><td>settings_schema</td><td>A description of your settings; Rina assembles the panel herself.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">The home tile is drawn often and has to be short: build it from what you
+        already know, and go to the network on your own schedule, answering from memory. A tile
+        that grows is a page, and there is already a place for a page.</p>
+      <h3>Two class fields</h3>
+      <table>
+        <thead><tr><th>Field</th><th>What it sets</th></tr></thead>
+        <tbody>
+          <tr><td>page_title</td><td>The tab's title. Left alone, the manifest's name is used.</td></tr>
+          <tr><td>page_icon</td><td>The tab's icon. Left alone, the manifest's icon is used.</td></tr>
+        </tbody>
+      </table>
+      <h3>Through <code>self.ctx</code> the application's services are available</h3>
+      <table>
+        <thead><tr><th>Method</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>respond</td><td>Rina will speak and show the text.</td></tr>
+          <tr><td>log</td><td>Writes to the plugin's log.</td></tr>
+          <tr><td>get_setting</td><td>Reads one of your settings.</td></tr>
+          <tr><td>set_setting</td><td>Writes one of your settings.</td></tr>
+          <tr><td>notify</td><td>A notification from the tray: a title and a message.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="tools">
+      <h2>Tools</h2>
+      <p>A tool is what the plugin <em>can do</em>. It goes into the core's shared registry
+        under the name <code>plugin.&lt;id&gt;.&lt;name&gt;</code> and gets exactly the same
+        gates there as a built-in one: the permission check, confirmation of the irreversible,
+        and a journal entry naming which plugin started it.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>name</td><td>A short name inside the plugin; the core adds the prefix itself.</td></tr>
+          <tr><td>summary</td><td>One line: what the tool does.</td></tr>
+          <tr><td>run</td><td>The function the core will call. The plugin never calls it itself.</td></tr>
+          <tr><td>params</td><td>The arguments, by the same <code>Param</code> the built-in tools use.</td></tr>
+          <tr><td>permissions</td><td>What has to be allowed. Empty means nothing.</td></tr>
+          <tr><td>confirm_required</td><td>Ask the person on every call.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">Permissions are checked <strong>before</strong> registration: what a plugin
+        is not entitled to is not granted, and the tool itself is not created. A tool without the
+        permission it needs would refuse anyway — but only after the person had seen it and
+        called it.</p>
+    </section>
+
+    <section id="permissions">
+      <h2>Permissions</h2>
+      <p>The catalogue is one, shared by the core and by plugins. A second catalogue "for
+        plugins" would mean two languages about one and the same thing and an inevitable
+        divergence — "network" here and "internet" there. But not all of it is available.</p>
+      <table>
+        <thead><tr><th>Name</th><th>What it allows</th><th>To a plugin</th></tr></thead>
+        <tbody>
+          <tr><td>process.launch</td><td>Open the applications and folders you name.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>system.media</td><td>Change the volume and control the player.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>system.lock</td><td>Lock the desktop on command.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>system.power</td><td>Shut down, restart and sleep the computer.</td><td><span class="no">never</span></td></tr>
+          <tr><td>screen.capture</td><td>Take a screenshot and save it.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>network.local</td><td>Ask the language model running on this computer.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>network.external</td><td>Reach services outside this computer.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>files.read</td><td>Read the files you pointed at.</td><td><span class="yes">granted</span></td></tr>
+          <tr><td>files.write</td><td>Create and change files.</td><td><span class="no">never</span></td></tr>
+          <tr><td>screen.read</td><td>See what is on the screen. Created in advance, for 5.0.</td><td><span class="no">never</span></td></tr>
+          <tr><td>input.synthesize</td><td>Click and type on your behalf. Created in advance, for 5.0.</td><td><span class="no">never</span></td></tr>
+        </tbody>
+      </table>
+      <p class="note">The four refusals are not about distrusting you; they are about what a
+        plugin must not be able to do by construction: shutting the computer down at somebody
+        else's code's decision is not what a weather plugin is installed for, and writing files
+        would mean somebody else's name in a person's directories. The last two belong to 5.0 and
+        hang on no tool at all yet.</p>
+      <p class="note">A refusal here is an answer: the person sees exactly what
+        the plugin was not given, and why.</p>
+    </section>
+
+    <section id="page">
+      <h2>Page vocabulary</h2>
+      <p>A plugin's page is described as <em>data</em>. No widgets, no markup: you return a list
+        of elements and the shell — whichever one is installed — draws them. Schema version two,
+        thirteen kinds.</p>
+      <table>
+        <thead><tr><th>Kind</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>title</td><td>A section heading.</td></tr>
+          <tr><td>text</td><td>Ordinary text.</td></tr>
+          <tr><td>note</td><td>A smaller, quieter explanation.</td></tr>
+          <tr><td>items</td><td>A list of lines.</td></tr>
+          <tr><td>button</td><td>A button with an action; the press arrives at <code>on_action</code>.</td></tr>
+          <tr><td>input</td><td>An input field with a placeholder and a button.</td></tr>
+          <tr><td>table</td><td>A table of rows and, if needed, a header.</td></tr>
+          <tr><td>progress</td><td>A progress bar from zero to one.</td></tr>
+          <tr><td>badge</td><td>A short state label.</td></tr>
+          <tr><td>divider</td><td>A separator.</td></tr>
+          <tr><td>card</td><td>A container with a title.</td></tr>
+          <tr><td>group</td><td>A group of elements.</td></tr>
+          <tr><td>row</td><td>A row: elements side by side.</td></tr>
+        </tbody>
+      </table>
+      <p class="note">An unfamiliar kind is shown visibly and by name: a plugin may be built for
+        a newer schema, and skipping it silently would make part of its page invisible without
+        a trace.</p>
+    </section>
+
+    <section id="settings">
+      <h2>Settings</h2>
+      <p>The same way: you describe the fields and Rina builds the panel. Four kinds.</p>
+      <table>
+        <thead><tr><th>Kind</th><th>What it is</th></tr></thead>
+        <tbody>
+          <tr><td>toggle</td><td>A switch: yes or no.</td></tr>
+          <tr><td>text</td><td>A line of text.</td></tr>
+          <tr><td>choice</td><td>One of a set.</td></tr>
+          <tr><td>slider</td><td>A number within bounds, with a step.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="example">
+      <h2>A whole example</h2>
+      <p>A plugin that declares one tool, answers a phrase and shows its own page.
+        <code>main.py</code> beside the manifest from the first section.</p>
+<pre><span class="rem"># plugins/weather/main.py</span>
+<span class="cmd">from</span> plugins.api <span class="cmd">import</span> Plugin, PluginTool
+<span class="cmd">from</span> plugins.page_spec <span class="cmd">import</span> Title, Text, Note, Button
+<span class="cmd">from</span> plugins.settings_spec <span class="cmd">import</span> Text <span class="cmd">as</span> TextField, Toggle
+
+
+<span class="cmd">class</span> WeatherPlugin(Plugin):
+
+    <span class="cmd">def</span> on_enable(self):
+        self.log(<span class="rem">"weather is on"</span>)
+
+    <span class="cmd">def</span> tools(self):
+        <span class="cmd">return</span> [PluginTool(
+            name=<span class="rem">"current"</span>,
+            summary=<span class="rem">"Tells the weather in the chosen city"</span>,
+            run=self._current,
+            permissions=(<span class="rem">"network.external"</span>,),
+        )]
+
+    <span class="cmd">def</span> _current(self, args):
+        city = self.setting(<span class="rem">"city"</span>, <span class="rem">"London"</span>)
+        <span class="cmd">return</span> {<span class="rem">"text"</span>: f<span class="rem">"It is clear in {city} right now"</span>}
+
+    <span class="cmd">def</span> on_command(self, text):
+        <span class="cmd">if</span> <span class="rem">"weather"</span> <span class="cmd">not in</span> text.lower():
+            <span class="cmd">return</span> <span class="cmd">False</span>
+        self.respond(self._current({})[<span class="rem">"text"</span>])
+        <span class="cmd">return</span> <span class="cmd">True</span>
+
+    <span class="cmd">def</span> page(self):
+        <span class="cmd">return</span> [
+            Title(<span class="rem">"Weather"</span>),
+            Text(f<span class="rem">"City: {self.setting('city', 'London')}"</span>),
+            Note(<span class="rem">"Refreshed on request, at most once in ten minutes."</span>),
+            Button(<span class="rem">"Refresh"</span>, action=<span class="rem">"refresh"</span>),
+        ]
+
+    <span class="cmd">def</span> on_action(self, action, value=<span class="cmd">None</span>):
+        <span class="cmd">if</span> action == <span class="rem">"refresh"</span>:
+            self.respond(self._current({})[<span class="rem">"text"</span>])
+
+    <span class="cmd">def</span> settings_schema(self):
+        <span class="cmd">return</span> [
+            TextField(<span class="rem">"city"</span>, <span class="rem">"City"</span>, default=<span class="rem">"London"</span>),
+            Toggle(<span class="rem">"speak"</span>, <span class="rem">"Say it aloud"</span>, default=<span class="cmd">True</span>),
+        ]</pre>
+      <p class="note">The folder goes into <code>plugins/</code>. On installation the name is
+        checked, the folder must land inside <code>plugins/</code>, Windows device names are
+        rejected, and replacing an already installed plugin forcibly switches it off.</p>
+    </section>
+
+    <section id="compat">
+      <h2>Compatibility</h2>
+      <p>The manifest states the API version the plugin is written for. The range that loads is
+        four to four: the lower bound deliberately coincides with the current one, because a
+        plugin that hands over a ready-made widget cannot be "partly supported" — a C# shell
+        will not draw a Python widget in any way at all.</p>
+      <p>A mismatch does not stay quiet. The person is told the reason, the version and what to
+        do: update Rina if the plugin is newer, or update the plugin if it is older. A silent
+        "the plugin simply does not work" looks like a breakage in Rina when what
+        is outdated is the plugin.</p>
+    </section>
+
+    <section id="protocol">
+      <h2>Protocol: channels</h2>
+      <p>The shell is the C# process: the window, the output devices, launching programs. The
+        core is the Python process: the decisions. The shell starts the core, watches it and
+        restarts it; the core connects as a client.</p>
+      <table>
+        <thead><tr><th>Channel</th><th>Name</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td>control</td><td><code>\\.\pipe\rina.&lt;session&gt;.control</code></td><td>JSON messages</td></tr>
+          <tr><td>data</td><td><code>\\.\pipe\rina.&lt;session&gt;.data</code></td><td>binary frames</td></tr>
+        </tbody>
+      </table>
+      <p>They are separate so that a burst of audio never holds a control message behind it. A
+        control frame is four bytes of length and a UTF-8 JSON payload, with a 1 MiB limit per
+        message. A data frame is a length, a stream id, a sequence number and bytes, with a
+        256 KiB limit.</p>
+      <p class="note">Binary data is <strong>never</strong> encoded inside JSON: base64 inflates
+        it by a third and makes audio share a queue with control.</p>
+    </section>
+
+    <section id="envelope">
+      <h2>Protocol: envelope</h2>
+      <p>Nine fields, and they are present in every control-channel message without exception.</p>
+      <table>
+        <thead><tr><th>Field</th><th>Meaning</th></tr></thead>
+        <tbody>
+          <tr><td>v</td><td>The protocol version — the highest common one, chosen at the handshake.</td></tr>
+          <tr><td>type</td><td><code>request</code>, <code>response</code>, <code>event</code> or <code>error</code>.</td></tr>
+          <tr><td>id</td><td>The message's identifier, unique within the session.</td></tr>
+          <tr><td>method</td><td>The name of the method or event — for a request and an event.</td></tr>
+          <tr><td>correlation_id</td><td>The request's id — for a response and an error.</td></tr>
+          <tr><td>stream_id</td><td>The stream this message belongs to, if it belongs to one.</td></tr>
+          <tr><td>timestamp</td><td>The time of sending, seconds since the epoch.</td></tr>
+          <tr><td>trace_id</td><td>End-to-end tracing.</td></tr>
+          <tr><td>payload</td><td>The contents; an empty object when there is nothing to say.</td></tr>
+        </tbody>
+      </table>
+<pre>{
+  <span class="cmd">"v"</span>: 1,
+  <span class="cmd">"type"</span>: "request",
+  <span class="cmd">"id"</span>: "s-0042",
+  <span class="cmd">"method"</span>: "command.handle",
+  <span class="cmd">"timestamp"</span>: 1756750000.123,
+  <span class="cmd">"trace_id"</span>: "t-8f21",
+  <span class="cmd">"payload"</span>: {"text": "запусти телеграм", "source": "typed"}
+}</pre>
+      <p class="note">An unknown method in a request is the error
+        <code>protocol.unknown_method</code>. An unknown event the receiver silently ignores.
+        The asymmetry is deliberate: a missed request is a lost action, a missed event is a lost
+        notification.</p>
+    </section>
+
+    <section id="contract">
+      <h2>Protocol: contract</h2>
+      <p>Everything that can be asked and heard is machine-readable —
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/contract-v1.json">contract-v1.json</a>.
+        Both sides are checked against it; the C# half of the protocol is generated from it.</p>
+      <table>
+        <thead><tr><th>Of what</th><th>How many</th><th>For example</th></tr></thead>
+        <tbody>
+          <tr><td>methods</td><td>66</td><td><code>command.handle</code>, <code>apps.launch</code>, <code>reminders.add</code></td></tr>
+          <tr><td>events</td><td>23</td><td><code>listening.started</code>, <code>assistant.response</code>, <code>reminder.fired</code></td></tr>
+          <tr><td>errors</td><td>30</td><td><code>permission.denied</code>, <code>app.not_found</code>, <code>confirmation.required</code></td></tr>
+          <tr><td>capabilities</td><td>19</td><td><code>audio.input</code>, <code>reminders</code>, <code>plugins</code></td></tr>
+          <tr><td>stream kinds</td><td>3</td><td><code>audio.input</code>, <code>audio.output</code>, <code>screen.frame</code></td></tr>
+        </tbody>
+      </table>
+      <p>The first message of a session is the handshake: both sides name the versions they
+        support and their capabilities, and the highest common version is chosen. Before it, any
+        other method answers with <code>protocol.not_ready</code>.</p>
+      <p class="note">Half of what is described goes unused in 4.0, and that is deliberate:
+        adding it later costs a rewrite on both sides, while laying it down now costs a paragraph
+        in a document. The full text is
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/PROTOCOL-v1.md">PROTOCOL-v1.md</a>.</p>
+    </section>
+
+    <section id="limits">
+      <h2>What is never granted</h2>
+      <p>A separate process is <strong>not a sandbox</strong>, and that has to be said plainly.
+        The same interpreter, the same user rights; <code>subprocess</code> works inside a
+        plugin. What a plugin lost is access to the <em>application</em>; access
+        to the machine was never taken from it.</p>
+      <div class="hatched">What the split does give: a plugin's tools go into the same registry
+        and get the same gates; some permissions are never granted, and a tool asking for one is
+        not created at all; a plugin can turn to the core for exactly two things; a call has a
+        deadline, one that does not answer is killed, and its neighbour is left intact.</div>
+      <p class="note">So install plugins the way you install any other code: looking at whose it
+        is. The full description of the boundaries is
+        <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/SECURITY.md">SECURITY.md</a>
+        and the <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/security/THREAT-MODEL.md">threat model</a>.</p>
+    </section>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry · <span class="fig">4.0.0-beta</span></span>
+  <span class="note">This page runs no scripts and sets no counters.</span>
+  <nav>
+    <a href="/en/">The product</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Repository</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/WRITING-PLUGINS.md">The long guide</a>
+    <a href="/api/" lang="ru">Русский</a>
+  </nav>
+</footer>
+
+</body>
+</html>

@@ -97,7 +97,7 @@ NEEDS_RELEASE = {
 
 #: Generators: their check is to compare what was generated with its source.
 GENERATORS = ("gen_csharp_contract.py", "gen_shell_strings.py",
-              "gen_xaml_tokens.py")
+              "gen_site.py", "gen_xaml_tokens.py")
 
 #: The checks that are not called by a file name.
 BY_HAND = {

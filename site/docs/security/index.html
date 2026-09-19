@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Безопасность — Rina Assistant</title>
+<meta name="description" content="Границы доверия и куда нести уязвимость.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Безопасность — Rina Assistant">
+<meta property="og:description" content="Границы доверия и куда нести уязвимость.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по SECURITY.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Безопасность</h1>
+      <p class="lead">Границы доверия и куда нести уязвимость.</p>
+      <p class="note">Документ репозитория, страницей. Написан по-английски. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/SECURITY.md">SECURITY.md</a>;
+        страница порождается из него и расходиться с ним не может.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#reporting-a-vulnerability">Reporting a vulnerability</a></li>
+      <li><a href="#supported-versions">Supported versions</a></li>
+      <li><a href="#what-rina-trusts-and-what-she-does-not">What Rina trusts, and what she does not</a></li>
+      <li><a href="#out-of-scope">Out of scope</a></li>
+      <li><a href="#diagnostics-and-privacy">Diagnostics and privacy</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<h2 id="reporting-a-vulnerability">Reporting a vulnerability</h2>
+<p>Report privately through <strong><a href="https://github.com/Luna-coreX/RinaAssistant/security/advisories/new">GitHub Security Advisories</a></strong> — not through public issues, so the problem is not disclosed before it is fixed.</p>
+<p>Please include the version, your operating system, and the smallest set of steps that reproduces the problem. A proof of concept helps, but a clear description is enough.</p>
+<p>Expect an acknowledgement within a few days. This is a personal project, not a company: there is no bounty programme and no guaranteed response time, but reports are taken seriously and credited in the changelog unless you prefer otherwise.</p>
+<p>For anything that is not a vulnerability — a crash, a wrong answer, a mistranslation — the normal <a href="https://github.com/Luna-coreX/RinaAssistant/issues">issue tracker</a> is the right place.</p>
+<h2 id="supported-versions">Supported versions</h2>
+<p>Only the latest release receives fixes. There are no long-term support branches.</p>
+<h2 id="what-rina-trusts-and-what-she-does-not">What Rina trusts, and what she does not</h2>
+<p>Knowing where the boundaries are makes it easier to tell a vulnerability from intended behaviour.</p>
+<h3 id="plugins-run-in-a-process-of-their-own-which-is-not-a-sandbox">Plugins run in a process of their own — which is not a sandbox</h3>
+<p>A plugin used to be ordinary Python inside the application. It now runs in a process of its own, one per plugin, and <strong>declares</strong> what it can do instead of doing it. Both halves of that need saying plainly, because the second is easily mistaken for the first.</p>
+<p><strong>What the separation gives you.</strong> A plugin&#x27;s tools go into the same registry as the built-in ones and get the same gates: the permission check, the confirmation for anything irreversible, and an entry in the call journal. Certain permissions are never issued to a plugin at all — powering the machine off, writing files, and the ones reserved for a later version — and a tool asking for one of those is not registered, so it cannot be offered to you and then refuse. A plugin can reach the application for exactly two things: saying a line, and reading its own setting. Every call has a deadline; a plugin that does not answer is treated as broken and stopped, and its neighbours keep working. On installation the identifier is checked, the folder it unpacks into must land directly inside <code>plugins/</code>, names Windows reserves for devices are refused, and a replacement is forced back to disabled instead of inheriting the old plugin&#x27;s &quot;enabled&quot;.</p>
+<p><strong>What it does not give you, and this is the part that matters.</strong> A separate process is not a sandbox. The plugin runs under the same interpreter with the same rights as you have, and <code>subprocess</code> inside it still works. What was taken away is its access to <em>the application</em>, not its access to <em>the machine</em>. A plugin&#x27;s permissions are honest about our tools and promise nothing whatsoever about Python.</p>
+<p>So installing a plugin remains exactly as consequential as running a downloaded program, and should be treated that way. The real boundary is restricted process rights; that is planned and does not exist yet. Until it does, this is the honest description rather than a smaller claim dressed up as a bigger one.</p>
+<h3 id="imported-commands-arrive-disabled">Imported commands arrive disabled</h3>
+<p>A command file can name any program to launch, so importing one is treated as untrusted input. Imported entries are stripped to known fields, checked against the known command and system-action types, capped in size and number, and <strong>always imported disabled</strong>. You have to look at a command and enable it before it can run.</p>
+<h3 id="destructive-actions-always-ask">Destructive actions always ask</h3>
+<p>Shutdown, restart and sleep are never performed on a single recognised phrase. Speech recognition mishears; a confirmation step means a misheard word cannot power off the machine.</p>
+<h3 id="text-from-outside-is-never-markup">Text from outside is never markup</h3>
+<p>Model replies, recognised speech, plugin output and plugin manifests are rendered as plain text. Otherwise a crafted string could make the interface fetch a remote resource — on Windows, an SMB path is enough to leak an authentication attempt.</p>
+<h3 id="the-language-model-is-local-by-default">The language model is local by default</h3>
+<p>Requests go only to the address in settings, <code>http://localhost:11434</code> unless you change it. If you point it somewhere else, the settings page says so, because at that moment your questions start leaving the machine.</p>
+<h3 id="system-programs-are-launched-by-absolute-path">System programs are launched by absolute path</h3>
+<p>Windows searches the current directory when a program is named without a path. Every system utility the application invokes is resolved through <code>%SystemRoot%</code> first, so a file dropped next to the application cannot take its place.</p>
+<h3 id="you-can-see-everything-that-is-kept-about-you">You can see everything that is kept about you</h3>
+<p>A page in the application — Privacy → <em>What Rina knows about me</em> — lists every kind of thing stored locally: the words you taught her, the conversation, your reminders, things to do, your own commands, how often each has run, plugins, the folders you pointed at, and which settings you changed. Every entry can be removed one at a time, a group at a time, a day at a time, or all at once; and all of it can be written out to a file, either as data or as text you can read.</p>
+<p>The list is assembled by walking the store rather than from a list somebody maintains, so a kind of data added later appears on that page without anybody having to remember to add it. If you find something stored that the page does not show, that is a defect and worth reporting.</p>
+<h3 id="she-can-tell-you-why-she-did-something">She can tell you why she did something</h3>
+<p>Ask &quot;почему?&quot; — or &quot;why?&quot; — and the answer comes out of the call journal: what was done, who asked for it, whether it was confirmed, and, for a program that was launched, where the path came from. Refusals are explained the same way, which is usually the question people actually have.</p>
+<h2 id="out-of-scope">Out of scope</h2>
+<ul class="plain"><li>Anything a plugin you installed does. See above — that is the trust model, not a defect in it.</li><li>Physical or administrator access to the machine. Someone who can write into the application folder can already replace the application.</li><li>Configuration you set yourself, such as pointing the model at a remote server after being warned.</li></ul>
+<h2 id="diagnostics-and-privacy">Diagnostics and privacy</h2>
+<p>The application writes a log to <code>%APPDATA%/RinaAssistant/logs/</code>, and keeps a journal of tool calls next to it. <strong>Neither records what you said</strong> — only how long it was — unless you explicitly enable &quot;Log message texts&quot; in Settings → Privacy.</p>
+<p>The rule for the call journal is not a list of exceptions but a property of each argument: a value chosen from a fixed set is written down as it stands, because &quot;shutdown&quot; came from a list of three and says nothing about you; free text is replaced by its length. That way the journal can answer <em>what she did</em> without answering <em>what you asked about</em>.</p>
+<p>This is so a log can be attached to a report without disclosing your conversations. Check the setting before attaching one, and skim the file if in doubt.</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/SECURITY.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>
