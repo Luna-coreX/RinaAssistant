@@ -610,29 +610,47 @@ else:
 
     sound = mp3_of(3.0)
 
-    def trickle(data, pieces=30, pause=0.01):
+    PIECES = 30
+    heard = _threading.Event()
+    fed = []
+
+    def trickle(data, pieces=PIECES, pause=0.01):
+        """Hands the mp3 over in pieces, and waits halfway through.
+
+        The wait is the check. Timing the first frame against the whole
+        arrival measured the machine: on a run where something stalled
+        the process for a moment the first frame landed at 703 ms of
+        707, and the decoder had done nothing wrong. This measures the
+        program instead — by the time a third of the sound had been handed
+        over, some of it had already come back decoded — and a reader
+        that waits for the last byte never sets the event and stands
+        here until the timeout, whatever the machine is doing.
+        """
         step = max(1, len(data) // pieces)
         for at in range(0, len(data), step):
             _time.sleep(pause)
+            fed.append(at)
+            if len(fed) == pieces // 3:
+                heard.wait(10.0)
             yield data[at:at + step]
 
-    began = _time.perf_counter()
     first = None
     samples = 0
     for pcm, hertz in speech.pcm_from_stream(trickle(sound)):
         if first is None:
-            first = _time.perf_counter() - began
+            first = len(fed)
+            heard.set()
         samples += len(pcm) // 2
-    whole = _time.perf_counter() - began
 
     check("поток разобрался", samples > 0, f"| {samples / 24000:.1f} с звука")
-    # The mp3 arrives over about three tenths of a second. The first
-    # frame must come out near the beginning of that, not at its end —
-    # and it did come out at the end while the reader waited for a full
-    # thirty-two-kilobyte mouthful before handing anything over.
+    # The first frame must come out near the beginning of the arrival,
+    # not at its end — and it did come out at the end while the reader
+    # waited for a full thirty-two-kilobyte mouthful before handing
+    # anything over. That took about twenty pieces of the thirty; this
+    # path takes four.
     check("первый звук — в начале прихода, а не в конце",
-          first is not None and first < whole / 2,
-          f"| первый через {first * 1000:.0f} мс, всё за {whole * 1000:.0f} мс")
+          first is not None and first <= PIECES // 3,
+          f"| первый звук после {first} кусков, всего пришло {len(fed)}")
 
 print()
 print("=== перебить можно словом ===")
