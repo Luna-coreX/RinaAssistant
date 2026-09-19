@@ -1,0 +1,165 @@
+/* Порождено tools/gen_site.py по docs/design/tokens.json.
+ * Руками не править.
+ *
+ * Значения программы для окна макета: три отделки, каждая
+ * со своей лестницей поверхностей и чернил, и плотности
+ * стекла. Имена — те же, что в `tokens.json`.
+ */
+
+:root {
+  --glass-bar: 0.0;
+  --glass-blur: 18.0;
+  --glass-column: 0.0;
+  --glass-control: 0.55;
+  --glass-edge: 0.14;
+  --glass-fade: 14.0;
+  --glass-field: 0.95;
+  --glass-overlay: 0.5;
+  --glass-popup: 0.9;
+  --glass-raised: 0.5;
+  --glass-strip: 0.62;
+}
+
+.win.silver {
+  --face: #e5e3de;
+  --face-high: #f0efeb;
+  --face-low: #d8d6d0;
+  --face-sunk: #cecbc4;
+  --seam: #c9c6be;
+  --glass: #17181a;
+  --glass-text: #eceae5;
+  --glass-dim: #918f88;
+  --ink: #232220;
+  --ink-soft: #5e5a52;
+  --ink-faint: #807b70;
+  --signal: #b03e16;
+  --signal-sunk: #8f3010;
+  --hatch: #232220;
+  --live: #2f6b32;
+}
+
+.win.silver.amber {
+  --signal: #b03e16;
+  --signal-sunk: #8f3010;
+}
+
+.win.silver.ember {
+  --signal: #a33227;
+  --signal-sunk: #87281f;
+}
+
+.win.silver.brass {
+  --signal: #78570e;
+  --signal-sunk: #634809;
+}
+
+.win.silver.moss {
+  --signal: #4a6b2a;
+  --signal-sunk: #3b5620;
+}
+
+.win.silver.steel {
+  --signal: #2a6285;
+  --signal-sunk: #22506d;
+}
+
+.win.silver.orchid {
+  --signal: #7d5478;
+  --signal-sunk: #664360;
+}
+
+.win.black {
+  --face: #1b1b19;
+  --face-high: #272621;
+  --face-low: #141412;
+  --face-sunk: #0f0f0e;
+  --seam: #343330;
+  --glass: #0a0b0c;
+  --glass-text: #eceae5;
+  --glass-dim: #8a887f;
+  --ink: #dedace;
+  --ink-soft: #a29d90;
+  --ink-faint: #7d7869;
+  --signal: #f2731c;
+  --signal-sunk: #cf5c12;
+  --hatch: #dedace;
+  --live: #6fbf73;
+}
+
+.win.black.amber {
+  --signal: #f2731c;
+  --signal-sunk: #cf5c12;
+}
+
+.win.black.ember {
+  --signal: #e2564a;
+  --signal-sunk: #c04338;
+}
+
+.win.black.brass {
+  --signal: #d99b2b;
+  --signal-sunk: #b8801f;
+}
+
+.win.black.moss {
+  --signal: #7bab52;
+  --signal-sunk: #658f42;
+}
+
+.win.black.steel {
+  --signal: #5fa8d3;
+  --signal-sunk: #4a8cb5;
+}
+
+.win.black.orchid {
+  --signal: #b48ead;
+  --signal-sunk: #997593;
+}
+
+.win.graphite {
+  --face: #1d2022;
+  --face-high: #2a2e31;
+  --face-low: #16181a;
+  --face-sunk: #101214;
+  --seam: #383d41;
+  --glass: #0b0d0f;
+  --glass-text: #e9e8e4;
+  --glass-dim: #8b8d8c;
+  --ink: #dcdbd5;
+  --ink-soft: #a09f98;
+  --ink-faint: #7b7a72;
+  --signal: #f2731c;
+  --signal-sunk: #cf5c12;
+  --hatch: #dcdbd5;
+  --live: #6cba74;
+}
+
+.win.graphite.amber {
+  --signal: #f2731c;
+  --signal-sunk: #cf5c12;
+}
+
+.win.graphite.ember {
+  --signal: #e65f53;
+  --signal-sunk: #c44a40;
+}
+
+.win.graphite.brass {
+  --signal: #d99b2b;
+  --signal-sunk: #b8801f;
+}
+
+.win.graphite.moss {
+  --signal: #7bab52;
+  --signal-sunk: #658f42;
+}
+
+.win.graphite.steel {
+  --signal: #5fa8d3;
+  --signal-sunk: #4a8cb5;
+}
+
+.win.graphite.orchid {
+  --signal: #b48ead;
+  --signal-sunk: #997593;
+}

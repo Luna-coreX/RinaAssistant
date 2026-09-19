@@ -10,17 +10,41 @@
 # странице действительно нужно: свои картинки, свой стиль, свои шрифты.
 
 /*
-  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
   Cross-Origin-Opener-Policy: same-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
 
-# Шрифты и снимки порождены из хранилища и меняются вместе с выпуском,
-# а не сами по себе.
+# Политика — по адресам, а не одна на всё. Макету нужен свой скрипт, и
+# если написать общее правило под `/*`, а исключение рядом, то на один
+# запрос попадут две политики сразу — а что из этого выйдет, решает
+# хостинг: одни берут последнюю, другие применяют обе пересечением, и
+# тогда скрипт окажется запрещён. Поэтому адреса перечислены поимённо и
+# ни один запрос не подпадает под две. `check_site.py` следит, что
+# каждая папка со страницей здесь названа.
+
+/
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/en/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/api/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+/docs/*
+  Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+# Макет программы — единственное место со скриптом, и разрешение выдано
+# ровно ему. Скрипт свой (`script-src 'self'`), обращаться ему некуда:
+# `default-src 'none'` остаётся, значит ни сети, ни кадров, ни форм
+# наружу. Страница об этом говорит вслух.
+
+/mock/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
+# Шрифты порождены из хранилища и меняются вместе с выпуском, а не сами
+# по себе.
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
-
-/shots/*
-  Cache-Control: public, max-age=604800

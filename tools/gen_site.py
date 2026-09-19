@@ -53,6 +53,9 @@ REPO = "https://github.com/Luna-coreX/RinaAssistant"
 BLOB = REPO + "/blob/HEAD/"
 PORTAL = "https://neurosync-foundry-portal.pages.dev/"
 LOOM = os.path.join(SITE, "wires.svg")
+MOCK = os.path.join(SITE, "mock", "cases.js")
+FINISHES = os.path.join(SITE, "mock", "finishes.css")
+RAMPS = os.path.join(SITE, "mock", "flow-ramps.js")
 
 #: The finish the page borrows from. The darkest of the three, because the
 #: page is lit like the room the world lives in.
@@ -451,6 +454,255 @@ def papers(tokens):
             for slug, source, title, lead, lang in PAPERS}
 
 
+#: What the mock says it did, by the intent the recorded set gives it.
+#:
+#: The golden set (`docs/golden/utterances.json`) pins **what she
+#: understood** — the intent and its arguments — and pins it by running
+#: the real parser. It does not pin the words she answers with, so those
+#: words are the mock's own, and the page says so outright. Everything
+#: to the left of the answer is the program's recorded behaviour.
+#:
+#: `check_site.py` asks that this table covers every intent in the set
+#: and invents none: a new intent recorded in the golden set must be
+#: answered here before the mock can be built.
+MOCK_SAID = {
+    "app.launch": ("сделала", "Открываю {app}."),
+    "app.not_found": ("не нашла", "Такой программы в указателе нет."),
+    "alias.teach": ("запомнила", "«{word}» — это {app}. Запомнила."),
+    "alias.ambiguous": ("переспросила",
+                        "Под «{word}» подходит несколько: {options}. Какую?"),
+    "alias.unknown": ("не нашла",
+                      "«{query}» я не нашла — запоминать нечего."),
+    "ask.wake": ("слушает", "Да?"),
+    "builtin.answer": ("ответила", "{topic}"),
+    "calc": ("посчитала", "{result}"),
+    "calc.zero_division": ("отказалась", "На ноль не делится."),
+    "cancelled": ("отменила", "Хорошо, отменила."),
+    "fallback.none": ("не поняла",
+                      "Не узнала фразу, а искать в сети сейчас не буду."),
+    "fallback.search": ("переспросила", "Не узнала фразу. Поискать в сети?"),
+    "reminder.create": ("поставила", "{kind} поставлен{tail}."),
+    "reminder.list": ("ответила", "Пока ничего не заведено."),
+    "reminder.cancel": ("отменила", "Отменила всё, что было заведено."),
+    "reminder.ambiguous": ("переспросила",
+                           "Программ с таким именем несколько: {options}."),
+    "reminder.unknown_app": ("не нашла",
+                             "К такой программе привязать нечего."),
+    "silence": ("промолчала", ""),
+    "system.action": ("сделала", "{action}"),
+    "system.confirm": ("переспросила", "{action} — это необратимо. Точно?"),
+    "websearch": ("ищет", "Ищу: {query}."),
+}
+
+#: Words for what the program names in English inside its own data.
+MOCK_WORDS = {
+    "volume_up": "Прибавила громкость",
+    "volume_down": "Убавила громкость",
+    "volume_mute": "Выключила звук",
+    "media_next": "Следующий трек",
+    "media_prev": "Предыдущий трек",
+    "media_play_pause": "Пауза",
+    "lock": "Заблокировала рабочий стол",
+    "screenshot": "Сняла экран",
+    "sleep": "Усыпить компьютер",
+    "restart": "Перезагрузить компьютер",
+    "shutdown": "Выключить компьютер",
+    "timer": "Таймер",
+    "alarm": "Будильник",
+    "reminder": "Напоминание",
+    "name": "Меня зовут Рина.",
+    "capabilities": "Открываю программы, ставлю таймеры, считаю, "
+                    "управляю системой.",
+    "thanks": "Пожалуйста.",
+}
+
+#: Which actions are irreversible: the mock shows them the way the
+#: program does — a question with hatching, not a done deed.
+MOCK_HEAVY = ("shutdown", "restart", "sleep")
+
+#: The phrases offered as chips, by their id in the recorded set.
+#:
+#: Chosen to walk the reader through the shapes the answer can take:
+#: done, asked, refused, counted, silent. Ids rather than text, so a
+#: reworded phrase in the set either follows or turns the check red.
+MOCK_CHIPS = [
+    "app.launch.plain.2",
+    "reminder.timer.1",
+    "calc.mul.2",
+    "system.volume.up.1",
+    "system.confirm.shutdown",
+    "alias.teach.rule",
+    "builtin.name.1",
+]
+
+
+def mock_cases():
+    """The recorded set, as the mock's data."""
+    with open(os.path.join(ROOT, "docs", "golden", "utterances.json"),
+              encoding="utf-8") as handle:
+        cases = json.load(handle)["cases"]
+
+    out = []
+    for one in cases:
+        want = dict(one["expect"])
+        intent = want.pop("intent", None)
+        if intent not in MOCK_SAID:
+            continue
+        note = want.pop("note", "")
+        state, shape = MOCK_SAID[intent]
+        said = shape
+        if "{topic}" in shape:
+            said = MOCK_WORDS.get(want.get("topic"), "")
+        if "{action}" in shape:
+            said = shape.replace("{action}",
+                                 MOCK_WORDS.get(want.get("action"), ""))
+        if "{kind}" in shape:
+            kind = want.get("kind")
+            said = shape.replace("{kind}", MOCK_WORDS.get(kind, "Напоминание"))
+            said = said.replace("{tail}", "о" if kind == "reminder" else "")
+        for field in ("app", "word", "query", "result"):
+            if "{%s}" % field in said:
+                said = said.replace("{%s}" % field, str(want.get(field, "")))
+        if "{options}" in said:
+            said = said.replace("{options}",
+                                ", ".join(want.get("options", [])))
+        out.append({
+            "id": one["id"],
+            "say": one["say"],
+            "intent": intent,
+            "args": {k: v for k, v in want.items() if k != "options"},
+            "state": state,
+            "said": said,
+            "heavy": want.get("action") in MOCK_HEAVY,
+            # The set's own note on why the same words mean
+            # something else here. One phrase is recorded several
+            # times: "выключи компьютер" without the wake word is
+            # silence, not a shutdown.
+            "note": note,
+        })
+
+    chips = [one for one in MOCK_CHIPS
+             if any(case["id"] == one for case in out)]
+    head = [
+        "/* Порождено tools/gen_site.py по docs/golden/utterances.json.",
+        " * Руками не править.",
+        " *",
+        " * Это записанные фразы программы — те же, которыми закреплён",
+        " * её разбор. Макет ничего не выдумывает: он показывает то,",
+        " * что по этой фразе поняла настоящая Рина. */",
+        "",
+    ]
+    return "\n".join(head + [
+        "window.RINA_CASES = "
+        + json.dumps(out, ensure_ascii=False, indent=1) + ";",
+        "window.RINA_CHIPS = "
+        + json.dumps(chips, ensure_ascii=False) + ";",
+        "",
+    ])
+
+
+def finishes(tokens):
+    """The program's own values, for the window the mock-up draws.
+
+    Not the page's palette. The page borrows from the graphite finish
+    and renames as it borrows — `plate`, `hole`, `cord` — because it is
+    a switchboard and not an instrument face. The mock-up is the
+    instrument face, so it takes the names the program uses and the
+    values behind them, all three finishes and every accent, and the
+    glass densities besides: the top bar and the section column hold
+    zero, everything a person presses is glass.
+
+    Written out rather than borrowed for the same reason the palette is
+    generated at all. A window drawn in approximately the program's
+    colours is a drawing of a program that does not exist.
+    """
+    out = [
+        "/* Порождено tools/gen_site.py по docs/design/tokens.json.",
+        " * Руками не править.",
+        " *",
+        " * Значения программы для окна макета: три отделки, каждая",
+        " * со своей лестницей поверхностей и чернил, и плотности",
+        " * стекла. Имена — те же, что в `tokens.json`.",
+        " */",
+        "",
+    ]
+
+    glass = tokens["glasswork"]
+    out.append(":root {")
+    for name, value in sorted(glass.items()):
+        if name == "note":
+            continue
+        out.append("  --glass-%s: %s;" % (name, value))
+    out += ["}", ""]
+
+    for name in ("silver", "black", "graphite"):
+        finish = tokens["finishes"][name]
+        color = finish["color"]
+        out.append(".win.%s {" % name)
+        for role in ("FACE", "FACE_HIGH", "FACE_LOW", "FACE_SUNK", "SEAM",
+                     "GLASS", "GLASS_TEXT", "GLASS_DIM", "INK", "INK_SOFT",
+                     "INK_FAINT", "SIGNAL", "SIGNAL_SUNK", "HATCH", "LIVE"):
+            out.append("  --%s: %s;" % (role.lower().replace("_", "-"),
+                                        color[role]))
+        out += ["}", ""]
+
+        for accent, stops in finish["accents"].items():
+            out.append(".win.%s.%s {" % (name, accent))
+            out.append("  --signal: %s;" % stops["signal"])
+            out.append("  --signal-sunk: %s;" % stops["signal_sunk"])
+            out += ["}", ""]
+
+    return "\n".join(out)
+
+
+def ramps(tokens):
+    """The flow's palettes and its numbers, for the mock-up.
+
+    The living background is the same arithmetic in the program and on
+    the page (`site/mock/flow.js` is a port of `Flow.cs`), and the one
+    thing a port must not carry is the palette: those are computed by
+    `tools/nebula.py` from the finish and the accent, and a second
+    implementation of that is exactly what `nebula.py` exists to
+    prevent. So they are generated here, all of them — three finishes
+    by six accents, vivid and calm — together with the numbers the
+    field is drawn with.
+    """
+    out = {}
+    for name, finish in tokens["finishes"].items():
+        flow = finish["nebula"]
+        shades = nebula.every_ramp(finish)
+        accents = sorted({one.split("/")[0] for one in shades})
+        out[name] = {
+            "scale": flow["scale"],
+            "warp": flow["warp"],
+            "period": tokens["motion"]["background"]["period"],
+            "drift": tokens["motion"]["background"]["drift"],
+            "accents": {
+                one: {
+                    "vivid": shades[one],
+                    "calm": next(stops for key, stops in shades.items()
+                                 if key.startswith(one + "/")),
+                }
+                for one in accents
+            },
+        }
+    head = [
+        "/* Порождено tools/gen_site.py по docs/design/tokens.json.",
+        " * Руками не править.",
+        " *",
+        " * Палитры живого фона: три отделки на шесть акцентов, яркая и",
+        " * приглушённая. Считает их tools/nebula.py — тот же модуль, что",
+        " * и для программы, и это единственное место, где они считаются.",
+        " * Рядом значения, которыми поле рисуется. */",
+        "",
+    ]
+    return "\n".join(head + [
+        "window.RINA_FLOW = "
+        + json.dumps(out, ensure_ascii=False, indent=1) + ";",
+        "",
+    ])
+
+
 def css(tokens):
     """The whole generated stylesheet."""
     roles = tokens["typography"]["role"]
@@ -542,6 +794,10 @@ def main(argv):
     wanted = css(tokens)
     drawn = wires(tokens)
     written = papers(tokens)
+    written[os.path.relpath(MOCK, SITE).replace(os.sep, "/")] = mock_cases()
+    written[os.path.relpath(FINISHES, SITE).replace(os.sep, "/")] = \
+        finishes(tokens)
+    written[os.path.relpath(RAMPS, SITE).replace(os.sep, "/")] = ramps(tokens)
     files = copies()
 
     missing = [src for src in files.values() if not os.path.isfile(src)]
@@ -611,7 +867,7 @@ def main(argv):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         shutil.copyfile(src, path)
     print("порождено: site/tokens.css, site/wires.svg")
-    print("  страниц документов: " + str(len(written)))
+    print("  страниц документов и данных макета: " + str(len(written)))
     print("  скопировано файлов: " + str(len(files))
           + " (шрифтов " + str(len(FACES)) + ")")
     return 0

@@ -1247,6 +1247,237 @@ tbody tr:hover td { background: color-mix(in srgb, var(--plate) 55%, transparent
 .paper details[open] > *:not(summary) { margin-top: var(--space-within); }
 
 /* --------------------------------------------------------------------
+ * 13в. Макет программы
+ *
+ * Окно Рины на странице. Оно набрано теми же значениями, что и сама
+ * программа, и потому показывает все три отделки: `finishes.css`
+ * порождается из `tokens.json` и переопределяет ровно то, чем окна
+ * отличаются. Серебро выходит светлым — так и должно быть, это
+ * исполнение прибора, а не тема страницы.
+ *
+ * Поверхность окна — `--plate`, а не `--ground`: земля у страницы своя
+ * и очень тёмная, а окно стоит на плите.
+ * -------------------------------------------------------------------- */
+.mock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  background: var(--plate);
+  color: var(--ink);
+  border: 1px solid var(--hair);
+  border-radius: var(--radius-max);
+  overflow: hidden;
+}
+
+.mock-rail {
+  display: grid;
+  gap: var(--space-within);
+  align-content: start;
+  padding: var(--space-within);
+  background: var(--plate-low);
+  border-bottom: 1px solid var(--hair);
+}
+
+.mock-mark {
+  font-family: var(--font-display);
+  font-size: var(--text-value);
+  letter-spacing: -0.03em;
+}
+
+.mock-parts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+  font-size: var(--text-value);
+}
+
+.mock-parts li {
+  padding: 5px var(--space-inner);
+  border-radius: var(--radius-tight);
+  color: var(--ink-soft);
+}
+
+.mock-parts li[aria-current] {
+  background: var(--plate);
+  color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--hair);
+}
+
+.mock-foot { font-size: var(--text-meta); color: var(--ink-faint); }
+
+.mock-body {
+  display: grid;
+  gap: var(--space-within);
+  align-content: start;
+  padding: var(--space-between);
+  min-width: 0;
+}
+
+.mock-body > * { min-width: 0; }
+
+/* Фигура: четыре состояния, как в программе. Кольцо говорит, слушает
+   ли она; сердцевина — отвечает ли. Ни одного слова: в окне это тоже
+   фигура, а не надпись. */
+.mock-shape {
+  display: flex;
+  align-items: center;
+  gap: var(--space-within);
+}
+
+.mock-state {
+  font-size: var(--text-meta);
+  color: var(--ink-soft);
+}
+
+.mock-figure {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+}
+
+.mock-ring {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--rim);
+  border-radius: 50%;
+}
+
+.mock-core {
+  position: absolute;
+  inset: 34%;
+  border-radius: 50%;
+  background: var(--rim);
+  transition: inset var(--motion-panel) var(--ease-out),
+              background var(--motion-panel) var(--ease-out),
+              box-shadow var(--motion-panel) var(--ease-out);
+}
+
+.mock-figure[data-state="asking"] .mock-ring { border-color: var(--cord); }
+
+.mock-figure[data-state="answering"] .mock-core {
+  inset: 26%;
+  background: var(--lamp);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--lamp) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mock-figure[data-state="listening"] .mock-ring {
+    animation: mock-listen 1.3s var(--ease-default) infinite;
+  }
+  .mock-figure[data-state="thinking"] .mock-ring {
+    border-style: dashed;
+    animation: mock-think 3.2s linear infinite;
+  }
+}
+
+@keyframes mock-listen {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.06); opacity: 0.7; }
+}
+
+@keyframes mock-think {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Три шага — те же, что на главной странице в пяти: услышала,
+   разобрала, сделала. Разбор показан так, как его записывает набор
+   фраз, без пересказа. */
+.mock-steps { display: grid; gap: var(--space-inner); margin: 0; }
+
+.mock-steps > div {
+  display: grid;
+  grid-template-columns: 12ch minmax(0, 1fr);
+  gap: var(--space-within);
+  align-items: baseline;
+  padding-bottom: var(--space-inner);
+  border-bottom: 1px solid var(--hair);
+}
+
+.mock-steps dt {
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.mock-steps dd {
+  margin: 0;
+  min-height: 1.5em;
+  overflow-wrap: anywhere;
+}
+
+.mock-parse {
+  font-family: var(--font-figure);
+  font-size: var(--text-legend);
+  color: var(--ink-soft);
+}
+
+.mock-steps dd[data-quiet] { color: var(--ink-faint); }
+
+.mock-ask { display: grid; gap: var(--space-tight); }
+
+.mock-label {
+  font-size: var(--text-meta);
+  color: var(--ink-faint);
+}
+
+.mock-row {
+  display: flex;
+  gap: var(--space-inner);
+  flex-wrap: wrap;
+}
+
+.mock-row input {
+  flex: 1 1 14ch;
+  min-width: 0;
+  min-height: 46px;
+  padding: var(--space-inner) var(--space-within);
+  background: var(--hole);
+  color: var(--ink);
+  border: 1px solid var(--rim);
+  border-radius: var(--radius-max);
+  font: inherit;
+  font-size: var(--text-value);
+}
+
+.mock-row input::placeholder { color: var(--ink-faint); }
+
+.mock-chips { display: flex; flex-wrap: wrap; gap: var(--space-tight); }
+
+.mock-chips .chip {
+  min-height: 34px;
+  padding: var(--space-tight) var(--space-inner);
+  font-size: var(--text-legend);
+}
+
+.mock-confirm { display: grid; gap: var(--space-within); }
+.mock-confirm p { margin: 0; }
+
+.mock-knobs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-within);
+  margin-top: var(--space-within);
+  font-size: var(--text-legend);
+}
+
+.mock-knobs label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-tight);
+}
+
+.mock-knobs input { accent-color: var(--cord); }
+
+.mock-note {
+  display: grid;
+  gap: var(--space-within);
+  margin-top: var(--space-between);
+}
+
+/* --------------------------------------------------------------------
  * 14. Ширина
  * -------------------------------------------------------------------- */
 @media (min-width: 900px) {
@@ -1291,6 +1522,13 @@ tbody tr:hover td { background: color-mix(in srgb, var(--plate) 55%, transparent
   }
 
   .doc { grid-template-columns: 220px minmax(0, 1fr); gap: var(--rhythm); }
+
+  /* Рейке окна место слева — как в самой программе. */
+  .mock { grid-template-columns: 190px minmax(0, 1fr); }
+  .mock-rail {
+    border-bottom: 0;
+    border-right: 1px solid var(--hair);
+  }
   .doc-rail { position: sticky; top: calc(var(--space-between) * 2.4); }
 }
 

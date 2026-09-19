@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Макет программы — Rina Assistant</title>
+<meta name="description" content="Окно Рины на странице: те же значения, тот же живой фон, те же семь разделов. Скажите фразу из записанного набора и посмотрите, что она поняла и что сделала.">
+<link rel="icon" href="../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Макет программы — Rina Assistant">
+<meta property="og:description" content="Окно Рины на странице: те же значения, тот же живой фон, те же семь разделов.">
+<meta property="og:image" content="../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../style.css">
+<link rel="stylesheet" href="finishes.css">
+<link rel="stylesheet" href="window.css">
+</head>
+<body class="doc-page">
+<!--
+  THESIS: Фраза соединяется с действием, и соединение видно. Отказ от
+  тёмного лендинга с градиентным героем и рядом стеклянных карточек.
+  OWN-WORLD: Коммутационное поле. Просверленная плита, шнур сигнального
+  цвета, ламповый индикатор, инвертированная наборная этикетка.
+  STORY: Посетитель трогает окно программы прежде, чем ставить её, и
+  видит на нём ровно то поведение, которое закреплено набором фраз.
+  FORM: «Коммутаторная», кандидат 4 из семи, seed a2a26a10.
+  SCRIPT: единственная страница сайта со скриптом, и она это говорит.
+-->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Макет программы</h1>
+      <p class="lead">Окно Рины, набранное её же значениями. Ходите по
+        разделам, меняйте отделку и акцент, скажите ей одну из фраз.</p>
+      <p class="note"><strong>Это единственная страница сайта, которая
+        выполняет скрипт.</strong> Свой, лежит здесь же
+        (<a href="mock.js">mock.js</a>, <a href="flow.js">flow.js</a>),
+        никуда не обращается и ничего не сохраняет.</p>
+    </div>
+  </div>
+</section>
+
+<div class="frame" id="content">
+  <div class="win-stage" id="stage">
+    <div class="win graphite amber" id="win" data-section="home" data-state="idle">
+
+      <canvas class="win-flow" id="flow" aria-hidden="true"></canvas>
+      <canvas class="win-calm" id="calm" aria-hidden="true"></canvas>
+
+      <div class="win-bar">
+        <span class="win-menu" aria-hidden="true"><span></span></span>
+        <span class="win-title">Rina Assistant</span>
+        <span class="win-keys" aria-hidden="true">
+          <button type="button" tabindex="-1">&#8211;</button>
+          <button type="button" tabindex="-1">&#9723;</button>
+          <button type="button" tabindex="-1">&#10005;</button>
+        </span>
+      </div>
+
+      <div class="win-body">
+        <nav class="win-rail" id="rail" aria-label="Разделы программы">
+          <button type="button" data-go="home" aria-current="page">Главная</button>
+          <button type="button" data-go="dialog">Диалог</button>
+          <button type="button" data-go="commands">Команды</button>
+          <button type="button" data-go="reminders">Напоминания</button>
+          <button type="button" data-go="plugins">Плагины</button>
+          <button type="button" data-go="privacy">Приватность</button>
+          <button type="button" data-go="settings">Настройки</button>
+          <button type="button" class="win-plug" data-go="notes">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" aria-hidden="true">
+              <path d="M3.5 2.5h6l3 3v8h-9z"/><path d="M5.5 7h5M5.5 9.5h5"/>
+            </svg>Заметки</button>
+        </nav>
+
+        <div class="win-pane">
+
+          <div class="win-page win-home" data-page="home" data-open>
+            <span class="win-ready" id="ready">Готова помочь.</span>
+            <div class="win-orb"><canvas id="orb"></canvas></div>
+          </div>
+
+          <div class="win-page" data-page="dialog">
+            <div class="win-top">
+              <h2 class="win-head">Диалог</h2>
+              <div class="win-tools">
+                <button class="win-press" type="button">Экспорт</button>
+                <button class="win-press" type="button">Очистить</button>
+              </div>
+            </div>
+            <div class="win-talk win-field" id="talk"></div>
+            <div class="win-ask">
+              <input class="win-input" id="line" type="text" autocomplete="off"
+                     placeholder="Скажите или напечатайте: «открой блокнот»">
+              <button class="win-press win-first" type="button" id="send">Отправить</button>
+            </div>
+            <div class="win-knobs">
+              <button class="win-toggle" type="button" aria-pressed="true"><i></i>Отвечать голосом</button>
+              <button class="win-toggle" type="button" aria-pressed="true"><i></i>Всегда слушать</button>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="commands">
+            <h2 class="win-head">Команды</h2>
+            <span class="win-group">Свои и встроенные</span>
+            <span class="win-meta">Системное действие · 1</span>
+            <div class="win-list win-glass">
+              <div class="win-row">
+                <span>
+                  <span class="win-name">свернись</span><br>
+                  <span class="win-note">Системное действие · свернуть окно</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                  <button class="win-press" type="button">Выполнить</button>
+                  <button class="win-press" type="button">Править</button>
+                  <button class="win-press win-heavy" type="button">Удалить</button>
+                </span>
+              </div>
+            </div>
+            <span class="win-meta">› Работает из коробки · 11</span>
+            <div class="win-tools">
+              <button class="win-press win-first" type="button">Новая команда</button>
+              <button class="win-press" type="button">Импорт</button>
+              <button class="win-press" type="button">Экспорт</button>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="reminders">
+            <h2 class="win-head">Напоминания</h2>
+            <div class="win-glass">
+              <div class="win-row">
+                <span class="win-group">Новое напоминание</span>
+                <span></span>
+              </div>
+              <div class="win-row">
+                <input class="win-input" type="text" placeholder="о чём напомнить">
+                <span></span>
+              </div>
+              <div class="win-row">
+                <span class="win-tools">
+                  <span class="win-select">через 15 минут</span>
+                  <span class="win-note">или в</span>
+                  <span class="win-select win-short">19:30</span>
+                </span>
+                <button class="win-press win-first" type="button">Напомнить</button>
+              </div>
+            </div>
+            <span class="win-meta">Заведено · 0</span>
+            <div class="win-empty">
+              <b>Напоминаний пока нет</b>
+              <span>Всё, о чём попросите напомнить, попадает сюда —
+                из поля выше или голосом.</span>
+              <i>«напомни через 15 минут выключить духовку»</i>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="plugins">
+            <h2 class="win-head">Плагины</h2>
+            <span class="win-group">Установлено · 7</span>
+            <div class="win-list win-glass" id="plugin-list">
+              <div class="win-row win-with-icon">
+                <span class="win-icon" aria-hidden="true">🕐</span>
+                <span>
+                  <span class="win-name">Часы</span><br>
+                  <span class="win-note">Сообщает текущее время и дату по запросу («сколько времени», «какая дата»).</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon">
+                <span class="win-icon" aria-hidden="true">⇄</span>
+                <span>
+                  <span class="win-name">Пересчёт</span><br>
+                  <span class="win-note">Переводит величины: «5 км в мили», «20 °C в °F», «3 кг в фунты». Поле прямо на главном экране.</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon">
+                <span class="win-icon" aria-hidden="true">🎲</span>
+                <span>
+                  <span class="win-name">Кубик</span><br>
+                  <span class="win-note">Бросает игральный кубик или монетку по команде («брось кубик», «подбрось монету»).</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon">
+                <span class="win-icon" aria-hidden="true">👋</span>
+                <span>
+                  <span class="win-name">Приветствие</span><br>
+                  <span class="win-note">Отвечает на приветствия. Скажите «привет» — и Рина ответит.</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon">
+                <span class="win-icon" aria-hidden="true">📝</span>
+                <span>
+                  <span class="win-name">Заметки</span><br>
+                  <span class="win-note">Быстрые заметки: своя вкладка, настройки и команда «запиши…».</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-press" type="button">Открыть</button>
+                  <button class="win-toggle" type="button" aria-pressed="true"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon win-off">
+                <span class="win-icon" aria-hidden="true">₽</span>
+                <span>
+                  <span class="win-name">Курс</span><br>
+                  <span class="win-note">Курс доллара и евро по Центробанку — плиткой на главном экране и по вопросу вслух.</span><br>
+                  <span class="win-meta">версия 1.0.0 · NeuroSync Foundry Team</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="false"><i></i></button>
+                </span>
+              </div>
+              <div class="win-row win-with-icon win-off">
+                <span class="win-icon" aria-hidden="true"></span>
+                <span>
+                  <span class="win-name">Weather API Demo</span><br>
+                  <span class="win-note">Minimal API v4 plugin that reads current weather from Open-Meteo</span><br>
+                  <span class="win-meta">версия 1.0.0 · Luna</span>
+                </span>
+                <span class="win-tools">
+                  <button class="win-toggle" type="button" aria-pressed="false"><i></i></button>
+                </span>
+              </div>
+            </div>
+            <div class="win-tools">
+              <button class="win-press win-first" type="button">Из папки</button>
+              <button class="win-press" type="button">Из архива</button>
+              <button class="win-press" type="button">Обновить</button>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="privacy">
+            <h2 class="win-head">Что Рина знает обо мне</h2>
+            <p class="win-lead">Всё это лежит на этом компьютере и никуда
+              не отправляется. Здесь видно каждую запись целиком.</p>
+            <div class="win-list win-glass" id="knows">
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Выученные слова</span><br>
+                  <span class="win-note">Как вы называете программы — Рина запомнила это из ваших поправок.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">4</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">История разговора</span><br>
+                  <span class="win-note">Сказанное и напечатанное вами, и ответы Рины. Ведётся, пока включено в настройках.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">7</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Напоминания</span><br>
+                  <span class="win-note">То, о чём вы просили напомнить.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">0</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Дела</span><br>
+                  <span class="win-note">Список того, что ждёт.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">3</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Свои команды</span><br>
+                  <span class="win-note">Фразы, которые вы завели, и что по ним происходит.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">1</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Статистика команд</span><br>
+                  <span class="win-note">Сколько раз какая команда выполнялась и когда в последний раз.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">12</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Плагины</span><br>
+                  <span class="win-note">Какие включены и что они у себя сохранили.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">7</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Папки поиска программ</span><br>
+                  <span class="win-note">Где вы велели искать программы.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">2</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Изменённые настройки</span><br>
+                  <span class="win-note">Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит.</span>
+                </span>
+                <span class="win-tools">
+                  <span class="win-figure">4</span>
+                  <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+                </span>
+              </div>
+            </div>
+            <div class="win-tools">
+              <button class="win-press" type="button">Обновить</button>
+              <button class="win-press" type="button">Выгрузить всё</button>
+              <button class="win-press win-heavy" type="button">Забыть обо мне всё</button>
+              <span class="win-meta">Записей всего: 40</span>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="settings">
+            <div class="win-top">
+              <h2 class="win-head">Настройки</h2>
+              <span class="win-select win-find">Найти настройку</span>
+            </div>
+            <span class="win-group">Голос и речь</span>
+            <div class="win-list" id="settings-list">
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Синтез</span><br>
+                  <span class="win-note">Как Рина говорит. Офлайн-движки работают без интернета</span>
+                </span>
+                <span class="win-tools"><span class="win-select">Edge Neural (живой, рекомендуется)</span></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Голос</span><br>
+                  <span class="win-note">Голоса зависят от выбранного движка синтеза</span>
+                </span>
+                <span class="win-tools"><span class="win-select">Светлана (ru, женский)</span></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Громкость</span><br>
+                  <span class="win-note">Насколько громко Рина говорит</span>
+                </span>
+                <span class="win-tools"><span class="win-slide" style-at="75%"><i></i><b></b></span><span class="win-figure">75</span></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Скорость речи</span><br>
+                  <span class="win-note">Выше 100 — торопится, ниже — тянет</span>
+                </span>
+                <span class="win-tools"><span class="win-slide" style-at="50%"><i></i><b></b></span><span class="win-figure">100</span></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Распознавание</span><br>
+                  <span class="win-note">Как Рина слышит. Без него команды только печатают</span>
+                </span>
+                <span class="win-tools"><span class="win-select">Whisper (офлайн, точный)</span></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Слова активации</span><br>
+                  <span class="win-note">Слова, с которых начинается обращение к Рине</span>
+                </span>
+                <span class="win-tools"><button class="win-press" type="button">Открыть</button></span>
+              </div>
+              <div class="win-row">
+                <span>
+                  <span class="win-name">Модели</span><br>
+                  <span class="win-note">Что скачано на этот компьютер</span>
+                </span>
+                <span class="win-tools"><button class="win-press" type="button">Открыть</button></span>
+              </div>
+            </div>
+            <div class="win-tools">
+              <button class="win-press win-heavy" type="button">Сбросить настройки</button>
+            </div>
+          </div>
+
+          <div class="win-page" data-page="notes">
+            <h2 class="win-head">Заметки</h2>
+            <p class="win-lead">Раздел плагина. Страницу описывает сам
+              плагин — списком элементов, а рисует её оболочка.</p>
+            <div class="win-ask">
+              <input class="win-input" type="text" placeholder="новая заметка">
+              <button class="win-press win-first" type="button">Записать</button>
+            </div>
+            <div class="win-list win-glass">
+              <div class="win-row">
+                <span class="win-name">купить кофе</span>
+                <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+              </div>
+              <div class="win-row">
+                <span class="win-name">позвонить в сервис</span>
+                <button class="win-forget" type="button" aria-label="Забыть">&#10005;</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="win-foot">
+        <span>ядро на связи · ядро 4.0.0-beta</span>
+        <span>вид · о программе</span>
+        <b>4.0.0-beta</b>
+      </div>
+
+      <div class="win-level"><i></i></div>
+    </div>
+  </div>
+
+  <form class="win-knobs-out" id="knobs">
+    <fieldset>
+      <legend>Отделка</legend>
+      <label><input type="radio" name="finish" value="silver"> Серебро</label>
+      <label><input type="radio" name="finish" value="black"> Чёрное</label>
+      <label><input type="radio" name="finish" value="graphite" checked> Графит</label>
+    </fieldset>
+    <fieldset>
+      <legend>Акцент</legend>
+      <label><input type="radio" name="accent" value="amber" checked> Янтарь</label>
+      <label><input type="radio" name="accent" value="ember"> Уголь</label>
+      <label><input type="radio" name="accent" value="brass"> Латунь</label>
+      <label><input type="radio" name="accent" value="moss"> Мох</label>
+      <label><input type="radio" name="accent" value="steel"> Сталь</label>
+      <label><input type="radio" name="accent" value="orchid"> Орхидея</label>
+    </fieldset>
+  </form>
+
+  <div class="mock-chips" id="chips"></div>
+  <p class="note mock-besides" id="besides" hidden></p>
+
+  <div class="mock-note">
+    <p class="note"><strong>Что здесь настоящее.</strong> Значения — из
+      <code>tokens.json</code>: лестница просветов, высота строки 40, орган
+      управления 36, колонка разделов 168, полоса уровня 4, радиус не больше
+      трёх, длительности 90/160/220/1000 с их кривыми. Окно набрано в тех же
+      точках, что настоящее, и целиком масштабируется под ширину страницы.
+      Живой фон — тот же, а не похожий: <a href="flow.js">flow.js</a> —
+      перенос <code>Flow.cs</code> значение в значение, те же четыре октавы,
+      то же искажение координат, те же палитры из <code>nebula.py</code>.
+      Верхняя полоса и колонка разделов прозрачны насквозь, как и положено:
+      они не поверхности, а места.</p>
+    <p class="note"><strong>Что она понимает — тоже настоящее.</strong> Фразы
+      и разбор порождены из записанного набора, которым закреплён её разбор,
+      все 134 случая. Одна и та же фраза записана в нём по нескольку раз,
+      потому что в разных состояниях значит разное, и макет это показывает.
+      Своими у него остаются только слова ответа: набор закрепляет понятое,
+      до слов ответа он не доходит.</p>
+    <p class="note"><strong>Чего здесь нет.</strong> Голоса и слуха. Настоящих
+      программ на вашем диске. Рамки окна, которую рисует Windows. И
+      сглаживания при увеличении поля: программа увеличивает картинку сама,
+      здесь это делает браузер — поле то же, кисть другая.</p>
+  </div>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry · <span class="fig">4.0.0-beta</span></span>
+  <span class="note">Эта страница выполняет свои скрипты и не ставит
+    счётчиков.</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Документация</a>
+    <a href="/api/">Разработчику</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+<script src="cases.js"></script>
+<script src="figure.js"></script>
+<script src="flow-ramps.js"></script>
+<script src="flow.js"></script>
+<script src="mock.js"></script>
+</body>
+</html>

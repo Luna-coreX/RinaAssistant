@@ -133,6 +133,9 @@ expected |= {"tokens.css", "wires.svg", "style.css", "_headers", "README.md",
              "en/api/index.html"}
 expected |= {"docs/%s/index.html" % slug
              for slug, *_rest in gen_site.PAPERS}
+expected |= {"mock/index.html", "mock/mock.js", "mock/flow.js",
+             "mock/figure.js", "mock/cases.js", "mock/flow-ramps.js",
+             "mock/finishes.css", "mock/window.css"}
 
 found = set()
 for here, dirs, names in os.walk(SITE):
@@ -752,23 +755,119 @@ FORBIDDEN = {
     # right here and loses its spacing there.
     'style="': "inline-стиль, который не переживёт политику ответов",
 }
+#: The one page that runs a script, and what it owes for that.
+#:
+#: The promise used to be one sentence about the whole site. It is now
+#: about paths, because the mock-up cannot answer without a script and
+#: a mock-up that does not answer is a picture. Narrowing a promise is
+#: allowed; narrowing it quietly is not — so the page says it outright,
+#: the policy is written for that path alone, and everything else is
+#: held to the old rule.
+RUNS_A_SCRIPT = "mock/index.html"
+
 for where in pages:
     for mark, what in FORBIDDEN.items():
         check(f"{where}: нет — {what}", mark not in lower[where],
               f"| найдено «{mark}»")
 
+mock = read(os.path.join(SITE, "mock", "index.html"))
+plain = mock.lower()
+for mark, what in FORBIDDEN.items():
+    if mark == "<script":
+        continue
+    check(f"макет: нет — {what}", mark not in plain, f"| найдено «{mark}»")
+
+check("макет выполняет скрипт", "<script" in plain,
+      "| без него окно не отвечает, и страница обещает, что он есть")
+check("и говорит об этом прямо",
+      "единственная страница сайта, которая" in plain
+      and "выполняет скрипт" in plain,
+      "| страница со скриптом обязана сказать это первой")
+check("скрипт у макета свой",
+      plain.count("<script") == plain.count('<script src="'),
+      "| встроенный скрипт политика не пропустит, и читать его негде")
+for one in re.findall(r'<script src="([^"]+)"', mock):
+    check(f"макет: скрипт {one} лежит здесь же",
+          os.path.isfile(os.path.join(SITE, "mock", one)),
+          "| страница просит скрипт, которого нет")
+
+# No other page refers to a script, the generated ones included.
+for name, text in pages.items():
+    check(f"{name}: скриптов по-прежнему нет", "<script" not in text.lower(),
+          "| обещание сузили до макета, а скрипт появился не там")
+
 # The policy is read from the header line itself, not from the file. The
 # file explains the policy in a comment above it, and a check looking for
 # the words anywhere would have been satisfied by the explanation while the
 # header said `default-src *` — found by breaking it.
+# The policy is read from the header lines themselves, not from the
+# file. The file explains the policy in a comment above it, and a check
+# looking for the words anywhere would have been satisfied by the
+# explanation while the header said `default-src *` — found by breaking
+# it.
+#
+# It is written per path rather than once under `/*`. The mock-up needs
+# a script of its own, and a general rule plus an exception puts two
+# policies on one request — what a host then does with them is its own
+# business: some take the last, some apply both by intersection, and
+# then the script is forbidden after all. So every address that serves
+# a page is named, no request falls under two, and this asks that no
+# page was forgotten.
 headers = read(os.path.join(SITE, "_headers"))
-policy = next((line for line in headers.splitlines()
-               if line.strip().startswith("Content-Security-Policy:")), "")
-check("политика ответов объявлена", bool(policy),
-      "| в _headers нет строки Content-Security-Policy")
-check("политика запрещает всё, чего на странице нет",
-      "default-src 'none'" in policy and "frame-ancestors 'none'" in policy,
-      "| _headers перестал держать обещание страницы")
+
+rules = {}
+where = None
+for line in headers.splitlines():
+    if line.startswith("/"):
+        where = line.strip()
+        rules[where] = []
+    elif where and line.strip() and not line.strip().startswith("#"):
+        rules[where].append(line.strip())
+
+policies = {name: next((one[len("Content-Security-Policy:"):].strip()
+                        for one in lines
+                        if one.startswith("Content-Security-Policy:")), "")
+            for name, lines in rules.items()}
+policies = {name: one for name, one in policies.items() if one}
+
+check("политика ответов объявлена", bool(policies),
+      "| в _headers нет ни одной строки Content-Security-Policy")
+check("под «/*» политики нет", "/*" not in policies,
+      "| общее правило и исключение дадут две политики на один запрос")
+
+STRICT = "/mock/*"
+for name, said in sorted(policies.items()):
+    check(f"{name}: запрещает всё, чего на странице нет",
+          "default-src 'none'" in said and "frame-ancestors 'none'" in said,
+          "| _headers перестал держать обещание страницы")
+    if name == STRICT:
+        check(f"{name}: разрешает только свой скрипт",
+              "script-src 'self'" in said,
+              "| у макета нет разрешения на собственный скрипт")
+    else:
+        check(f"{name}: скрипты не разрешены", "script-src" not in said,
+              "| разрешение расползлось с макета")
+
+shape = {one for name, one in policies.items() if name != STRICT}
+check("у всех страниц, кроме макета, политика одна и та же",
+      len(shape) == 1, f"| разных вариантов: {len(shape)}")
+
+# Every folder with a page is named. A page without a policy is a page
+# without the promise, and the only place that shows is the live host.
+covered = []
+for here, dirs, names in os.walk(SITE):
+    dirs[:] = [one for one in dirs if one not in ("fonts",)]
+    if "index.html" not in names:
+        continue
+    at = os.path.relpath(here, SITE).replace(os.sep, "/")
+    at = "/" if at == "." else "/" + at + "/"
+    hit = [name for name in policies
+           if name == at or (name.endswith("*")
+                             and at.startswith(name[:-1]))]
+    covered.append((at, bool(hit)))
+naked = [at for at, hit in covered if not hit]
+check(f"политика есть у каждой страницы: {len(covered)} папок", not naked,
+      "| без политики: " + ", ".join(naked))
 
 # ---------------------------------------------------------------------------
 # The stylesheet takes its colours from the design system
@@ -896,6 +995,89 @@ for name, text in written.items():
           "| никуда не ведут: " + ", ".join(sorted(set(broken))[:6]))
     check(f"{name}: чужих узлов нет", not strangers,
           "| " + ", ".join(sorted(strangers)))
+
+# ---------------------------------------------------------------------------
+# The mock-up answers out of the recorded set
+# ---------------------------------------------------------------------------
+#
+# The whole worth of the mock-up is that it is not a mock: the phrases
+# and what she understood of them come from `docs/golden/utterances.json`
+# — the same set that pins the real parser, generated into `cases.js`.
+# Only the wording of the reply is the page's own, and the page says so.
+#
+# So two things are asked here. That the data really is the set, all of
+# it, unaltered. And that the table of replies covers every intent the
+# set contains: an intent added to the recorded behaviour and not
+# answered here would quietly vanish from the mock-up.
+print()
+print("=== макет отвечает записанным набором ===")
+
+import gen_site
+
+with io.open(os.path.join(ROOT, "docs", "golden", "utterances.json"),
+             encoding="utf-8") as handle:
+    recorded = json.load(handle)["cases"]
+
+shown = read(os.path.join(SITE, "mock", "cases.js"))
+found = re.search(r"window\.RINA_CASES = (\[.*?\]);\s*$", shown,
+                  re.S | re.M)
+check("данные макета читаются", found is not None,
+      "| cases.js больше не разбирается")
+
+if found:
+    data = json.loads(found.group(1))
+    check(f"в макете все записанные фразы: {len(data)} из {len(recorded)}",
+          len(data) == len(recorded),
+          "| часть набора до макета не доехала")
+    said = {one["say"] for one in data}
+    lost = [one["say"] for one in recorded if one["say"] not in said]
+    check("и ни одна не переписана", not lost,
+          "| нет в макете: " + "; ".join(lost[:4]))
+    wrong = [one["id"] for one in data
+             if one["intent"] != next(
+                 (c["expect"].get("intent") for c in recorded
+                  if c["id"] == one["id"]), None)]
+    check("разбор в макете — тот же, что в наборе", not wrong,
+          "| разошлось: " + ", ".join(wrong[:4]))
+
+# The ready-made phrases are named by their id in the set rather than
+# by their text, so a phrase reworded in the set is picked up by the
+# chip on its own. But an id the set does not have is a chip that
+# quietly fails to appear, and the first edition lost five of seven
+# that way.
+missing = [one for one in gen_site.MOCK_CHIPS
+           if not any(c["id"] == one for c in recorded)]
+check("все готовые фразы есть в наборе", not missing,
+      "| нет таких имён: " + ", ".join(missing))
+
+kinds = {one["expect"].get("intent") for one in recorded}
+kinds.discard(None)
+unanswered = sorted(kinds - set(gen_site.MOCK_SAID))
+mockup = read(os.path.join(SITE, "mock", "index.html"))
+driver = read(os.path.join(SITE, "mock", "mock.js"))
+# The state is told by more than the shape. The figure is a sphere with
+# a film of light on it and the state does read from it — but it also
+# reads from the word on the home screen, which the script changes
+# along with the figure. A shape alone would be a single signal, and in
+# this system a state never has only one.
+check("у фигуры состояние написано словом",
+      'id="ready"' in mockup and "ready.textContent" in driver,
+      "| форма шара — единственное, чем сказано состояние")
+check("и слово есть для каждого состояния",
+      all(one in driver for one in ("Слушаю.", "Думаю.", "Отвечаю.",
+                                    "Готова помочь.")),
+      "| у состояния нет слова, и оно покажется именем из кода")
+check("у фигуры есть все её состояния",
+      all(one in read(os.path.join(SITE, "mock", "figure.js"))
+          for one in ("idle:", "listening:", "thinking:", "answering:",
+                      "asking:")),
+      "| состояние фигуры не описано")
+
+check("на каждое намерение набора у макета есть ответ", not unanswered,
+      "| нечем ответить на: " + ", ".join(unanswered))
+invented = sorted(set(gen_site.MOCK_SAID) - kinds)
+check("и ни одного лишнего", not invented,
+      "| в наборе таких нет: " + ", ".join(invented))
 
 # ---------------------------------------------------------------------------
 # What the page says leaves, against what the code can dial
@@ -1448,6 +1630,37 @@ for token, what, rule, per_cent in LAYERS:
     got = ratio(values["ink-soft"], face)
     check(f"легенды поверх «{what}» ({face}) — {got:.2f} при нужных 4.5",
           got >= 4.5, "| строку, которую пересекает жгут, читать труднее нормы")
+
+# The three finishes are executions of one instrument, and the window
+# has to read in each. Silver is light, so "ink on plate" is a
+# different pair there; checking graphite alone would check a third.
+print()
+print("=== три отделки макета ===")
+
+shades = read(os.path.join(SITE, "mock", "finishes.css"))
+for finish in ("silver", "black", "graphite"):
+    block = re.search(r"\.win\." + finish + r" \{(.*?)\}", shades, re.S)
+    check(f"отделка {finish} объявлена", block is not None)
+    if not block:
+        continue
+    seen = dict(re.findall(r"--([a-z0-9-]+):\s*(#[0-9a-fA-F]{6})",
+                           block.group(1)))
+    # The figure's ring against the plate scores about 2.5 — below what
+    # a meaningful graphic owes. Painting it brighter would make a
+    # resting window loud, so the state is written in words and the
+    # ring accompanies them as material. What is checked is not the
+    # colour but that the word is there and that the script sets it.
+    for ink, face, floor, what in (("ink", "face", 4.5, "набор окна"),
+                                   ("ink-soft", "face", 4.5, "легенды окна"),
+                                   ("ink", "face-low", 4.5, "набор на рейке"),
+                                   ("ink", "face-high", 4.5, "набор на кнопке"),
+                                   ):
+        if ink not in seen or face not in seen:
+            check(f"{finish}: пара {ink}/{face} объявлена", False)
+            continue
+        got = ratio(seen[ink], seen[face])
+        check(f"{finish}: {what} — {got:.2f} при нужных {floor}",
+              got >= floor, "| в этой отделке окно читается хуже нормы")
 
 # The faces the page loads are the faces the program ships. A page set in
 # something the program does not have looks like the program and is not.
