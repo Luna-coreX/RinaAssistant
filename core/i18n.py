@@ -726,6 +726,47 @@ _EN = {
     '{name} — готово.': '{name} — done.',
     '{name} — готово. Включить?': '{name} — done. Switch it on?',
 
+    # --- the download catalogue (`core/models.py`, `4.0b-A14`) ---
+    #
+    # These are written as literals beside the sizes and the addresses,
+    # where the knowledge about engines lives, and translated on the way
+    # out. Without them the list of downloads was the one place in the
+    # window where the two languages stood in the same row: «Пакет Vosk»
+    # over «Downloaded.»
+    'Vosk: русский, малый': 'Vosk: Russian, small',
+    'Быстрый и нетребовательный. Хватает для команд.':
+        'Fast and undemanding. Enough for commands.',
+    'Vosk: русский, полный': 'Vosk: Russian, full',
+    'Точнее, но почти два гигабайта и заметно больше памяти.':
+        'More accurate, but nearly two gigabytes and noticeably more memory.',
+    'Whisper: base': 'Whisper: base',
+    'Скачается сам при первом распознавании.':
+        'Downloads itself the first time it is needed.',
+    'Голос Piper: русский (Ирина)': 'Piper voice: Russian (Irina)',
+    'Голос на этом компьютере, без интернета. Нужен пакет Piper.':
+        'A voice on this computer, no internet. Needs the Piper package.',
+    'Пакет Vosk': 'Vosk package',
+    'Нужен, чтобы модель Vosk заработала.':
+        'Needed for the Vosk model to work.',
+    'Пакет Whisper': 'Whisper package',
+    'Лёгкая сборка Whisper: те же модели, без torch.':
+        'A light build of Whisper: the same models, without torch.',
+    'Пакет Piper': 'Piper package',
+    'Речь на этом компьютере. К нему нужен голос.':
+        'Speech on this computer. It needs a voice as well.',
+    'Пакет Edge (онлайн)': 'Edge package (online)',
+    'Голоса Microsoft. Текст реплики уходит к ним по сети; модель '
+    'скачивать не нужно.':
+        'Microsoft voices. The text of the reply goes to them over the '
+        'network; nothing is downloaded.',
+
+    # --- the list of languages (`core/settings_schema.py`) ---
+    #
+    # The share is deliberately not a number (ADR 0007), and the words
+    # that say so are themselves a string in the interface: in an
+    # English window the note used to be the only Russian in the list.
+    '{name} — перевод неполный': '{name} — translation incomplete',
+
     # --- small talk (4.0b-A03): hello, thanks, how are you ---
     'Всегда рада помочь.': 'Always glad to help.',
     'Привет. Слушаю.': 'Hello. I am listening.',

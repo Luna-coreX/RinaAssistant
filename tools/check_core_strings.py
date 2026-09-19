@@ -119,9 +119,14 @@ def main() -> int:
     # which lists are shown to a person would be wrong in both
     # directions, and the price of the list is one line when a new
     # table appears.
+    from core import models
     from voice import hotkey_actions, system_control, user_commands
 
     tables = {
+        "CATALOGUE": [word for m in models.CATALOGUE
+                      for word in (m.title, m.note)],
+        "PACKAGES": [word for p in models.PACKAGES
+                     for word in (p.title, p.note)],
         "COMMAND_TYPES": [title for _v, title, _i
                           in user_commands.COMMAND_TYPES],
         "CONDITIONS": [title for _v, title in user_commands.CONDITIONS],
@@ -145,6 +150,49 @@ def main() -> int:
     check("и таблицы, которые переводятся на лету, тоже",
           not lost, f"| проверено {counted}, без перевода {len(lost)}")
     for one in lost[:12]:
+        print(f"        {one}")
+
+    # And the other half of the same question: the table having a
+    # translation does not mean anybody applies it.
+    #
+    # Both halves failed at once in the download catalogue. There was no
+    # English for it anywhere, and nothing passed it through `tr` — so
+    # the window showed «Пакет Vosk» with «Downloaded.» underneath, two
+    # languages in one row. The six hotkey names failed only the second
+    # half: `_EN` had them all, `settings_schema.options_for` returned
+    # them raw, and the same names came out English on one screen and
+    # Russian on another.
+    #
+    # Neither was visible to the checks above, because those ask about
+    # the strings that reach `tr`. This one asks the opposite way: set
+    # the language to English, take what the core actually hands the
+    # shell, and look for Cyrillic in it. A measurement of the result
+    # cannot be fooled by a call site nobody wrote.
+    from core import models, settings_schema
+    from core.i18n import set_language, get_language
+
+    was = get_language()
+    set_language("English")
+    try:
+        left = []
+        for row in models.catalogue():
+            for field in ("title", "note"):
+                if RUS.search(str(row.get(field, ""))):
+                    left.append(f"каталог/{row['id']}: «{row[field]}»")
+        for key in settings_schema.describe():
+            for row in settings_schema.options_for(key, {}) or []:
+                word = str(row.get("title", ""))
+                # A language is called by its own name in every
+                # language: «Русский» in an English list is the right
+                # word, not a missed translation.
+                if RUS.search(word) and key != "ui_language":
+                    left.append(f"{key}: «{word}»")
+    finally:
+        set_language(was)
+
+    check("и по-английски ядро отдаёт английское",
+          not left, f"| по-русски пришло {len(left)}")
+    for one in left[:12]:
         print(f"        {one}")
 
     # Every other language is allowed to be partial — that is stated in

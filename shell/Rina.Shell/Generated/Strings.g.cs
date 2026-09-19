@@ -1974,7 +1974,7 @@ public static partial class Loc
             ["Скажите «запиши купить хлеб» — или впишите сюда."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Say «запиши купить хлеб» — or type it here.",
+                    ["English"] = "Say “add buy bread” — or type it here.",
                 },
             ["Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."] =
                 new Dictionary<string, string>

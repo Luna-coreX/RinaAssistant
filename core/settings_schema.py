@@ -305,7 +305,11 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         # hotkeys themselves: a person invents those, and they cannot be
         # enumerated.
         from voice.hotkey_actions import HOTKEY_ACTIONS
-        return [{"value": action, "title": title, "available": True}
+        # Through `named`, like every other title this function returns.
+        # The wire's own `hotkeys.actions` already translated these; this
+        # branch did not, so the same six names came out in Russian on
+        # the settings page and in English everywhere else.
+        return [{"value": action, "title": named(title), "available": True}
                 for action, (title, _hint, _icon) in HOTKEY_ACTIONS.items()]
     if key == "ui_language":
         # The share of translation is deliberately not given as a number:
@@ -316,7 +320,7 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         from core.i18n import LANGUAGES, coverage
         return [{"value": name,
                  "title": (name if coverage(name) >= 0.99
-                           else f"{name} — перевод неполный"),
+                           else tr("{name} — перевод неполный", name=name)),
                  "available": True}
                 for name in LANGUAGES]
     if key == "whisper_model":

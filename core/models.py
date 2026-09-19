@@ -230,17 +230,25 @@ def catalogue(settings=None, running=None) -> list[dict]:
     between two cores in one process — the very hidden global that `4.0-B05`
     was about.
     """
+    # The catalogue is written as literals and translated here, on the
+    # way out — the same boundary as the engine names in
+    # `settings_schema.values()`: a table is keys, and the language is
+    # chosen in settings. Without this the window showed «Пакет Vosk» in
+    # Russian with «Downloaded.» under it in English, because the row's
+    # chrome came from the shell's table and the row's name did not.
+    from core.i18n import t as tr
+
     running = running or {}
     out = []
     for p in PACKAGES:
         item = {
             "id": p.id,
             "kind": "package",
-            "title": p.title,
+            "title": tr(p.title),
             "purpose": p.purpose,
             "engine": p.engine,
             "size": p.size,
-            "note": p.note,
+            "note": tr(p.note),
             "ours": True,
             "wanted": p.wanted,
             "installed": have_package(p),
@@ -257,11 +265,11 @@ def catalogue(settings=None, running=None) -> list[dict]:
         item = {
             "id": m.id,
             "kind": "model",
-            "title": m.title,
+            "title": tr(m.title),
             "purpose": m.purpose,
             "engine": m.engine,
             "size": m.size,
-            "note": m.note,
+            "note": tr(m.note),
             "ours": m.ours,
             "wanted": m.wanted,
             "installed": bool(installed(m)) if m.ours else False,
