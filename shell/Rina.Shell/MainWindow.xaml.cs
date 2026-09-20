@@ -33,6 +33,12 @@ public partial class MainWindow : Window
         ("dialog", Word("Диалог")),
         ("commands", Word("Команды")),
         ("reminders", Word("Напоминания")),
+        // Beside the reminders, because the two answer neighbouring
+        // questions — what is coming, and what has been going on — and a
+        // person looking for one often wants the other. Not merged with
+        // them: a reminder fires and a session merely runs, and a column
+        // that called both "напоминания" would be naming the timer.
+        ("sessions", Word("Сессии")),
         ("plugins", Word("Плагины")),
         // Between the plugins and the settings, not inside them. It is the
         // page that makes "privacy-first" a thing a person can check rather
@@ -151,6 +157,7 @@ public partial class MainWindow : Window
             ["dialog"] = () => new Pages.DialoguePage(Link),
             ["commands"] = () => new Pages.CommandsPage(Link),
             ["reminders"] = () => new Pages.RemindersPage(Link),
+            ["sessions"] = () => new Pages.SessionsPage(Link),
             ["plugins"] = () => new Pages.PluginsPage(Link),
             ["privacy"] = () => new Pages.PrivacyPage(Link),
             ["settings"] = () => new Pages.SettingsPage(Link),

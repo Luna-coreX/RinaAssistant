@@ -93,6 +93,13 @@
       ],
       "side": "core"
     },
+    "sessions": {
+      "methods": [
+        "sessions.finish",
+        "sessions.list"
+      ],
+      "side": "core"
+    },
     "stt": {
       "methods": [
         "speech.listen_once",
@@ -543,6 +550,8 @@
     "reminders.cancel": "reminders",
     "reminders.create": "reminders",
     "reminders.list": "reminders",
+    "sessions.finish": "sessions",
+    "sessions.list": "sessions",
     "settings.describe": null,
     "settings.get": null,
     "settings.options": null,

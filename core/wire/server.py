@@ -333,6 +333,8 @@ class ProtocolServer:
             "settings.set": self._settings_set,
             "settings.describe": self._settings_describe,
             "settings.options": self._settings_options,
+            "sessions.list": self._sessions_list,
+            "sessions.finish": self._sessions_finish,
             "todo.list": self._todo_list,
             "todo.add": self._todo_add,
             "todo.close": self._todo_close,
@@ -824,6 +826,38 @@ class ProtocolServer:
 
     def _reminders(self):
         return getattr(self.engine, "_reminders", None)
+
+    # -- working sessions (4.0b-A02) ---------------------------------------
+
+    def _sessions_list(self, message: Envelope) -> dict:
+        """
+        Every session, the open one included and marked as such.
+
+        Closed ones come too: "what did I do yesterday" is the question
+        the whole thing exists for, and a core that returned only what
+        is running now would leave no way to answer it. Whoever shows
+        them sorts and filters.
+        """
+        store = self.engine.sessions
+        items = []
+        for one in store.all():
+            items.append({**one, "spent": store.spent(one)})
+        return {"items": items}
+
+    def _sessions_finish(self, message: Envelope) -> dict:
+        """
+        Close the open session from the window.
+
+        The same act as saying it aloud, and it goes through the same
+        store: a second way of closing that wrote the field itself
+        would be a second place to forget the focus flag.
+        """
+        session = self.engine.sessions.finish(
+            str(message.payload.get("note", "")))
+        if session is None:
+            raise fault(ERROR_INVALID_PAYLOAD, "открытой сессии нет")
+        return {"item": {**session,
+                         "spent": self.engine.sessions.spent(session)}}
 
     # -- things to do (4.0b-A13) --------------------------------------------
 

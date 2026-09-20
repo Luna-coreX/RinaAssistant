@@ -422,6 +422,73 @@ typed.talk_after_speaking(9.0)
 check("без разговора ответ его не открывает", not typed.talking())
 
 print()
+print("=== ответ не зависит от того, что стоит на машине ===")
+# The router used to ask `llm.is_enabled()`, which reads the
+# module-level settings singleton — the machine's own config, not the
+# store this core was handed. The checks below were green for months
+# and went red the first day somebody switched a model on, having
+# measured nothing about the program in between.
+import core.settings_store as _store
+
+_was = _store.settings.get("llm_enabled", False)
+try:
+    _store.settings.set("llm_enabled", True)
+    off = RinaEngine(settings=MemorySettings({
+        "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+        "history": [], "web_search_fallback": True,
+    }))
+    off.ears_outside = True
+    check("модель на машине включена, у ядра — нет, и решает ядро",
+          off._router_context("typed", False).llm_enabled is False,
+          "| роутер спросил машину, а не свой стор")
+finally:
+    _store.settings.set("llm_enabled", _was)
+
+print()
+print("=== светская беседа уходит модели, когда она есть ===")
+# Six canned lines are the same six lines for the life of the program,
+# and a person hears the table on the third day. Handed to the model —
+# but only when there is one, otherwise «привет» would stop working on
+# a machine with nothing configured, and the recorded set would stop
+# measuring what it measures.
+for phrase in ("как дела", "привет", "спасибо", "как тебя зовут"):
+    check(f"«{phrase}» без модели отвечает сама",
+          route(phrase, ctx).name == "builtin.answer",
+          f"| {route(phrase, ctx).name}")
+    check(f"«{phrase}» с моделью уходит ей",
+          route(phrase, llm).name == "llm.answer",
+          f"| {route(phrase, llm).name}")
+
+# What she must not invent. A model asked "what can you do" answers for
+# assistants in general; here the list is exact and is the product's
+# whole claim.
+check("«что ты умеешь» остаётся своим ответом и при модели",
+      route("что ты умеешь", llm).name == "builtin.answer",
+      f"| {route('что ты умеешь', llm).name}")
+
+print()
+print("=== короткое слово не находит себя внутри длинного ===")
+# «пока» lives inside «покажи», and the table matched by substring: the
+# answer to "покажи задачи" was «До встречи». Real answer, wrong phrase,
+# and nothing says so.
+check("«покажи задачи» — это список, а не прощание",
+      route("покажи задачи", ctx).name == "todo.list",
+      f"| {route('покажи задачи', ctx).name}")
+check("а «пока» по-прежнему прощание",
+      route("пока", ctx).name == "builtin.answer",
+      f"| {route('пока', ctx).name}")
+
+print()
+print("=== список дел отвечает и на «задачи» ===")
+# The other word for the same thing. It answered to only one of them,
+# and «какие у нас задачи на сегодня» went past the list entirely.
+for phrase in ("какие у нас задачи на сегодня", "какие задачи",
+               "мои задачи", "список задач", "что у меня на сегодня"):
+    check(f"«{phrase}» -> todo.list",
+          route(phrase, ctx).name == "todo.list",
+          f"| {route(phrase, ctx).name}")
+
+print()
 print("=== неизменяемость намерения ===")
 i = route("запусти телеграм", ctx)
 try:

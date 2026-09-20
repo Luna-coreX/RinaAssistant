@@ -6486,8 +6486,8 @@ public partial class App
         var stuck = new List<string>();
         var pairs = 0;
         foreach (var section in new[] { "home", "dialog", "commands",
-                                        "reminders", "plugins", "privacy",
-                                        "settings", "about" })
+                                        "reminders", "sessions", "plugins",
+                                        "privacy", "settings", "about" })
         {
             window.ShowSectionFor(section);
             await Task.Delay(700);
@@ -6522,8 +6522,8 @@ public partial class App
         var blank = new List<string>();
         var captions = 0;
         foreach (var section in new[] { "home", "dialog", "commands",
-                                        "reminders", "plugins", "settings",
-                                        "about" })
+                                        "reminders", "sessions", "plugins",
+                                        "settings", "about" })
         {
             window.ShowSectionFor(section);
             await Task.Delay(700);

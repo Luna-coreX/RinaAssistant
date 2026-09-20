@@ -38,11 +38,20 @@
   "{0} из {1}": {
     "English": "{0} of {1}"
   },
+  "{0} мин": {
+    "English": "{0} min"
+  },
   "{0} раз": {
     "English": "{0} times"
   },
   "{0} с": {
     "English": "{0} s"
+  },
+  "{0} ч": {
+    "English": "{0} h"
+  },
+  "{0} ч {1} мин": {
+    "English": "{0} h {1} min"
   },
   "{0} — сейчас недоступно": {
     "English": "{0} — unavailable right now"
@@ -76,6 +85,9 @@
   },
   "«напомни через 15 минут выключить духовку»": {
     "English": "“remind me in 15 minutes to turn off the oven”"
+  },
+  "«начни сессию над отчётом»": {
+    "English": "“начни сессию над отчётом”"
   },
   "Адрес модели": {
     "English": "Model address"
@@ -389,6 +401,9 @@
   "Забыть эту запись": {
     "English": "Forget this entry"
   },
+  "Завершить": {
+    "English": "Finish"
+  },
   "Закрытые никуда не делись: их видно переключателем.": {
     "English": "Closed ones are still here: the switch shows them."
   },
@@ -451,6 +466,9 @@
   },
   "И слух, и голос работают по пакету и модели — их размер в установщик не помещается.": {
     "English": "Hearing and speaking each need a package and a model — too large to put in the installer."
+  },
+  "ИДЁТ СЕЙЧАС": {
+    "English": "RUNNING NOW"
   },
   "ИЗ ЧЕГО СОБРАНА": {
     "English": "WHAT IT'S MADE OF"
@@ -797,6 +815,12 @@
   "ПРОЧЕЕ": {
     "English": "OTHER"
   },
+  "ПРОШЛЫЕ": {
+    "English": "PAST"
+  },
+  "ПРОШЛЫЕ · {0}": {
+    "English": "PAST · {0}"
+  },
   "Папка с плагином": {
     "English": "Plugin folder"
   },
@@ -865,6 +889,9 @@
   },
   "Пока ни одного напоминания": {
     "English": "No reminders yet"
+  },
+  "Пока ни одной сессии": {
+    "English": "No sessions yet"
   },
   "Пока ничего": {
     "English": "Nothing yet"
@@ -1066,6 +1093,15 @@
   },
   "Серебро, чёрный или графит — равноправные": {
     "English": "Silver, black or graphite — equals"
+  },
+  "Сессии": {
+    "English": "Sessions"
+  },
+  "Сессии живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Sessions live in the core, and there is no link to it right now."
+  },
+  "Сессия — это отрезок работы с названием. Начните голосом или строкой, и здесь останется, сколько он шёл и что в нём было.": {
+    "English": "A session is a stretch of work with a name. Start one by voice or by typing, and what is left here is how long it ran and what was in it."
   },
   "Система синтеза": {
     "English": "Synthesis engine"
@@ -1445,6 +1481,9 @@
   "завтра в это же время": {
     "English": "tomorrow at this time"
   },
+  "заметок {0}": {
+    "English": "{0} notes"
+  },
   "записей: {0}": {
     "English": "entries: {0}"
   },
@@ -1462,6 +1501,12 @@
   },
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
+  },
+  "команд {0}": {
+    "English": "{0} commands"
+  },
+  "меньше минуты": {
+    "English": "under a minute"
   },
   "метаданные версии {0}, а мы умеем 1": {
     "English": "metadata version {0}, and we speak 1"
@@ -1517,6 +1562,9 @@
   "нет связи": {
     "English": "no connection"
   },
+  "ничего не записано": {
+    "English": "nothing recorded"
+  },
   "ничего — шагов пока нет": {
     "English": "nothing — there are no steps yet"
   },
@@ -1556,6 +1604,9 @@
   "применится после перезапуска": {
     "English": "applies after a restart"
   },
+  "программ {0}": {
+    "English": "{0} applications"
+  },
   "пусто": {
     "English": "empty"
   },
@@ -1583,11 +1634,17 @@
   "файл .onnx": {
     "English": "the .onnx file"
   },
+  "фокус": {
+    "English": "focus"
+  },
   "формат настроек и истории": {
     "English": "format of settings and history"
   },
   "хэш не сошёлся: ждали {0}…, получили {1}…": {
     "English": "the hash did not match: expected {0}…, got {1}…"
+  },
+  "чем всё кончилось — если есть что сказать": {
+    "English": "how it ended — if there is anything to say"
   },
   "через 15 минут": {
     "English": "in 15 minutes"

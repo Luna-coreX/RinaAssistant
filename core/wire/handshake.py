@@ -169,6 +169,14 @@ _CAPABILITY_LIST = (
     Capability("todo", Side.CORE,
                ("todo.list", "todo.add", "todo.close", "todo.remove"),
                "дела: то, что ждёт, а не срабатывает"),
+    # Sessions are declared as a capability of their own rather than
+    # hidden among the things to do, for the same reason the list was not
+    # hidden among the reminders: a side says that it **keeps a record of
+    # work**, and that shows at the handshake and in the diagnostics. A
+    # method tucked into a neighbour's capability is declared silently.
+    Capability("sessions", Side.CORE,
+               ("sessions.list", "sessions.finish"),
+               "рабочие сессии: чем человек занят и сколько это идёт"),
     Capability("history", Side.CORE,
                ("history.list", "history.clear", "history.export"),
                "разговор: посмотреть, стереть, выгрузить"),

@@ -79,6 +79,11 @@ public static partial class Loc
                 {
                     ["English"] = "{0} MB",
                 },
+            ["{0} мин"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} min",
+                },
             ["{0} раз"] =
                 new Dictionary<string, string>
                 {
@@ -88,6 +93,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "{0} s",
+                },
+            ["{0} ч"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} h",
+                },
+            ["{0} ч {1} мин"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} h {1} min",
                 },
             ["{0} — сейчас недоступно"] =
                 new Dictionary<string, string>
@@ -143,6 +158,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "“remind me in 15 minutes to turn off the oven”",
+                },
+            ["«начни сессию над отчётом»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“начни сессию над отчётом”",
                 },
             ["Адрес модели"] =
                 new Dictionary<string, string>
@@ -669,6 +689,11 @@ public static partial class Loc
                 {
                     ["English"] = "Forget this entry",
                 },
+            ["Завершить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Finish",
+                },
             ["завтра в это же время"] =
                 new Dictionary<string, string>
                 {
@@ -688,6 +713,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Replaced: {0}. It is off — turn it on if you trust it.",
+                },
+            ["заметок {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} notes",
                 },
             ["Замечать, какие программы открыты"] =
                 new Dictionary<string, string>
@@ -799,6 +829,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Hearing and speaking each need a package and a model — too large to put in the installer.",
+                },
+            ["ИДЁТ СЕЙЧАС"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "RUNNING NOW",
                 },
             ["Из архива"] =
                 new Dictionary<string, string>
@@ -953,6 +988,11 @@ public static partial class Loc
                 {
                     ["English"] = "key {0} is unknown to the shell",
                 },
+            ["команд {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} commands",
+                },
             ["Команда сохранена."] =
                 new Dictionary<string, string>
                 {
@@ -1000,6 +1040,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Brass",
+                },
+            ["меньше минуты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "under a minute",
                 },
             ["метаданные версии {0}, а мы умеем 1"] =
                 new Dictionary<string, string>
@@ -1272,6 +1317,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Nothing waiting",
+                },
+            ["ничего не записано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing recorded",
                 },
             ["Ничего не нашлось по «{0}»"] =
                 new Dictionary<string, string>
@@ -1616,6 +1666,11 @@ public static partial class Loc
                 {
                     ["English"] = "No reminders yet",
                 },
+            ["Пока ни одной сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No sessions yet",
+                },
             ["Пока ничего"] =
                 new Dictionary<string, string>
                 {
@@ -1745,6 +1800,11 @@ public static partial class Loc
                     ["Español"] = "Buscar actualizaciones",
                     ["Українська"] = "Перевіряти оновлення",
                 },
+            ["программ {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} applications",
+                },
             ["Программы"] =
                 new Dictionary<string, string>
                 {
@@ -1777,6 +1837,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Other",
+                },
+            ["ПРОШЛЫЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "PAST",
+                },
+            ["ПРОШЛЫЕ · {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "PAST · {0}",
                 },
             ["пусто"] =
                 new Dictionary<string, string>
@@ -1980,6 +2050,21 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Silver, black or graphite — equals",
+                },
+            ["Сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sessions",
+                },
+            ["Сессии живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sessions live in the core, and there is no link to it right now.",
+                },
+            ["Сессия — это отрезок работы с названием. Начните голосом или строкой, и здесь останется, сколько он шёл и что в нём было."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A session is a stretch of work with a name. Start one by voice or by typing, and what is left here is how long it ran and what was in it.",
                 },
             ["Система синтеза"] =
                 new Dictionary<string, string>
@@ -2383,6 +2468,11 @@ public static partial class Loc
                     ["Español"] = "El archivo no se pudo analizar como JSON.",
                     ["Українська"] = "Файл не розібрався як JSON.",
                 },
+            ["фокус"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "focus",
+                },
             ["формат настроек и истории"] =
                 new Dictionary<string, string>
                 {
@@ -2422,6 +2512,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The colour Rina draws attention with",
+                },
+            ["чем всё кончилось — если есть что сказать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "how it ended — if there is anything to say",
                 },
             ["Чем вызывать Рину и её действия"] =
                 new Dictionary<string, string>

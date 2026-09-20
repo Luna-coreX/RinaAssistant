@@ -145,6 +145,7 @@
 | `privacy` | ядро | `privacy.inventory`, `privacy.forget`, `privacy.export` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.try`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
+| `sessions` | ядро | `sessions.list`, `sessions.finish` |
 | `history` | ядро | `history.list`, `history.clear`, `history.export` |
 | `llm` | ядро | — |
 | `tasks` | ядро | `task.cancel` |
@@ -268,6 +269,8 @@
 | `todo.add` | `text` | записать дело |
 | `todo.close` | `todo_id`, `done` | пометить сделанным или вернуть в работу |
 | `todo.remove` | `todo_id` | убрать дело совсем |
+| `sessions.list` | — | сессии целиком, открытая помечена (`4.0b-A02`) |
+| `sessions.finish` | `note` | закрыть открытую сессию |
 | `plugins.page` | `plugin_id` | декларативное описание страницы |
 | `plugins.home` | — | плитки включённых плагинов для главного экрана (`4.0b-A07`); всё сразу, потому что главная рисует их вместе |
 | `plugins.action` | `plugin_id`, `action`, `values` | новое описание страницы |

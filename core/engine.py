@@ -867,7 +867,19 @@ class RinaEngine:
             # source: see `RouterContext.unbidden`.
             unbidden=bool(self._always_listen),
             reminders_active=len(self._reminders.active()),
-            llm_enabled=llm.is_enabled(),
+            # Asked of **this core's** settings, not of the module-level
+            # singleton `llm.is_enabled()` reads.
+            #
+            # That singleton is the hidden global `4.0-B05` and `4.0-B06`
+            # were about, and one place still reached for it. What it
+            # cost: `tools/test_router.py` hands the core a stand-in
+            # store with no model in it, and the router still asked the
+            # machine — so the check went green or red depending on
+            # whether whoever ran it had Ollama switched on. It was green
+            # for months and turned red the first day somebody enabled a
+            # model, having measured nothing about the program in
+            # between.
+            llm_enabled=bool(self._settings.get("llm_enabled", False)),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
             last_launch_query=self._last_launch_query,
             todo_find=self._todo.matches,

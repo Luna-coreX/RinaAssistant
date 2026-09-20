@@ -36,8 +36,21 @@ ADD_WORDS = ("запиши", "добавь в дела", "добавь дело"
              "надо", "нужно сделать", "не забыть")
 
 #: A request to see the list.
+#:
+#: «Задача» beside «дело», because that is the other word people use
+#: for the same thing and the list answered to only one of them:
+#: «какие у нас задачи на сегодня» went past the list, past everything
+#: else, and ended at the model or in a web search.
+#:
+#: «на сегодня» is not parsed and nothing here pretends it is. A thing
+#: to do has no date at all — that is what separates it from a
+#: reminder — so "today" has nothing to select on, and the whole list
+#: is the honest answer to it.
 LIST_WORDS = ("какие дела", "мои дела", "список дел", "что мне надо",
-              "что я должен", "что я должна")
+              "что я должен", "что я должна",
+              "какие задачи", "мои задачи", "список задач",
+              "покажи задачи", "покажи дела", "что у меня на сегодня",
+              "задачи на сегодня", "дела на сегодня")
 
 #: A request to close something.
 DONE_WORDS = ("сделал", "сделала", "готово", "выполнил", "выполнила",

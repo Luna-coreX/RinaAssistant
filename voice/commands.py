@@ -199,10 +199,27 @@ ANSWER_PHRASES = {
 }
 
 
+#: A phrase of the table, standing as a whole word.
+#:
+#: Substrings were how this matched until somebody said «покажи
+#: задачи» and Rina answered «До встречи»: «пока» lives inside
+#: «покажи». Short words in a table matched by `in` will keep finding
+#: themselves inside longer ones, and the failure is silent — the
+#: answer is a real answer, just to a phrase nobody said.
+def _whole(phrase):
+    import re
+
+    return re.compile(r"(?<!\w)" + re.escape(phrase) + r"(?!\w)")
+
+
+_WHOLE = {topic: [_whole(one) for one in phrases]
+          for topic, phrases in ANSWER_PHRASES.items()}
+
+
 def match_answer(low):
     """The topic of a built-in answer, or None. A pure function."""
-    for topic, phrases in ANSWER_PHRASES.items():
-        if any(phrase in low for phrase in phrases):
+    for topic, patterns in _WHOLE.items():
+        if any(one.search(low) for one in patterns):
             return topic
     return None
 

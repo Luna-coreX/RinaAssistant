@@ -106,6 +106,10 @@ public static class Methods
     public const string RemindersCreate = "reminders.create";
     /// <summary>Возможность: reminders.</summary>
     public const string RemindersList = "reminders.list";
+    /// <summary>Возможность: sessions.</summary>
+    public const string SessionsFinish = "sessions.finish";
+    /// <summary>Возможность: sessions.</summary>
+    public const string SessionsList = "sessions.list";
     /// <summary>Базовый метод.</summary>
     public const string SettingsDescribe = "settings.describe";
     /// <summary>Базовый метод.</summary>
@@ -201,6 +205,8 @@ public static class Methods
             ["reminders.cancel"] = "reminders",
             ["reminders.create"] = "reminders",
             ["reminders.list"] = "reminders",
+            ["sessions.finish"] = "sessions",
+            ["sessions.list"] = "sessions",
             ["settings.describe"] = null,
             ["settings.get"] = null,
             ["settings.options"] = null,
@@ -443,6 +449,8 @@ public static class Capabilities
     public const string Privacy = "privacy";
     /// <summary>Объявляет core.</summary>
     public const string Reminders = "reminders";
+    /// <summary>Объявляет core.</summary>
+    public const string Sessions = "sessions";
     /// <summary>Объявляет core.</summary>
     public const string Stt = "stt";
     /// <summary>Объявляет shell.</summary>

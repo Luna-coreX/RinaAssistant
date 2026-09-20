@@ -706,6 +706,28 @@ def _builtin(command, ctx):
 
     topic = commands.match_answer(command.lower().strip())
     if topic:
+        # Small talk goes to the model when there is one.
+        #
+        # «Как дела» answered from a table of six lines is the same six
+        # lines for the rest of the program's life, and a person hears
+        # the table on the third day. This is the one part of what Rina
+        # says that has no right answer to be got wrong, so it is the
+        # one part worth handing to something that can vary.
+        #
+        # **Except what she must not invent.** `capabilities` is an
+        # enumeration of what this program actually does; a model
+        # asked "what can you do" will answer for assistants in
+        # general, and on a product whose whole claim is an exact list
+        # that is not a livelier answer but a false one.
+        #
+        # **And only when a model is there.** Without one the table
+        # answers as before — that is what keeps «привет» working on a
+        # machine with nothing configured, and what keeps the recorded
+        # set (`docs/golden/utterances.json`) measuring the same thing
+        # it measured: the runner has no model, so it still sees
+        # `builtin.answer`.
+        if topic != "capabilities" and ctx.llm_enabled:
+            return None
         return Intent("builtin.answer", {"topic": topic}, stage="builtin")
 
     return None
