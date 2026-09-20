@@ -2290,6 +2290,12 @@ class ProtocolServer:
             finally:
                 self._reply_running = False
 
+    #: When the current reply began, and when its first sound existed.
+    #: Held on the server because two methods fill them in: the streaming
+    #: branch and the whole-file fallback.
+    _said_from = 0.0
+    _first_sound = None
+
     def _say_it(self, text: str) -> None:
         voice = str(self._settings().get("voice", "") if self._settings()
                     else "")
@@ -2314,7 +2320,19 @@ class ProtocolServer:
 
         self._cut_in = False
         spoken = 0.0
-        for piece in speech.sentences(text):
+        # Where the wait before she speaks actually goes.
+        #
+        # «Ответ за секунду, а заговорила через шестнадцать» is a report
+        # nobody could act on: the path runs through synthesis, a pipe,
+        # credit and somebody else's audio device, and every one of them
+        # is a plausible culprit to a person guessing. So the core says
+        # its own half out loud — one line per reply — and the guessing
+        # stops at the process boundary. This is the first of the three
+        # numbers `4.0s-S5` wants in the regression.
+        began = self._said_from = time.monotonic()
+        self._first_sound = None
+        pieces = list(speech.sentences(text))
+        for piece in pieces:
             if self._cut_in:
                 log.info("Остаток реплики не сказан: перебили")
                 break
@@ -2330,7 +2348,16 @@ class ProtocolServer:
                 log.warning("Не синтезировалось: %s", safe(piece))
                 continue
             spoken += len(pcm) / 2 / max(self.synthesiser.sample_rate, 1)
+            if self._first_sound is None:
+                self._first_sound = time.monotonic() - began
             self.send_speech(pcm, self.synthesiser.sample_rate)
+
+        log.info("Речь (%s): до первого звука %s, вся реплика %d мс, "
+                 "речи %.1f с, предложений %d",
+                 getattr(self.synthesiser, "name", "?"),
+                 ("%d мс" % (self._first_sound * 1000)
+                  if self._first_sound is not None else "не было"),
+                 (time.monotonic() - began) * 1000, spoken, len(pieces))
 
         # The conversation's window belongs to the person, so it starts
         # when they can speak — after she stops. See
@@ -2363,6 +2390,8 @@ class ProtocolServer:
             for pcm in self.synthesiser.stream(piece, voice=voice, rate=rate):
                 if not pcm:
                     continue
+                if self._first_sound is None:
+                    self._first_sound = time.monotonic() - self._said_from
                 sent += len(pcm) / 2 / max(self.synthesiser.sample_rate, 1)
                 self.send_speech(pcm, self.synthesiser.sample_rate)
         except Exception:                               # noqa: BLE001
