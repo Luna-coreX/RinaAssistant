@@ -26,6 +26,44 @@ namespace Rina.Shell;
 /// </remarks>
 public partial class MainWindow : Window
 {
+    /// <summary>What a fired reminder says on the banner and in the tray.</summary>
+    /// <remarks>
+    /// <para>
+    /// The same words the core speaks, put together the same way. Two
+    /// places building one sentence would drift apart at the first
+    /// change, and the drift would show as the banner saying one thing
+    /// while the voice said another.
+    /// </para>
+    /// <para>
+    /// <b>And it lives here rather than beside the tray.</b> The tray
+    /// notification sits in <c>Startup.cs</c>, which
+    /// <c>tools/check_strings.py</c> skips — that file is where the
+    /// checks live, and its Russian is their own. Which is exactly how
+    /// a hard-coded «Напоминание» stood there untranslated while every
+    /// other word in the program went through the table: the one place
+    /// nothing was watching.
+    /// </para>
+    /// </remarks>
+    internal static (string Title, string Body) Fired(
+        System.Text.Json.Nodes.JsonNode? item)
+    {
+        var text = (item?["text"]?.GetValue<string>() ?? "").Trim();
+        var title = (item?["kind"]?.GetValue<string>() ?? "") switch
+        {
+            "timer" => S("Таймер"),
+            "alarm" => S("Будильник"),
+            _ => S("Напоминание"),
+        };
+        // Two parts rather than one sentence, because the two places
+        // that show this want it differently: the banner says it as a
+        // line, the tray wants a heading and a body. Handing out one
+        // string and splitting it back apart on the full stop was the
+        // first edition, and it breaks on the first reminder whose text
+        // contains one.
+        if (text.Length == 0) return (title, S("Время вышло."));
+        return (title, char.ToUpper(text[0]) + text[1..]);
+    }
+
     /// <summary>The sections in the order they stand in the column.</summary>
     private static readonly (string Name, string Title)[] SectionList =
     [
@@ -905,6 +943,24 @@ public partial class MainWindow : Window
             case "assistant.response":
                 if (ShowToasts && !IsVisible)
                     Toast?.Say(message.Payload["text"]?.GetValue<string>() ?? "");
+                break;
+
+            // A fired reminder shows itself whether the window is open or
+            // not, and that is the one place this rule is broken on
+            // purpose.
+            //
+            // An ordinary answer follows a question, and somebody looking
+            // at the window is already looking at the answer. A reminder
+            // follows nothing: it arrives while a person is doing
+            // something else, and until now, with the window open on any
+            // page but the dialogue, it did nothing observable at all —
+            // the tray balloon was shown only when the window was hidden.
+            case "reminder.fired":
+                if (ShowToasts)
+                {
+                    var (title, body) = Fired(message.Payload["item"]);
+                    Toast?.Say(title + ". " + body);
+                }
                 break;
 
             case "assistant.error":

@@ -726,6 +726,16 @@ _EN = {
     '{name} — готово.': '{name} — done.',
     '{name} — готово. Включить?': '{name} — done. Switch it on?',
 
+    # --- reminders: warning ahead, and the firing itself (`4.0-E05`) ---
+    'час': 'an hour',
+    '{h} часа': '{h} hours',
+    '{h} часов': '{h} hours',
+    'Через {lead}: {what}. В {when}.': 'In {lead}: {what}. At {when}.',
+    '{title}. Время вышло.': '{title}. Time is up.',
+    'запланированное': 'what is planned',
+    '{what} в {when}': '{what} at {when}',
+    'На сегодня запланировано: {listed}.': 'Planned for today: {listed}.',
+
     # --- working sessions (4.0b-A02) and focus mode (4.0b-A05) ---
     'Начала сессию {goal}.': 'Started a session {goal}.',
     'Сессия закрыта: {goal}, {spent}.': 'Session closed: {goal}, {spent}.',

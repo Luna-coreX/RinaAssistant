@@ -275,6 +275,11 @@ public static partial class Loc
                 {
                     ["English"] = "At what time",
                 },
+            ["Время вышло."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Time is up.",
+                },
             ["Время пишется как 19:30."] =
                 new Dictionary<string, string>
                 {

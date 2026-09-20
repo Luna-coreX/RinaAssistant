@@ -331,6 +331,13 @@ class ReminderStore:
                 "on": on,
                 "created_at": item.get("created_at", 0),
                 "done": bool(item.get("done")),
+                # Which advance warnings have already been said. Kept on
+                # the entry rather than in the scheduler: the scheduler
+                # is restarted with the program, and a person who left
+                # Rina running overnight would hear "in three hours"
+                # again every morning.
+                "warned": [int(one) for one in (item.get("warned") or [])
+                           if str(one).lstrip("-").isdigit()],
             })
         return clean
 
@@ -373,6 +380,12 @@ class ReminderStore:
             "on": on,
             "created_at": time.time(),
             "done": False,
+            # Written here rather than left for `all()` to fill in. The
+            # shape the store puts down and the shape §10 describes are
+            # checked against each other, and a field that appears only
+            # on the way out makes the two disagree — the event would
+            # carry a set of fields the document does not promise.
+            "warned": [],
         }
         # reading and writing in one operation: the scheduler in a
         # background thread marks what has fired at exactly the moment the
@@ -407,6 +420,51 @@ class ReminderStore:
         return [r for r in self.active()
                 if r.get("on") is None and r.get("fire_at", 0) <= now]
 
+    def ahead_due(self, now=None):
+        """
+        Which warnings are owed, as `(item, lead)`.
+
+        A lead is owed when its moment has passed, it has not been said,
+        and — the part that matters — the reminder was **created before
+        that moment**. Without the last condition "remind me in fifteen
+        minutes" would answer with "in an hour: …" the same second,
+        because an hour before it is already the past.
+        """
+        now = now if now is not None else time.time()
+        owed = []
+        for item in self.active():
+            if item.get("on") is not None or not item.get("fire_at"):
+                continue
+            for lead in AHEAD:
+                moment = item["fire_at"] - lead
+                if moment > now:
+                    continue
+                if lead in item.get("warned", []):
+                    continue
+                if float(item.get("created_at") or 0) > moment:
+                    continue
+                # Only the nearest owed lead. Coming back to a machine
+                # that slept through both, a person wants "in an hour",
+                # not "in three hours" followed by "in an hour".
+                owed.append((item, lead))
+                break
+        return owed
+
+    def mark_warned(self, item_id, lead):
+        with self._settings.transaction():
+            items = self.all()
+            for item in items:
+                if item.get("id") == item_id:
+                    said = list(item.get("warned") or [])
+                    # Everything larger is closed at the same time. A
+                    # lead that was slept through is not owed later: its
+                    # moment is the point of it.
+                    for one in AHEAD:
+                        if one >= lead and one not in said:
+                            said.append(one)
+                    item["warned"] = said
+            self.save_all(items)
+
     def triggered(self, event):
         """
         What is waiting for this event (`4.0b-A03`).
@@ -432,6 +490,95 @@ class ReminderStore:
 # ---------------------------------------------------------------------------
 # The wordings
 # ---------------------------------------------------------------------------
+#: How long before the hour Rina says something.
+#:
+#: A closed list in the code, like the occasions in `TRIGGER_KINDS` and
+#: the packages in `PACKAGES`: everything that makes her speak of her
+#: own accord is named in advance.
+#:
+#: Two, and both large. A warning is worth having when there is still
+#: time to act on it — three hours to change a plan, an hour to set
+#: off — and worthless at five minutes, when the thing itself is about
+#: to say the same words. The cost of a third, smaller lead is not
+#: code: it is one more interruption in somebody's afternoon.
+AHEAD = (3 * 60 * 60, 60 * 60)
+
+
+def ahead_word(lead):
+    """How a lead time is said."""
+    if lead >= 3600 and lead % 3600 == 0:
+        hours = lead // 3600
+        return (tr("час") if hours == 1
+                else tr("{h} часа", h=hours) if hours < 5
+                else tr("{h} часов", h=hours))
+    return tr("{m} мин", m=lead // 60)
+
+
+def say_fired(item):
+    """What she says when the hour comes."""
+    titles = {"timer": tr("Таймер"), "reminder": tr("Напоминание"),
+              "alarm": tr("Будильник")}
+    title = titles.get(item.get("kind"), tr("Напоминание"))
+    text = (item.get("text") or "").strip()
+    if not text:
+        return tr("{title}. Время вышло.", title=title)
+    # A capital after the full stop. The text was stored as it was said
+    # — «выключить духовку» — and «Напоминание. выключить духовку» reads
+    # as a sentence that lost its beginning.
+    return "%s. %s%s" % (title, text[0].upper(), text[1:])
+
+
+def say_ahead(item, lead):
+    """The warning itself."""
+    what = item.get("text") or tr("запланированное")
+    return tr("Через {lead}: {what}. В {when}.",
+              lead=ahead_word(lead), what=what,
+              when=when_text(item.get("fire_at", 0)))
+
+
+def today(items, now=None):
+    """
+    What is still ahead today, by the clock.
+
+    Only what has a time: something waiting for an occasion has no
+    "today" — it happens when it happens. And only what is still ahead:
+    a plan that has already passed is not a plan any more.
+    """
+    now = now if now is not None else time.time()
+    stamp = time.localtime(now)
+    out = []
+    for item in items:
+        if item.get("done") or item.get("on") is not None:
+            continue
+        fire_at = float(item.get("fire_at") or 0)
+        if fire_at <= now:
+            continue
+        when = time.localtime(fire_at)
+        if (when.tm_year, when.tm_mon, when.tm_mday) !=                 (stamp.tm_year, stamp.tm_mon, stamp.tm_mday):
+            continue
+        out.append(item)
+    out.sort(key=lambda one: one["fire_at"])
+    return out
+
+
+def say_today(items):
+    """
+    Today's plans in one sentence, or nothing at all.
+
+    Nothing rather than "ничего не запланировано": this is said as an
+    addition to an answer about something else, and an addition that
+    reports an absence turns every answer into two. Silence when there
+    is nothing is what makes it worth saying when there is.
+    """
+    if not items:
+        return ""
+    listed = "; ".join(
+        tr("{what} в {when}", what=one.get("text") or tr("запланированное"),
+           when=when_text(one["fire_at"]))
+        for one in items[:5])
+    return tr("На сегодня запланировано: {listed}.", listed=listed)
+
+
 def humanize_left(seconds):
     """"через 1 ч 5 мин" — how much is left."""
     seconds = max(0, int(seconds))

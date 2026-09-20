@@ -7022,8 +7022,15 @@ public partial class App
 
         if (message.Method == "reminder.fired")
         {
-            var text = message.Payload["item"]?["text"]?.GetValue<string>() ?? "";
-            _tray?.Notify("Напоминание", text.Length > 0 ? text : "Пора.");
+            // Through the window's own helper: the title by kind lives
+            // in one place, and this file is skipped by the string
+            // check — a literal written here is a literal nobody sees.
+            // Fully qualified: inside `App` the bare name `MainWindow` is
+            // `Application.MainWindow`, the property, and the type is
+            // shadowed by it.
+            var (title, body) =
+                Rina.Shell.MainWindow.Fired(message.Payload["item"]);
+            _tray?.Notify(title, body);
         }
     }
 

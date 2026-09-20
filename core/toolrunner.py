@@ -660,10 +660,30 @@ def _add_todo(ctx, args):
 
 
 def _list_todo(ctx, args):
+    """
+    What waits — and, if there is any, what is planned for today.
+
+    The two are different things and stay different: a thing to do has
+    no clock, a reminder is nothing but one. They are said together
+    because the question is one question. Somebody asking "what have I
+    got today" is not asking about a data structure, and answering
+    «Дел нет» while a meeting stands at six would be true and useless.
+
+    The plans are added only when there are some. An answer that ends
+    "and nothing is planned" reports an absence nobody asked about, and
+    turns every answer into two sentences; saying nothing when there is
+    nothing is what makes the sentence worth hearing when it appears.
+    """
+    from voice import reminders as reminders_mod
     from voice import todo as todo_mod
 
     items = ctx.todo.all(done=False)
-    return ToolResult.done(todo_mod.say_list(items), value=items)
+    said = todo_mod.say_list(items)
+    planned = reminders_mod.say_today(
+        reminders_mod.today(ctx.reminders.active()) if ctx.reminders else [])
+    if planned:
+        said = said + " " + planned
+    return ToolResult.done(said, value=items)
 
 
 def _close_todo(ctx, args):

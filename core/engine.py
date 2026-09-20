@@ -733,7 +733,24 @@ class RinaEngine:
         these two paths have no reason to differ. While they did differ,
         what was bound to an event did not reach the journal the way
         everything else did.
+
+        **She says it out loud, and that had been lost in the port.**
+        3.1.0 spoke the reminder, showed it and notified; 4.0 kept only
+        the event, and the one thing the shell did with it was a tray
+        balloon — shown solely when the window was hidden. So a reminder
+        that came due while somebody had the window open did nothing
+        observable at all: no voice, no banner, a row quietly turning
+        grey in a tab they were not looking at. On an assistant whose
+        whole point is answering aloud, an alarm that says nothing is
+        the one thing it must not be.
+
+        Said here rather than in the shell because Rina's lines are the
+        core's (ADR 0007), and because the next shell — mobile, voice,
+        no screen at all — would otherwise have to rediscover that a
+        reminder is worth saying.
         """
+        from voice import reminders as reminders_mod
+
         with trace_scope():
             self._reminders.mark_done(item["id"])
             # The snapshot was taken before the mark and still says
@@ -742,6 +759,22 @@ class RinaEngine:
             # would contradict the store, from which the shell will take
             # the list a second later.
             self._emit(Events.REMINDER_FIRED, item={**item, "done": True})
+            self.say(reminders_mod.say_fired(item))
+
+    def _warn_ahead(self, item, lead):
+        """
+        Say that something is coming, while there is still time to act.
+
+        Marked before it is said, not after. Speaking goes to another
+        thread and takes as long as speech takes; a mark that waited for
+        it would let the next tick, one second later, find the same lead
+        still owed and say it again.
+        """
+        from voice import reminders as reminders_mod
+
+        with trace_scope():
+            self._reminders.mark_warned(item["id"], lead)
+            self.say(reminders_mod.say_ahead(item, lead))
 
     def _reminder_worker(self):
         """
@@ -758,6 +791,8 @@ class RinaEngine:
         store = self._reminders
         while not self._stop_reminders.wait(1.0):
             try:
+                for item, lead in store.ahead_due():
+                    self._warn_ahead(item, lead)
                 for item in store.due():
                     self._fire_reminder(item)
             except Exception:
