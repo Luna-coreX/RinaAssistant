@@ -689,9 +689,18 @@ public partial class App
         if (settings?.FirstChoice() is { } choice)
         {
             choice.IsDropDownOpen = true;
-            await Task.Delay(300);
-            var popup = choice.Template.FindName("PART_Popup", choice)
+            // Waited for rather than slept through. Three hundred
+            // milliseconds is a guess about how fast a machine opens a
+            // popup, and under a full regression it is sometimes the
+            // wrong guess: the check went red about a template that was
+            // perfectly fine and simply not up yet.
+            System.Windows.Controls.Primitives.Popup? popup = null;
+            await Until(() =>
+            {
+                popup = choice.Template.FindName("PART_Popup", choice)
                         as System.Windows.Controls.Primitives.Popup;
+                return popup is { IsOpen: true, Child: not null };
+            });
             Check("список раскрывается своим шаблоном",
                   popup is { IsOpen: true, Child: not null },
                   $"| вариантов {choice.Items.Count}");
@@ -704,18 +713,16 @@ public partial class App
         else Check("список раскрывается своим шаблоном", false,
                    "| ни одного списка на странице");
 
-        window.ShowSectionFor("commands");
-        await Task.Delay(1500);
         Check("страница команд открылась",
-              window.CurrentPage is Pages.CommandsPage);
+              await OpenedAsync<Pages.CommandsPage>(window, "commands")
+                  is not null);
 
         // Plugins: the last page that was still a stub. The whole round is
         // checked — the list, switching on, the plugin's own page and an
         // action on it — because every link here crosses the process
         // boundary, and "the list arrived" does not mean anything yet.
-        window.ShowSectionFor("plugins");
-        await Task.Delay(1500);
-        if (window.CurrentPage is Pages.PluginsPage plugins)
+        if (await OpenedAsync<Pages.PluginsPage>(window, "plugins")
+                is { } plugins)
         {
             for (var i = 0; i < 60 && plugins.PluginCount == 0; i++)
                 await Task.Delay(100);
@@ -3457,7 +3464,21 @@ public partial class App
                 // frames. Waiting for it to stop moving is the same
                 // question the pause was asking, answered rather than
                 // estimated.
-                await Settled(() => home.Swell);
+                //
+                // **And whether it settled is asked out loud.** While
+                // `Settled` gave up in silence, a busy machine produced
+                // «0,001 против 0,001» three times over: the figure had
+                // not moved yet, and the check said the states looked
+                // alike. It was red about the program and right about
+                // nothing.
+                //
+                // Idle is exempt: it is the state the figure is already
+                // in when the loop starts, so there is nothing for it to
+                // travel towards and nothing to wait for.
+                var moved = await Settled(() => home.Swell);
+                if (doing is not Doing.Idle)
+                    Check($"фигура добралась до {doing}", moved,
+                          "| за 4 с не сдвинулась — мерить нечего");
                 seen.Add((doing, home.Swell));
             }
 
@@ -3873,11 +3894,10 @@ public partial class App
         window.Left = -4000;
         window.Top = -4000;
         window.Show();
-        window.ShowSectionFor("home");
+        var athome = await OpenedAsync<Pages.HomePage>(window, "home");
         window.RunBackdropForShot();
-        await Task.Delay(900);
 
-        if (window.CurrentPage is not Pages.HomePage home)
+        if (athome is not { } home)
         {
             Console.WriteLine("главной нет — снимать нечего");
             Shutdown();
@@ -5416,7 +5436,7 @@ public partial class App
             // And how far it travels in a second, which is the interval a
             // person judges by. Below a value or so it is a photograph that
             // technically updates.
-            await Task.Delay(2400);
+            await Task.Delay(2400);  // measured: сдвиг за время и есть вопрос
             var drift = window.BackdropDrift;
             Check("и за секунду сдвигается заметно", drift >= 1.0,
                   $"| {drift:0.00} значения за секунду");
@@ -5510,7 +5530,7 @@ public partial class App
         Check("счётчик спрятан",
               mine.Countdown.Visibility != Visibility.Visible);
 
-        await Task.Delay(2500);
+        await Task.Delay(2500);  // measured: что оно НЕ закрылось само
         Check("и через две с половиной секунды окно на месте",
               mine.IsVisible, "| ноль значит «ждать», а не «одна секунда»");
         Check("невыбранный ответ — отказ, а не «истёк»",
@@ -5527,7 +5547,7 @@ public partial class App
         Check("счётчик показан",
               theirs.Countdown.Visibility == Visibility.Visible);
 
-        await Task.Delay(3200);
+        await Task.Delay(3200);  // measured: ждём истечения самого срока
         Check("по сроку окно закрылось само", !theirs.IsVisible);
         Check("молчание засчитано отказом",
               theirs.Result == Pages.Consent.Expired, $"| {theirs.Result}");
@@ -5759,9 +5779,8 @@ public partial class App
               $"| {link.State}");
 
         // --- commands ---
-        window.ShowSectionFor("commands");
-        await Task.Delay(1200);
-        if (window.CurrentPage is Pages.CommandsPage commands)
+        if (await OpenedAsync<Pages.CommandsPage>(window, "commands")
+                is { } commands)
         {
             var before = commands.CommandCount;
             var opened = await commands.OpenEditorAsync(null);
@@ -6114,11 +6133,16 @@ public partial class App
             // The page is built afresh: the description must be human on
             // the very first draw, not after something has managed to load
             // the kinds along the way.
-            window.ShowSectionFor("dialog");
-            await Task.Delay(300);
-            window.ShowSectionFor("commands");
-            await Task.Delay(1200);
-            var fresh = window.CurrentPage as Pages.CommandsPage;
+            // Waiting for the page is not enough here, and the first
+            // edition of this conversion learned it the hard way: the
+            // page exists at once, and its rows arrive over the wire
+            // afterwards. The pause that stood here was waiting for the
+            // list, not for the page — so the wait has to be for the
+            // list too.
+            await OpenedAsync<Pages.DialoguePage>(window, "dialog");
+            var fresh = await OpenedAsync<Pages.CommandsPage>(
+                window, "commands");
+            await Until(() => !string.IsNullOrEmpty(fresh?.FirstDescription()));
             Check("список показывает её словами, а не полями",
                   fresh?.FirstDescription().Contains("Программа") == true,
                   $"| «{fresh?.FirstDescription()}»");
@@ -6245,9 +6269,8 @@ public partial class App
         else Check("страница команд открылась", false);
 
         // --- reminders ---
-        window.ShowSectionFor("reminders");
-        await Task.Delay(1200);
-        if (window.CurrentPage is Pages.RemindersPage reminders)
+        if (await OpenedAsync<Pages.RemindersPage>(window, "reminders")
+                is { } reminders)
         {
             var before = reminders.PlannedCount;
             var made = await reminders.CreateAsync("проверить почту", 15);
@@ -6278,8 +6301,7 @@ public partial class App
         // The page's promise is completeness, so the assertions are about
         // completeness: that what was stored a moment ago is on it, and
         // that a group this shell has never heard of is on it too.
-        window.ShowSectionFor("privacy");
-        await Task.Delay(1200);
+        await OpenedAsync<Pages.PrivacyPage>(window, "privacy");
         if (window.CurrentPage is not Pages.PrivacyPage kept)
             Check("страница приватности открылась", false);
         else
@@ -6554,7 +6576,7 @@ public partial class App
         Check("по имени идёт свет", about.NameFlows);
 
         var litWas = about.NameInk();
-        await Task.Delay(1500);
+        await Task.Delay(1500);  // measured: движение света за время
         var litNow = about.NameInk();
         Check("и свет действительно движется",
               Math.Abs(litNow - litWas) > 2.0,
@@ -7076,7 +7098,31 @@ public partial class App
     /// going; "has it stopped changing" can, and that is the same question
     /// for anything that settles.
     /// </remarks>
-    private static async Task Settled(Func<double> value, double seconds = 4.0)
+    /// <returns>
+    /// <c>true</c> when the value moved and then stopped; <c>false</c>
+    /// when the deadline ran out first.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <b>It used to give up in silence, and that is what made the home
+    /// check flaky.</b> On a machine busy with the rest of the
+    /// regression the figure did not always start moving inside four
+    /// seconds; the helper returned anyway, the caller read a value
+    /// that had not budged, and the check reported «Listening
+    /// отличается от покоя | 0,001 против 0,001» — three identical
+    /// numbers and no hint that nothing had been waited for. A
+    /// measurement whose failure looks like a result about the program
+    /// is worse than no measurement.
+    /// </para>
+    /// <para>
+    /// The deadline is still a deadline: something has to stop the
+    /// loop. What changed is that running out of it is now an answer
+    /// the caller receives, rather than one it cannot tell from
+    /// success.
+    /// </para>
+    /// </remarks>
+    private static async Task<bool> Settled(Func<double> value,
+                                            double seconds = 4.0)
     {
         var deadline = DateTime.UtcNow.AddSeconds(seconds);
         var before = value();
@@ -7087,6 +7133,7 @@ public partial class App
         while (DateTime.UtcNow < deadline
                && Math.Abs(value() - before) < 0.0005)
             await Task.Delay(20);
+        if (Math.Abs(value() - before) < 0.0005) return false;
 
         var still = 0;
         before = value();
@@ -7097,6 +7144,31 @@ public partial class App
             still = Math.Abs(now - before) < 0.0005 ? still + 1 : 0;
             before = now;
         }
+        return still >= 3;
+    }
+
+    /// <summary>Open a section and wait until its page is actually up.</summary>
+    /// <remarks>
+    /// <para>
+    /// Seven places did this with a fixed pause — a second and a half
+    /// in the longest of them — and a fixed pause is a guess about how
+    /// fast a machine builds a page. It is wrong in both directions at
+    /// once: too short on a busy machine, which is a red check about
+    /// nothing, and too long on every other run, which is nine and a
+    /// half seconds of the suite spent asleep.
+    /// </para>
+    /// <para>
+    /// The condition is the one the code after it was going to test
+    /// anyway: the page is of the kind that was asked for.
+    /// </para>
+    /// </remarks>
+    private static async Task<T?> OpenedAsync<T>(MainWindow window,
+                                                 string section)
+        where T : class
+    {
+        window.ShowSectionFor(section);
+        await Until(() => window.CurrentPage is T);
+        return window.CurrentPage as T;
     }
 
     private static async Task<bool> Until(Func<bool> ready,
