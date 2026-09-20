@@ -99,6 +99,16 @@ GROUPS = {
         # Switching it on is the person's decision, not a side effect of
         # installing (T-19).
         "watch_apps": False,
+        # Watching and remembering are two permissions, not one
+        # (`4.0b-A02`, `T-22`). `watch_apps` lets Rina see which window is
+        # in front — that is what context reminders need, and they forget
+        # it at once. A session **writes it down**, hour by hour, and that
+        # is a wider record of a person than anything else here; so it has
+        # its own switch, and it does nothing while the first one is off.
+        "session_apps": False,
+        # Working folders, likewise. A path says what somebody is working
+        # on and often who they work for.
+        "session_folders": False,
         # journalling. The text of lines is the content of a conversation, so
         # it is written only with explicit consent and only at DEBUG level.
         "log_level": "INFO",
@@ -126,6 +136,13 @@ GROUPS = {
     # vanish. In one file, frequent writes to one would touch the other.
     "todo": {
         "todo": [],
+    },
+    # Working sessions (`4.0b-A02`), in a group of their own for the same
+    # reason as things to do: they are written while somebody works and
+    # read afterwards, and a chronicle of a day's applications beside a
+    # list kept for months would make every session write touch the list.
+    "sessions": {
+        "sessions": [],
     },
 }
 

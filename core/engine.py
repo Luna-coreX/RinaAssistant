@@ -29,6 +29,7 @@ from core.executor import Executor
 from core.toolrunner import NO_SHELL, ToolContext, ToolRunner
 from voice.wake import get_wake_words
 from voice.reminders import ReminderStore
+from voice.sessions import SessionStore
 from voice.todo import TodoStore
 from core.logging_setup import get_logger, safe, security_log
 from core.protocol import Events
@@ -154,6 +155,13 @@ class RinaEngine:
         self._speak_count = 0
         self._reminders = ReminderStore(settings)
         self._todo = TodoStore(settings)
+        self._sessions = SessionStore(settings)
+        #: What is in front, and since when (`4.0b-A02`). A pair,
+        #: not a history: see `_credit_foreground`.
+        self._in_front = ("", 0.0)
+        #: What focus mode is holding back (`4.0b-A05`). One, not a
+        #: queue — see `offer`.
+        self._held_offer = None
 
         # Parsing, memory of the question asked, and execution are separated
         # into distinct objects (4.0-B02, B03, B04). The core ties them
@@ -168,6 +176,8 @@ class RinaEngine:
                 settings=settings,
                 reminders=self._reminders,
                 todo=self._todo,
+                sessions=self._sessions,
+                release_held=lambda: self.release_held(),
                 commands=self._cmd_store,
                 plugins=plugin_manager,
                 # Through a lambda rather than a bound method: the core may
@@ -637,14 +647,33 @@ class RinaEngine:
     def note_foreground(self, launch):
         """
         The shell reports: the person switched to this program
-        (`4.0b-A03`).
+        (`4.0b-A03`, `4.0b-A02`).
 
-        **The core remembers nothing.** Not which program is in front now,
-        nor which was before, nor how long was spent in it: the event is
-        compared with the waiting reminders and forgotten at once. Knowing
-        which programs somebody opens is information of the same kind as
-        the text of their words (T-19), and the only way not to lose such a
-        history is not to keep one.
+        **By default the core still remembers nothing.** The event is
+        compared with the waiting reminders and forgotten: not which
+        program is in front, nor which was before, nor how long was
+        spent in it. Knowing which programs somebody opens is
+        information of the same kind as the text of their words
+        (`T-19`), and the surest way not to lose such a history is not
+        to keep one.
+
+        **A working session is the one case where a history is kept, and
+        it takes two switches and an open session to get there**
+        (`4.0b-A02`, `T-22`). `watch_apps` lets Rina see the change at
+        all — without it this method is never called. `session_apps`
+        lets her write it down. And even then nothing accumulates
+        unless a session is open, because there is nowhere to put it:
+        the chronicle belongs to a named stretch of work, not to the
+        program. Turn either switch off, or close the session, and the
+        paragraph above is true again word for word.
+
+        **Two fields, not a log.** What is held between events is the
+        program in front and the moment it came forward; when the next
+        change arrives, the time between them is credited to the one
+        that is leaving. A running total per application in the open
+        session is a far smaller thing than a list of switches with
+        their timestamps, and it answers the only question anybody asked
+        of it — "what did this stretch of work go on".
 
         What arrives is a **path**, not a window name: a person changes the
         window title themselves by opening somebody else's file in an
@@ -654,11 +683,47 @@ class RinaEngine:
         launch = str(launch or "")
         if not launch:
             return 0
+        self._credit_foreground(launch)
         fired = self._reminders.triggered(
             {"kind": "app.foreground", "launch": launch})
         for item in fired:
             self._fire_reminder(item)
         return len(fired)
+
+    def _credit_foreground(self, launch, now=None):
+        """
+        Give the program that is leaving the time it was in front.
+
+        Held outside the session on purpose. The pair "what is in front
+        and since when" exists whether or not anybody is recording, and
+        putting it in the store would mean a write on every window
+        change — for a person who never switched the recording on.
+        """
+        import time as _time
+
+        now = now if now is not None else _time.time()
+        was, since = self._in_front
+        self._in_front = (launch, now)
+        if not was or was == launch or not since:
+            return
+        if not self._settings.get("session_apps", False):
+            return
+        self._sessions.saw(self._app_name(was), now - since)
+
+    @staticmethod
+    def _app_name(launch):
+        """
+        The program, as a person would name it — not its full path.
+
+        A path names a place on somebody's disk, and a session is read
+        back to them out loud. `C:\\Users\\...\\Code.exe` in an answer is
+        both unreadable and more than was asked for.
+        """
+        import os as _os
+
+        base = _os.path.basename(str(launch or "")).strip()
+        stem, ext = _os.path.splitext(base)
+        return stem or base
 
     def _fire_reminder(self, item):
         """
@@ -806,12 +871,21 @@ class RinaEngine:
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
             last_launch_query=self._last_launch_query,
             todo_find=self._todo.matches,
+            # Whether a session is open changes what the answer to
+            # "finish it" is, and nothing else; the router still
+            # decides nothing about sessions it cannot see.
+            session_open=self._sessions.current() is not None,
         )
 
     @property
     def todo(self):
         """The list of things to do (`4.0b-A13`) — for the protocol."""
         return self._todo
+
+    @property
+    def sessions(self):
+        """Working sessions (`4.0b-A02`) — for the protocol."""
+        return self._sessions
 
     def _remember_choice(self, query, entry):
         from voice import app_launcher
@@ -841,9 +915,45 @@ class RinaEngine:
         value, and always something the person has just brought about
         themselves. Nothing new is learned about anybody to make the
         offer — the boundary the plan draws around initiative.
+
+        **Focus holds it back rather than throws it away** (`4.0b-A05`).
+        Inside a focused session the offer is kept and made once when
+        the session closes. Dropping it would make focus a way of
+        losing things: the voice a person waited an hour to download
+        would finish, say nothing, and never mention itself again.
+        Making it anyway would make the mode a promise Rina breaks.
+
+        One offer is kept, not a queue. Two offers about the same
+        setting are the same offer, and a list of everything that
+        happened during three hours of work is not an interruption
+        avoided — it is an interruption postponed and made worse.
         """
+        if self._sessions.focused():
+            self._held_offer = (key, value, about, sentence)
+            return
         self.say(sentence)
         self._ask(dialog_mod.Question.offer_setting(key, value, about))
+
+    def release_held(self):
+        """
+        Give back the one thing focus held, and raise its question.
+
+        Returns the sentence rather than saying it. Whoever closed the
+        session is about to speak — "session closed, two hours" — and
+        an offer said from here would come out **before** that, which
+        is the wrong order for something that has been waiting an hour
+        already. The caller puts it at the end of its own answer.
+
+        The question itself is raised here, because a pending question
+        is the dialogue's and not the caller's.
+        """
+        held = self._held_offer
+        self._held_offer = None
+        if held is None:
+            return ""
+        key, value, about, sentence = held
+        self._ask(dialog_mod.Question.offer_setting(key, value, about))
+        return sentence
 
     def _take_offer(self, intent):
         """The person agreed: switch it on and say so."""
@@ -1022,6 +1132,26 @@ class RinaEngine:
             ctx.apps = app_index.get_index() or []
             if ctx.apps:
                 intent = router_mod.route(text, ctx)
+
+        # Written into the open session, if one is open (`4.0b-A02`).
+        #
+        # **This is the text of a command, which the journal refuses to
+        # keep at all** (`T-05`: «текста команды в журнале нет никогда»,
+        # even with `log_texts` on). The two are not in conflict, and
+        # the difference is worth stating rather than leaving to be
+        # noticed. The journal exists to work out what happened after
+        # something went wrong, and for that "what was launched" is
+        # enough — the words add nothing and cost a recording of
+        # somebody's speech. A session exists to answer "what did I do
+        # yesterday", and there the words **are** the answer. It is
+        # opened by name, read back on request, shown row by row in
+        # "what Rina knows about me", and forgotten one session at a
+        # time. `T-22`.
+        #
+        # After the parse rather than before: a phrase that turned out
+        # not to be addressed to her is not a command that was given.
+        if intent.name != "silence":
+            self._sessions.remember_command(text)
 
         if intent.name == "silence":
             # Said out loud in the journal, because from outside this is

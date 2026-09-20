@@ -394,11 +394,112 @@ ASK_MODEL = Tool(
 )
 
 
+# ---------------------------------------------------------------------------
+# Working sessions (4.0b-A02) and focus mode (4.0b-A05)
+# ---------------------------------------------------------------------------
+#
+# None of these asks for a permission, and that is worth saying out loud
+# rather than leaving to be noticed. A session starts nothing, opens
+# nothing and touches no file of anybody's: it writes to Rina's own
+# settings. What it *records* — which applications were in front, which
+# folders were worked in — is a wider record of a person than anything
+# else here, and that is governed by two switches of its own
+# (`session_apps`, `session_folders`) rather than by a permission,
+# because a permission is asked once per action and this is a standing
+# state. `T-22` describes it.
+START_SESSION = Tool(
+    name="start_session",
+    summary="Начать рабочую сессию с названием.",
+    params=(Param("goal", "string", "Над чем работа."),),
+    permissions=set(),
+    # Two sessions with the same name are two stretches of work, and a
+    # person may well have meant two.
+    idempotent=False,
+    returns="Подтверждение с названием сессии.",
+    errors=("tool.invalid_arguments",),
+)
+
+FINISH_SESSION = Tool(
+    name="finish_session",
+    summary="Закрыть открытую сессию, при желании с заметкой.",
+    params=(Param("note", "string", "Чем всё кончилось.", required=False),),
+    permissions=set(),
+    # Closing what is closed changes nothing.
+    idempotent=True,
+    returns="Сколько сессия шла и что в ней было.",
+    errors=(),
+)
+
+NOTE_SESSION = Tool(
+    name="note_session",
+    summary="Дописать заметку к открытой сессии.",
+    params=(Param("text", "string", "Что записать."),),
+    permissions=set(),
+    idempotent=False,
+    returns="Подтверждение.",
+    errors=("tool.invalid_arguments",),
+)
+
+FOLDER_SESSION = Tool(
+    name="folder_session",
+    summary="Запомнить рабочий каталог открытой сессии.",
+    params=(Param("path", "string", "Каталог, как его назвали."),),
+    permissions=set(),
+    # The same folder twice is the same folder.
+    idempotent=True,
+    returns="Подтверждение, либо объяснение, почему не записано.",
+    errors=("tool.invalid_arguments",),
+)
+
+WHICH_SESSION = Tool(
+    name="which_session",
+    summary="Какая сессия открыта сейчас.",
+    params=(),
+    permissions=set(),
+    idempotent=True,
+    returns="Название открытой сессии и сколько она идёт.",
+    errors=(),
+)
+
+LAST_SESSION = Tool(
+    name="last_session",
+    summary="Что было в прошлой сессии.",
+    params=(),
+    permissions=set(),
+    idempotent=True,
+    returns="Название, длительность, заметки и приложения.",
+    errors=(),
+)
+
+WORKED_ON = Tool(
+    name="worked_on",
+    summary="Сколько времени ушло на названное дело за неделю.",
+    params=(Param("query", "string", "Название или его часть."),),
+    permissions=set(),
+    idempotent=True,
+    returns="Суммарное время и число сессий.",
+    errors=(),
+)
+
+SET_FOCUS = Tool(
+    name="set_focus",
+    summary="Режим фокуса: Рина не заговаривает сама.",
+    params=(Param("on", "boolean", "Включить или выключить."),),
+    permissions=set(),
+    idempotent=True,
+    returns="Подтверждение.",
+    errors=(),
+)
+
+
 ALL_TOOLS = (
     LAUNCH_APP, LIST_APPS, TEACH_ALIAS, FORGET_ALIAS,
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     ADD_TODO, LIST_TODO, CLOSE_TODO,
+    START_SESSION, FINISH_SESSION, NOTE_SESSION, FOLDER_SESSION,
+    WHICH_SESSION,
+    LAST_SESSION, WORKED_ON, SET_FOCUS,
     RUN_USER_COMMAND, TRY_USER_COMMAND, EXPLAIN_LAST,
     DISPATCH_PLUGIN_COMMAND,
     CALCULATE, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,

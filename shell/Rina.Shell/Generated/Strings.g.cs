@@ -727,6 +727,16 @@ public static partial class Loc
                 {
                     ["English"] = "SCHEDULED · {0}",
                 },
+            ["Запоминать время по программам в сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remember time per application in a session",
+                },
+            ["Запоминать рабочие каталоги в сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remember working folders in a session",
+                },
             ["Запуск без подписи"] =
                 new Dictionary<string, string>
                 {
@@ -1783,6 +1793,11 @@ public static partial class Loc
                 {
                     ["English"] = "path",
                 },
+            ["Путь говорит, над чем идёт работа. Выключено по умолчанию"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A path says what the work is about. Off by default",
+                },
             ["Равно чему"] =
                 new Dictionary<string, string>
                 {
@@ -2225,6 +2240,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "then",
+                },
+            ["Только внутри открытой сессии и только при верхней настройке"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Only inside an open session, and only with the setting above",
                 },
             ["Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит."] =
                 new Dictionary<string, string>

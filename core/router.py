@@ -33,6 +33,7 @@ import re
 from dataclasses import dataclass, field
 
 from core import apps as apps_mod
+from voice import sessions as sessions_mod
 from voice import todo as todo_mod
 from core.intent import Intent
 
@@ -113,6 +114,8 @@ class RouterContext:
     #: person's to say (`4.0b-E06`), and a finder that returns the first
     #: takes that decision quietly.
     todo_find: object = None
+    #: Is a working session open right now (`4.0b-A02`).
+    session_open: bool = False
 
 
 def route(text, ctx=None):
@@ -151,7 +154,8 @@ def route(text, ctx=None):
     # a launch by grammar and not by meaning, and "включи музыку
     # погромче" is about the volume. Both are settled by order rather
     # than by a cleverer parse.
-    for stage in (_answer_to_question, _why, _todo, _reminder, _system,
+    for stage in (_answer_to_question, _why, _session, _todo, _reminder,
+                  _system,
                   _teach, _music, _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
@@ -460,6 +464,59 @@ _CORRECTION = re.compile(
     r"^(?:нет[,\s]+|не\s+т[оа]т[,\s]+|)?"
     r"я\s+имел[а]?\s+в\s+виду\s+(?P<app>.+)$",
     re.IGNORECASE)
+
+
+def _session(command, ctx):
+    """
+    Working sessions (`4.0b-A02`) and focus mode (`4.0b-A05`).
+
+    Before `_todo` and before `_system`, and both placements matter.
+
+    Before `_system`, because "включи режим фокуса" is a switch by
+    grammar: the system stage owns "включи", and given the phrase first
+    it would look for a system action called "режим фокуса", not find
+    one, and the phrase would fall through to a web search.
+
+    Before `_todo` for the opposite reason — nothing of the kind. The
+    two share no words at all: "запиши" is the list's and a note to a
+    session has to say "в сессию". The order between them decides
+    nothing, and writing here that it did would be untrue.
+
+    The stage decides nothing about which sessions exist. Whether one is
+    open is the store's to know; the router only needs it to tell
+    "start" from "you already have one open", because those are
+    different answers to the same phrase.
+    """
+    parsed = sessions_mod.parse(command)
+    if parsed is None:
+        return None
+    what, rest = parsed
+
+    if what == "start":
+        # Already open: not an error and not a silent replacement. The
+        # previous stretch of work would otherwise end at a moment
+        # nobody chose, and the record would say it ended when the next
+        # one began.
+        if ctx.session_open:
+            return Intent("session.busy", {"goal": rest}, stage="sessions")
+        return Intent("session.start", {"goal": rest}, stage="sessions")
+    if what == "finish":
+        return Intent("session.finish", {"note": rest}, stage="sessions")
+    if what == "note":
+        return Intent("session.note", {"text": rest}, stage="sessions")
+    if what == "folder":
+        return Intent("session.folder", {"path": rest}, stage="sessions")
+    if what == "current":
+        return Intent("session.current", stage="sessions")
+    if what == "last":
+        return Intent("session.last", stage="sessions")
+    if what == "worked":
+        return Intent("session.worked", {"query": rest}, stage="sessions")
+    if what == "focus_on":
+        return Intent("session.focus_on", stage="sessions")
+    if what == "focus_off":
+        return Intent("session.focus_off", stage="sessions")
+    return None
 
 
 def _todo(command, ctx):

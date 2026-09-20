@@ -214,6 +214,49 @@ class Executor:
     def _do_why_last(self, intent, source):
         return self._run("explain_last", {}, source=source)
 
+    # ---------- working sessions (4.0b-A02) and focus (4.0b-A05) ------
+    def _do_session_start(self, intent, source):
+        return self._run("start_session", {"goal": intent.arg("goal")},
+                         source=source)
+
+    def _do_session_busy(self, intent, source):
+        """
+        One is already open — so say which, rather than swap it.
+
+        The answer names the open one and what closes it. A person who
+        meant to switch tasks has one sentence to say; a person who
+        forgot a session was running has just been told.
+        """
+        return self._run("which_session", {}, source=source)
+
+    def _do_session_finish(self, intent, source):
+        return self._run("finish_session", {"note": intent.arg("note") or ""},
+                         source=source)
+
+    def _do_session_note(self, intent, source):
+        return self._run("note_session", {"text": intent.arg("text")},
+                         source=source)
+
+    def _do_session_folder(self, intent, source):
+        return self._run("folder_session", {"path": intent.arg("path")},
+                         source=source)
+
+    def _do_session_current(self, intent, source):
+        return self._run("which_session", {}, source=source)
+
+    def _do_session_last(self, intent, source):
+        return self._run("last_session", {}, source=source)
+
+    def _do_session_worked(self, intent, source):
+        return self._run("worked_on", {"query": intent.arg("query")},
+                         source=source)
+
+    def _do_session_focus_on(self, intent, source):
+        return self._run("set_focus", {"on": True}, source=source)
+
+    def _do_session_focus_off(self, intent, source):
+        return self._run("set_focus", {"on": False}, source=source)
+
     # ---------- things to do (4.0b-A13) ----------
     def _do_todo_add(self, intent, source):
         return self._run("add_todo", {"text": intent.arg("text")},

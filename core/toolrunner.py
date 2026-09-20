@@ -54,6 +54,11 @@ class ToolContext:
     #: Things to do (`4.0b-A13`). A store of their own rather than a field
     #: on the reminders: they grow independently and live different spans.
     todo: Any = None
+    #: Working sessions (`4.0b-A02`). Its own store for the same
+    #: reason as the list: written while somebody works, read after.
+    sessions: Any = None
+    #: Say the offer focus mode held back (`4.0b-A05`).
+    release_held: Callable = None
     commands: Any = None
     plugins: Any = None
     emit: Callable = None
@@ -529,6 +534,122 @@ def _calculate(ctx, args):
         result["result"])
 
 
+# The module rather than its pieces: the sayings belong beside the store
+# that knows what a session is, for the same reason `_list_todo` reaches
+# for `voice.todo`.
+from voice import sessions as sessions_mod
+
+
+def _start_session(ctx, args):
+    session = ctx.sessions.start(str(args.get("goal", "")))
+    if session is None:
+        return ToolResult.failed(tr("Не поняла, над чем начать."),
+                                 "tool.invalid_arguments")
+    return ToolResult.done(sessions_mod.say_started(session), value=session)
+
+
+def _finish_session(ctx, args):
+    open_one = ctx.sessions.current()
+    if open_one is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    # Measured before closing: afterwards the answer would have to work
+    # the length out from two stored numbers, and the one place that
+    # knows both is the store.
+    was_focused = bool(open_one.get("focus"))
+    session = ctx.sessions.finish(str(args.get("note", "")))
+    spent = ctx.sessions.spent(session)
+    # What focus held back is said now, while the person is listening
+    # to the closing anyway — and after it, not before. `4.0b-A05`.
+    held = (ctx.release_held() if was_focused and ctx.release_held
+            else "")
+    said = sessions_mod.say_session(
+        session, spent,
+        prefix=sessions_mod.say_finished(session, spent))
+    return ToolResult.done((said + " " + held).strip() if held else said,
+                           value=session)
+
+
+def _note_session(ctx, args):
+    text = str(args.get("text", ""))
+    if not text.strip():
+        return ToolResult.failed(tr("Не поняла, что записать."),
+                                 "tool.invalid_arguments")
+    session = ctx.sessions.note(text)
+    if session is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    return ToolResult.done(tr("Записала в сессию: {text}.", text=text.strip()),
+                           value=session)
+
+
+def _folder_session(ctx, args):
+    path = str(args.get("path", ""))
+    if not path.strip():
+        return ToolResult.failed(tr("Не поняла, какой каталог."),
+                                 "tool.invalid_arguments")
+    if ctx.sessions.current() is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    # Said out loud is not the same as agreed to be kept. The switch is
+    # the standing answer; the phrase is only this once.
+    if not (ctx.settings and ctx.settings.get("session_folders", False)):
+        return ToolResult.done(
+            tr("Каталоги я не запоминаю — это включается в настройках."))
+    ctx.sessions.remember_folder(path)
+    return ToolResult.done(tr("Запомнила каталог: {path}.", path=path))
+
+
+def _which_session(ctx, args):
+    session = ctx.sessions.current()
+    if session is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    spent = ctx.sessions.spent(session)
+    said = sessions_mod.say_session(
+        session, spent,
+        prefix=tr("Идёт сессия {goal}, уже {spent}.",
+                  goal=session["goal"],
+                  spent=sessions_mod._spell(spent)))
+    if session["focus"]:
+        said += " " + tr("Режим фокуса включён.")
+    return ToolResult.done(said, value=session)
+
+
+def _last_session(ctx, args):
+    session = ctx.sessions.last()
+    if session is None:
+        return ToolResult.done(tr("Прошлых сессий пока нет."))
+    return ToolResult.done(
+        sessions_mod.say_session(session, ctx.sessions.spent(session)),
+        value=session)
+
+
+def _worked_on(ctx, args):
+    query = str(args.get("query", ""))
+    # "На этой неделе" is a decision about the calendar, and it is taken
+    # here rather than in the store: the store is asked for a period and
+    # does not invent one.
+    since = time.time() - sessions_mod.WEEK
+    total, count = ctx.sessions.worked(query, since=since)
+    return ToolResult.done(sessions_mod.say_worked(query, total, count),
+                           value={"seconds": total, "sessions": count})
+
+
+def _set_focus(ctx, args):
+    on = bool(args.get("on"))
+    if ctx.sessions.current() is None:
+        # Focus is a property of a session, not a mode of the program.
+        # Without one there is nothing to be focused on, and inventing a
+        # session here would start a stretch of work nobody named.
+        # One literal on one line, because the check that asks whether
+        # everything Rina says has English reads the first string of a
+        # call and a split literal hides the rest of the sentence from
+        # it. A shorter line is also the better sentence.
+        return ToolResult.done(
+            tr("Фокус живёт внутри сессии — сначала начните сессию."))
+    ctx.sessions.set_focus(on)
+    return ToolResult.done(tr("Фокус включён. Сама заговаривать не буду.")
+                           if on else
+                           tr("Фокус выключен."))
+
+
 def _add_todo(ctx, args):
     item = ctx.todo.add(str(args["text"]))
     if item is None:
@@ -675,6 +796,14 @@ IMPLEMENTATIONS = {
     "explain_last": _explain_last,
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
+    "start_session": _start_session,
+    "finish_session": _finish_session,
+    "note_session": _note_session,
+    "folder_session": _folder_session,
+    "which_session": _which_session,
+    "last_session": _last_session,
+    "worked_on": _worked_on,
+    "set_focus": _set_focus,
     "add_todo": _add_todo,
     "list_todo": _list_todo,
     "close_todo": _close_todo,

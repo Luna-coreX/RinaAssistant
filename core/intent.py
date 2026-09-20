@@ -51,6 +51,17 @@ INTENTS = {
     # identically, and the catalogue would promise a difference the
     # behaviour does not have. The difference is recorded in `said`.
     "why.last":           "Объяснить последнее действие",
+    # working sessions (4.0b-A02) and focus mode (4.0b-A05)
+    "session.start":      "Начать сессию. Аргументы: goal",
+    "session.busy":       "Сессия уже идёт. Аргументы: goal",
+    "session.finish":     "Завершить сессию. Аргументы: note",
+    "session.note":       "Заметка к сессии. Аргументы: text",
+    "session.folder":     "Рабочий каталог сессии. Аргументы: path",
+    "session.current":    "Какая сессия открыта",
+    "session.last":       "Что было в прошлой сессии",
+    "session.worked":     "Сколько времени ушло. Аргументы: query",
+    "session.focus_on":   "Включить режим фокуса",
+    "session.focus_off":  "Выключить режим фокуса",
     "todo.add":           "Записать дело. Аргументы: text",
     "todo.list":          "Показать дела",
     "todo.done":          "Закрыть дело. Аргументы: query",

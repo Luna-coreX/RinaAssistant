@@ -236,7 +236,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 75 checks, about five minutes
+python tools/regress.py          # 76 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 
@@ -289,7 +289,7 @@ Full plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Security
 
-What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-two threats, and for each of them the **residual risk**
+What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-three threats, and for each of them the **residual risk**
 written down, because a defence without one has stopped being thought about.
 The sweep that walks that document rather than a list somebody maintains is
 `tools/test_security.py`.

@@ -131,6 +131,15 @@ public static class SettingsLayout
         [
             new("watch_apps", Word("Замечать, какие программы открыты"),
                 Word("Нужно для напоминаний «когда открою…». Выключено по умолчанию")),
+            // Watching and remembering are two switches, not one
+            // (`4.0b-A02`, `T-22`). The first lets Rina see the change;
+            // the second lets her write it down inside an open session.
+            // One switch for both would mean that turning on context
+            // reminders also started a diary.
+            new("session_apps", Word("Запоминать время по программам в сессии"),
+                Word("Только внутри открытой сессии и только при верхней настройке")),
+            new("session_folders", Word("Запоминать рабочие каталоги в сессии"),
+                Word("Путь говорит, над чем идёт работа. Выключено по умолчанию")),
         ],
         [
             new(Word("Где искать программы"),

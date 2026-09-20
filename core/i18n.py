@@ -726,6 +726,48 @@ _EN = {
     '{name} — готово.': '{name} — done.',
     '{name} — готово. Включить?': '{name} — done. Switch it on?',
 
+    # --- working sessions (4.0b-A02) and focus mode (4.0b-A05) ---
+    'Начала сессию {goal}.': 'Started a session {goal}.',
+    'Сессия закрыта: {goal}, {spent}.': 'Session closed: {goal}, {spent}.',
+    'Сессия: {goal}, {spent}.': 'Session: {goal}, {spent}.',
+    'Идёт сессия {goal}, уже {spent}.':
+        'A session is running {goal}, {spent} so far.',
+    'Сейчас нет открытой сессии.': 'No session is open right now.',
+    'Прошлых сессий пока нет.': 'There are no past sessions yet.',
+    'Не поняла, над чем начать.': 'I did not catch what to start on.',
+    'Записала в сессию: {text}.': 'Noted in the session: {text}.',
+    'Не поняла, какой каталог.': 'I did not catch which folder.',
+    'Каталоги я не запоминаю — это включается в настройках.':
+        'I do not remember folders — that is switched on in settings.',
+    'Запомнила каталог: {path}.': 'Folder remembered: {path}.',
+    'Заметки: {notes}.': 'Notes: {notes}.',
+    'Команд: {count}.': 'Commands: {count}.',
+    'Больше всего: {apps}.': 'Mostly: {apps}.',
+    'Каталоги: {folders}.': 'Folders: {folders}.',
+    '{query}: {spent}, сессий {count}.':
+        '{query}: {spent}, {count} sessions.',
+    'Про это у меня ничего не записано: {query}.':
+        'I have nothing written down about this: {query}.',
+    'Режим фокуса включён.': 'Focus mode is on.',
+    'Фокус включён. Сама заговаривать не буду.':
+        'Focus is on. I will not speak up on my own.',
+    'Фокус выключен.': 'Focus is off.',
+    'Фокус живёт внутри сессии — сначала начните сессию.':
+        'Focus lives inside a session — start one first.',
+
+    # A stretch of time, said rather than printed.
+    '{h} ч {m} мин': '{h} h {m} min',
+    '{h} ч': '{h} h',
+    '{m} мин': '{m} min',
+    'меньше минуты': 'under a minute',
+
+    # ...and the same session on the "what Rina knows about me" page.
+    'заметок {n}': '{n} notes',
+    'команд {n}': '{n} commands',
+    'приложений {n}': '{n} applications',
+    'идёт': 'running',
+    'закрыта': 'closed',
+
     # --- the download catalogue (`core/models.py`, `4.0b-A14`) ---
     #
     # These are written as literals beside the sizes and the addresses,

@@ -24,6 +24,7 @@ import os
 import time
 
 from core import settings_schema
+from core.i18n import t as tr
 
 
 def _text(value, limit=300):
@@ -104,6 +105,49 @@ def _todo(settings):
             "what": _text(entry.get("text", "")),
             "detail": "done" if entry.get("done") else "open",
             "where": "",
+            "when": when,
+        })
+    return out
+
+
+def _sessions(settings):
+    """
+    Working sessions (`4.0b-A02`), and the widest record here.
+
+    A session holds what somebody was at, for how long, which
+    applications were in front of them and — when they agreed to it —
+    which folders they worked in. That is closer to a diary than
+    anything else Rina keeps, which is exactly why it is spelled out
+    row by row rather than summed up as "sessions: 12": a person
+    looking at this page has to be able to see the day they want
+    forgotten and forget it.
+    """
+    out = []
+    for entry in (settings.get("sessions", []) or []):
+        if not isinstance(entry, dict):
+            continue
+        try:
+            when = float(entry.get("started", 0) or 0)
+        except (TypeError, ValueError):
+            when = 0.0
+        apps = entry.get("apps", {})
+        parts = []
+        if entry.get("notes"):
+            parts.append(tr("заметок {n}", n=len(entry["notes"])))
+        if entry.get("commands"):
+            parts.append(tr("команд {n}", n=len(entry["commands"])))
+        if isinstance(apps, dict) and apps:
+            parts.append(tr("приложений {n}", n=len(apps)))
+        out.append({
+            "id": _text(entry.get("id", ""), 100),
+            "what": _text(entry.get("goal", "")),
+            "detail": ", ".join(parts) or (tr("идёт") if not
+                                           entry.get("finished")
+                                           else tr("закрыта")),
+            # The folders are the sharpest part of a session, so they
+            # stand in the column that names a place rather than being
+            # counted among the rest.
+            "where": _text("; ".join(entry.get("folders") or []), 300),
             "when": when,
         })
     return out
@@ -200,6 +244,7 @@ GROUPS = (
     ("history", ("history",), _history),
     ("reminders", ("reminders",), _reminders),
     ("todo", ("todo",), _todo),
+    ("sessions", ("sessions",), _sessions),
     ("commands", ("custom_commands",), _commands),
     ("stats", ("command_stats",), _stats),
     ("plugins", ("enabled_plugins", "plugin_settings"), _plugins),
@@ -349,6 +394,7 @@ FORGETTABLE = {
     "history": ("history", None),
     "reminders": ("reminders", "id"),
     "todo": ("todo", "id"),
+    "sessions": ("sessions", "id"),
     "commands": ("custom_commands", "id"),
     "stats": ("command_stats", None),
     "plugins": ("enabled_plugins", None),
