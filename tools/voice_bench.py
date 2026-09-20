@@ -67,19 +67,69 @@ class Adapter:
 
 
 class EdgeAdapter(Adapter):
-    """A reference point: online synthesis, which the application already has."""
+    """A reference point: online synthesis, which the application already has.
+
+    **Through the application's own engine, not through `edge-tts`
+    directly.** The other adapters here are candidates the program does
+    not have yet, and for them the library is the only thing to call.
+    Edge is the one the program ships, and the sentence above is its
+    whole reason for being on the bench — so measuring anything other
+    than the path the program actually takes makes the reference point
+    a reference to nothing.
+
+    It mattered. This adapter called `Communicate.save()`, which waits
+    out the whole reply, and went on doing so after `4.0b-E10` taught
+    Edge to stream. The bench reported the main product metric for the
+    one engine people use as 1447 ms when the program was managing
+    1027: a measurement that kept its name after its subject moved.
+    """
 
     name = "edge"
     voice = "ru-RU-SvetlanaNeural"
+    streaming = True
+
+    #: When the first sound was ready, and how much sound came out.
+    #: Both are filled in during `synthesize` and read by `measure`.
+    first_at = None
+    audio_s = None
 
     def synthesize(self, text, path):
-        import asyncio
-        import edge_tts
+        from core.speech import pcm_from_stream
+        from voice import tts
 
-        async def run():
-            await edge_tts.Communicate(text, self.voice).save(path)
+        engine = tts.get_engine("edge")
+        self.first_at = None
+        self.audio_s = None
+        started = time.perf_counter()
+        samples = 0
+        hertz = 0
 
-        asyncio.run(run())
+        with open(path, "wb") as into:
+            def passing():
+                # The chunks go to disk on their way through, so the
+                # blind comparison still gets its file: the point of
+                # streaming is that nothing waits for the file, not
+                # that there is no file.
+                for chunk in engine.stream(text, volume=75, rate=100):
+                    if chunk:
+                        into.write(chunk)
+                        yield chunk
+
+            for pcm, rate in pcm_from_stream(passing(), engine.stream_format):
+                if not pcm:
+                    continue
+                if self.first_at is None:
+                    # Measured at the first **decoded** sample, not at
+                    # the first mp3 chunk. What the program can play is
+                    # the honest "first sound"; the raw chunk is a
+                    # promise of one, and counting it would flatter
+                    # this engine against the others by the decoding.
+                    self.first_at = time.perf_counter() - started
+                samples += len(pcm) // 2
+                hertz = rate or hertz
+
+        if samples and hertz:
+            self.audio_s = round(samples / hertz, 3)
 
 
 class Pyttsx3Adapter(Adapter):
@@ -177,17 +227,27 @@ def measure(adapter, item, out_dir):
     elapsed = time.perf_counter() - started
 
     duration, rate = audio_facts(path) if error is None else (None, None)
+    # An mp3 `soundfile` cannot read still has a duration if the adapter
+    # decoded it on the way past. Without this Edge had no RTF at all —
+    # a dash in the column that decides whether a voice keeps up with
+    # itself.
+    if duration is None and getattr(adapter, "audio_s", None):
+        duration = adapter.audio_s
     size = os.path.getsize(path) if os.path.isfile(path) else 0
+
+    # Without streaming the first sound is available only once everything
+    # is ready, so TTFA equals the whole time. A streaming adapter says
+    # when its first sound was actually there, and that is the number
+    # this bench exists to compare.
+    ttfa = elapsed
+    if getattr(adapter, "streaming", False):
+        ttfa = getattr(adapter, "first_at", None)
 
     return {
         "id": item["id"],
         "group": item["group"],
         "chars": len(item["text"]),
-        # Without streaming synthesis the first sound is available only once
-        # everything is ready, so TTFA equals the whole time. A streaming
-        # candidate's adapter is obliged to measure the moment of the first
-        # chunk and override this field.
-        "ttfa_s": None if error else round(elapsed, 3),
+        "ttfa_s": None if error or ttfa is None else round(ttfa, 3),
         "synthesis_s": round(elapsed, 3),
         "audio_s": duration,
         "rtf": round(elapsed / duration, 3) if duration else None,

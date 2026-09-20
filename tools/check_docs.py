@@ -537,5 +537,50 @@ for key, (what, opens, closes) in SPOKEN.items():
           f"| README: {sorted(said)} | настройки: {sorted(want)}")
 
 print()
+print("=== стенд меряет ту дорогу, по которой идёт звук ===")
+#
+# `4.0b-E10` taught Edge to stream, and the bench went on calling
+# `Communicate.save()` — the whole-reply path the program had stopped
+# taking. So the main product metric for the one engine people use was
+# reported as 1447 ms while the program managed 1027: a measurement
+# that kept its name after its subject moved, which is the failure
+# `4.0s-S5` exists to prevent and the one nothing was watching for.
+#
+# Asked statically, because the bench needs the network and the
+# regression does not: an engine the program declares as streaming has
+# to be measured as streaming.
+import ast
+
+from voice import tts as tts_mod
+
+streams = {name for name in ("edge", "piper", "silent", "sapi", "pyttsx3",
+                             "coqui")
+           if getattr(tts_mod.get_engine(name), "streams", False)}
+
+bench = ast.parse(io.open(os.path.join(ROOT, "tools", "voice_bench.py"),
+                          encoding="utf-8").read())
+declared = {}
+for node in ast.walk(bench):
+    if not isinstance(node, ast.ClassDef):
+        continue
+    fields = {}
+    for body in node.body:
+        if isinstance(body, ast.Assign) and len(body.targets) == 1                 and isinstance(body.targets[0], ast.Name):
+            try:
+                fields[body.targets[0].id] = ast.literal_eval(body.value)
+            except ValueError:
+                pass
+    if "name" in fields:
+        declared[fields["name"]] = bool(fields.get("streaming", False))
+
+missed = sorted(one for one in streams
+                if one in declared and not declared[one])
+check("движок с потоком и на стенде меряется потоком", not missed,
+      f"| меряются целиком: {missed}")
+check("стенд знает о движках программы",
+      streams and streams <= set(declared),
+      f"| с потоком {sorted(streams)}, на стенде {sorted(declared)}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
