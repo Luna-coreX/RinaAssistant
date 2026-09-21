@@ -167,7 +167,7 @@ dotnet run --project shell/Rina.Shell</pre>
 <p>Rina talks to <code>http://localhost:11434</code> by default and warns you plainly if you point her anywhere that is not local.</p>
 <hr class="seam">
 <h2 id="development">Development</h2>
-<pre>python tools/regress.py          # 78 checks, about six minutes
+<pre>python tools/regress.py          # 79 checks, about six minutes
 python tools/regress.py --list   # what they are</pre>
 <p>Behaviour is pinned by a golden set of 134 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.</p>
 <p>How to debug two processes at once — <a href="/docs/debugging/"><code>docs/DEBUGGING.md</code></a>.</p>
@@ -186,7 +186,7 @@ python tools/regress.py --list   # what they are</pre>
 <p>Full plan: <a href="/docs/plan/"><code>docs/ROADMAP.md</code></a>.</p>
 <hr class="seam">
 <h2 id="security">Security</h2>
-<p>What we defend against, from whom, and with what — <a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>. Six surfaces, twenty-three threats, and for each of them the <strong>residual risk</strong> written down, because a defence without one has stopped being thought about. The sweep that walks that document rather than a list somebody maintains is <code>tools/test_security.py</code>.</p>
+<p>What we defend against, from whom, and with what — <a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>. Six surfaces, twenty-four threats, and for each of them the <strong>residual risk</strong> written down, because a defence without one has stopped being thought about. The sweep that walks that document rather than a list somebody maintains is <code>tools/test_security.py</code>.</p>
 <p>Reporting a vulnerability: <a href="/docs/security/"><code>SECURITY.md</code></a>.</p>
 <hr class="seam">
 <h2 id="contributing-and-feedback">Contributing and feedback</h2>

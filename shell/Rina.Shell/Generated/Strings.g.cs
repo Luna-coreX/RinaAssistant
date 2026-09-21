@@ -1079,6 +1079,11 @@ public static partial class Loc
                 {
                     ["English"] = "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*",
                 },
+            ["Модель может искать в интернете"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The model may search the web",
+                },
             ["Мох"] =
                 new Dictionary<string, string>
                 {
@@ -2272,6 +2277,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The list of what is waiting.",
+                },
+            ["Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "It asks when its own knowledge falls short. The query goes to DuckDuckGo",
                 },
             ["Спрашиваю…"] =
                 new Dictionary<string, string>

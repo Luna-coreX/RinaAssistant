@@ -119,6 +119,7 @@ CONSTRAINTS: dict[str, Constraint] = {
     "llm_url": Constraint(depends_on="llm_enabled",
                           warn_code="llm.remote_address"),
     "llm_model": Constraint(depends_on="llm_enabled"),
+    "llm_web": Constraint(depends_on="llm_enabled"),
     "llm_persona": Constraint(depends_on="llm_enabled"),
 
     # Recording the text of lines is a decision about privacy, and it has
@@ -177,6 +178,7 @@ CONSTRAINTS: dict[str, Constraint] = {
 WATCHED = frozenset({
     "llm_url",
     "llm_enabled",
+    "llm_web",
     "log_texts",
     "program_folders",
     "watch_apps",

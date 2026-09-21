@@ -14,11 +14,15 @@ It adds no dependencies: Ollama answers over HTTP, and urllib is enough.
 
 import http.client
 import json
+import re
 import time
 import urllib.error
 import urllib.request
 
 from core.i18n import t as tr
+from core.logging_setup import get_logger, safe
+
+log = get_logger("llm")
 
 
 DEFAULT_URL = "http://localhost:11434"
@@ -176,6 +180,36 @@ def _context_messages(history):
     return messages
 
 
+#: What the model says when it wants to look something up.
+#:
+#: A line of its own rather than a phrase to be recognised. "Answer
+#: `ПОИСК: <запрос>` and nothing else" is a thing a model either did or
+#: did not do; "I do not know, this needs checking" is a thing somebody
+#: has to guess at, and guessing at free text is how a program comes to
+#: search because an answer happened to contain the word "unknown".
+WANTS_SEARCH = re.compile(r"^\s*ПОИСК:\s*(.+?)\s*$")
+
+#: Said to the model when it is allowed to look.
+MAY_SEARCH = (
+    "Если для ответа нужны свежие сведения или ты не уверена в фактах, "
+    "ответь ровно одной строкой: ПОИСК: <что искать> — и ничем больше. "
+    "Иначе отвечай как обычно."
+)
+
+
+def _searched(query):
+    """What the web says, as lines for the prompt. Empty if nothing."""
+    from voice import websearch
+
+    found = websearch.results(query)
+    if not found:
+        return ""
+    lines = ["Найдено в интернете по запросу «%s»:" % query]
+    for at, one in enumerate(found, 1):
+        lines.append("%d. %s — %s" % (at, one["title"], one["body"]))
+    return "\n".join(lines)
+
+
 def ask(question, history=None):
     """
     Asks the model a question and returns the answer.
@@ -190,17 +224,43 @@ def ask(question, history=None):
     except (TypeError, ValueError):
         timeout = DEFAULT_TIMEOUT
 
-    messages = [{"role": "system", "content": persona()}]
-    messages += _context_messages(history)
-    messages.append({"role": "user", "content": question})
+    may_search = bool(_settings().get("llm_web", False))
 
-    data = _request("/api/chat", payload={
-        "model": current_model(),
-        "messages": messages,
-        "stream": False,
-    }, timeout=max(5, min(timeout, 300)))
+    def once(extra=""):
+        told = persona()
+        if extra:
+            told = (told + "\n\n" + extra) if told else extra
+        messages = [{"role": "system", "content": told}]
+        messages += _context_messages(history)
+        messages.append({"role": "user", "content": question})
+        data = _request("/api/chat", payload={
+            "model": current_model(),
+            "messages": messages,
+            "stream": False,
+        }, timeout=max(5, min(timeout, 300)))
+        return ((data.get("message") or {}).get("content") or "").strip()
 
-    answer = ((data.get("message") or {}).get("content") or "").strip()
+    answer = once(MAY_SEARCH if may_search else "")
+
+    # **The model decides, and it gets one search — not a conversation.**
+    #
+    # Asking it first and searching only when it says it needs to is
+    # what keeps "как дела" from costing two seconds and a query to
+    # somebody else's service. What it must not become is a loop: the
+    # second pass is told nothing about searching, so a model that
+    # likes the word cannot spend an afternoon on it.
+    #
+    # A search that found nothing is not reported as a failure. The
+    # question goes back without results and is answered as it would
+    # have been with the setting off — which is a worse answer, and a
+    # better one than silence.
+    if may_search:
+        found = WANTS_SEARCH.match(answer)
+        if found:
+            query = found.group(1)
+            log.info("Модель попросила поиск: %s", safe(query))
+            answer = once(_searched(query))
+
     if not answer:
         raise LLMError(tr("Модель вернула пустой ответ"))
     return answer

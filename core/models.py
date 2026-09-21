@@ -185,6 +185,21 @@ PACKAGES = (
             purpose="tts",
             note="Голоса Microsoft. Текст реплики уходит к ним по сети; "
                  "модель скачивать не нужно."),
+
+    # Reading search results, for `4.0b-E13`.
+    #
+    # **Not in the installer.** It weighs forty-two megabytes — `lxml`
+    # and a Rust HTTP client that can pass for a browser — and the whole
+    # release is two hundred and forty. A thing that large, wanted by
+    # some and not by others, is what `4.0b-A15` built this list for.
+    #
+    # `engine` is empty on purpose: finishing this download offers no
+    # engine, and `_worth_offering` reads that field to decide.
+    Package("pkg-search", "Пакет поиска", "ddgs", "ddgs",
+            "", size=42 * 1024 * 1024,
+            purpose="web",
+            note="Чтобы модель могла смотреть в интернете. "
+                 "Запрос уходит в DuckDuckGo."),
 )
 
 

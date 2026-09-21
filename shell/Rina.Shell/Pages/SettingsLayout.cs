@@ -179,6 +179,11 @@ public static class SettingsLayout
                 Word("Адрес модели. Не локальный означает, что разговоры уйдут наружу")),
             new("llm_model", Word("Название модели"),
                 Word("Имя модели на этом сервере")),
+            // Under the model's own switch, because it is the model
+            // that searches: with «Отвечать моделью» off there is
+            // nobody to want a search.
+            new("llm_web", Word("Модель может искать в интернете"),
+                Word("Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo")),
             new("llm_persona", Word("Характер"),
                 Word("Каким характером модель отвечает")),
             new("llm_timeout", Word("Сколько ждать ответа, секунд"),

@@ -123,8 +123,12 @@ check("в каталоге есть и модели, и пакеты",
 # offered. Found by a person installing on a second computer: Rina heard,
 # understood, and had no way whatever to answer aloud — no package and no
 # model for any speaking engine existed in the catalogue at all.
-check("у каждой записи сказано, для слуха она или для голоса",
-      all(m.get("purpose") in ("stt", "tts") for m in listed),
+# `web` joined them with `4.0b-E13`: the search package is neither for
+# hearing nor for speaking, and the setup wizard walks `stt` and `tts`
+# by name, so it does not offer this one — which is right. Search is
+# not part of setting the program up.
+check("у каждой записи сказано, для чего она",
+      all(m.get("purpose") in ("stt", "tts", "web") for m in listed),
       f"| {sorted({m.get('purpose') for m in listed})}")
 check("в каталоге есть чем говорить",
       any(m["purpose"] == "tts" for m in listed),

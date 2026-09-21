@@ -89,6 +89,10 @@ GROUPS = {
         # the local language model (Ollama). Off by default: this is a heavy
         # capability that requires an installed server.
         "llm_enabled": False,
+        # The model may look things up (`4.0b-E13`). Off until
+        # asked for: switching it on means questions leave this
+        # machine for a search service (`T-23`).
+        "llm_web": False,
         "llm_url": "http://localhost:11434",
         "llm_model": "",
         "llm_persona": "",

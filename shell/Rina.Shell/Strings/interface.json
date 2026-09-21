@@ -599,6 +599,9 @@
   "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*": {
     "English": "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*"
   },
+  "Модель может искать в интернете": {
+    "English": "The model may search the web"
+  },
   "Мох": {
     "English": "Moss"
   },
@@ -1231,6 +1234,9 @@
   },
   "Список того, что ждёт.": {
     "English": "The list of what is waiting."
+  },
+  "Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo": {
+    "English": "It asks when its own knowledge falls short. The query goes to DuckDuckGo"
   },
   "Спрашиваю…": {
     "English": "Asking…"

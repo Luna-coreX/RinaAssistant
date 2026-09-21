@@ -807,6 +807,9 @@ _EN = {
     'Речь на этом компьютере. К нему нужен голос.':
         'Speech on this computer. It needs a voice as well.',
     'Пакет Edge (онлайн)': 'Edge package (online)',
+    'Пакет поиска': 'Search package',
+    'Чтобы модель могла смотреть в интернете. Запрос уходит в DuckDuckGo.':
+        'So the model can look things up. The query goes to DuckDuckGo.',
     'Голоса Microsoft. Текст реплики уходит к ним по сети; модель '
     'скачивать не нужно.':
         'Microsoft voices. The text of the reply goes to them over the '

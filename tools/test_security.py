@@ -71,6 +71,7 @@ ELSEWHERE = {
     "T-12": "поверхность 5.0 — там же",
     "T-14": "--check-updates · подпись и целостность обновления",
     "T-15": "--check-diagnostics · состав диагностического пакета",
+    "T-23": "tools/test_websearch.py · поиск по просьбе модели, один раз",
 }
 
 
@@ -276,7 +277,8 @@ from core import models
 # here" — and then both lines change together.
 named_packages = {p.pip for p in models.PACKAGES}
 about("T-20", "устанавливаемое перечислено таблицей ядра",
-      named_packages == {"vosk", "faster-whisper", "piper-tts", "edge-tts"},
+      named_packages == {"vosk", "faster-whisper", "piper-tts", "edge-tts",
+                         "ddgs"},
       f"| {sorted(named_packages)}")
 
 # And each name is a name. `pip install` takes a URL, a path, a local
