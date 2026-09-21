@@ -920,5 +920,69 @@ check("сказанное не ей ничего не обрывает", silent_
       f"| {silent_cuts}")
 
 print()
+print("=== решить, каким путём идти, не стоит времени ===")
+#
+# **The fault this is here for.** Rina took sixteen seconds to start
+# speaking on a machine where the same code took one, on every
+# sentence, whatever its length. The sixteen seconds were spent
+# deciding whether to use a proxy: `urllib.request.proxy_bypass` on
+# Windows enriches the host with its address and its fully qualified
+# name before comparing, and `socket.getfqdn` is a reverse lookup —
+# fifteen seconds on that machine. `aiohttp` calls it on every request
+# when no proxy was given and `trust_env` is on, which is the state a
+# window started from the desktop is always in: a proxy set
+# system-wide lives in the registry, not in the environment.
+#
+# Checked causally rather than with a stopwatch. A stopwatch would
+# measure the machine — the very thing this whole fault was about.
+# Instead the two names that cost the time are taken away, and the
+# decision has to come out anyway.
+import socket as socket_mod
+import urllib.request as urllib_request
+
+from voice import tts as tts_mod
+
+edge = tts_mod.get_engine("edge")
+was_fqdn = socket_mod.getfqdn
+was_bypass = urllib_request.proxy_bypass
+
+
+# A mark rather than an exception. The first edition raised, and
+# `_through` catches `Exception` to fall back to a direct connection on
+# a machine whose settings cannot be read — so the raise was swallowed
+# and the check stayed green over the very fault it was written for.
+called = []
+
+
+def noted(name, answer):
+    def instead(*_args, **_kw):
+        called.append(name)
+        return answer
+    return instead
+
+
+socket_mod.getfqdn = noted("getfqdn", "host")
+urllib_request.proxy_bypass = noted("proxy_bypass", 0)
+try:
+    edge._through()
+finally:
+    socket_mod.getfqdn = was_fqdn
+    urllib_request.proxy_bypass = was_bypass
+
+check("путь выбирается без обратного поиска имени", not called,
+      "| _through() позвал %s — это пятнадцать секунд на каждую фразу"
+      % ", ".join(sorted(set(called))))
+
+# And the proxy is handed to the engine rather than left to be found:
+# an engine given one does not ask the environment, which is what
+# keeps `aiohttp` from making the same call itself.
+import inspect
+
+source = inspect.getsource(tts_mod.EdgeTTSEngine)
+check("прокси передаётся движку явно",
+      source.count("proxy=") >= 2,
+      "| Communicate без proxy= снова спросит окружение")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

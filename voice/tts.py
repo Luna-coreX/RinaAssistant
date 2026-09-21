@@ -424,6 +424,104 @@ class EdgeTTSEngine(TTSEngine):
     streams = True
     stream_format = "mp3"
 
+    #: The host the service lives on, for the bypass list.
+    HOST = "speech.platform.bing.com"
+
+    @classmethod
+    def _through(cls):
+        """The proxy to reach the service through, or None for direct.
+
+        **Found by measurement, on a machine where Rina took sixteen
+        seconds to start speaking.** The route to Microsoft's speech
+        service was slow from that machine — 15.7 seconds to the first
+        byte — and fast through the proxy the person had set up:
+        under a second. Every browser on that machine used the proxy;
+        Rina did not, and so she alone was sixteen times slower.
+
+        **The rest of this program already goes that way.** Model
+        downloads use `urllib`, which on Windows reads the system
+        proxy out of the registry; the web search opens the person's
+        browser, which honours it too. Edge was the one place that
+        went direct — not by decision, but because nobody had looked.
+        `edge-tts` reads `HTTPS_PROXY` from the environment on its own
+        (`trust_env=True`), and the environment is exactly where a
+        proxy set system-wide is **not**: a window started from the
+        desktop carries the variables that existed when the desktop
+        started.
+
+        `getproxies()` answers both cases in one call — the variables
+        when they are set, the registry when they are not — so there
+        is one answer here rather than two rules that disagree.
+
+        The bypass list is honoured: a person who excluded a host
+        excluded it, and routing it anyway would be deciding their
+        network for them.
+        """
+        import urllib.request
+
+        try:
+            proxy = urllib.request.getproxies().get("https")
+            return proxy if proxy and not cls._bypassed() else None
+        except Exception:                               # noqa: BLE001
+            # A machine whose proxy settings cannot be read is a
+            # machine that goes direct, as it did before.
+            return None
+
+    @classmethod
+    def _bypassed(cls):
+        """Is the service in the "go direct" list — by name alone.
+
+        **`urllib.request.proxy_bypass` is not used, and that is the
+        whole fix.** On Windows it enriches the host with its address
+        and its fully qualified name before comparing, and
+        `socket.getfqdn` is a reverse lookup: measured on the machine
+        this was found on, **fifteen seconds**. Every one of them was
+        spent to decide that a public Microsoft hostname is not in
+        somebody's list of local exceptions.
+
+        That is also the whole of the original fault. `aiohttp` calls
+        the same function on every request when no proxy is given to
+        it and `trust_env` is on — which is exactly the state a window
+        started from the desktop is in, because a proxy set
+        system-wide is in the registry and not in the environment. So
+        Rina paid fifteen seconds before every sentence, and paid it
+        again for the next one; with the variables set she took the
+        environment branch, a string comparison, and was fast. Two
+        machines, one program, a sixteenfold difference, and nothing
+        anywhere said why.
+
+        Passing the proxy on explicitly stops `aiohttp` asking at all,
+        which leaves only this — and this compares names, as the
+        registry's own list is written in names.
+        """
+        import fnmatch
+        import os
+        import urllib.request
+
+        listed = (os.environ.get("no_proxy") or os.environ.get("NO_PROXY")
+                  or "")
+        if not listed:
+            try:
+                import winreg
+
+                with winreg.OpenKey(
+                        winreg.HKEY_CURRENT_USER,
+                        r"Software\Microsoft\Windows\CurrentVersion"
+                        r"\Internet Settings") as key:
+                    listed = str(winreg.QueryValueEx(key,
+                                                     "ProxyOverride")[0])
+            except Exception:                           # noqa: BLE001
+                listed = ""
+        for one in listed.replace(";", ",").split(","):
+            one = one.strip().lower()
+            if not one or one == "<local>":
+                # `<local>` means a name with no dots in it. The
+                # service has plenty.
+                continue
+            if one == cls.HOST or fnmatch.fnmatch(cls.HOST, one)                     or cls.HOST.endswith("." + one.lstrip(".*")):
+                return True
+        return False
+
     @staticmethod
     def _asked(voice, volume, rate):
         """The three things edge-tts wants, in the shape it wants them."""
@@ -447,7 +545,8 @@ class EdgeTTSEngine(TTSEngine):
 
             async def _gen():
                 communicate = edge_tts.Communicate(
-                    text, voice_id, rate=rate_str, volume=vol_str)
+                    text, voice_id, rate=rate_str, volume=vol_str,
+                    proxy=self._through())
                 await communicate.save(tmp)
 
             asyncio.run(_gen())
@@ -494,6 +593,7 @@ class EdgeTTSEngine(TTSEngine):
         began = _time.monotonic()
         first = None
         chunks = 0
+        through = self._through()
         #: When the service handed over the first chunk. A list because
         #: the producer runs in another thread and writes it there.
         made = [None]
@@ -502,7 +602,8 @@ class EdgeTTSEngine(TTSEngine):
             async def read():
                 try:
                     talk = edge_tts.Communicate(text, voice_id,
-                                                rate=rate_str, volume=vol_str)
+                                                rate=rate_str, volume=vol_str,
+                                                proxy=through)
                     async for part in talk.stream():
                         if part["type"] == "audio" and part.get("data"):
                             # When the service gave it, as against when
@@ -539,8 +640,9 @@ class EdgeTTSEngine(TTSEngine):
                 chunks += 1
                 yield piece
         finally:
-            log.info("Edge: сервис отдал за %s, забрали через %s, "
+            log.info("Edge (%s): сервис отдал за %s, забрали через %s, "
                      "кусков %d, поток %d мс",
+                     through or "напрямую",
                      ("%d мс" % (made[0] * 1000)) if made[0] is not None
                      else "—",
                      ("%d мс" % (first * 1000)) if first is not None
