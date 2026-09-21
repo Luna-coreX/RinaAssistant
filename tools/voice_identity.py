@@ -45,12 +45,31 @@ CACHE = os.path.join(os.path.expanduser("~"), ".cache", "rina-voice")
 
 #: The verification network.
 #:
-#: WeSpeaker ResNet34 trained on VoxCeleb with large-margin finetuning:
-#: a standard of the speaker-verification field, 25 MB, Apache-2.0, and
-#: it runs on the processor in ONNX. Speaker verification is close to
-#: language-independent — it is trained to hear the person, not the
-#: words — so an English-trained network judges Russian speech.
-VERIFIER = "wespeaker_en_voxceleb_resnet34_LM.onnx"
+#: CAM++ from 3D-Speaker, trained on Chinese and English common data:
+#: 27 MB, Apache-2.0, runs on the processor in ONNX.
+#:
+#: **Chosen by measurement, after the obvious choice failed.** The first
+#: network here was WeSpeaker ResNet34 on VoxCeleb, a field standard,
+#: and on two VITS speakers — a man and a woman — it separated cleanly.
+#: On eight adult women recorded through consumer microphones it stopped
+#: working: different people averaged 0.647 and the closest pair reached
+#: 0.880, while a control that was certainly the same voice scored
+#: 0.861. The gap was **negative** — the same person scored lower than
+#: the most similar two strangers — and every identity number taken with
+#: it was undecidable.
+#:
+#: Reaching for a bigger model of the same family did not help:
+#: ResNet293, four times the size, gave +0.006. The problem was the
+#: domain, not the capacity. CAM++ on the same recordings: different
+#: people 0.308, closest pair 0.537, same person 0.856 — a gap of
+#: +0.319.
+#:
+#: The lesson is kept beside the constant: speaker verification is
+#: called language-independent, and across a homogeneous cohort in a
+#: language the network never heard, it is not. Whichever network stands
+#: here, `check()` prints the cohort's own spread, so a verifier that
+#: has stopped separating says so instead of returning a number anyway.
+VERIFIER = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
 VERIFIER_URL = ("https://huggingface.co/csukuangfj/speaker-embedding-models/"
                 "resolve/main/" + VERIFIER)
 
@@ -83,6 +102,11 @@ PHRASES = (
     "Готово. Открываю Visual Studio Code.",
     "Напоминаю: встреча с друзьями в восемнадцать ноль-ноль.",
 )
+
+
+#: Others measured on the way, kept so the comparison can be repeated.
+OTHER_VERIFIERS = ("wespeaker_en_voxceleb_resnet34_LM.onnx",
+                   "wespeaker_en_voxceleb_resnet293_LM.onnx")
 
 
 def verifier_path(quiet=False):
@@ -283,7 +307,7 @@ def check(paths, against, out=None):
         bar = scale["max"]
         print("Планка «дальше всех» — %.4f: столько набирают самые "
               "похожие двое из них." % bar)
-        if bar > 0.80:
+        if bar > 0.70:
             # Said out loud, because a check that cannot separate is
             # worse than no check: it returns a number either way.
             print("ВНИМАНИЕ: источники плохо различимы этим "
