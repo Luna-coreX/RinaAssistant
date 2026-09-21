@@ -231,13 +231,33 @@ def may_search():
 
 
 def _searched(query):
-    """What the web says, as lines for the prompt. Empty if nothing."""
+    """What the web says, as lines for the prompt. Empty if nothing.
+
+    **The findings come with an instruction, and without it they were
+    ignored.** Handing them over silently is not enough: asked «какая
+    погода в Хабаровске», the model asked for a search, got three
+    forecasts for that day and that city, and answered «у меня нет
+    доступа к актуальным данным в реальном времени». The persona is
+    part of why — it says to admit honestly when she does not know, and
+    on the second pass nothing said that she now does.
+
+    So it is said. Along with the escape, because the opposite failure
+    is worse: if the answer really is not among the findings, saying
+    what is missing beats inventing it.
+    """
     from voice import websearch
 
     found = websearch.results(query)
     if not found:
         return ""
-    lines = ["Найдено в интернете по запросу «%s»:" % query]
+    lines = [
+        "Ты просила поискать — вот что нашлось. Отвечай по найденному: "
+        "это и есть те свежие сведения, которых тебе не хватало. Не "
+        "отвечай «не знаю» и не говори, что у тебя нет доступа к данным "
+        "в реальном времени: данные перед тобой. Если ответа в найденном "
+        "всё-таки нет, скажи прямо, чего не хватает.",
+        "Найдено в интернете по запросу «%s»:" % query,
+    ]
     for at, one in enumerate(found, 1):
         lines.append("%d. %s — %s" % (at, one["title"], one["body"]))
     return "\n".join(lines)

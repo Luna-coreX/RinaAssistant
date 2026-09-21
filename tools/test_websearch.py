@@ -119,6 +119,29 @@ check("и найденное ей передали",
       "Оно голубое" in model.asked[1], f"| {model.asked[1][:80]}")
 
 print()
+print("=== находкам сказано, что они ответ ===")
+# **Handed over silently, the findings were ignored.** Measured on
+# the model this was found on: asked «какая погода в Хабаровске», it asked for a
+# search, was given three forecasts for that day and that city, and
+# answered «у меня нет доступа к актуальным данным в реальном времени».
+# The persona pulls that way too — it says to admit honestly when she
+# does not know — and nothing on the second pass said that she now does.
+model, searched, answer = run(
+    ["ПОИСК: погода в Хабаровске", "Плюс двенадцать."],
+    found=[{"title": "Погода", "body": "Плюс двенадцать.", "href": "x"}])
+told = model.asked[1]
+check("сказано отвечать по найденному",
+      "Отвечай по найденному" in told, "| указания нет")
+check("и не отговариваться отсутствием доступа",
+      "в реальном времени" in told, "| про доступ не сказано")
+# The opposite failure is worse: told only to answer from the findings,
+# a model that was handed links without numbers would invent numbers.
+check("но если ответа в находках нет — сказать прямо",
+      "чего не хватает" in told, "| оговорки нет")
+check("сами находки на месте",
+      "Плюс двенадцать" in told, "| находок в промпте нет")
+
+print()
 print("=== не просила — не искали ===")
 model, searched, answer = run(["Канберра."])
 check("поиска не было", searched == [], f"| {searched}")
