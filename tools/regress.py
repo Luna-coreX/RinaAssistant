@@ -84,6 +84,7 @@ NOT_A_CHECK = {
     "retranslate.py": "правит комментарии по заданию",
     "sandbox.py": "песочница, которой пользуются проверки",
     "voice_bench.py": "стенд замеров: меряет, а не проверяет",
+    "voice_identity.py": "замер личности голоса: скачивает модели и синтезирует",
 }
 
 #: The checks that need a built release, and where it lies.
