@@ -62,6 +62,38 @@ def similar(a, b, threshold=THRESHOLD):
     return difflib.SequenceMatcher(None, a, b).ratio() >= threshold
 
 
+def whole_word(haystack, needle) -> bool:
+    """
+    Is `needle` in `haystack` as a word of its own, not inside another.
+
+    **The third time this bit.** «пока» lives inside «покажи», so
+    «покажи задачи» was answered «До встречи». «техно» lives inside
+    «технологиями», so «как успехи с технологиями для полного
+    погружения» was taken for a request to put on some techno. Both
+    were tables matched with `in`, both answers were real answers to a
+    phrase nobody said, and nothing anywhere said so — which is what
+    makes this failure worth one function rather than three fixes.
+
+    A phrase of several words is looked for as a substring: its own
+    length is the boundary, and «включи музыку» cannot hide inside
+    another word. A single word is compared with the words of what was
+    said.
+
+    **This is not right for every table, and the difference is the
+    point.** Russian inflects, and `voice/todo.py` matches «сделал»
+    against «сделала» on purpose — there `in` is doing prefix work and
+    taking it away would lose the ending. Tables of nouns and fixed
+    phrases want this function; tables of verb stems want what they
+    have. What none of them wants is to decide by accident.
+    """
+    hay, ned = normalize(haystack), normalize(needle)
+    if not hay or not ned:
+        return False
+    if " " in ned:
+        return ned in hay
+    return ned in hay.split()
+
+
 def contains_phrase(haystack, needle, threshold=THRESHOLD):
     """
     Is the phrase `needle` inside `haystack` — exactly or with typos.

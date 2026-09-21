@@ -479,6 +479,49 @@ check("а «пока» по-прежнему прощание",
       f"| {route('пока', ctx).name}")
 
 print()
+print("=== жанр не прячется внутри чужого слова ===")
+# The same failure as «пока» inside «покажи», a day later and five
+# letters long: «техно» lives inside «технологиями», so «как успехи с
+# технологиями для полного погружения» was taken for a request to put
+# on some techno. The comment over the genre list had predicted it —
+# "a list that starts swallowing other words" — and the list was
+# matched with `in` all the same.
+for phrase in ("как успехи с технологиями для полного погружения",
+               "расскажи про рокировку в шахматах",
+               "нужна электроника для дома"):
+    check(f"«{phrase[:40]}» — не музыка",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).name}")
+
+# And a topic is not a request. `about_music` answers "is this X a
+# genre or a program" for «включи X»; used as the whole gate it sent
+# every sentence that merely mentioned music to the music stage.
+for phrase in ("расскажи про рок-музыку", "что такое поп-культура",
+               "чем джаз отличается от блюза"):
+    check(f"«{phrase[:40]}» — вопрос, а не просьба",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).name}")
+
+# Where a genre is actually consulted — «включи X», is X a genre or a
+# program — a swallowed word is worse still: it plays music instead of
+# starting what was asked for, and the program never opens.
+for phrase in ("включи попкорн", "включи технопарк", "включи хаускипер"):
+    check(f"«{phrase}» — программа, не жанр внутри неё",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).stage}")
+
+# What must go on working.
+for phrase, want in (("включи техно", "music.play"),
+                     ("поставь лоу-фай", "music.play"),
+                     ("врубай рок", "music.play"),
+                     ("включи музыку", "music.ask")):
+    check(f"«{phrase}» -> {want}", route(phrase, ctx).name == want,
+          f"| {route(phrase, ctx).name}")
+check("«включи блокнот» по-прежнему запуск",
+      route("включи блокнот", ctx).stage != "music",
+      f"| {route('включи блокнот', ctx).stage}")
+
+print()
 print("=== список дел отвечает и на «задачи» ===")
 # The other word for the same thing. It answered to only one of them,
 # and «какие у нас задачи на сегодня» went past the list entirely.

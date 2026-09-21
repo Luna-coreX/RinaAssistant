@@ -682,7 +682,10 @@ def _music(command, ctx):
     """Music: asked for by name, or asked about."""
     from voice import music
 
-    if not music.about_music(command):
+    # A request, not a topic. `about_music` answers "is this X a genre
+    # or a program" for «включи X»; used as the whole gate it sent
+    # «расскажи про рок-музыку» to the music stage as well.
+    if not music.asked_for_music(command):
         return None         # "включи блокнот" belongs to the launcher
     if music.asked_without_saying_which(command):
         return Intent("music.ask", stage="music")

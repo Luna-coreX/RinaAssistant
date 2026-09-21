@@ -16,7 +16,7 @@ and shown an error is worse off than one told what was actually done.
 
 import re
 
-from voice.textmatch import normalize
+from voice.textmatch import normalize, whole_word
 
 #: What counts as asking for music without saying which.
 ASK_PHRASES = ("включи музыку", "поставь музыку", "давай музыку",
@@ -64,10 +64,52 @@ def about_music(text) -> bool:
     words = set(low.split())
     if words & set(NOT_THE_GENRE):
         return True
-    # Compared in the normalised form on both sides: `normalize` drops
+    # As whole words, and normalised on both sides: `normalize` drops
     # the hyphen, so "lo-fi" in the list never matches "lo fi" in what
     # was said — and "включи lo-fi" went to the launcher.
-    return any(normalize(genre) in low for genre in GENRES)
+    #
+    # The comment above this list had predicted exactly this: "a list
+    # that starts swallowing other words". It did, at five letters —
+    # «техно» inside «технологиями» — and it is worse where genres are
+    # actually consulted: «включи попкорн» carries «поп», «включи
+    # технопарк» carries «техно», and both were music instead of a
+    # program.
+    return any(whole_word(low, genre) for genre in GENRES)
+
+
+def asked_for_music(text) -> bool:
+    """
+    Is this a **request** to put music on, rather than a sentence that
+    mentions music.
+
+    `about_music` answers the narrower question it was written for —
+    «включи X»: is X a genre or a program — and the router was using it
+    as the whole gate. So any sentence carrying a genre or the word
+    «музыку» went to the music stage, and «расскажи про рок-музыку»
+    and «что такое поп-культура» were answered as "which genre shall I
+    put on". A topic is not a request, and the difference is a verb.
+
+    Three shapes count as asking. A putting-on verb — «включи»,
+    «поставь», «play». The fixed phrases of `asked_without_saying_which`
+    — «включи музыку» and its kin. And a phrase that is nothing but the
+    music itself: «лоу-фай», said as an answer to "which?".
+    """
+    low = normalize(text or "")
+    if not low or not about_music(low):
+        return False
+    if asked_without_saying_which(low):
+        return True
+    if any(whole_word(low, verb) for verb in PUT_ON):
+        return True
+    # Nothing in it but the naming of music. Said on its own this is an
+    # answer, not a story about a genre.
+    #
+    # The leftover is compared whole, not word by word: `normalize`
+    # turns «лоу-фай» into two words, and a per-word comparison made
+    # the bare genre — the commonest answer to "which?" — stop playing
+    # anything.
+    rest = " ".join(w for w in low.split() if w not in NOT_THE_GENRE)
+    return bool(rest) and any(normalize(genre) == rest for genre in GENRES)
 
 
 def asked_without_saying_which(text) -> bool:
