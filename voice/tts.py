@@ -478,6 +478,26 @@ class EdgeTTSEngine(TTSEngine):
         coming = queue.Queue()
         DONE = object()
 
+        # The engine's own half of the wait, said out loud.
+        #
+        # The core reports how long a reply took to start speaking, and
+        # on a live machine that came out as sixteen seconds where the
+        # same code measured on its own takes one. Everything between —
+        # the segmentation, the decoder, the imports, the contention,
+        # the name lookup — was measured and is fast. So this method
+        # says its own two numbers: when the service handed the first
+        # chunk over, and when anybody came to collect it. They have
+        # opposite fixes, and until they were separate the sixteen
+        # seconds had two plausible owners.
+        import time as _time
+
+        began = _time.monotonic()
+        first = None
+        chunks = 0
+        #: When the service handed over the first chunk. A list because
+        #: the producer runs in another thread and writes it there.
+        made = [None]
+
         def pump():
             async def read():
                 try:
@@ -485,6 +505,14 @@ class EdgeTTSEngine(TTSEngine):
                                                 rate=rate_str, volume=vol_str)
                     async for part in talk.stream():
                         if part["type"] == "audio" and part.get("data"):
+                            # When the service gave it, as against when
+                            # anybody took it. Two numbers, because
+                            # "sixteen seconds" has two possible owners
+                            # — somebody else's service, or an
+                            # interpreter too busy to come and collect —
+                            # and they want opposite fixes.
+                            if made[0] is None:
+                                made[0] = _time.monotonic() - began
                             coming.put(part["data"])
                 except Exception as trouble:            # noqa: BLE001
                     coming.put(trouble)
@@ -492,23 +520,6 @@ class EdgeTTSEngine(TTSEngine):
                     coming.put(DONE)
 
             asyncio.run(read())
-
-        # The engine's own half of the wait, said out loud.
-        #
-        # The core already reports how long a reply took to start
-        # speaking, and on one machine that came out as sixteen and a
-        # half seconds where the same code here takes one. Everything
-        # between — the segmentation, the decoder, the imports, the
-        # contention, the name lookup — has been measured and is fast,
-        # which leaves the part this method owns: getting the first
-        # chunk out of somebody else's service. So it says so, and the
-        # two lines together split the wait at the one boundary that
-        # was still guesswork.
-        import time as _time
-
-        began = _time.monotonic()
-        first = None
-        chunks = 0
 
         worker = threading.Thread(target=pump, name="rina-edge", daemon=True)
         worker.start()
@@ -528,7 +539,10 @@ class EdgeTTSEngine(TTSEngine):
                 chunks += 1
                 yield piece
         finally:
-            log.info("Edge: первый кусок %s, кусков %d, поток %d мс",
+            log.info("Edge: сервис отдал за %s, забрали через %s, "
+                     "кусков %d, поток %d мс",
+                     ("%d мс" % (made[0] * 1000)) if made[0] is not None
+                     else "—",
                      ("%d мс" % (first * 1000)) if first is not None
                      else "не пришёл",
                      chunks, (_time.monotonic() - began) * 1000)
