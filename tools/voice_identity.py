@@ -54,10 +54,21 @@ VERIFIER = "wespeaker_en_voxceleb_resnet34_LM.onnx"
 VERIFIER_URL = ("https://huggingface.co/csukuangfj/speaker-embedding-models/"
                 "resolve/main/" + VERIFIER)
 
-#: Above this, a verification system of this family calls two recordings
-#: the same person. Written down because the number is meaningless
-#: without it, and because a threshold quietly assumed is a threshold
-#: chosen after seeing the result.
+#: A starting threshold only, and not to be trusted on its own.
+#:
+#: **A fixed number was wrong the first time it met a real cohort.**
+#: Against two VITS speakers — a man and a woman — the scale was clean:
+#: 0.97 for the same voice, 0.62 between the two. Against eight adult
+#: women recorded on consumer microphones, the same network put two
+#: *different* people at 0.880 and averaged 0.647, while a control that
+#: was certainly the same voice scored 0.888. Nothing could be decided
+#: at those numbers, and a check reading 0.60 would have decided
+#: anyway.
+#:
+#: So the cohort calibrates the threshold: `spread()` measures how far
+#: apart the reference speakers are from each other, and a candidate is
+#: judged against that, not against this constant. The constant stays
+#: as the fallback for when there is only one reference to compare to.
 SAME_PERSON = 0.60
 
 #: Phrases for judging identity.
@@ -237,19 +248,62 @@ def sweep(alphas, out_dir):
     return rows
 
 
+def spread(refs):
+    """How far this cohort's own speakers stand from each other.
+
+    The scale of the answer, measured on the very people the candidate
+    is compared against, rather than taken from a constant: eight women
+    of similar age recorded on similar microphones sit far closer
+    together than a man and a woman do, and the same number means
+    different things in the two cases.
+    """
+    import itertools
+
+    names = list(refs)
+    pairs = [cosine(refs[a], refs[b])
+             for a, b in itertools.combinations(names, 2)]
+    if not pairs:
+        return None
+    return {"n": len(names), "mean": sum(pairs) / len(pairs),
+            "min": min(pairs), "max": max(pairs)}
+
+
 def check(paths, against, out=None):
     """The ADR 0003 check on any recordings: how near are they to each other."""
     ears = Verifier()
     mine = {os.path.basename(p): ears.embed_file(p) for p in paths}
     refs = {os.path.basename(p): ears.embed_file(p) for p in against}
     print(f"Верификатор: {VERIFIER}, размерность {ears.dim}")
-    print(f"Порог «тот же человек» — {SAME_PERSON:.2f}")
+
+    scale = spread(refs)
+    if scale:
+        print("Разброс самих источников (%d шт.): среднее %.4f, "
+              "от %.4f до %.4f"
+              % (scale["n"], scale["mean"], scale["min"], scale["max"]))
+        bar = scale["max"]
+        print("Планка «дальше всех» — %.4f: столько набирают самые "
+              "похожие двое из них." % bar)
+        if bar > 0.80:
+            # Said out loud, because a check that cannot separate is
+            # worse than no check: it returns a number either way.
+            print("ВНИМАНИЕ: источники плохо различимы этим "
+                  "верификатором — на таких числах решать нельзя.")
+    else:
+        bar = SAME_PERSON
+        print("Источник один: сравниваю с запасным порогом %.2f" % bar)
     print()
+
     for name, vector in mine.items():
         near = [(cosine(vector, one), who) for who, one in refs.items()]
         near.sort(reverse=True)
         worst, who = near[0]
-        verdict = "ничей" if worst < SAME_PERSON else f"это {who}"
+        # Stated as what was actually measured. The bar is the closest
+        # pair among the sources, so falling below it means only that
+        # two real people are at least this alike — a weak claim, and
+        # the strongest this comparison supports.
+        verdict = ("не ближе, чем самые похожие двое источников"
+                   if worst < bar
+                   else "ближе к %s, чем любые двое источников" % who)
         print("  %-34s ближайший %.4f (%s) — %s" % (name, worst, who, verdict))
 
 
