@@ -493,19 +493,45 @@ class EdgeTTSEngine(TTSEngine):
 
             asyncio.run(read())
 
+        # The engine's own half of the wait, said out loud.
+        #
+        # The core already reports how long a reply took to start
+        # speaking, and on one machine that came out as sixteen and a
+        # half seconds where the same code here takes one. Everything
+        # between — the segmentation, the decoder, the imports, the
+        # contention, the name lookup — has been measured and is fast,
+        # which leaves the part this method owns: getting the first
+        # chunk out of somebody else's service. So it says so, and the
+        # two lines together split the wait at the one boundary that
+        # was still guesswork.
+        import time as _time
+
+        began = _time.monotonic()
+        first = None
+        chunks = 0
+
         worker = threading.Thread(target=pump, name="rina-edge", daemon=True)
         worker.start()
-        while True:
-            piece = coming.get()
-            if piece is DONE:
-                return
-            if isinstance(piece, Exception):
-                # Said out loud rather than swallowed: half a reply and
-                # silence about why is how a network failure looks like
-                # a broken program.
-                log.warning("Edge оборвался: %s", piece)
-                continue
-            yield piece
+        try:
+            while True:
+                piece = coming.get()
+                if piece is DONE:
+                    return
+                if isinstance(piece, Exception):
+                    # Said out loud rather than swallowed: half a reply
+                    # and silence about why is how a network failure
+                    # looks like a broken program.
+                    log.warning("Edge оборвался: %s", piece)
+                    continue
+                if first is None:
+                    first = _time.monotonic() - began
+                chunks += 1
+                yield piece
+        finally:
+            log.info("Edge: первый кусок %s, кусков %d, поток %d мс",
+                     ("%d мс" % (first * 1000)) if first is not None
+                     else "не пришёл",
+                     chunks, (_time.monotonic() - began) * 1000)
 
 
 class PiperEngine(TTSEngine):

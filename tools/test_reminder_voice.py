@@ -153,28 +153,64 @@ check("сказанное предупреждение переживает пе
       "| после перезапуска сказала бы второй раз")
 
 print()
+print("=== что «на сегодня» значит ===")
+# Asked of `today()` with a fixed clock rather than of the whole program
+# at whatever hour the suite happens to run.
+#
+# The first edition of this check set a reminder for «23:30» and
+# asserted the answer named it. It passed all day and failed at 23:44:
+# by then 23:30 is tomorrow, the answer was right to stay quiet, and
+# the check was measuring the clock on the wall. The very fault this
+# suite spent a day taking out of the shell, written back in by hand.
+NOON = time.mktime((2026, 9, 21, 12, 0, 0, 0, 0, -1))
+same_day = [{"id": "a", "text": "встреча с друзьями", "on": None,
+             "done": False, "fire_at": NOON + 6 * 3600},
+            {"id": "b", "text": "вчерашнее", "on": None, "done": False,
+             "fire_at": NOON - 3 * 3600},
+            {"id": "c", "text": "завтрашнее", "on": None, "done": False,
+             "fire_at": NOON + 30 * 3600},
+            {"id": "d", "text": "по поводу", "on": {"kind": "app.foreground"},
+             "done": False, "fire_at": 0}]
+ahead = reminders_mod.today(same_day, now=NOON)
+check("сегодняшнее и впереди — попадает",
+      [one["text"] for one in ahead] == ["встреча с друзьями"],
+      f"| {[one['text'] for one in ahead]}")
+said = reminders_mod.say_today(ahead)
+check("названо с временем", "встреча с друзьями" in said and "18:00" in said,
+      f"| {said}")
+check("пусто — молчит", reminders_mod.say_today([]) == "",
+      f"| {reminders_mod.say_today([])!r}")
+
+print()
 print("=== планы попадают в ответ о делах ===")
 s = Session()
 answer = s.say("какие задачи на сегодня")
 check("без планов про них ни слова",
       "заплан" not in answer.lower(), f"| {answer}")
 
+# The wiring, asked as a rule and not as an outcome: whatever `today()`
+# says at this hour, the answer has to agree with it. True at any hour,
+# including the twenty minutes before midnight.
 s = Session()
-s.say("напомни в 23:30 встреча с друзьями")
+s.engine._reminders.add("reminder", time.time() + 20 * 60, "встреча с друзьями")
+planned = reminders_mod.today(s.engine._reminders.active())
 answer = s.say("какие задачи на сегодня")
 check("дел нет — сказано", "дел нет" in answer.lower(), f"| {answer}")
-check("а план назван", "встреча с друзьями" in answer, f"| {answer}")
-check("и с временем", "23:30" in answer, f"| {answer}")
+check("ответ согласен с тем, что сегодня есть",
+      ("встреча с друзьями" in answer) == bool(planned),
+      f"| сегодня {len(planned)}, ответ: {answer}")
 
 s = Session()
 s.say("запиши купить хлеб")
-s.say("напомни в 23:30 встреча с друзьями")
+s.engine._reminders.add("reminder", time.time() + 20 * 60, "встреча с друзьями")
+planned = reminders_mod.today(s.engine._reminders.active())
 answer = s.say("какие у нас задачи на сегодня")
-check("дела и планы вместе",
-      "купить хлеб" in answer and "встреча с друзьями" in answer,
-      f"| {answer}")
+check("дело названо", "купить хлеб" in answer, f"| {answer}")
+check("и план — если он сегодня",
+      ("встреча с друзьями" in answer) == bool(planned),
+      f"| сегодня {len(planned)}, ответ: {answer}")
 
-# Tomorrow is not today, and neither is what has already passed.
+# Tomorrow is not today, at any hour.
 s = Session()
 s.engine._reminders.add("reminder", time.time() + 30 * 3600, "завтрашнее")
 answer = s.say("какие задачи на сегодня")
