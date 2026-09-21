@@ -111,6 +111,41 @@ def call_with_secret(texts_allowed):
     return ran["n"]
 
 
+#: The question asked of the model, in the same unmistakable shape.
+QUESTION = "вопрос-про-жирафа-в-сейфе-99417"
+
+
+def model_failed():
+    """A model that refuses, driven through the real tool and journal."""
+    settings = MemorySettings({"log_level": "DEBUG", "log_texts": False})
+    import core.settings_store as settings_store
+    settings_store.settings = settings
+
+    logging_setup.setup(force=True)
+    logging_setup.apply_settings()
+
+    from core import llm, toolrunner
+
+    was = llm.ask
+
+    def refuse(question, history=None):
+        raise llm.LLMError("Ollama не отвечает: соединение отклонено")
+
+    llm.ask = refuse
+    try:
+        result = toolrunner._ask_model(
+            ToolContext(settings=settings, emit=lambda name, **data: None),
+            {"question": QUESTION})
+    finally:
+        llm.ask = was
+
+    for name in (logging_setup.LOGGER_NAME,
+                 logging_setup.SECURITY_LOGGER_NAME):
+        for handler in logging.getLogger(name).handlers:
+            handler.flush()
+    return result
+
+
 def main():
     print("=== журналы: что в них попадает ===")
     print(f"      (пишем в {_HOME})")
@@ -139,6 +174,26 @@ def main():
     verbatim = [name for name, text in journals() if SECRET in text]
     check("а с включённым log_texts текст записан", verbatim,
           f"| {verbatim}")
+
+    print()
+    print("=== почему модель не ответила — записано ===")
+    # **Silence is the thing being fixed.** The caller turns a refusal
+    # into "the model did not answer" and drops the text, so the journal
+    # held twenty-one seconds of nothing between «Какая погода в
+    # Хабаровске?» and «Извини, я не поняла команду», and why it failed
+    # had to be reproduced instead of read.
+    #
+    # The reason is about the server; the question is the person's. Both
+    # halves are measured, because a fix that started writing the
+    # question would trade one fault for a worse one.
+    result = model_failed()
+    check("инструмент сообщил о неудаче",
+          not result.ok and result.error_code == "llm.unavailable",
+          f"| {result.error_code}")
+    told = [name for name, text in journals() if "соединение отклонено" in text]
+    check("причина в журнале есть", told, f"| {told}")
+    leaked = [name for name, text in journals() if QUESTION in text]
+    check("а вопроса в нём нет", not leaked, f"| {leaked}")
 
     print()
     print("ИТОГО ошибок:", fails)

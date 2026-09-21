@@ -761,8 +761,16 @@ def _ask_model(ctx, args):
     try:
         answer = llm.ask(args["question"], args.get("context"))
     except llm.LLMError as e:
+        # **Said out loud, because it was silent and that cost an
+        # evening.** The caller turns this into "the model did not
+        # answer" and drops the text; the journal then held twenty-one
+        # seconds of nothing between the question and the apology, and
+        # why it failed had to be guessed at. The reason is about the
+        # server, never about what was said, so it is safe here.
+        log.warning("Модель не ответила: %s", e)
         return ToolResult.failed(str(e), "llm.unavailable")
     except Exception as e:
+        log.exception("Модель не ответила")
         return ToolResult.failed(str(e), "llm.unavailable")
     return ToolResult.done(answer, answer)
 

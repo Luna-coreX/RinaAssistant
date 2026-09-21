@@ -167,6 +167,39 @@ check("и поиска по такому контексту не будет да
       route("Рина, столица австралии", open_ctx).name == "fallback.none",
       f"| {route('Рина, столица австралии', open_ctx).name}")
 
+# The half that was missing, and it was missing here too: every check
+# above asks the core with source="voice". The fact was computed from
+# the mode alone, so a line typed while the microphone was open counted
+# as noise in the room.
+typed_ctx = brain._router_context("typed", require_wake=False)
+check("напечатанное непрошеным не бывает",
+      typed_ctx.unbidden is False,
+      f"| unbidden={typed_ctx.unbidden}, source={typed_ctx.source!r}")
+check("и поиск по напечатанному остаётся",
+      route("столица австралии", typed_ctx).name == "fallback.search",
+      f"| {route('столица австралии', typed_ctx).name}")
+
+# The same fact on the other side of the core. The router is given it;
+# the engine asks it again for the fallback after the model failed —
+# and two places computing one rule is how they come apart.
+asked = []
+brain._tools = type("Tools", (), {
+    "call": lambda self, name, args, source=None, **kw: (
+        asked.append((name, source))
+        or type("R", (), {"ok": True, "message": ""})())
+})()
+said = []
+brain.say = lambda text, **kw: said.append(text)
+
+brain._fallback_reply("столица австралии", "typed")
+check("после отказа модели напечатанное всё же ищется",
+      asked == [("web_search", "typed")], f"| {asked}")
+
+asked.clear(); said.clear()
+brain._fallback_reply("столица австралии", "voice")
+check("а услышанное при открытом микрофоне — нет",
+      asked == [] and said and "не поняла" in said[0], f"| {asked} {said}")
+
 print()
 print("=== разговор: слово активации говорится один раз ===")
 # The complaint that started `4.0b-E06`: "the activation word has to be

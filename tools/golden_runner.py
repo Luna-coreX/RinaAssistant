@@ -228,6 +228,14 @@ class InProcessDriver(Driver):
             self.engine._dialog.dropped()
             self.settings.set("reminders", [])
             self.settings.set("app_aliases", {})
+            # **The open conversation is state too, and it was the one
+            # piece not being cleared.** Being spoken to opens a window
+            # in which the wake word need not be said again; a case that
+            # arrived by ear left that window open for the next one, so
+            # «просто разговор в комнате» and «выключи компьютер» were
+            # obeyed without ever being addressed. Invisible while every
+            # case was delivered as typed, because typing never opens it.
+            self.engine._close_talk()
         self.obs.clear()
         self.engine.handle_command(text, require_wake=require_wake,
                                    source=source)
@@ -522,10 +530,24 @@ def run(path, groups=None, verbose=False, driver_name="in-process"):
     started = time.perf_counter()
     passed, failures = 0, []
     for case in cases:
-        got = driver.send(case["say"], source=case.get("source", "typed"),
+        # **«Непрошеный» is a state of the microphone, so the phrase
+        # arrives by ear.** The three cases about that mode set the flag
+        # and said nothing about the source, so the suite delivered them
+        # as typed — a combination the running program cannot produce,
+        # and the same mistake one floor down from the one the driver
+        # already carries a comment about. It stayed invisible while
+        # «непрошеный» was computed from the mode alone; the moment the
+        # core started asking where the phrase came from, all three went
+        # red and were right to.
+        #
+        # A case may still say `source` outright and is obeyed.
+        unbidden = case.get("unbidden", False)
+        got = driver.send(case["say"],
+                          source=case.get("source",
+                                          "voice" if unbidden else "typed"),
                           require_wake=case.get("wake", False),
                           keep_state=case.get("keep_state", False),
-                          unbidden=case.get("unbidden", False))
+                          unbidden=unbidden)
         if matches(case["expect"], got):
             passed += 1
             if verbose:

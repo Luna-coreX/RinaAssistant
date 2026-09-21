@@ -882,6 +882,33 @@ class RinaEngine:
                                 for item in self.apps_source()]
         return self._apps_cache
 
+    #: The sources that arrive by ear.
+    BY_EAR = ("voice", "always")
+
+    def _unbidden(self, source):
+        """
+        Did this phrase arrive without anybody meaning to say it.
+
+        **The open microphone is half the answer, and it was taken for
+        the whole.** `RouterContext.unbidden` is a fact — whether
+        anybody meant to say this — and it was computed from the mode
+        alone. So a line the person **typed** while "always listen" was
+        on counted as noise in the room, and every rule that guards
+        against chance speech fired on a deliberate sentence.
+
+        What it cost: «Какая погода в Хабаровске?», typed, the model
+        asked and failed — and instead of the search that was supposed
+        to catch that, «Извини, я не поняла команду». The guard exists
+        so a browser does not open on a cough. Nobody coughs a sentence
+        into a text box.
+
+        The docstring of `unbidden` says it already: a fact, not a
+        label; the name of a source says where a phrase came in, and
+        this rule is about whether anybody meant it. Typing is the
+        meaning it.
+        """
+        return bool(self._always_listen) and source in self.BY_EAR
+
     def _router_context(self, source, require_wake):
         """Everything the router needs to know about the world — a snapshot at this moment."""
         from voice import app_index, app_launcher
@@ -899,8 +926,8 @@ class RinaEngine:
             require_wake=require_wake and not self.talking(),
             source=source,
             # Asked of ourselves rather than read off the name of the
-            # source: see `RouterContext.unbidden`.
-            unbidden=bool(self._always_listen),
+            # source: see `RouterContext.unbidden` and `_unbidden`.
+            unbidden=self._unbidden(source),
             reminders_active=len(self._reminders.active()),
             # Asked of **this core's** settings, not of the module-level
             # singleton `llm.is_enabled()` reads.
@@ -1410,11 +1437,12 @@ class RinaEngine:
 
         With the microphone open on her own initiative we do not search:
         noise and chance speech land here, and a browser must not be
-        opened on them. Asked of the mode, not of the name of the source —
-        that name is `voice` in both modes, and the rule had never fired.
+        opened on them. Asked of `_unbidden`, which is the same fact the
+        router is given — and asked of it rather than of the mode,
+        because a typed line is nobody's chance speech.
         """
         allowed = (self._settings.get("web_search_fallback", True)
-                   and not self._always_listen)
+                   and not self._unbidden(source))
         if allowed:
             result = self._tools.call("web_search", {"query": command},
                                       source=source)
