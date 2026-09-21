@@ -74,6 +74,31 @@ public sealed class Speaker : IDisposable
                    int bits = Microphone.Bits, int channels = Microphone.Channels)
         => _format = new WaveFormat(sampleRate, bits, channels);
 
+    /// <summary>
+    /// How many times the queue ran dry while she was still speaking.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is what "her speech glitches sometimes" is, counted.
+    /// <c>BufferedWaveProvider</c> pads an empty queue with silence
+    /// rather than complaining, so an underrun is heard by a person
+    /// and recorded by nobody: the device plays on, the sentence has a
+    /// hole in it, and every log in both processes says the reply went
+    /// out whole.
+    /// </para>
+    /// <para>
+    /// Counted here rather than guessed at from timings, because the
+    /// two explanations — the sender being late and the receiver being
+    /// starved of credit — look identical from outside and want
+    /// opposite fixes.
+    /// </para>
+    /// </remarks>
+    public int DryRuns { get; private set; }
+
+    //: Whether the queue is empty **now**, seen by the watcher. A hole
+    //: is this going true and then more sound arriving.
+    private bool _ranDry;
+
     /// <summary>Add a chunk to the queue; playback starts by itself.</summary>
     public void Enqueue(ReadOnlySpan<byte> pcm)
     {
@@ -82,6 +107,14 @@ public sealed class Speaker : IDisposable
         lock (_lock)
         {
             Ensure();
+            // Sound arriving after the queue emptied means the queue
+            // should not have emptied: what played in between was
+            // silence nobody asked for.
+            if (_ranDry && _device?.PlaybackState == PlaybackState.Playing)
+            {
+                DryRuns++;
+                _ranDry = false;
+            }
             _draining = false;
             _buffer!.AddSamples(pcm.ToArray(), 0, pcm.Length);
             _written += pcm.Length;
@@ -216,7 +249,22 @@ public sealed class Speaker : IDisposable
     /// </remarks>
     public async Task RoomAsync(int wanted, CancellationToken token)
     {
-        var ceiling = Math.Max(wanted, _format.AverageBytesPerSecond);
+        // Two and a half seconds in hand, not one.
+        //
+        // Credit goes back one chunk at a time and each return is a
+        // call that waits for its answer — eighty-five milliseconds of
+        // sound per round trip down the pipe. A second of cushion is
+        // eleven such trips; anything that makes them slower than the
+        // sound they pay for drains the queue, and a drained queue is
+        // played as silence rather than reported.
+        //
+        // The cushion is nearly free. It was kept at a second so that
+        // "stop" would be instant, and that reasoning does not hold:
+        // interrupting clears the queue outright (`Interrupt`), so what
+        // is in it costs nothing to throw away. What a wider cushion
+        // does cost is memory — a hundred and twenty kilobytes — and
+        // the buffer holds five seconds, so it still cannot overflow.
+        var ceiling = Math.Max(wanted, _format.AverageBytesPerSecond * 5 / 2);
         while (!token.IsCancellationRequested && Pending > ceiling)
             await Task.Delay(30, token).ConfigureAwait(false);
     }
@@ -265,6 +313,7 @@ public sealed class Speaker : IDisposable
                 while (IsSpeaking)
                 {
                     await Task.Delay(50).ConfigureAwait(false);
+                    if (Pending == 0) _ranDry = true;
                     quiet = Pending == 0 ? quiet + 1 : 0;
                     if (quiet < 5) continue;      // a quarter of a second
                     lock (_lock) _device?.Stop();
@@ -333,7 +382,10 @@ public sealed class Speaker : IDisposable
         if (_device is null || _buffer is null) return;
         if (_device.PlaybackState == PlaybackState.Playing) return;
 
-        var preRoll = _format.AverageBytesPerSecond / 5;
+        // Four hundred milliseconds rather than two hundred. The
+        // first gap is the likeliest: the sender is still opening its
+        // connection to the service while the first chunk plays.
+        var preRoll = _format.AverageBytesPerSecond * 2 / 5;
         if (!_draining && _buffer.BufferedBytes < preRoll) return;
         _device.Play();
     }

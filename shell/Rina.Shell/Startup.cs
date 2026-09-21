@@ -1803,6 +1803,31 @@ public partial class App
         }
         finally { flood.Dispose(); }
 
+        // --- a queue that ran dry is counted ---
+        //
+        // `BufferedWaveProvider` pads an empty queue with silence rather
+        // than complaining, so an underrun is heard by a person and
+        // recorded by nobody: the device plays on, the sentence has a
+        // hole in it, and every log in both processes says the reply
+        // went out whole. That is what "her speech glitches sometimes"
+        // was, twice now, and both times it took a day to find because
+        // there was no number anywhere.
+        var gapped = new Audio.Speaker();
+        try
+        {
+            gapped.Enqueue(Tone(seconds: 0.5));
+            await Until(() => gapped.Pending == 0, 4.0);
+            Check("пустая очередь сама по себе не разрыв",
+                  gapped.DryRuns == 0, $"| {gapped.DryRuns}");
+
+            // Sound arriving after the queue emptied: that is the hole.
+            gapped.Enqueue(Tone(seconds: 0.5));
+            await Until(() => gapped.DryRuns > 0, 4.0);
+            Check("звук после пустой очереди — это разрыв, и он сосчитан",
+                  gapped.DryRuns == 1, $"| {gapped.DryRuns}");
+        }
+        finally { gapped.Dispose(); }
+
         // --- the tail of an utterance is not thrown away ---
         //
         // The core closes the stream when it has finished **sending**, and
