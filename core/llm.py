@@ -189,12 +189,45 @@ def _context_messages(history):
 #: search because an answer happened to contain the word "unknown".
 WANTS_SEARCH = re.compile(r"^\s*ПОИСК:\s*(.+?)\s*$")
 
-#: Said to the model when it is allowed to look.
-MAY_SEARCH = (
-    "Если для ответа нужны свежие сведения или ты не уверена в фактах, "
-    "ответь ровно одной строкой: ПОИСК: <что искать> — и ничем больше. "
-    "Иначе отвечай как обычно."
-)
+#: Months, for saying today's date to the model.
+#:
+#: A table rather than `strftime("%B")`: that one answers in whatever
+#: language the machine's locale happens to be, and the model is being
+#: spoken to in Russian.
+MONTHS = ("января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+          "августа", "сентября", "октября", "ноября", "декабря")
+
+
+def may_search():
+    """What the model is told when it is allowed to look things up.
+
+    **The date comes first, and it is the half that was missing.** The
+    first edition only offered the search, and a model whose training
+    stopped in 2024 answered «что было с MR-очками в 2026» with "I do
+    not have information about 2026, my data ends earlier" — which is
+    true, polite, and the exact opposite of asking to be told. It was
+    not refusing to search; it did not know that 2026 had happened.
+
+    So it is told the date, and told plainly that its own knowledge is
+    out of date past it. Then "I do not know this" stops being a
+    conclusion and becomes a reason.
+
+    Measured against the model this was found on: with the offer alone,
+    one of the two questions asked for a search; with the date and the
+    instruction not to answer "I do not know", both did, while "как
+    дела" and "сколько будет два плюс два" still went unsearched.
+    """
+    today = time.localtime()
+    return (
+        "Сегодня %d %s %d года. Твои собственные знания устарели: всё, "
+        "что случилось позже них, ты узнаёшь только поиском.\n"
+        "Ты умеешь искать в интернете. Если сведений не хватает — "
+        "свежих, местных или просто тебе неизвестных — не отвечай «не "
+        "знаю» и не говори про ограничения своих данных: вместо этого "
+        "ответь ровно одной строкой ПОИСК: <что искать> — и ничем "
+        "больше. Искать буду я и верну тебе найденное."
+        % (today.tm_mday, MONTHS[today.tm_mon - 1], today.tm_year)
+    )
 
 
 def _searched(query):
@@ -224,7 +257,7 @@ def ask(question, history=None):
     except (TypeError, ValueError):
         timeout = DEFAULT_TIMEOUT
 
-    may_search = bool(_settings().get("llm_web", False))
+    wants_web = bool(_settings().get("llm_web", False))
 
     def once(extra=""):
         told = persona()
@@ -240,7 +273,7 @@ def ask(question, history=None):
         }, timeout=max(5, min(timeout, 300)))
         return ((data.get("message") or {}).get("content") or "").strip()
 
-    answer = once(MAY_SEARCH if may_search else "")
+    answer = once(may_search() if wants_web else "")
 
     # **The model decides, and it gets one search — not a conversation.**
     #
@@ -254,7 +287,7 @@ def ask(question, history=None):
     # question goes back without results and is answered as it would
     # have been with the setting off — which is a worse answer, and a
     # better one than silence.
-    if may_search:
+    if wants_web:
         found = WANTS_SEARCH.match(answer)
         if found:
             query = found.group(1)

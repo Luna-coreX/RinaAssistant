@@ -147,6 +147,29 @@ check("второй проход прошёл без находок",
       f"| {model.asked[1][:80]}")
 
 print()
+print("=== модели говорят, какое сегодня число ===")
+# The half that was missing, and the reason «что было с MR-очками в
+# 2026» came back as "I have no information about 2026, my data ends
+# earlier". That is true, polite, and the opposite of asking to be
+# told: the model was not refusing to search, it did not know that
+# 2026 had happened.
+import time as time_mod
+
+told = llm.may_search()
+now = time_mod.localtime()
+check("названо сегодняшнее число",
+      str(now.tm_mday) in told and str(now.tm_year) in told,
+      f"| {told.splitlines()[0][:70]}")
+check("и месяц словом, а не номером",
+      llm.MONTHS[now.tm_mon - 1] in told,
+      f"| ждали «{llm.MONTHS[now.tm_mon - 1]}»")
+# Said outright, because "I do not know" was the answer it kept giving
+# instead of asking.
+check("сказано не отвечать «не знаю»", "не знаю" in told, f"| {told[-160:]}")
+check("и не ссылаться на устаревшие данные",
+      "устарели" in told or "ограничения" in told, f"| {told[:90]}")
+
+print()
 print("=== разметка просьбы ===")
 for line, want in (("ПОИСК: погода в Москве", "погода в Москве"),
                    ("  ПОИСК:   погода  ", "погода"),
