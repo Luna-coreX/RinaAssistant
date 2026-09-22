@@ -331,6 +331,54 @@ def check(paths, against, out=None):
         print("  %-34s ближайший %.4f (%s) — %s" % (name, worst, who, verdict))
 
 
+def pick(folder, canonical, into, keep=0.7, least=None):
+    """Keep the takes that still sound like the canonical sample.
+
+    **Generated material drifts, and the drift is a selection problem
+    rather than a defect.** A voice pinned by its own recording holds
+    at about 0.758 across utterances where the same person scores
+    0.856: recognisably one person, and loose enough that training a
+    voice conversion model on all of it would teach the average of the
+    wandering. There is a measure of how far each take has wandered,
+    so the loosest ones are simply not used.
+
+    Ranked rather than thresholded: a threshold is a number chosen
+    before seeing the distribution, and this one would have to be
+    chosen again for every voice.
+    """
+    import shutil
+
+    ears = Verifier()
+    want = ears.embed_file(canonical)
+    takes = sorted(glob_wavs(folder))
+    if not takes:
+        print("нечего отбирать:", folder)
+        return []
+    scored = sorted(((cosine(ears.embed_file(p), want), p) for p in takes),
+                    reverse=True)
+    total = sum(v for v, _ in scored) / len(scored)
+    how_many = least if least else max(1, int(len(scored) * keep))
+    how_many = min(how_many, len(scored))
+    os.makedirs(into, exist_ok=True)
+    for _, path in scored[:how_many]:
+        shutil.copy2(path, os.path.join(into, os.path.basename(path)))
+    print("дублей: %d, среднее до канона %.3f" % (len(scored), total))
+    print("оставлено %d: от %.3f до %.3f"
+          % (how_many, scored[how_many - 1][0], scored[0][0]))
+    print("отброшено %d: от %.3f до %.3f"
+          % (len(scored) - how_many,
+             scored[-1][0] if len(scored) > how_many else 0.0,
+             scored[how_many][0] if len(scored) > how_many else 0.0))
+    print("куда:", into)
+    return scored[:how_many]
+
+
+def glob_wavs(folder):
+    import glob as _glob
+
+    return _glob.glob(os.path.join(folder, "*.wav"))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sweep", action="store_true",
@@ -343,12 +391,24 @@ def main():
     ap.add_argument("--against", nargs="+", metavar="WAV", default=(),
                     help="записи живых дикторов для сравнения")
     ap.add_argument("--out", default=None, help="куда класть записи")
+    ap.add_argument("--pick", metavar="DIR",
+                    help="отобрать дубли, ближайшие к --canonical")
+    ap.add_argument("--canonical", metavar="WAV",
+                    default=os.path.join(ROOT, "assets", "voice",
+                                         "rina-voice-v1.wav"),
+                    help="эталонная запись голоса")
+    ap.add_argument("--keep", type=float, default=0.7,
+                    help="какую долю оставить (0..1)")
     args = ap.parse_args()
 
     out_dir = args.out or os.path.join(OUT_ROOT, "sweep")
     if args.sweep:
         alphas = [float(x) for x in args.alphas.split(",") if x.strip()]
         sweep(alphas, out_dir)
+        return 0
+    if args.pick:
+        pick(args.pick, args.canonical,
+             args.out or os.path.join(OUT_ROOT, "picked"), keep=args.keep)
         return 0
     if args.check:
         if not args.against:
