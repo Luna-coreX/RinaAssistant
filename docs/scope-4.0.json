@@ -666,7 +666,7 @@
     "title": "Стенд замеров"
   },
   "V-03": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "L",
     "title": "Прогон кандидатов на русском"
@@ -678,19 +678,19 @@
     "title": "ADR: стриминг против выразительности"
   },
   "V-05": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "M",
     "title": "Протокол записи датасета"
   },
   "V-06": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "",
     "title": "Сбор датасета"
   },
   "V-07": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "",
     "title": "Обучение или интерполяция"
