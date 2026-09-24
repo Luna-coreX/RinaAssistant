@@ -869,12 +869,12 @@ _EN = {
     'Обращайся к собеседнику в женском роде.': 'When the language you answer in marks gender, address the person in the feminine.',
     'Пиши обычным текстом, без разметки: звёздочки и решётки не превращаются ни в жирный шрифт, ни в заголовки, а так и остаются символами.': 'Write plain text, without markup: asterisks and hashes don’t turn into bold type or headings, they stay symbols.',
     'Этот ответ прозвучит вслух. Уложись в два-три предложения и обходись без списков — на слух их не разобрать. Если вопрос требует подробного ответа, скажи главное и предложи рассказать подробнее.': 'This answer will be spoken aloud. Keep it to two or three sentences and do without lists — they can’t be followed by ear. If a question needs a detailed answer, say the main thing and offer to tell more.',
-    # The reserved character (4.0b-E14): Rina's persona before the warm one.
-    'Ты — Рина, голосовой ассистент на компьютере пользователя.': 'You are Rina, a voice assistant on the user’s computer.',
-    'Отвечай кратко и по делу: одно-два предложения.': 'Answer briefly and to the point: one or two sentences.',
+    # The own personality (4.0b-E14): its base, when the person wrote no
+    # character, and its name.
+    'Ты — персональный ассистент на компьютере пользователя.': 'You are a personal assistant on the user’s computer.',
+    'Тебя зовут {name}.': 'Your name is {name}.',
     # The characters' names, as the settings list them.
-    'Тёплая': 'Warm',
-    'Сдержанная': 'Reserved',
+    'Своя личность': 'Own personality',
     # The address form's choices, as the settings list them.
     'Без рода': 'Gender-neutral',
     'В мужском роде': 'Masculine',

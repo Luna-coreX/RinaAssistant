@@ -9,10 +9,9 @@ arrival — this one was: every line correct in the editor, and the model
 got «…ассистент Luna.Общайся тепло…», because Python joins adjacent
 literals without a space and says nothing.
 
-The prompt is a character and a situation. The character is one of the
-ready ones, chosen in the settings, or one of the person's own; the
-situation is what is true whatever the character — and each part of it
-was found or decided here:
+The prompt is a character and a situation. The character is Rina's, or
+that of a personality the person made; the situation is what is true
+whatever the character — and each part of it was found or decided here:
 
 **The name is one paragraph, and without it nothing is left dangling.**
 Empty is the ordinary case, not an error. A name written into the text
@@ -149,8 +148,8 @@ check("перевод строки в имени не рвёт текст",
 
 print()
 print("=== род ===")
-pronouns = sorted({m.group(0) for persona in llm.PERSONAS.values()
-                   for p in persona for m in HE.finditer(p)})
+pronouns = sorted({m.group(0) for p in (*llm.RINA, *llm.OWN_BASE)
+                   for m in HE.finditer(p)})
 check("характер не говорит о человеке «он»", not pronouns,
       f"| {', '.join(pronouns)}")
 check("по умолчанию — без рода, и это сказано модели",
@@ -201,7 +200,7 @@ print("=== предлагается только то, что знает пер�
 # persona and everything the situation adds is translated into it. A
 # language added to `LANGUAGES` with its persona in Russian would be the
 # finding this began with, promised in the settings.
-every = [*(p for persona in llm.PERSONAS.values() for p in persona),
+every = [*llm.RINA, *llm.OWN_BASE, llm.SELF_NAMED,
          llm.NAMED, llm.PLAIN, llm.SPOKEN, *llm.ADDRESS.values()]
 for lang in i18n.LANGUAGES:
     if lang == "Русский":
@@ -212,44 +211,51 @@ for lang in i18n.LANGUAGES:
           f"| без перевода {len(missing)} из {len(every)}")
 
 print()
-print("=== выбор характера ===")
-default = next(iter(llm.PERSONAS))
-check("по умолчанию — тёплая", default == "warm" and bare.startswith(llm.WARM[0]),
-      f"| по умолчанию {default!r}: {bare.splitlines()[0]}")
-brief = told(llm_character="brief")
-check("сдержанная выбирается",
-      brief.startswith(llm.BRIEF[0]) and llm.WARM[1] not in brief,
-      f"| {brief.splitlines()[0]}")
-check("и положение дел к ней добавляется так же",
-      llm.ADDRESS["neutral"] in brief and llm.PLAIN in brief,
-      "| сдержанная осталась без рода и разметки")
-check("незнакомый характер — как по умолчанию",
-      told(llm_character="мусор") == bare)
-offered = settings_schema.options_for("llm_character", {})
-check("настройки предлагают все характеры, и у каждого есть слово",
-      [o["value"] for o in offered] == list(llm.PERSONAS)
+print("=== личность ===")
+# Rina, or one of the person's own. What was here the evening before —
+# «тёплая» and «сдержанная» — were two moods of one Rina, where
+# personalities were meant.
+check("по умолчанию отвечает Рина", bare.startswith(llm.RINA[0]),
+      f"| {bare.splitlines()[0]}")
+check("незнакомое значение — тоже Рина", told(personality="мусор") == bare)
+mine = told(personality="own", own_name="Макс",
+            llm_persona="Отвечай как пират.")
+check("своя личность знает своё имя и свой характер",
+      mine.startswith("Тебя зовут Макс.\nОтвечай как пират.\n"),
+      f"| {mine[:60]!r}")
+check("и в ней нет ничего от Рины",
+      not any(p in mine for p in llm.RINA[:4]), "| абзацы Рины в чужой личности")
+plain = told(personality="own")
+check("без имени и характера — простой ассистент, а не Рина",
+      plain.startswith(llm.OWN_BASE[0]) and "зовут" not in plain
+      and llm.RINA[0] not in plain, f"| {plain[:60]!r}")
+check("свой характер действует только у своей личности",
+      "пират" not in told(llm_persona="Отвечай как пират."),
+      "| характер своей личности просочился в Рину")
+check("положение дел добавляется и к своей личности",
+      llm.ADDRESS["neutral"] in mine and llm.PLAIN in mine,
+      "| своя личность осталась без рода и разметки")
+offered = settings_schema.options_for("personality", {})
+check("настройки предлагают Рину и свою личность, и у каждой есть слово",
+      [o["value"] for o in offered] == ["rina", "own"]
       and all(o["title"] for o in offered),
       f"| {[(o['value'], o['title']) for o in offered]}")
+named_offer = settings_schema.options_for("personality", {"own_name": "Макс"})
+check("своя личность в списке называется своим именем",
+      named_offer[1]["title"] == "Макс", f"| {named_offer[1]['title']!r}")
 
 print()
-print("=== свой характер ===")
-own = told(llm_persona="Отвечай как пират.")
-check("свой характер заменяет персону целиком",
-      own.startswith("Отвечай как пират.\n") and "Ты — Рина" not in own,
-      f"| {own[:60]!r}")
-check("свой характер важнее выбранного",
-      llm.BRIEF[0] not in told(llm_persona="Отвечай как пират.",
-                                llm_character="brief"))
-own_named = told(llm_persona="Отвечай как пират.", user_name="Саша",
-                 address_form="feminine", tts_engine="edge")
-check("а положение дел к нему добавляется",
+print("=== положение дел и своя личность ===")
+own_named = told(personality="own", llm_persona="Отвечай как пират.",
+                 user_name="Саша", address_form="feminine", tts_engine="edge")
+check("имя человека, род и «вслух» доходят и до своей личности",
       "зовут Саша." in own_named and llm.ADDRESS["feminine"] in own_named
       and llm.SPOKEN in own_named, f"| {own_named[:80]!r}")
 
 print()
 print("=== на странице приватности ===")
 store = MemorySettings({"user_name": "Саша", "address_form": "feminine",
-                        "llm_character": "brief"})
+                        "personality": "own", "own_name": "Макс"})
 kept = {item["id"]: item["detail"]
         for group in privacy.inventory(store) if group["id"] == "settings"
         for item in group["items"]}
@@ -257,8 +263,9 @@ check("заданное имя видно среди того, что о чел�
       kept.get("user_name") == "Саша", f"| {kept.get('user_name')!r}")
 check("и род обращения тоже",
       kept.get("address_form") == "feminine", f"| {kept.get('address_form')!r}")
-check("и выбранный характер",
-      kept.get("llm_character") == "brief", f"| {kept.get('llm_character')!r}")
+check("и своя личность — выбор и имя",
+      kept.get("personality") == "own" and kept.get("own_name") == "Макс",
+      f"| {kept.get('personality')!r}, {kept.get('own_name')!r}")
 
 print()
 print("ИТОГО ошибок:", fails)

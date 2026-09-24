@@ -63,7 +63,11 @@ log = get_logger("wire")
 #: makes the current recogniser or synthesiser stale; a change to anything
 #: else does not. See `ProtocolServer._voice_follows_settings`.
 _VOICE_KEYS = ("stt_engine", "vosk_model", "whisper_model",
-               "tts_engine", "piper_model")
+               "tts_engine", "piper_model",
+               # Who answers changes the voice when the own personality
+               # has one (`4.0b-E14`): switching must not wait for a
+               # restart any more than picking an engine does.
+               "personality", "own_voice_model")
 
 
 class ProtocolServer:

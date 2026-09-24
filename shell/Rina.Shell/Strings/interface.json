@@ -344,9 +344,6 @@
   "Думаю…": {
     "English": "Thinking…"
   },
-  "Если заполнено, заменяет выбранный характер": {
-    "English": "If filled in, replaces the chosen persona"
-  },
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
@@ -500,6 +497,9 @@
     "Español": "Importar",
     "Українська": "Імпорт"
   },
+  "Имя": {
+    "English": "Name"
+  },
   "Имя значения": {
     "English": "Name of the value"
   },
@@ -508,6 +508,9 @@
   },
   "Имя, которым Рина вас называет. Можно оставить пустым": {
     "English": "The name Rina calls you by. Can be left empty"
+  },
+  "Имя, характер, слова активации и свой голос": {
+    "English": "Name, character, wake words and a voice of its own"
   },
   "Искать нераспознанное": {
     "English": "Search unrecognized commands"
@@ -533,6 +536,9 @@
   "Как её позвать": {
     "English": "What to call her"
   },
+  "Как зовут эту личность. Без слов активации её зовут по имени": {
+    "English": "What this personality is called. Without wake words, it is called by name"
+  },
   "Как к вам обращаться": {
     "English": "What to call you"
   },
@@ -545,6 +551,9 @@
   "Каким словом Рина зовёт какую программу": {
     "English": "Which word Rina uses for which program"
   },
+  "Каким характером отвечает эта личность": {
+    "English": "What character this personality answers with"
+  },
   "Какое действие": {
     "English": "Which action"
   },
@@ -553,9 +562,6 @@
   },
   "Какой адрес открыть": {
     "English": "Which address to open"
-  },
-  "Какой из готовых характеров у Рины": {
-    "English": "Which of the ready personas Rina has"
   },
   "Какую команду вызвать": {
     "English": "Which command to call"
@@ -595,6 +601,9 @@
   },
   "Латунь": {
     "English": "Brass"
+  },
+  "Личность": {
+    "English": "Personality"
   },
   "Микрофон": {
     "Deutsch": "Mikrofon",
@@ -1004,6 +1013,9 @@
   "Прочее": {
     "English": "Other"
   },
+  "Пусто — зовут по имени": {
+    "English": "Empty — called by name"
+  },
   "Путь": {
     "English": "Path"
   },
@@ -1100,8 +1112,8 @@
   "Своих команд пока нет": {
     "English": "No commands of your own yet"
   },
-  "Свой характер": {
-    "English": "Own persona"
+  "Свой голос": {
+    "English": "Own voice"
   },
   "Сворачивать в трей": {
     "Deutsch": "In den Infobereich minimieren",
@@ -1111,6 +1123,9 @@
   },
   "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
     "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
+  },
+  "Своя личность": {
+    "English": "Own personality"
   },
   "Серебро": {
     "English": "Silver"
@@ -1295,6 +1310,9 @@
   "Точно выполнить?": {
     "English": "Run it — are you sure?"
   },
+  "У Рины пока нет своего голоса — он появится в 4.0.0 Stable": {
+    "English": "Rina has no voice of her own yet — it arrives in 4.0.0 Stable"
+  },
   "УМЕЕТ СРАЗУ": {
     "English": "WORKS OUT OF THE BOX"
   },
@@ -1366,6 +1384,9 @@
   },
   "Файл голоса .onnx": {
     "English": "The .onnx voice file"
+  },
+  "Файл голоса Piper, .onnx. Пусто — голос из общих настроек": {
+    "English": "A Piper voice file, .onnx. Empty — the voice from the general settings"
   },
   "Файл не разобрался как JSON.": {
     "Deutsch": "Die Datei ließ sich nicht als JSON lesen.",
@@ -1564,6 +1585,9 @@
   },
   "например, «открой почту»": {
     "English": "for example, “open mail”"
+  },
+  "например, Макс": {
+    "English": "e.g. Max"
   },
   "например, Саша": {
     "English": "e.g. Alex"

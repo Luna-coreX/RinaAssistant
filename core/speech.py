@@ -1061,6 +1061,13 @@ class EngineSynthesiser:
                     pass
 
 
+def own_voice(settings) -> str:
+    """The own personality's voice file, when it is the one answering."""
+    if str(settings.get("personality", "") or "") != "own":
+        return ""
+    return str(settings.get("own_voice_model", "") or "").strip()
+
+
 def synthesiser_for(settings) -> Synthesiser:
     """
     Which synthesis is chosen in the settings.
@@ -1073,6 +1080,12 @@ def synthesiser_for(settings) -> Synthesiser:
     engine = str(settings.get("tts_engine", "silent") or "silent")
     if engine in ("", "silent"):
         return SilentSynthesiser()
+    # The own personality's voice, when it was given one (`4.0b-E14`).
+    # After «без озвучки», not before: that is a choice about speaking at
+    # all, and a personality's voice does not overrule it.
+    own = own_voice(settings)
+    if own:
+        return PiperSynthesiser(own)
     if engine == "piper" and settings.get("piper_model"):
         # A road of its own: Piper gives samples straight into memory, without a file.
         return PiperSynthesiser(str(settings.get("piper_model", "") or ""))

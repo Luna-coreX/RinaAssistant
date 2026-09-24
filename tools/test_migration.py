@@ -348,5 +348,41 @@ for kept_lang in ("Русский", "English"):
 shutil.rmtree(gone_home, ignore_errors=True)
 
 print()
+print("=== характер, написанный до личностей ===")
+
+# `4.0b-E14`. A filled-in `llm_persona` used to replace Rina's character
+# whatever else was chosen; now it is the own personality's character and
+# applies only when that one is. Somebody who wrote one is moved to it once,
+# rather than finding their Rina changed without a word.
+def store_with(values):
+    where = tempfile.mkdtemp(prefix="rina-persona-")
+    folder = os.path.join(where, "RinaAssistant")
+    os.makedirs(folder)
+    with io.open(os.path.join(folder, "settings.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump(dict({"config_version": 2}, **values), f, ensure_ascii=False)
+    with io.open(os.path.join(folder, "commands.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump({}, f)
+    _, loaded = fresh_store(where)
+    loaded.load()
+    return where, loaded
+
+
+cases = (
+    ("свой характер без выбора — переходит на свою личность",
+     {"llm_persona": "Отвечай как пират."}, "own"),
+    ("выбор уже сделан — его не трогают",
+     {"llm_persona": "Отвечай как пират.", "personality": "rina"}, "rina"),
+    ("без своего характера — Рина",
+     {"llm_persona": ""}, "rina"),
+)
+for label, values, wanted in cases:
+    where, loaded = store_with(values)
+    check(label, loaded.get("personality") == wanted,
+          f"| {loaded.get('personality')!r}")
+    shutil.rmtree(where, ignore_errors=True)
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

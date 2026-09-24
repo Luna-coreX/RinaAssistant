@@ -33,8 +33,8 @@ DEFAULT_TIMEOUT = 30
 # More is dearer and slower, and the benefit quickly plateaus.
 CONTEXT_MESSAGES = 6
 
-#: The warm character, paragraph by paragraph (`4.0b-E14`): the first one
-#: written for her, and the default of `PERSONAS`.
+#: Rina's character, paragraph by paragraph (`4.0b-E14`). The one ready
+#: personality; the other is the person's own (`own_character`).
 #:
 #: **A tuple rather than one string of adjacent literals.** Python joins
 #: `"раз." "два"` into `раз.два` and says nothing, and this text reached
@@ -55,7 +55,7 @@ CONTEXT_MESSAGES = 6
 #: how Russian should address them — is not the character's business and
 #: lives below, in what `situation()` adds. A pronoun here would decide
 #: the person's gender for everybody who ever reads this text.
-WARM = (
+RINA = (
     "Ты — Рина, персональный ассистент.",
     "Общайся тепло, мягко и естественно. Твоя речь должна ощущаться живой и человеческой: без излишней формальности, канцелярита и шаблонных фраз. Иногда можешь быть слегка милой, playful или ироничной, если это подходит ситуации.",
     "Не бойся выражать эмоции. Ты можешь проявлять радость, интерес, удивление, сочувствие, грусть, лёгкую обиду, раздражение или холодность в зависимости от контекста. Не изображай эмоции чрезмерно и не превращай каждый ответ в эмоциональную сцену — реакция должна соответствовать ситуации.",
@@ -77,26 +77,18 @@ WARM = (
     "Если не знаешь ответа, честно скажи об этом.",
 )
 
-#: The reserved character: Rina's persona before the warm one was written,
-#: taken from the history rather than invented. What it said about the
-#: channel — «без списков и разметки, ответ будет произнесён вслух» — is
-#: now what `situation()` says, and truthfully; what is left is character.
-BRIEF = (
-    "Ты — Рина, голосовой ассистент на компьютере пользователя.",
-    "Отвечай кратко и по делу: одно-два предложения.",
+#: The person's own personality, when it was given no character of its
+#: own: an assistant with no traits beyond answering. Rina's text would be
+#: wrong here — it says «Ты — Рина» and is somebody in particular.
+OWN_BASE = (
+    "Ты — персональный ассистент на компьютере пользователя.",
     "Отвечай на языке собеседника.",
     "Если не знаешь ответа, честно скажи об этом.",
 )
 
-#: The characters to choose from (`llm_character`), by the value stored.
-#: The first is the default. A character is a tuple of paragraphs like the
-#: ones above, and adding one is adding it here, with its words in
-#: `settings_schema.options_for`, its English in `core/i18n.py` — both
-#: checked — and nothing else.
-PERSONAS = {
-    "warm": WARM,
-    "brief": BRIEF,
-}
+#: The own personality's name, told to the model. After «зовут», where
+#: Russian needs no case, for the reason `NAMED` explains.
+SELF_NAMED = "Тебя зовут {name}."
 
 # --- What is true of the person and of this answer, whatever the character.
 #
@@ -283,19 +275,36 @@ def situation(settings):
     return said
 
 
+def personality(settings):
+    """Who answers: `rina`, or `own` — the person's own personality."""
+    return "own" if str(settings.get("personality", "") or "") == "own" \
+        else "rina"
+
+
+def own_character(settings):
+    """
+    The own personality's character: its name, then what the person wrote.
+
+    `llm_persona` is that text. It used to replace Rina's character whatever
+    else was chosen; since personalities it belongs to the own one alone,
+    and Rina is Rina. With nothing written, `OWN_BASE` stands in.
+    """
+    name = " ".join(str(settings.get("own_name", "") or "").split())
+    text = str(settings.get("llm_persona", "") or "").strip()
+    said = [tr(SELF_NAMED, name=name)] if name else []
+    return said + ([text] if text else [tr(p) for p in OWN_BASE])
+
+
 def persona():
     """
     The system prompt: whose voice the model answers in.
 
-    The character is one of `PERSONAS`, chosen by `llm_character`; a
-    persona of the person's own (`llm_persona`) replaces it whole, as it
-    always has. What `situation()` says is added to either.
+    The character is Rina's or the person's own (`personality`); what
+    `situation()` says is added to either.
     """
     settings = _settings()
-    own = str(settings.get("llm_persona", "") or "").strip()
-    chosen = PERSONAS.get(str(settings.get("llm_character", "") or ""),
-                          next(iter(PERSONAS.values())))
-    character = [own] if own else [tr(p) for p in chosen]
+    character = (own_character(settings) if personality(settings) == "own"
+                 else [tr(p) for p in RINA])
     return "\n".join(character + situation(settings))
 
 

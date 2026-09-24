@@ -49,12 +49,28 @@ def hush_asked(text) -> bool:
     return any(word in _tokenize(text) for word in HUSH_WORDS)
 
 
+def _cleaned(words) -> list:
+    if not isinstance(words, list):
+        return []
+    return [str(w).strip().lower() for w in words if str(w).strip()]
+
+
 def get_wake_words(settings) -> list:
-    """Returns the list of the wake word's variants (in lower case)."""
-    words = settings.get("wake_words", None)
-    result = []
-    if isinstance(words, list):
-        result = [str(w).strip().lower() for w in words if str(w).strip()]
+    """
+    Returns the list of the wake word's variants (in lower case).
+
+    Whose words depends on who answers (`4.0b-E14`). A personality of the
+    person's own is called by its own words, or by its name when none
+    were given; with neither, Rina's words stay — an assistant nobody can
+    call is worse than one still called by the old name.
+    """
+    if str(settings.get("personality", "") or "") == "own":
+        own = (_cleaned(settings.get("own_wake_words", None))
+               or _cleaned([" ".join(str(settings.get("own_name", "")
+                                         or "").split())]))
+        if own:
+            return own
+    result = _cleaned(settings.get("wake_words", None))
     # backward compatibility: a single wake_word
     if not result:
         single = str(settings.get("wake_word", "Рина")).strip().lower()

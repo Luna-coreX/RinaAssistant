@@ -95,10 +95,20 @@ GROUPS = {
         "llm_web": False,
         "llm_url": "http://localhost:11434",
         "llm_model": "",
-        # Which of the ready characters (`core.llm.PERSONAS`); `llm_persona`,
-        # when filled in, replaces it with the person's own.
-        "llm_character": "warm",
+        # Who answers (`4.0b-E14`): Rina, or a personality of the person's
+        # own. It changes the wake words, the character and — when the own
+        # one has a voice — the voice. The program is still called Rina.
+        "personality": "rina",
+        # The own personality. Its character is `llm_persona`; with no wake
+        # words it is called by its name; with no voice it speaks in the one
+        # the settings chose.
+        "own_name": "",
+        "own_wake_words": [],
+        "own_voice_model": "",
         "llm_persona": "",
+        # Retired: the ready characters were moods of one Rina, not
+        # personalities (see `settings_schema`).
+        "llm_character": "warm",
         # What Rina calls the person (`4.0b-E14`). Asked by the first-run
         # wizard, and deliberately not dependent on `llm_enabled`, though
         # today only the model's persona reads it: the wizard asks before
@@ -261,6 +271,7 @@ class SettingsStore:
         # bringing the data's shape up to the current schema version
         migrated = self._migrate_schema() or migrated
         migrated = self._retire_language() or migrated
+        migrated = self._adopt_own_persona() or migrated
 
         if migrated:
             self.save_all()
@@ -416,6 +427,24 @@ class SettingsStore:
         if (legacy_lang in LANGUAGES
                 and self._data.get("ui_language") == DEFAULTS["ui_language"]):
             self._data["ui_language"] = legacy_lang
+
+    def _adopt_own_persona(self):
+        """
+        A character written before personalities existed stays in force.
+
+        Until `4.0b-E14` a filled-in `llm_persona` replaced Rina's character
+        whatever else was chosen. Now it is the character of the person's
+        own personality and applies only when that one is chosen, so
+        somebody who wrote one is moved to it — once, on the first load
+        that knows about personalities: after that the file has the key,
+        and the choice is theirs to change.
+        """
+        if "personality" in self._raw_group("settings"):
+            return False
+        if not str(self._data.get("llm_persona", "") or "").strip():
+            return False
+        self._data["personality"] = "own"
+        return True
 
     def _retire_language(self):
         """

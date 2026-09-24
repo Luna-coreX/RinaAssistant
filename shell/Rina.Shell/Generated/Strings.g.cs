@@ -611,11 +611,6 @@ public static partial class Loc
                 {
                     ["English"] = "Thinking…",
                 },
-            ["Если заполнено, заменяет выбранный характер"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "If filled in, replaces the chosen persona",
-                },
             ["Если не ответить, действие не выполнится."] =
                 new Dictionary<string, string>
                 {
@@ -888,6 +883,11 @@ public static partial class Loc
                     ["Español"] = "Importar",
                     ["Українська"] = "Імпорт",
                 },
+            ["Имя"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name",
+                },
             ["Имя значения"] =
                 new Dictionary<string, string>
                 {
@@ -902,6 +902,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The name Rina calls you by. Can be left empty",
+                },
+            ["Имя, характер, слова активации и свой голос"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name, character, wake words and a voice of its own",
                 },
             ["иначе"] =
                 new Dictionary<string, string>
@@ -953,6 +958,11 @@ public static partial class Loc
                 {
                     ["English"] = "What to call her",
                 },
+            ["Как зовут эту личность. Без слов активации её зовут по имени"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What this personality is called. Without wake words, it is called by name",
+                },
             ["Как к вам обращаться"] =
                 new Dictionary<string, string>
                 {
@@ -973,6 +983,11 @@ public static partial class Loc
                 {
                     ["English"] = "Which word Rina uses for which program",
                 },
+            ["Каким характером отвечает эта личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What character this personality answers with",
+                },
             ["Какое действие"] =
                 new Dictionary<string, string>
                 {
@@ -987,11 +1002,6 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Which address to open",
-                },
-            ["Какой из готовых характеров у Рины"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "Which of the ready personas Rina has",
                 },
             ["Какую команду вызвать"] =
                 new Dictionary<string, string>
@@ -1065,6 +1075,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Brass",
+                },
+            ["Личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Personality",
                 },
             ["меньше минуты"] =
                 new Dictionary<string, string>
@@ -1189,6 +1204,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "for example, “open mail”",
+                },
+            ["например, Макс"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "e.g. Max",
                 },
             ["например, отвечай коротко и по делу"] =
                 new Dictionary<string, string>
@@ -1888,6 +1908,11 @@ public static partial class Loc
                 {
                     ["English"] = "empty",
                 },
+            ["Пусто — зовут по имени"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Empty — called by name",
+                },
             ["Путь"] =
                 new Dictionary<string, string>
                 {
@@ -2053,10 +2078,10 @@ public static partial class Loc
                 {
                     ["English"] = "No commands of your own yet",
                 },
-            ["Свой характер"] =
+            ["Свой голос"] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "Own persona",
+                    ["English"] = "Own voice",
                 },
             ["Сворачивать в трей"] =
                 new Dictionary<string, string>
@@ -2070,6 +2095,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row.",
+                },
+            ["Своя личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Own personality",
                 },
             ["связь потеряна, поднимаем"] =
                 new Dictionary<string, string>
@@ -2396,6 +2426,11 @@ public static partial class Loc
                 {
                     ["English"] = "Run it — are you sure?",
                 },
+            ["У Рины пока нет своего голоса — он появится в 4.0.0 Stable"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina has no voice of her own yet — it arrives in 4.0.0 Stable",
+                },
             ["Убрать"] =
                 new Dictionary<string, string>
                 {
@@ -2514,6 +2549,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The .onnx voice file",
+                },
+            ["Файл голоса Piper, .onnx. Пусто — голос из общих настроек"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A Piper voice file, .onnx. Empty — the voice from the general settings",
                 },
             ["Файл не разобрался как JSON."] =
                 new Dictionary<string, string>
