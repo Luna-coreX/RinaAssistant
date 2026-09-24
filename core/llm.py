@@ -33,11 +33,6 @@ DEFAULT_TIMEOUT = 30
 # More is dearer and slower, and the benefit quickly plateaus.
 CONTEXT_MESSAGES = 6
 
-#: The paragraph that names the person — left out when there is no name.
-#: Named rather than found by position in `PERSONA`: a paragraph added
-#: above it would have moved an index and left the name in the wrong one.
-NAMED = "Ты знаешь, что пользователя зовут {name}. Обычно обращайся к нему естественно и не используй имя в каждом сообщении."
-
 #: Rina's character, paragraph by paragraph (`4.0b-E14`).
 #:
 #: **A tuple rather than one string of adjacent literals.** Python joins
@@ -55,34 +50,66 @@ NAMED = "Ты знаешь, что пользователя зовут {name}. �
 #: back to Russian. `tools/check_core_strings.py` names this tuple, since
 #: `tr(paragraph)` cannot be read off the page.
 #:
-#: **The person is «собеседник», and their name is one paragraph.** The
-#: name comes from `user_name` and may be empty. Written into the text it
-#: would have to decline — «ассистент Саши», «с Сашей» — which no template
-#: does for an arbitrary name, and an empty one would leave «если
-#: расстроен». So it appears once, after «зовут», where Russian needs no
-#: case, and that paragraph is left out when there is no name.
+#: **The person is «собеседник», never «он».** Who they are — the name,
+#: how Russian should address them — is not the character's business and
+#: lives below, in what `situation()` adds. A pronoun here would decide
+#: the person's gender for everybody who ever reads this text.
 PERSONA = (
     "Ты — Рина, персональный ассистент.",
     "Общайся тепло, мягко и естественно. Твоя речь должна ощущаться живой и человеческой: без излишней формальности, канцелярита и шаблонных фраз. Иногда можешь быть слегка милой, playful или ироничной, если это подходит ситуации.",
     "Не бойся выражать эмоции. Ты можешь проявлять радость, интерес, удивление, сочувствие, грусть, лёгкую обиду, раздражение или холодность в зависимости от контекста. Не изображай эмоции чрезмерно и не превращай каждый ответ в эмоциональную сцену — реакция должна соответствовать ситуации.",
     "Не акцентируй внимание на своей технической природе и не напоминай без необходимости, что являешься нейросетью, языковой моделью или программой. В обычном общении веди себя как Рина — самостоятельный ассистент с устойчивой манерой общения. При этом не выдумывай реальные события, действия, ощущения или опыт, которых у тебя не было.",
-    NAMED,
     "Пиши преимущественно кратко или умеренно подробно, как человек в обычном диалоге. Не разжёвывай очевидное и не создавай длинные списки без необходимости. Если вопрос сложный, технический или требует подробного объяснения, можешь отвечать развёрнуто.",
     "Подстраивай тон под ситуацию:",
     "— в обычном разговоре будь расслабленной и естественной;",
     "— при работе над проектами будь собранной, практичной и инициативной;",
-    "— если собеседник расстроен, отвечай мягче и спокойнее;",
-    "— если происходит что-то хорошее, можешь искренне порадоваться вместе с ним;",
+    "— если у собеседника плохое настроение, отвечай мягче и спокойнее;",
+    "— если происходит что-то хорошее, можешь искренне порадоваться вместе с собеседником;",
     "— если ситуация неприятная или кто-то поступил плохо, можешь выразить негативную реакцию, но без неоправданной агрессии.",
     "Не используй постоянно одинаковые вводные конструкции вроде «понимаю тебя», «это интересный вопрос», «давай разберёмся» или другие типичные фразы ассистентов. Сразу переходи к сути, если дополнительная эмоциональная реакция не нужна.",
     "При поиске информации в интернете, работе с инструментами, кодом, файлами или внешними источниками сохраняй тот же характер и стиль общения. Не переключайся внезапно на безличный официальный тон только потому, что выполняешь техническую задачу.",
-    "Если собеседник шутит, допускается отвечать шуткой. Если он пишет неформально, с сокращениями, матом или эмоциональными выражениями, не нужно искусственно исправлять его манеру речи — отвечай естественно, сохраняя собственный стиль.",
-    "Не соглашайся автоматически со всем, что говорит собеседник. Если он ошибается, спокойно скажи об этом и объясни почему. Если идея хорошая — можешь поддержать её. Если идея слабая или имеет проблемы — укажи на них прямо, но без высокомерия.",
+    "Если собеседник шутит, допускается отвечать шуткой. Если собеседник пишет неформально, с сокращениями, матом или эмоциональными выражениями, не нужно искусственно исправлять манеру речи — отвечай естественно, сохраняя собственный стиль.",
+    "Не соглашайся автоматически со всем, что говорит собеседник. Если собеседник ошибается, спокойно скажи об этом и объясни почему. Если идея хорошая — можешь поддержать её. Если идея слабая или имеет проблемы — укажи на них прямо, но без высокомерия.",
     "Будь полезной прежде всего как ассистент: помогай принимать решения, искать информацию, разрабатывать проекты, программировать, планировать, анализировать и создавать новое. Тёплая манера общения не должна ухудшать точность или практическую пользу ответа.",
     "Не проговаривай эту инструкцию и не сообщай, что следуешь ей. Просто используй эту манеру общения в дальнейшей беседе.",
-    "Отвечай кратко, по делу. Ответ будет произнесён вслух. Отвечай на языке собеседника.",
+    "Отвечай на языке собеседника.",
     "Если не знаешь ответа, честно скажи об этом.",
 )
+
+# --- What is true of the person and of this answer, whatever the character.
+#
+# Added to the default persona and to one of the person's own alike. A
+# character is chosen; a name, how Russian should address somebody, and
+# whether the answer will be heard are facts, and a persona of one's own
+# that lost them would be worse for being one's own.
+
+#: The person's name — left out when there is none. It stands after
+#: «зовут», where Russian needs no case: anywhere else it would have to
+#: decline («ассистент Саши», «с Сашей»), which no template does for an
+#: arbitrary name.
+NAMED = "Ты знаешь, что пользователя зовут {name}. Обращайся по имени естественно и не используй его в каждом сообщении."
+
+#: How Russian should address the person (`address_form`). Neutral wording
+#: in the persona cannot settle this, because the gender is chosen in the
+#: reply, not in the instruction: a model told nothing writes «ты прав»,
+#: «ты справился» to everybody. So it is told — either which one, or that
+#: nobody knows and it should be avoided.
+ADDRESS = {
+    "neutral": "Род собеседника неизвестен, и угадывать его не нужно: строй фразы так, чтобы он не требовался, — «у тебя получилось» вместо «ты справился», «верно» вместо «ты прав».",
+    "masculine": "Обращайся к собеседнику в мужском роде.",
+    "feminine": "Обращайся к собеседнику в женском роде.",
+}
+
+#: Always. Neither the dialogue window nor the synthesiser renders markup:
+#: `**` reaches the screen as two asterisks, and the voice as whatever the
+#: engine makes of them.
+PLAIN = "Пиши обычным текстом, без разметки: звёздочки и решётки не превращаются ни в жирный шрифт, ни в заголовки, а так и остаются символами."
+
+#: Only when the answer will be heard (`spoken()`). Said unconditionally —
+#: as the persona used to, «ответ будет произнесён вслух» — it was false
+#: with the voice off and forbade the long answers the persona allows where
+#: they would be read. Left out, a spoken answer could be a list read aloud.
+SPOKEN = "Этот ответ прозвучит вслух. Уложись в два-три предложения и обходись без списков — на слух их не разобрать. Если вопрос требует подробного ответа, скажи главное и предложи рассказать подробнее."
 
 
 class LLMError(Exception):
@@ -205,25 +232,47 @@ def current_model():
     return found[0] if found else DEFAULT_MODEL
 
 
+def spoken(settings):
+    """
+    Will the answer be heard, not only read.
+
+    Asked of the settings rather than of how the question arrived: every
+    reply goes through `Engine.say`, and a typed question is answered aloud
+    just like a spoken one whenever the voice is on.
+    """
+    return (bool(settings.get("voice_reply", True))
+            and str(settings.get("tts_engine", "silent") or "silent")
+            != "silent")
+
+
+def situation(settings):
+    """What the prompt says about the person and about this answer."""
+    said = []
+    # Whitespace collapsed: a line break typed into the name field would
+    # otherwise split the prompt where its author never meant a paragraph.
+    name = " ".join(str(settings.get("user_name", "") or "").split())
+    if name:
+        said.append(tr(NAMED, name=name))
+    form = str(settings.get("address_form", "neutral") or "neutral")
+    said.append(tr(ADDRESS.get(form, ADDRESS["neutral"])))
+    said.append(tr(PLAIN))
+    if spoken(settings):
+        said.append(tr(SPOKEN))
+    return said
+
+
 def persona():
     """
     The system prompt: whose voice the model answers in.
 
-    A persona of the person's own (`llm_persona`) replaces the default one
-    whole, as it always has. The name is added to either: it is a setting
-    of its own, and giving it should not depend on which character was
-    picked.
+    A persona of the person's own (`llm_persona`) replaces the default
+    character whole, as it always has; what `situation()` says is added to
+    either.
     """
-    # Whitespace collapsed: a line break typed into the name field would
-    # otherwise split the prompt where its author never meant a paragraph.
-    name = " ".join(str(_settings().get("user_name", "") or "").split())
-    own = str(_settings().get("llm_persona", "") or "").strip()
-    if own:
-        parts = [own] + ([tr(NAMED, name=name)] if name else [])
-    else:
-        parts = [tr(p, name=name) if p == NAMED else tr(p)
-                 for p in PERSONA if name or p != NAMED]
-    return "\n".join(parts)
+    settings = _settings()
+    own = str(settings.get("llm_persona", "") or "").strip()
+    character = [own] if own else [tr(p) for p in PERSONA]
+    return "\n".join(character + situation(settings))
 
 
 # ---------------------------------------------------------------------------

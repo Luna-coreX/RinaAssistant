@@ -132,6 +132,24 @@ try:
           (set_name.get("values") or {}).get("user_name") == "Саша",
           f"| {set_name}")
 
+    # The address form, on the same step: offered with its words by the
+    # core, since the shell draws the list from this answer and has no
+    # words of its own for it; taken when valid, refused when not.
+    forms = (answer(core, "settings.options", {"keys": ["address_form"]})
+             .get("options") or {}).get("address_form") or []
+    check("вариантов рода три, и у каждого есть слово",
+          len(forms) == 3 and all(f.get("title") for f in forms), f"| {forms}")
+    set_form = answer(core, "settings.set",
+                      {"values": {"address_form": "feminine"}})
+    check("род принят",
+          (set_form.get("values") or {}).get("address_form") == "feminine",
+          f"| {set_form}")
+    bad_form = answer(core, "settings.set",
+                      {"values": {"address_form": "какой-нибудь"}})
+    check("а выдуманный — нет",
+          "address_form" not in (bad_form.get("values") or {}),
+          f"| {bad_form}")
+
     print()
     print("=== флаг меняет только завершение мастера ===")
     # The button in "About" opens the same wizard, and opening it must not
@@ -163,9 +181,12 @@ try:
     after = answer(core, "setup.state")
     check("и после перезапуска ядра тоже",
           after.get("needed") is False, f"| {after}")
-    kept = answer(core, "settings.get", {"keys": ["user_name"]})
+    kept = answer(core, "settings.get", {"keys": ["user_name", "address_form"]})
     check("имя из мастера пережило перезапуск",
           (kept.get("values") or {}).get("user_name") == "Саша", f"| {kept}")
+    check("и род тоже",
+          (kept.get("values") or {}).get("address_form") == "feminine",
+          f"| {kept}")
     core.proc.kill()
 
 finally:

@@ -9,24 +9,32 @@ arrival — this one was: every line correct in the editor, and the model
 got «…ассистент Luna.Общайся тепло…», because Python joins adjacent
 literals without a space and says nothing.
 
-Four things, each found or decided while making the persona translatable:
+The prompt is a character and a situation. The character is the persona
+or one of the person's own; the situation is what is true whatever the
+character — and each part of it was found or decided here:
 
 **The name is one paragraph, and without it nothing is left dangling.**
 Empty is the ordinary case, not an error. A name written into the text
 would leave «если  расстроен» when there is none — and would have to
 decline when there is one, which no template does for an arbitrary name.
 
+**The gender is said, not guessed.** Neutral wording in the persona does
+not settle it: the model picks «ты прав» or «ты права» in its reply, and a
+model told nothing picks the masculine for everybody. So the persona never
+says «он» about the person, and the address form says the rest.
+
+**"Spoken aloud" only when it will be.** Said always, it was false with
+the voice off; said never, a list got read aloud. And markup never: the
+window does not render it either.
+
 **The persona follows the language.** A Russian instruction was found to
 take every other language away from the model: spoken to in English, it
 stopped answering. In an English window the model must be told in English.
 
-**A persona of the person's own still gets the name.** The name is a
-setting of its own; giving it should not depend on which character was
-picked.
-
-**The name is on the privacy page.** It is personal data, and the page
-that promises to list everything must list it — by construction, because
-it is an ordinary setting, and checked here because E14 is where it began.
+**The name and the form are on the privacy page.** Personal data, and the
+page that promises to list everything must list them — by construction,
+because they are ordinary settings, and checked here because this is
+where they began.
 
 To run:
     python tools/test_persona.py
@@ -93,6 +101,11 @@ def told(**settings):
 #: (`check_glued.py`) sees literals and this is what they turned into.
 GLUED = re.compile(r"[.,;:!?…»][A-Za-zА-Яа-яЁё]")
 CYRILLIC = re.compile(r"[А-Яа-яЁё]")
+#: A masculine pronoun. In the character's paragraphs there is nothing
+#: male for one to refer to but the person — so any of these decides the
+#: person's gender for everybody who reads the persona, and a use that
+#: means something else is worth rephrasing anyway.
+HE = re.compile(r"\b(?:он|его|ему|им|ним|него|нему|нём)\b", re.I)
 
 i18n.set_language("Русский")
 
@@ -128,10 +141,41 @@ check("перевод строки в имени не рвёт текст",
       f"| строк {broken.count(chr(10))} против {named.count(chr(10))}")
 
 print()
+print("=== род ===")
+pronouns = sorted({m.group(0) for p in llm.PERSONA for m in HE.finditer(p)})
+check("характер не говорит о человеке «он»", not pronouns,
+      f"| {', '.join(pronouns)}")
+check("по умолчанию — без рода, и это сказано модели",
+      llm.ADDRESS["neutral"] in bare, "| модели не сказано, что род неизвестен")
+for form in ("masculine", "feminine"):
+    chosen = told(address_form=form)
+    others = [f for f in llm.ADDRESS if f != form and llm.ADDRESS[f] in chosen]
+    check(f"{form}: сказано именно это",
+          llm.ADDRESS[form] in chosen and not others,
+          f"| прочие формы в тексте: {others}")
+check("незнакомое значение — как без рода",
+      llm.ADDRESS["neutral"] in told(address_form="мусор"))
+
+print()
+print("=== вслух ===")
+aloud = told(tts_engine="edge", voice_reply=True)
+check("голос включён — сказано, что ответ прозвучит",
+      llm.SPOKEN in aloud, "| про голос ни слова")
+check("движок «без озвучки» — не сказано, и слова «вслух» нет вовсе",
+      "вслух" not in bare, "| текст обещает голос, которого нет")
+check("ответ голосом выключен — не сказано",
+      llm.SPOKEN not in told(tts_engine="edge", voice_reply=False))
+check("без разметки — всегда",
+      llm.PLAIN in bare and llm.PLAIN in aloud, "| про разметку не сказано")
+
+print()
 print("=== по-английски ===")
 i18n.set_language("English")
 try:
-    english = told(user_name="Sasha")
+    # Everything the situation can add, at once: a Russian line anywhere
+    # in it pulls the answer into Russian as surely as the character does.
+    english = told(user_name="Sasha", address_form="feminine",
+                   tts_engine="edge")
     stray = CYRILLIC.findall(english)
     check("персона целиком английская", not stray,
           f"| кириллицы: {len(stray)} букв, начало: "
@@ -146,20 +190,24 @@ print()
 print("=== свой характер ===")
 own = told(llm_persona="Отвечай как пират.")
 check("свой характер заменяет персону целиком",
-      own == "Отвечай как пират.", f"| {own!r}")
-own_named = told(llm_persona="Отвечай как пират.", user_name="Саша")
-check("а имя к нему добавляется",
-      own_named.startswith("Отвечай как пират.\n")
-      and "зовут Саша." in own_named, f"| {own_named[:80]!r}")
+      own.startswith("Отвечай как пират.\n") and "Ты — Рина" not in own,
+      f"| {own[:60]!r}")
+own_named = told(llm_persona="Отвечай как пират.", user_name="Саша",
+                 address_form="feminine", tts_engine="edge")
+check("а положение дел к нему добавляется",
+      "зовут Саша." in own_named and llm.ADDRESS["feminine"] in own_named
+      and llm.SPOKEN in own_named, f"| {own_named[:80]!r}")
 
 print()
-print("=== имя на странице приватности ===")
-store = MemorySettings({"user_name": "Саша"})
+print("=== на странице приватности ===")
+store = MemorySettings({"user_name": "Саша", "address_form": "feminine"})
 kept = {item["id"]: item["detail"]
         for group in privacy.inventory(store) if group["id"] == "settings"
         for item in group["items"]}
 check("заданное имя видно среди того, что о человеке известно",
       kept.get("user_name") == "Саша", f"| {kept.get('user_name')!r}")
+check("и род обращения тоже",
+      kept.get("address_form") == "feminine", f"| {kept.get('address_form')!r}")
 
 print()
 print("ИТОГО ошибок:", fails)

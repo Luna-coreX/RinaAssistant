@@ -140,6 +140,10 @@ def main() -> int:
         # untranslated one is worse here than anywhere: a Russian line in
         # the persona pulls the model's answers into Russian.
         "PERSONA": list(llm.PERSONA),
+        # And what is added to any character: the name, the address form,
+        # the rules of the channel. Untranslated, these pull just as hard.
+        "SITUATION": [llm.NAMED, llm.PLAIN, llm.SPOKEN,
+                      *llm.ADDRESS.values()],
     }
 
     lost = []

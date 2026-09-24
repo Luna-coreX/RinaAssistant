@@ -121,6 +121,10 @@ CONSTRAINTS: dict[str, Constraint] = {
     "llm_model": Constraint(depends_on="llm_enabled"),
     "llm_web": Constraint(depends_on="llm_enabled"),
     "llm_persona": Constraint(depends_on="llm_enabled"),
+    # Three fixed values with words for them, listed the way `whisper_model`
+    # is: the set is the core's, because it is what the persona knows how
+    # to say (`core.llm.ADDRESS`).
+    "address_form": Constraint(dynamic=True),
 
     # Recording the text of lines is a decision about privacy, and it has
     # force only when history is on.
@@ -325,6 +329,16 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
                            else tr("{name} — перевод неполный", name=name)),
                  "available": True}
                 for name in LANGUAGES]
+    if key == "address_form":
+        from core.llm import ADDRESS
+        # Written out as literals so the translation check can read them;
+        # the values come from `ADDRESS`, so a form added there and not
+        # here fails loudly rather than appearing without a name.
+        titles = {"neutral": tr("Без рода"),
+                  "masculine": tr("В мужском роде"),
+                  "feminine": tr("В женском роде")}
+        return [{"value": form, "title": titles[form], "available": True}
+                for form in ADDRESS]
     if key == "whisper_model":
         # Whisper's list of models is fixed and known without installing
         # anything: these are names, not files that were found.

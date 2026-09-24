@@ -53,6 +53,7 @@ public partial class SetupWindow : Window
         // the name has to come from somewhere other than its text. Empty is
         // an answer — pressing «Дальше» on a blank field is how somebody
         // declines, and nothing asks twice.
+        NameStep = _steps.Count;
         _steps.Add(new Step(
             S("Как к вам обращаться"),
             S("Рина будет называть вас этим именем. Можно оставить пустым."),
@@ -135,7 +136,38 @@ public partial class SetupWindow : Window
     private readonly List<string> _chosen = [];
     private readonly List<JsonObject> _models = [];
     private TextBox? _name;
+    private ComboBox? _form;
     private TextBox? _wake;
+
+    // What is stored, read once by `LoadAsync`, and what the person has
+    // made of it since. Shown rather than blanked on a wizard opened again,
+    // and compared rather than written blindly: «Дальше» writes only what
+    // was changed, so walking past this step disturbs nothing.
+    private string _nameWas = "";
+    private string _formWas = "neutral";
+    private string? _nameNow;
+    private string? _formNow;
+
+    /// <summary>The address forms the core offers: the value and its word.</summary>
+    private readonly List<(string Value, string Title)> _forms = [];
+
+    /// <summary>Which step asks for the name.</summary>
+    public int NameStep { get; }
+
+    /// <summary>How many address forms the name step offers — for the check.</summary>
+    public int FormsOffered => _form?.Items.Count ?? 0;
+
+    /// <summary>Which address form is chosen on the step shown — for the check.</summary>
+    public string FormChosen
+    {
+        get => (_form?.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+        set
+        {
+            if (_form is null) return;
+            foreach (var item in _form.Items.OfType<ComboBoxItem>())
+                if (item.Tag as string == value) _form.SelectedItem = item;
+        }
+    }
 
     /// <summary>What was typed as the person's name — for the check.</summary>
     public string NameTyped
@@ -168,19 +200,51 @@ public partial class SetupWindow : Window
     {
         var stack = new StackPanel();
         // Every visit builds the step anew, and a person walks back and
-        // forth: carried over from the field the last visit made, or a name
-        // typed a step ago comes back blank.
-        _name = new TextBox
+        // forth: what they typed is carried over, or a name typed a step ago
+        // comes back as whatever is stored.
+        var name = new TextBox
         {
             Style = (Style)FindResource("Field"),
-            Text = _name?.Text ?? "",
+            Text = _nameNow ?? _nameWas,
             Width = 260,
             HorizontalAlignment = HorizontalAlignment.Left,
         };
+        name.TextChanged += (_, _) => _nameNow = name.Text;
+        _name = name;
         // The same example the settings field shows, taken from there: one
         // name for one question, wherever it is asked.
-        Styles.Ui.SetHint(_name, SettingsLayout.HintInField("user_name"));
-        stack.Children.Add(_name);
+        Styles.Ui.SetHint(name, SettingsLayout.HintInField("user_name"));
+        stack.Children.Add(name);
+
+        // On the same step because it is the same question — how to address
+        // somebody — and Russian asks it twice: by name and by gender. Left
+        // out when the core did not answer, rather than offered with words
+        // the shell would have had to invent.
+        _form = null;
+        if (_forms.Count == 0) return stack;
+        stack.Children.Add(new TextBlock
+        {
+            Text = SettingsLayout.TitleOf("address_form"),
+            Style = (Style)FindResource("Text.Meta"),
+            Margin = new Thickness(0, 16, 0, 6),
+        });
+        var form = new ComboBox
+        {
+            Style = (Style)FindResource("Choice"),
+            Width = 260,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        var wanted = _formNow ?? _formWas;
+        foreach (var (value, title) in _forms)
+        {
+            var item = new ComboBoxItem { Content = title, Tag = value };
+            form.Items.Add(item);
+            if (value == wanted) form.SelectedItem = item;
+        }
+        form.SelectionChanged += (_, _) =>
+            _formNow = (form.SelectedItem as ComboBoxItem)?.Tag as string;
+        _form = form;
+        stack.Children.Add(form);
         return stack;
     }
 
@@ -343,14 +407,19 @@ public partial class SetupWindow : Window
     // ------------------------------------------------------------ keeping
     private async Task KeepName()
     {
-        // Only a name given is written. The field starts empty rather than
-        // showing what is stored, so on a wizard opened again later a blank
-        // is not evidence of a decision — writing it would erase a name
-        // somebody set in the settings by walking past this step. Clearing
-        // it is done there.
-        var said = _name?.Text?.Trim() ?? "";
-        if (said.Length > 0)
-            await _link.SetAsync("user_name", JsonValue.Create(said));
+        // Only what changed is written. The field shows what is stored, so a
+        // blank here is a decision — the name was there and was removed —
+        // and writing it is right; an untouched field writes nothing, so
+        // walking past the step leaves the settings as they were.
+        var said = (_nameNow ?? _nameWas).Trim();
+        if (said != _nameWas
+            && await _link.SetAsync("user_name", JsonValue.Create(said)))
+            _nameWas = said;
+
+        var form = _formNow ?? _formWas;
+        if (form != _formWas
+            && await _link.SetAsync("address_form", JsonValue.Create(form)))
+            _formWas = form;
     }
 
     private async Task KeepWake()
@@ -409,7 +478,28 @@ public partial class SetupWindow : Window
         var told = await _link.AskAsync(Methods.ModelsCatalogue, null);
         foreach (var item in told?["items"]?.AsArray() ?? [])
             if (item is JsonObject model) _models.Add(model);
-        if (_at == ModelsStep) Show(ModelsStep);
+
+        // The name step's two answers: what is stored now, and the forms
+        // with their words. Asked of the core like the settings page asks
+        // it — the words for the forms are the core's, and a second list of
+        // them here would part company with the first.
+        var stored = await _link.AskAsync(Methods.SettingsGet, new JsonObject
+        {
+            ["keys"] = new JsonArray((JsonNode)"user_name",
+                                     (JsonNode)"address_form"),
+        });
+        _nameWas = stored?["values"]?["user_name"]?.GetValue<string>() ?? "";
+        _formWas = stored?["values"]?["address_form"]?.GetValue<string>()
+                   ?? "neutral";
+        var offered = await _link.AskAsync(Methods.SettingsOptions, new JsonObject
+        {
+            ["keys"] = new JsonArray((JsonNode)"address_form"),
+        });
+        foreach (var item in offered?["options"]?["address_form"]?.AsArray() ?? [])
+            _forms.Add((item?["value"]?.GetValue<string>() ?? "",
+                        item?["title"]?.GetValue<string>() ?? ""));
+
+        if (_at == ModelsStep || _at == NameStep) Show(_at);
     }
 
     private void Show(int at)

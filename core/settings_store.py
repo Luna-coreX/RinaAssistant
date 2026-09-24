@@ -103,6 +103,10 @@ GROUPS = {
         # row, so a name typed there could not be corrected until an
         # unrelated switch was turned on. Empty is the ordinary case.
         "user_name": "",
+        # In what grammatical gender Russian addresses the person. Neutral
+        # by default, which is not "masculine by default": the model is told
+        # nobody knows and to phrase around it, rather than left to guess.
+        "address_form": "neutral",
         "llm_timeout": 30,
         # Reminders bound to a program (4.0b-A03). Off by default, and not
         # out of caution for its own sake: knowing which programs somebody

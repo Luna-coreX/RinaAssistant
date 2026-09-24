@@ -222,6 +222,11 @@ public static partial class Loc
                 {
                     ["English"] = "Above 100 she hurries, below she drawls",
                 },
+            ["В каком роде обращаться"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Grammatical gender",
+                },
             ["В команде есть необратимое действие — Рина спросит подтверждение."] =
                 new Dictionary<string, string>
                 {
@@ -1987,6 +1992,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Rina is a voice assistant that runs on this computer. A few questions, and that is all.",
+                },
+            ["Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Russian tells «ты прав» from «ты права». Without a gender, Rina avoids such forms",
                 },
             ["С чего начнём?"] =
                 new Dictionary<string, string>

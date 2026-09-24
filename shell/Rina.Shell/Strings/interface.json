@@ -119,6 +119,9 @@
   "Быстрее ста — торопится, медленнее — растягивает": {
     "English": "Above 100 she hurries, below she drawls"
   },
+  "В каком роде обращаться": {
+    "English": "Grammatical gender"
+  },
   "В команде есть необратимое действие — Рина спросит подтверждение.": {
     "English": "The command contains an irreversible action — Rina will ask to confirm."
   },
@@ -1057,6 +1060,9 @@
   },
   "Рина — голосовой помощник на этом компьютере. Несколько вопросов, и всё.": {
     "English": "Rina is a voice assistant that runs on this computer. A few questions, and that is all."
+  },
+  "Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы": {
+    "English": "Russian tells «ты прав» from «ты права». Without a gender, Rina avoids such forms"
   },
   "С чего начнём?": {
     "English": "Where shall we start?"

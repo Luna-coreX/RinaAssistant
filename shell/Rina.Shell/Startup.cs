@@ -1706,12 +1706,20 @@ public partial class App
         // back and forth: a name typed and then left behind by «Назад»
         // must be there on the way forward again. Nothing is written —
         // `Keep` runs on «Дальше», and this core is the developer's own.
-        wizard.ShowFor(1);
+        wizard.ShowFor(wizard.NameStep);
+        Check("на шаге имени есть выбор рода, и слова для него от ядра",
+              wizard.FormsOffered == 3, $"| вариантов {wizard.FormsOffered}");
+        // Picked away from whatever is stored, so a chosen form coming
+        // back proves the carrying over rather than the stored value.
+        var picked = wizard.FormChosen == "feminine" ? "masculine" : "feminine";
         wizard.NameTyped = "Проверка";
-        wizard.ShowFor(2);
-        wizard.ShowFor(1);
+        wizard.FormChosen = picked;
+        wizard.ShowFor(wizard.NameStep + 1);
+        wizard.ShowFor(wizard.NameStep);
         Check("набранное имя переживает уход назад",
               wizard.NameTyped == "Проверка", $"| «{wizard.NameTyped}»");
+        Check("и выбранный род тоже",
+              wizard.FormChosen == picked, $"| «{wizard.FormChosen}»");
 
         // Counted on the step that has the boxes, which is the one just
         // opened. Asked before it, this counted the greeting's boxes —

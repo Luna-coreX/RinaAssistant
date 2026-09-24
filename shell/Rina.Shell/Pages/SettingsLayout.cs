@@ -190,6 +190,8 @@ public static class SettingsLayout
             // is on would be a first-run answer locked in place.
             new("user_name", Word("Как к вам обращаться"),
                 Word("Имя, которым Рина вас называет. Можно оставить пустым")),
+            new("address_form", Word("В каком роде обращаться"),
+                Word("Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы")),
             new("llm_persona", Word("Характер"),
                 Word("Каким характером модель отвечает")),
             new("llm_timeout", Word("Сколько ждать ответа, секунд"),
