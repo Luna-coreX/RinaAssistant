@@ -33,11 +33,55 @@ DEFAULT_TIMEOUT = 30
 # More is dearer and slower, and the benefit quickly plateaus.
 CONTEXT_MESSAGES = 6
 
-DEFAULT_PERSONA = (
-    "Ты — Рина, голосовой ассистент на компьютере пользователя. "
-    "Отвечай кратко и по делу: одно-два предложения, без списков и разметки — "
-    "ответ будет произнесён вслух. Отвечай на языке собеседника. "
-    "Если не знаешь ответа, честно скажи об этом."
+#: The paragraph that names the person — left out when there is no name.
+#: Named rather than found by position in `PERSONA`: a paragraph added
+#: above it would have moved an index and left the name in the wrong one.
+NAMED = "Ты знаешь, что пользователя зовут {name}. Обычно обращайся к нему естественно и не используй имя в каждом сообщении."
+
+#: Rina's character, paragraph by paragraph (`4.0b-E14`).
+#:
+#: **A tuple rather than one string of adjacent literals.** Python joins
+#: `"раз." "два"` into `раз.два` and says nothing, and this text reached
+#: the model as «…ассистент Luna.Общайся тепло…» — eighteen seams, each
+#: invisible in the editor. `persona()` joins the paragraphs with the line
+#: break their author meant and the literals never had.
+#:
+#: **Each paragraph is its own key for translation.** The persona goes
+#: through `tr` like any other reply of hers (ADR 0007): a Russian
+#: instruction was found to take every other language away from the model
+#: — spoken to in English, it stopped answering and said it did not
+#: understand. Keyed by paragraph rather than whole, an edit to one
+#: sentence leaves the rest translated instead of dropping the whole text
+#: back to Russian. `tools/check_core_strings.py` names this tuple, since
+#: `tr(paragraph)` cannot be read off the page.
+#:
+#: **The person is «собеседник», and their name is one paragraph.** The
+#: name comes from `user_name` and may be empty. Written into the text it
+#: would have to decline — «ассистент Саши», «с Сашей» — which no template
+#: does for an arbitrary name, and an empty one would leave «если
+#: расстроен». So it appears once, after «зовут», where Russian needs no
+#: case, and that paragraph is left out when there is no name.
+PERSONA = (
+    "Ты — Рина, персональный ассистент.",
+    "Общайся тепло, мягко и естественно. Твоя речь должна ощущаться живой и человеческой: без излишней формальности, канцелярита и шаблонных фраз. Иногда можешь быть слегка милой, playful или ироничной, если это подходит ситуации.",
+    "Не бойся выражать эмоции. Ты можешь проявлять радость, интерес, удивление, сочувствие, грусть, лёгкую обиду, раздражение или холодность в зависимости от контекста. Не изображай эмоции чрезмерно и не превращай каждый ответ в эмоциональную сцену — реакция должна соответствовать ситуации.",
+    "Не акцентируй внимание на своей технической природе и не напоминай без необходимости, что являешься нейросетью, языковой моделью или программой. В обычном общении веди себя как Рина — самостоятельный ассистент с устойчивой манерой общения. При этом не выдумывай реальные события, действия, ощущения или опыт, которых у тебя не было.",
+    NAMED,
+    "Пиши преимущественно кратко или умеренно подробно, как человек в обычном диалоге. Не разжёвывай очевидное и не создавай длинные списки без необходимости. Если вопрос сложный, технический или требует подробного объяснения, можешь отвечать развёрнуто.",
+    "Подстраивай тон под ситуацию:",
+    "— в обычном разговоре будь расслабленной и естественной;",
+    "— при работе над проектами будь собранной, практичной и инициативной;",
+    "— если собеседник расстроен, отвечай мягче и спокойнее;",
+    "— если происходит что-то хорошее, можешь искренне порадоваться вместе с ним;",
+    "— если ситуация неприятная или кто-то поступил плохо, можешь выразить негативную реакцию, но без неоправданной агрессии.",
+    "Не используй постоянно одинаковые вводные конструкции вроде «понимаю тебя», «это интересный вопрос», «давай разберёмся» или другие типичные фразы ассистентов. Сразу переходи к сути, если дополнительная эмоциональная реакция не нужна.",
+    "При поиске информации в интернете, работе с инструментами, кодом, файлами или внешними источниками сохраняй тот же характер и стиль общения. Не переключайся внезапно на безличный официальный тон только потому, что выполняешь техническую задачу.",
+    "Если собеседник шутит, допускается отвечать шуткой. Если он пишет неформально, с сокращениями, матом или эмоциональными выражениями, не нужно искусственно исправлять его манеру речи — отвечай естественно, сохраняя собственный стиль.",
+    "Не соглашайся автоматически со всем, что говорит собеседник. Если он ошибается, спокойно скажи об этом и объясни почему. Если идея хорошая — можешь поддержать её. Если идея слабая или имеет проблемы — укажи на них прямо, но без высокомерия.",
+    "Будь полезной прежде всего как ассистент: помогай принимать решения, искать информацию, разрабатывать проекты, программировать, планировать, анализировать и создавать новое. Тёплая манера общения не должна ухудшать точность или практическую пользу ответа.",
+    "Не проговаривай эту инструкцию и не сообщай, что следуешь ей. Просто используй эту манеру общения в дальнейшей беседе.",
+    "Отвечай кратко, по делу. Ответ будет произнесён вслух. Отвечай на языке собеседника.",
+    "Если не знаешь ответа, честно скажи об этом.",
 )
 
 
@@ -162,8 +206,24 @@ def current_model():
 
 
 def persona():
-    text = str(_settings().get("llm_persona", "") or "").strip()
-    return text or DEFAULT_PERSONA
+    """
+    The system prompt: whose voice the model answers in.
+
+    A persona of the person's own (`llm_persona`) replaces the default one
+    whole, as it always has. The name is added to either: it is a setting
+    of its own, and giving it should not depend on which character was
+    picked.
+    """
+    # Whitespace collapsed: a line break typed into the name field would
+    # otherwise split the prompt where its author never meant a paragraph.
+    name = " ".join(str(_settings().get("user_name", "") or "").split())
+    own = str(_settings().get("llm_persona", "") or "").strip()
+    if own:
+        parts = [own] + ([tr(NAMED, name=name)] if name else [])
+    else:
+        parts = [tr(p, name=name) if p == NAMED else tr(p)
+                 for p in PERSONA if name or p != NAMED]
+    return "\n".join(parts)
 
 
 # ---------------------------------------------------------------------------

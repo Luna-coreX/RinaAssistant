@@ -96,6 +96,13 @@ GROUPS = {
         "llm_url": "http://localhost:11434",
         "llm_model": "",
         "llm_persona": "",
+        # What Rina calls the person (`4.0b-E14`). Asked by the first-run
+        # wizard, and deliberately not dependent on `llm_enabled`, though
+        # today only the model's persona reads it: the wizard asks before
+        # anybody has decided about the model, and a dependency disables the
+        # row, so a name typed there could not be corrected until an
+        # unrelated switch was turned on. Empty is the ordinary case.
+        "user_name": "",
         "llm_timeout": 30,
         # Reminders bound to a program (4.0b-A03). Off by default, and not
         # out of caution for its own sake: knowing which programs somebody

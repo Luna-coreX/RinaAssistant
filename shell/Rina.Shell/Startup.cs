@@ -1686,14 +1686,37 @@ public partial class App
         Check("каталог моделей доехал до окна", wizard.Offered > 0,
               $"| моделей {wizard.Offered}");
 
-        var at = int.TryParse(step, out var wanted) ? wanted : 2;
+        var at = int.TryParse(step, out var wanted) ? wanted : wizard.ModelsStep;
         wizard.ShowFor(at);
         Check($"шаг {at} рисуется", wizard.StageFilled);
+
+        // **The models step is where the wizard looks for it.** It was a
+        // literal `2` here and in the window, and the name step moved it
+        // to 3: every check below would have counted the boxes of the wake
+        // word's step — there are none — and read that as "nothing ticked".
+        wizard.ShowFor(wizard.ModelsStep);
+        var boxesThere = wizard.BoxesShown;
+        wizard.ShowFor(wizard.ModelsStep - 1);
+        Check("шаг моделей там, где мастер его ищет",
+              boxesThere > 0 && wizard.BoxesShown == 0,
+              $"| на шаге {wizard.ModelsStep} флажков {boxesThere}, "
+              + $"на шаге перед ним {wizard.BoxesShown}");
+
+        // `4.0b-E14`. Every visit builds a step anew, and a person walks
+        // back and forth: a name typed and then left behind by «Назад»
+        // must be there on the way forward again. Nothing is written —
+        // `Keep` runs on «Дальше», and this core is the developer's own.
+        wizard.ShowFor(1);
+        wizard.NameTyped = "Проверка";
+        wizard.ShowFor(2);
+        wizard.ShowFor(1);
+        Check("набранное имя переживает уход назад",
+              wizard.NameTyped == "Проверка", $"| «{wizard.NameTyped}»");
 
         // Counted on the step that has the boxes, which is the one just
         // opened. Asked before it, this counted the greeting's boxes —
         // there are none — and called that "nothing is ticked by default".
-        wizard.ShowFor(2);
+        wizard.ShowFor(wizard.ModelsStep);
 
         // **Two questions, and only the first is about this machine.**
         // The catalogue marks a few things as worth having in advance —

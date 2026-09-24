@@ -48,10 +48,24 @@ public partial class SetupWindow : Window
             S("Здравствуйте"),
             S("Рина — голосовой помощник на этом компьютере. Несколько вопросов, и всё."),
             BuildGreeting));
+        // Asked because the plan says so (`4.0b-E14`), though it is not
+        // a question of working or not: the persona names the person, and
+        // the name has to come from somewhere other than its text. Empty is
+        // an answer — pressing «Дальше» on a blank field is how somebody
+        // declines, and nothing asks twice.
         _steps.Add(new Step(
-            S("Как вас звать"),
+            S("Как к вам обращаться"),
+            S("Рина будет называть вас этим именем. Можно оставить пустым."),
+            BuildName, KeepName));
+        // «Как вас звать» until the step above arrived: it meant what to
+        // call her, and read as "what is your name". Next to a step that
+        // really asks that, the two would have said the same words about
+        // opposite things.
+        _steps.Add(new Step(
+            S("Как её позвать"),
             S("По этому слову Рина понимает, что обращаются к ней."),
             BuildWake, KeepWake));
+        ModelsStep = _steps.Count;
         _steps.Add(new Step(
             S("Что доустановить"),
             S("И слух, и голос работают по пакету и модели — их размер в установщик не помещается."),
@@ -62,6 +76,15 @@ public partial class SetupWindow : Window
             BuildDone, KeepAll));
         Show(0);
     }
+
+    /// <summary>Which step has the models on it.</summary>
+    /// <remarks>
+    /// Counted as the steps are laid out rather than written as a number.
+    /// It was a literal `2` in three places here and two in the check, and
+    /// the name step moved it: a literal would have read the greeting's
+    /// contents as "the ticked models" without a word.
+    /// </remarks>
+    public int ModelsStep { get; }
 
     /// <summary>How many models the catalogue offered — for the check.</summary>
     public int Offered => _models.Count;
@@ -96,6 +119,10 @@ public partial class SetupWindow : Window
         _models.Where(m => m["wanted"]?.GetValue<bool>() ?? false)
                .Select(m => m["id"]?.GetValue<string>() ?? "").ToList();
 
+    /// <summary>How many boxes the step shown has, ticked or not — for the check.</summary>
+    public int BoxesShown =>
+        Stage.Content is DependencyObject root ? Boxes(root).Count() : 0;
+
     /// <summary>Is there anything on the step at all — for the check.</summary>
     public bool StageFilled => Stage.Content is FrameworkElement;
 
@@ -107,7 +134,15 @@ public partial class SetupWindow : Window
 
     private readonly List<string> _chosen = [];
     private readonly List<JsonObject> _models = [];
+    private TextBox? _name;
     private TextBox? _wake;
+
+    /// <summary>What was typed as the person's name — for the check.</summary>
+    public string NameTyped
+    {
+        get => _name?.Text ?? "";
+        set { if (_name is not null) _name.Text = value; }
+    }
 
     // ----------------------------------------------------------------- steps
     private FrameworkElement BuildGreeting()
@@ -126,6 +161,26 @@ public partial class SetupWindow : Window
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 0, 0, 8),
             });
+        return stack;
+    }
+
+    private FrameworkElement BuildName()
+    {
+        var stack = new StackPanel();
+        // Every visit builds the step anew, and a person walks back and
+        // forth: carried over from the field the last visit made, or a name
+        // typed a step ago comes back blank.
+        _name = new TextBox
+        {
+            Style = (Style)FindResource("Field"),
+            Text = _name?.Text ?? "",
+            Width = 260,
+            HorizontalAlignment = HorizontalAlignment.Left,
+        };
+        // The same example the settings field shows, taken from there: one
+        // name for one question, wherever it is asked.
+        Styles.Ui.SetHint(_name, SettingsLayout.HintInField("user_name"));
+        stack.Children.Add(_name);
         return stack;
     }
 
@@ -286,6 +341,18 @@ public partial class SetupWindow : Window
             : S("{0} МБ", bytes / (1024 * 1024));
 
     // ------------------------------------------------------------ keeping
+    private async Task KeepName()
+    {
+        // Only a name given is written. The field starts empty rather than
+        // showing what is stored, so on a wizard opened again later a blank
+        // is not evidence of a decision — writing it would erase a name
+        // somebody set in the settings by walking past this step. Clearing
+        // it is done there.
+        var said = _name?.Text?.Trim() ?? "";
+        if (said.Length > 0)
+            await _link.SetAsync("user_name", JsonValue.Create(said));
+    }
+
     private async Task KeepWake()
     {
         var said = _wake?.Text?.Trim() ?? "";
@@ -342,7 +409,7 @@ public partial class SetupWindow : Window
         var told = await _link.AskAsync(Methods.ModelsCatalogue, null);
         foreach (var item in told?["items"]?.AsArray() ?? [])
             if (item is JsonObject model) _models.Add(model);
-        if (_at == 2) Show(2);
+        if (_at == ModelsStep) Show(ModelsStep);
     }
 
     private void Show(int at)
@@ -362,7 +429,7 @@ public partial class SetupWindow : Window
         // The models are read off the screen as we leave that step, not when
         // the wizard ends: by then the boxes have been replaced by the last
         // step's contents and there is nothing left to read.
-        if (_at == 2) { _chosen.Clear(); Gather(Stage); }
+        if (_at == ModelsStep) { _chosen.Clear(); Gather(Stage); }
 
         var keep = _steps[_at].Keep;
         if (keep is not null) await keep();
@@ -374,7 +441,7 @@ public partial class SetupWindow : Window
 
     private void OnBack(object sender, RoutedEventArgs e)
     {
-        if (_at == 2) { _chosen.Clear(); Gather(Stage); }
+        if (_at == ModelsStep) { _chosen.Clear(); Gather(Stage); }
         Show(_at - 1);
     }
 }

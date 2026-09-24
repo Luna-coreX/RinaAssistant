@@ -184,6 +184,12 @@ public static class SettingsLayout
             // nobody to want a search.
             new("llm_web", Word("Модель может искать в интернете"),
                 Word("Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo")),
+            // Not greyed with the rest of this section: the wizard asks
+            // for it before anybody has decided about the model, and a
+            // name that could not be corrected until an unrelated switch
+            // is on would be a first-run answer locked in place.
+            new("user_name", Word("Как к вам обращаться"),
+                Word("Имя, которым Рина вас называет. Можно оставить пустым")),
             new("llm_persona", Word("Характер"),
                 Word("Каким характером модель отвечает")),
             new("llm_timeout", Word("Сколько ждать ответа, секунд"),
@@ -283,6 +289,7 @@ public static class SettingsLayout
         "llm_url" => S("http://localhost:11434"),
         "llm_model" => S("например, llama3"),
         "llm_persona" => S("например, отвечай коротко и по делу"),
+        "user_name" => S("например, Саша"),
         "vosk_model" => S("папка с моделью"),
         "piper_model" => S("файл .onnx"),
         // There is deliberately no `wake_word` here. The core marks it

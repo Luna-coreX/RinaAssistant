@@ -119,7 +119,7 @@ def main() -> int:
     # which lists are shown to a person would be wrong in both
     # directions, and the price of the list is one line when a new
     # table appears.
-    from core import models
+    from core import llm, models
     from voice import hotkey_actions, system_control, user_commands
 
     tables = {
@@ -136,6 +136,10 @@ def main() -> int:
         "CONFIRM_QUESTIONS": list(system_control.CONFIRM_QUESTIONS.values()),
         "HOTKEY_ACTIONS": [said for pair in hotkey_actions.HOTKEY_ACTIONS.values()
                            for said in pair[:2]],
+        # The model's instruction, paragraph by paragraph (`4.0b-E14`). An
+        # untranslated one is worse here than anywhere: a Russian line in
+        # the persona pulls the model's answers into Russian.
+        "PERSONA": list(llm.PERSONA),
     }
 
     lost = []

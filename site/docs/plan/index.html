@@ -43,7 +43,7 @@
     </div>
     <div class="strip">
       <div><b>102/102</b><span>4.0-port</span></div>
-      <div><b>30/71</b><span>4.0-beta</span></div>
+      <div><b>34/71</b><span>4.0-beta</span></div>
       <div><b>0/7</b><span>4.0-stable</span></div>
       <div><b>0/2</b><span>4.1+</span></div>
       <div><b>0/40</b><span>5.0.0</span></div>
@@ -1040,21 +1040,33 @@
 <p>Результат: методика <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/BENCH.md"><code>voice/BENCH.md</code></a>, корпус <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/corpus.json"><code>voice/corpus.json</code></a>, прогонщик <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/voice_bench.py"><code>tools/voice_bench.py</code></a>. Прогнан и работает.</p>
 </details>
 <details>
-<summary><strong>V-03 · Прогон кандидатов на русском</strong> — L — V-02</summary>
-<p>Список пересобран 22 сентября 2026: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>voice/CANDIDATES.md</code></a>. Прогнаны трое. Двое отпали, третий — VoxCPM2 — прошёл условие ADR 0003 по замеру. Голос выбран и сохранён: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>. Создан словесным описанием, без единой чужой записи, дальше от каждого из восьми живых дикторов, чем они друг от друга, и говорит на двух языках одним голосом.</p>
+<summary><strong>V-03 · Прогон кандидатов на русском</strong> — L — V-02 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Список пересобран 22 сентября 2026: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>voice/CANDIDATES.md</code></a>. Прогнаны трое. Двое отпали, третий — VoxCPM2 — прошёл условие ADR 0003 по замеру; ещё два прогона переносили найденный голос в быстрый движок. Голос выбран и сохранён: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>. Создан словесным описанием, без единой чужой записи, дальше от каждого из восьми живых дикторов, чем они друг от друга, и говорит на двух языках одним голосом.</p>
 </details>
 <details>
 <summary><strong>V-04 · ADR: стриминг против выразительности</strong> — S — V-03</summary>
 <p><strong>Ключевое решение всего трека.</strong> Лучшая модель эмоций для русского не стримит, а диалог без стриминга ощущается мёртвым. От выбора зависят и аудио-конвейер оболочки, и форма протокола. Возможен гибрид: стримящая модель для диалога, выразительная — для длинных или эмоционально важных реплик.</p>
 </details>
 <details>
-<summary><strong>V-05 · Протокол записи датасета</strong> — M — V-01</summary>
+<summary><strong>V-05 · Протокол записи датасета</strong> — M — V-01 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
 <p>Текстовый корпус (фонетическое покрытие русского, разные эмоции), условия записи, разметка эмоций, контроль качества. Нужен, только если выбран путь обучения.</p>
 </details>
-<p class="task"><strong>V-06 · Сбор датасета</strong> — XL — V-05 — часы записей, длительный календарный процесс</p>
-<p class="task"><strong>V-07 · Обучение или интерполяция</strong> — XL — V-06 или V-01</p>
-<p class="task"><strong>V-08 · Оценка</strong> — M — V-07 — слепое сравнение, консистентность тембра, узнаваемость</p>
-<p class="task"><strong>V-09 · Интеграция как движок ядра</strong> — M — V-07, 5.0-A06</p>
+<details>
+<summary><strong>V-06 · Сбор датасета</strong> — XL — V-05 — часы записей, длительный календарный процесс — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Календарного процесса не понадобилось. Материал наговорён VoxCPM2 с канонического образца: 700 фраз примерно за полчаса на арендованной видеокарте. Согласия спрашивать не у кого — источник есть голос, которого нет ни у одного живого человека, и его запись хранится в проекте: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>.</p>
+</details>
+<details>
+<summary><strong>V-07 · Обучение или интерполяция</strong> — XL — V-06 или V-01 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Обучение. Piper дообучен от <code>ru_RU/irina/medium</code>: 257 эпох на процессоре рабочей машины, около 10 минут каждая, и ещё 300 на арендованной RTX 4090 — около 8 секунд на эпоху. Итог — чекпойнт <code>epoch=4696</code>.</p>
+</details>
+<details>
+<summary><strong>V-08 · Оценка</strong> — M — V-07 — слепое сравнение, консистентность тембра, узнаваемость</summary>
+<p>Начата. На 257-й эпохе: 0.825 до канона и 0.812 между репликами при <code>length_scale</code> 1.25; до ближайшего живого диктора — 0.24–0.32 по всем замерам Piper. Облачный результат скачан, но не померен, слепого сравнения не было. Это следующий шаг трека.</p>
+</details>
+<details>
+<summary><strong>V-09 · Интеграция как движок ядра</strong> — M — V-07, 5.0-A06</summary>
+<p>Движок Piper в ядре уже есть (настройка <code>piper_model</code>), так что задача сводится к поставке модели голосом по умолчанию, а не к новому движку.</p>
+</details>
 <hr class="seam">
 <h2 id="proekt-rinaneuro">ПРОЕКТ RinaNeuro</h2>
 <p>Начинается после 5.0.0. Порядок этапов намеренно ставит личность первой: она ценна сама по себе, и если дальше не хватит сил, продукт всё равно существует.</p>

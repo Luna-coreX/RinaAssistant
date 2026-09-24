@@ -119,6 +119,20 @@ try:
     # go red on a train rather than when the code broke.
 
     print()
+    print("=== имя из мастера ядро принимает ===")
+    # `4.0b-E14`. The wizard writes the name the way it writes the wake
+    # word — `settings.set`, one key — and a key the core does not know is
+    # refused rather than kept. Written here exactly as the shell writes it;
+    # read back after the restart below, because a name asked once has to
+    # be there the next time she speaks.
+    set_name = answer(core, "settings.set", {"values": {"user_name": "Саша"}})
+    # Asked of the accepted values, not of the absence of an error: the
+    # reply lists what was taken, and a refused key is simply not in it.
+    check("имя принято",
+          (set_name.get("values") or {}).get("user_name") == "Саша",
+          f"| {set_name}")
+
+    print()
     print("=== флаг меняет только завершение мастера ===")
     # The button in "About" opens the same wizard, and opening it must not
     # mark the first run as done: somebody who looked at the wizard out of
@@ -149,6 +163,9 @@ try:
     after = answer(core, "setup.state")
     check("и после перезапуска ядра тоже",
           after.get("needed") is False, f"| {after}")
+    kept = answer(core, "settings.get", {"keys": ["user_name"]})
+    check("имя из мастера пережило перезапуск",
+          (kept.get("values") or {}).get("user_name") == "Саша", f"| {kept}")
     core.proc.kill()
 
 finally:

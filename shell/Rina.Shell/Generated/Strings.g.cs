@@ -888,6 +888,11 @@ public static partial class Loc
                 {
                     ["English"] = "Model name on that server",
                 },
+            ["Имя, которым Рина вас называет. Можно оставить пустым"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The name Rina calls you by. Can be left empty",
+                },
             ["иначе"] =
                 new Dictionary<string, string>
                 {
@@ -928,15 +933,20 @@ public static partial class Loc
                 {
                     ["English"] = "One combination each",
                 },
-            ["Как вас звать"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "What to call her",
-                },
             ["Как вы называете программы — Рина запомнила это из ваших поправок."] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "What you call your programs — Rina learned this from your corrections.",
+                },
+            ["Как её позвать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to call her",
+                },
+            ["Как к вам обращаться"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to call you",
                 },
             ["Какая программа"] =
                 new Dictionary<string, string>
@@ -1179,6 +1189,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "for example, mode",
+                },
+            ["например, Саша"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "e.g. Alex",
                 },
             ["Например: «Рина, поставь таймер на десять минут»."] =
                 new Dictionary<string, string>
@@ -1947,6 +1962,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Rina will be ready right after you sign in",
+                },
+            ["Рина будет называть вас этим именем. Можно оставить пустым."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will call you by this name. You can leave it empty.",
                 },
             ["Рина ещё ничего о вас не запомнила: поговорите с ней, и здесь появятся записи."] =
                 new Dictionary<string, string>

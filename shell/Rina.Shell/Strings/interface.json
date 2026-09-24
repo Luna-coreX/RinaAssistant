@@ -500,6 +500,9 @@
   "Имя модели на этом сервере": {
     "English": "Model name on that server"
   },
+  "Имя, которым Рина вас называет. Можно оставить пустым": {
+    "English": "The name Rina calls you by. Can be left empty"
+  },
   "Искать нераспознанное": {
     "English": "Search unrecognized commands"
   },
@@ -518,11 +521,14 @@
   "Каждому своё сочетание": {
     "English": "One combination each"
   },
-  "Как вас звать": {
-    "English": "What to call her"
-  },
   "Как вы называете программы — Рина запомнила это из ваших поправок.": {
     "English": "What you call your programs — Rina learned this from your corrections."
+  },
+  "Как её позвать": {
+    "English": "What to call her"
+  },
+  "Как к вам обращаться": {
+    "English": "What to call you"
   },
   "Какая программа": {
     "English": "Which program"
@@ -1037,6 +1043,9 @@
   "Рина будет готова сразу после входа": {
     "English": "Rina will be ready right after you sign in"
   },
+  "Рина будет называть вас этим именем. Можно оставить пустым.": {
+    "English": "Rina will call you by this name. You can leave it empty."
+  },
   "Рина ещё ничего о вас не запомнила: поговорите с ней, и здесь появятся записи.": {
     "English": "Rina has not remembered anything about you yet: talk to her and entries will appear here."
   },
@@ -1543,6 +1552,9 @@
   },
   "например, «открой почту»": {
     "English": "for example, “open mail”"
+  },
+  "например, Саша": {
+    "English": "e.g. Alex"
   },
   "например, отвечай коротко и по делу": {
     "English": "for example, answer briefly and to the point"
