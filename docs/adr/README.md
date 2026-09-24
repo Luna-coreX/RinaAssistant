@@ -27,6 +27,7 @@ These were settled in discussion and are recorded in [`../ROADMAP.md`](../ROADMA
 |---|---|
 | Plugins run in their own process, in 4.0 | `4.0-H07` |
 | 4.0 split into a frozen port and a feature-bearing beta | `4.0-S03` |
+| Shell UI moves to Rust + Tauri, superseding [0008](0008-ui-framework.md); C# outside the UI goes where Rust is not a loss | `5.0-F01` |
 
 ## Open, and blocking work
 

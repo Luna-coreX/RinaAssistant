@@ -46,7 +46,7 @@
       <div><b>35/71</b><span>4.0-beta</span></div>
       <div><b>0/7</b><span>4.0-stable</span></div>
       <div><b>0/2</b><span>4.1+</span></div>
-      <div><b>0/40</b><span>5.0.0</span></div>
+      <div><b>0/44</b><span>5.0.0</span></div>
       <div><b>0/46</b><span>RinaNeuro</span></div>
     </div>
   </div>
@@ -1019,6 +1019,25 @@
 <details>
 <summary><strong>5.0-D10 · Ручной доступ к примитивам</strong> — M — D05..D07</summary>
 <p>Плагины и пользовательские сценарии. Цель — проверить руки руками.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-f-obolochka-na-tauri-tematiki-i-api-plaginov">Блок F — Оболочка на Tauri, тематики и API плагинов</h3>
+<p>Решено 25 сентября 2026. Записи ADR пока нет: смена фреймворка оболочки отменяет <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0008-ui-framework.md">ADR 0008</a> и по правилам проекта требует новой записи до начала работ — она стоит в списке «решено, но не записано».</p>
+<details>
+<summary><strong>5.0-F01 · Оболочка на Rust + Tauri</strong> — XL — 4.0</summary>
+<p>WPF ожиданий не оправдал. Интерфейс переходит в Tauri: Rust и веб-вид (WebView2). Ядро остаётся на Python, граница прежняя — протокол с версиями (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0002-ipc-transport.md">ADR 0002</a>, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0004-versioning-and-compatibility.md">ADR 0004</a>). Это и позволяет вести новую оболочку параллельно старой, против того же ядра и тех же проверок.</p>
+</details>
+<details>
+<summary><strong>5.0-F02 · Тематики оболочки по мажорам</strong> — L — F01</summary>
+<p>Каждая мажорная версия получает свою тематику оформления, и человек выбирает между ними в настройках: 4.0 — «Nebula», 5.0 — «Greeth». Цена названа: каждая новая оболочка несёт все прежние тематики, так что Nebula в 5.0 реализуется заново в веб-технологиях. Задел есть: <code>tokens.json</code> не привязан к фреймворку, и сайт уже рисует макет окна в HTML/CSS из тех же токенов.</p>
+</details>
+<details>
+<summary><strong>5.0-F03 · Рендер VRM в веб-виде</strong> — L — F01</summary>
+<p>Модель VRM рисуется внутри веб-вида оболочки (<code>@pixiv/three-vrm</code> на three.js), а не отдельным нативным рендером: совмещать нативную поверхность с веб-окном, тем более с прозрачностью, заметно труднее. Перед началом нужен короткий пробный прототип — прозрачное окно поверх рабочего стола и частота кадров на WebView2.</p>
+</details>
+<details>
+<summary><strong>5.0-F04 · Плагины на Rust и Python</strong> — XL — F01, 4.0-H07</summary>
+<p>Плагин пишется на Python, на Rust (с Tauri для своего интерфейса) или на обоих сразу. Устойчивого ABI у Rust нет, поэтому плагин на Rust — отдельный процесс по протоколу, как и решено для плагинов вообще (<code>4.0-H07</code>); плагин на двух языках — две половины и один манифест.</p>
 </details>
 <hr class="seam">
 <h3 id="blok-e-vypusk-5-0-0">Блок E — Выпуск 5.0.0</h3>
