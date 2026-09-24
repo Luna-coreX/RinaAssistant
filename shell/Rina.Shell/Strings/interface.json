@@ -344,6 +344,9 @@
   "Думаю…": {
     "English": "Thinking…"
   },
+  "Если заполнено, заменяет выбранный характер": {
+    "English": "If filled in, replaces the chosen persona"
+  },
   "Если не ответить, действие не выполнится.": {
     "English": "If you don’t answer, nothing happens."
   },
@@ -542,9 +545,6 @@
   "Каким словом Рина зовёт какую программу": {
     "English": "Which word Rina uses for which program"
   },
-  "Каким характером модель отвечает": {
-    "English": "What character the model answers with"
-  },
   "Какое действие": {
     "English": "Which action"
   },
@@ -553,6 +553,9 @@
   },
   "Какой адрес открыть": {
     "English": "Which address to open"
+  },
+  "Какой из готовых характеров у Рины": {
+    "English": "Which of the ready personas Rina has"
   },
   "Какую команду вызвать": {
     "English": "Which command to call"
@@ -1096,6 +1099,9 @@
   },
   "Своих команд пока нет": {
     "English": "No commands of your own yet"
+  },
+  "Свой характер": {
+    "English": "Own persona"
   },
   "Сворачивать в трей": {
     "Deutsch": "In den Infobereich minimieren",

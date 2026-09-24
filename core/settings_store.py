@@ -95,6 +95,9 @@ GROUPS = {
         "llm_web": False,
         "llm_url": "http://localhost:11434",
         "llm_model": "",
+        # Which of the ready characters (`core.llm.PERSONAS`); `llm_persona`,
+        # when filled in, replaces it with the person's own.
+        "llm_character": "warm",
         "llm_persona": "",
         # What Rina calls the person (`4.0b-E14`). Asked by the first-run
         # wizard, and deliberately not dependent on `llm_enabled`, though

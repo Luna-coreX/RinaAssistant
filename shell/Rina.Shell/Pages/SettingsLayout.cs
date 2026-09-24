@@ -192,8 +192,13 @@ public static class SettingsLayout
                 Word("Имя, которым Рина вас называет. Можно оставить пустым")),
             new("address_form", Word("В каком роде обращаться"),
                 Word("Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы")),
-            new("llm_persona", Word("Характер"),
-                Word("Каким характером модель отвечает")),
+            new("llm_character", Word("Характер"),
+                Word("Какой из готовых характеров у Рины")),
+            // Under the choice, because it overrides it: filled in, the
+            // choice above stops mattering, and a person has to be able to
+            // see why.
+            new("llm_persona", Word("Свой характер"),
+                Word("Если заполнено, заменяет выбранный характер")),
             new("llm_timeout", Word("Сколько ждать ответа, секунд"),
                 Word("Дольше — терпеливее, но и молчание дольше")),
         ]),

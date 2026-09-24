@@ -33,7 +33,8 @@ DEFAULT_TIMEOUT = 30
 # More is dearer and slower, and the benefit quickly plateaus.
 CONTEXT_MESSAGES = 6
 
-#: Rina's character, paragraph by paragraph (`4.0b-E14`).
+#: The warm character, paragraph by paragraph (`4.0b-E14`): the first one
+#: written for her, and the default of `PERSONAS`.
 #:
 #: **A tuple rather than one string of adjacent literals.** Python joins
 #: `"раз." "два"` into `раз.два` and says nothing, and this text reached
@@ -54,7 +55,7 @@ CONTEXT_MESSAGES = 6
 #: how Russian should address them — is not the character's business and
 #: lives below, in what `situation()` adds. A pronoun here would decide
 #: the person's gender for everybody who ever reads this text.
-PERSONA = (
+WARM = (
     "Ты — Рина, персональный ассистент.",
     "Общайся тепло, мягко и естественно. Твоя речь должна ощущаться живой и человеческой: без излишней формальности, канцелярита и шаблонных фраз. Иногда можешь быть слегка милой, playful или ироничной, если это подходит ситуации.",
     "Не бойся выражать эмоции. Ты можешь проявлять радость, интерес, удивление, сочувствие, грусть, лёгкую обиду, раздражение или холодность в зависимости от контекста. Не изображай эмоции чрезмерно и не превращай каждый ответ в эмоциональную сцену — реакция должна соответствовать ситуации.",
@@ -75,6 +76,27 @@ PERSONA = (
     "Отвечай на языке собеседника.",
     "Если не знаешь ответа, честно скажи об этом.",
 )
+
+#: The reserved character: Rina's persona before the warm one was written,
+#: taken from the history rather than invented. What it said about the
+#: channel — «без списков и разметки, ответ будет произнесён вслух» — is
+#: now what `situation()` says, and truthfully; what is left is character.
+BRIEF = (
+    "Ты — Рина, голосовой ассистент на компьютере пользователя.",
+    "Отвечай кратко и по делу: одно-два предложения.",
+    "Отвечай на языке собеседника.",
+    "Если не знаешь ответа, честно скажи об этом.",
+)
+
+#: The characters to choose from (`llm_character`), by the value stored.
+#: The first is the default. A character is a tuple of paragraphs like the
+#: ones above, and adding one is adding it here, with its words in
+#: `settings_schema.options_for`, its English in `core/i18n.py` — both
+#: checked — and nothing else.
+PERSONAS = {
+    "warm": WARM,
+    "brief": BRIEF,
+}
 
 # --- What is true of the person and of this answer, whatever the character.
 #
@@ -265,13 +287,15 @@ def persona():
     """
     The system prompt: whose voice the model answers in.
 
-    A persona of the person's own (`llm_persona`) replaces the default
-    character whole, as it always has; what `situation()` says is added to
-    either.
+    The character is one of `PERSONAS`, chosen by `llm_character`; a
+    persona of the person's own (`llm_persona`) replaces it whole, as it
+    always has. What `situation()` says is added to either.
     """
     settings = _settings()
     own = str(settings.get("llm_persona", "") or "").strip()
-    character = [own] if own else [tr(p) for p in PERSONA]
+    chosen = PERSONAS.get(str(settings.get("llm_character", "") or ""),
+                          next(iter(PERSONAS.values())))
+    character = [own] if own else [tr(p) for p in chosen]
     return "\n".join(character + situation(settings))
 
 

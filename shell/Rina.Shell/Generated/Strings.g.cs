@@ -611,6 +611,11 @@ public static partial class Loc
                 {
                     ["English"] = "Thinking…",
                 },
+            ["Если заполнено, заменяет выбранный характер"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "If filled in, replaces the chosen persona",
+                },
             ["Если не ответить, действие не выполнится."] =
                 new Dictionary<string, string>
                 {
@@ -968,11 +973,6 @@ public static partial class Loc
                 {
                     ["English"] = "Which word Rina uses for which program",
                 },
-            ["Каким характером модель отвечает"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "What character the model answers with",
-                },
             ["Какое действие"] =
                 new Dictionary<string, string>
                 {
@@ -987,6 +987,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Which address to open",
+                },
+            ["Какой из готовых характеров у Рины"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which of the ready personas Rina has",
                 },
             ["Какую команду вызвать"] =
                 new Dictionary<string, string>
@@ -2047,6 +2052,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "No commands of your own yet",
+                },
+            ["Свой характер"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Own persona",
                 },
             ["Сворачивать в трей"] =
                 new Dictionary<string, string>

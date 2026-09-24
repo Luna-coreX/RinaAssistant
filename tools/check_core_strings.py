@@ -139,7 +139,8 @@ def main() -> int:
         # The model's instruction, paragraph by paragraph (`4.0b-E14`). An
         # untranslated one is worse here than anywhere: a Russian line in
         # the persona pulls the model's answers into Russian.
-        "PERSONA": list(llm.PERSONA),
+        "PERSONAS": [p for persona in llm.PERSONAS.values()
+                     for p in persona],
         # And what is added to any character: the name, the address form,
         # the rules of the channel. Untranslated, these pull just as hard.
         "SITUATION": [llm.NAMED, llm.PLAIN, llm.SPOKEN,

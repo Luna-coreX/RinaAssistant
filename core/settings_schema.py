@@ -121,6 +121,9 @@ CONSTRAINTS: dict[str, Constraint] = {
     "llm_model": Constraint(depends_on="llm_enabled"),
     "llm_web": Constraint(depends_on="llm_enabled"),
     "llm_persona": Constraint(depends_on="llm_enabled"),
+    # The ready characters: the core's set, because it is the core that
+    # holds their texts (`core.llm.PERSONAS`).
+    "llm_character": Constraint(dynamic=True, depends_on="llm_enabled"),
     # Three fixed values with words for them, listed the way `whisper_model`
     # is: the set is the core's, because it is what the persona knows how
     # to say (`core.llm.ADDRESS`).
@@ -329,6 +332,12 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
                            else tr("{name} — перевод неполный", name=name)),
                  "available": True}
                 for name in LANGUAGES]
+    if key == "llm_character":
+        from core.llm import PERSONAS
+        titles = {"warm": tr("Тёплая"),
+                  "brief": tr("Сдержанная")}
+        return [{"value": name, "title": titles[name], "available": True}
+                for name in PERSONAS]
     if key == "address_form":
         from core.llm import ADDRESS
         # Written out as literals so the translation check can read them;

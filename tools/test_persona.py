@@ -9,9 +9,10 @@ arrival — this one was: every line correct in the editor, and the model
 got «…ассистент Luna.Общайся тепло…», because Python joins adjacent
 literals without a space and says nothing.
 
-The prompt is a character and a situation. The character is the persona
-or one of the person's own; the situation is what is true whatever the
-character — and each part of it was found or decided here:
+The prompt is a character and a situation. The character is one of the
+ready ones, chosen in the settings, or one of the person's own; the
+situation is what is true whatever the character — and each part of it
+was found or decided here:
 
 **The name is one paragraph, and without it nothing is left dangling.**
 Empty is the ordinary case, not an error. A name written into the text
@@ -59,7 +60,7 @@ neutralise(storage=False)
 _llm.ask = _real_ask
 
 from console import use_utf8
-from core import i18n, llm, privacy
+from core import i18n, llm, privacy, settings_schema
 from core.settings_api import MemorySettings
 
 use_utf8()
@@ -142,7 +143,8 @@ check("перевод строки в имени не рвёт текст",
 
 print()
 print("=== род ===")
-pronouns = sorted({m.group(0) for p in llm.PERSONA for m in HE.finditer(p)})
+pronouns = sorted({m.group(0) for persona in llm.PERSONAS.values()
+                   for p in persona for m in HE.finditer(p)})
 check("характер не говорит о человеке «он»", not pronouns,
       f"| {', '.join(pronouns)}")
 check("по умолчанию — без рода, и это сказано модели",
@@ -193,7 +195,8 @@ print("=== предлагается только то, что знает пер�
 # persona and everything the situation adds is translated into it. A
 # language added to `LANGUAGES` with its persona in Russian would be the
 # finding this began with, promised in the settings.
-every = [*llm.PERSONA, llm.NAMED, llm.PLAIN, llm.SPOKEN, *llm.ADDRESS.values()]
+every = [*(p for persona in llm.PERSONAS.values() for p in persona),
+         llm.NAMED, llm.PLAIN, llm.SPOKEN, *llm.ADDRESS.values()]
 for lang in i18n.LANGUAGES:
     if lang == "Русский":
         continue
@@ -203,11 +206,34 @@ for lang in i18n.LANGUAGES:
           f"| без перевода {len(missing)} из {len(every)}")
 
 print()
+print("=== выбор характера ===")
+default = next(iter(llm.PERSONAS))
+check("по умолчанию — тёплая", default == "warm" and bare.startswith(llm.WARM[0]),
+      f"| по умолчанию {default!r}: {bare.splitlines()[0]}")
+brief = told(llm_character="brief")
+check("сдержанная выбирается",
+      brief.startswith(llm.BRIEF[0]) and llm.WARM[1] not in brief,
+      f"| {brief.splitlines()[0]}")
+check("и положение дел к ней добавляется так же",
+      llm.ADDRESS["neutral"] in brief and llm.PLAIN in brief,
+      "| сдержанная осталась без рода и разметки")
+check("незнакомый характер — как по умолчанию",
+      told(llm_character="мусор") == bare)
+offered = settings_schema.options_for("llm_character", {})
+check("настройки предлагают все характеры, и у каждого есть слово",
+      [o["value"] for o in offered] == list(llm.PERSONAS)
+      and all(o["title"] for o in offered),
+      f"| {[(o['value'], o['title']) for o in offered]}")
+
+print()
 print("=== свой характер ===")
 own = told(llm_persona="Отвечай как пират.")
 check("свой характер заменяет персону целиком",
       own.startswith("Отвечай как пират.\n") and "Ты — Рина" not in own,
       f"| {own[:60]!r}")
+check("свой характер важнее выбранного",
+      llm.BRIEF[0] not in told(llm_persona="Отвечай как пират.",
+                                llm_character="brief"))
 own_named = told(llm_persona="Отвечай как пират.", user_name="Саша",
                  address_form="feminine", tts_engine="edge")
 check("а положение дел к нему добавляется",
@@ -216,7 +242,8 @@ check("а положение дел к нему добавляется",
 
 print()
 print("=== на странице приватности ===")
-store = MemorySettings({"user_name": "Саша", "address_form": "feminine"})
+store = MemorySettings({"user_name": "Саша", "address_form": "feminine",
+                        "llm_character": "brief"})
 kept = {item["id"]: item["detail"]
         for group in privacy.inventory(store) if group["id"] == "settings"
         for item in group["items"]}
@@ -224,6 +251,8 @@ check("заданное имя видно среди того, что о чел�
       kept.get("user_name") == "Саша", f"| {kept.get('user_name')!r}")
 check("и род обращения тоже",
       kept.get("address_form") == "feminine", f"| {kept.get('address_form')!r}")
+check("и выбранный характер",
+      kept.get("llm_character") == "brief", f"| {kept.get('llm_character')!r}")
 
 print()
 print("ИТОГО ошибок:", fails)
