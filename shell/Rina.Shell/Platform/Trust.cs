@@ -30,9 +30,8 @@ public static class Trust
     private static readonly object Lock = new();
     private static Dictionary<string, DateTime>? _allowed;
 
-    private static string Path => System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RinaAssistant", "trusted.json");
+    private static string Path =>
+        System.IO.Path.Combine(DataFolder.Roaming, "trusted.json");
 
     /// <summary>Whether the file is signed or the person already allowed it.</summary>
     public static bool Allowed(string path)

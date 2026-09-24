@@ -45,6 +45,7 @@ import io
 import json
 import os
 import re
+import hashlib
 import shutil
 import subprocess
 import sys
@@ -285,6 +286,80 @@ def all_checks(shots_dir):
 
 
 # ---------------------------------------------------------------------------
+# The profile every check is handed
+# ---------------------------------------------------------------------------
+class Profile:
+    """
+    A stand-in `APPDATA` for one check, which the check must leave alone.
+
+    **The suite was rewriting the developer's settings.** Twenty checks
+    wrote into the profile they ran under — the settings file among them:
+    `test_two_engines.py` switched «Отвечать моделью» off on every run —
+    and the call journal Rina answers «почему?» from, the security log,
+    the list of things to do. Each check isolates itself now; this is what
+    keeps the next one honest. It gets a profile of its own and fails if
+    it wrote into it: a check that isolates itself never touches what it
+    was given, so anything here means one that does not.
+
+    Only Rina's own folder is watched. `dotnet run` writes a NuGet config
+    into any profile that has none, and that is the build tool's, not a
+    check's — watching all of `APPDATA` failed every shell mode on it.
+
+    The models are the one thing read from the real profile — hearing
+    needs one to hear with — and they are linked rather than copied, a
+    junction the snapshot does not walk into and the clean-up removes
+    without following.
+    """
+
+    def __init__(self):
+        self.home = tempfile.mkdtemp(prefix="rina-regress-profile-")
+        folder = os.path.join(self.home, "RinaAssistant")
+        os.makedirs(folder)
+        self.ours = folder
+        self.models = os.path.join(folder, "models")
+        real = os.path.join(os.environ.get("APPDATA", ""),
+                            "RinaAssistant", "models")
+        if os.path.isdir(real):
+            try:
+                import _winapi
+                _winapi.CreateJunction(real, self.models)
+            except (ImportError, AttributeError, OSError):
+                pass            # hearing will say it has no model, out loud
+        self.before = self._files()
+
+    def _files(self):
+        found = {}
+        for base, dirs, files in os.walk(self.ours):
+            dirs[:] = [d for d in dirs
+                       if os.path.join(base, d) != self.models]
+            for name in files:
+                full = os.path.join(base, name)
+                try:
+                    with open(full, "rb") as handle:
+                        found[full] = hashlib.sha1(handle.read()).hexdigest()
+                except OSError:
+                    found[full] = "locked"
+        return found
+
+    def written(self):
+        """What the check left here, as paths inside the profile."""
+        after = self._files()
+        return sorted(os.path.relpath(k, self.home)
+                      for k in set(self.before) | set(after)
+                      if self.before.get(k) != after.get(k))
+
+    def remove(self):
+        # The junction first, by itself: `rmdir` on a junction removes the
+        # link and never what it points at — the developer's models.
+        if os.path.isdir(self.models):
+            try:
+                os.rmdir(self.models)
+            except OSError:
+                return          # left to the temporary folder, untouched
+        shutil.rmtree(self.home, ignore_errors=True)
+
+
+# ---------------------------------------------------------------------------
 # The run
 # ---------------------------------------------------------------------------
 def run(check, timeout):
@@ -292,15 +367,21 @@ def run(check, timeout):
     if check.skip:
         return "пропущено", 0.0, check.skip, [], []
     started = time.monotonic()
+    profile = Profile()
     try:
         done = subprocess.run(check.command, capture_output=True, text=True,
                               encoding="utf-8", errors="replace",
-                              env=child_env(), timeout=timeout)
+                              env=child_env(APPDATA=profile.home),
+                              timeout=timeout)
     except FileNotFoundError:
+        profile.remove()
         return "пропущено", 0.0, f"нет {check.command[0]}", [], []
     except subprocess.TimeoutExpired:
+        profile.remove()
         return ("провал", time.monotonic() - started,
                 f"не уложилась в {timeout} с", [])
+    written = profile.written()
+    profile.remove()
 
     spent = time.monotonic() - started
     tail = ""
@@ -342,7 +423,14 @@ def run(check, timeout):
     # first run.
     inner = [line.strip() for line in (done.stdout or "").splitlines()
              if line.strip().startswith("пропущено")]
-    return (("успех" if done.returncode == 0 else "провал"), spent, tail,
+    if written:
+        # First among the reasons: whatever else went red, this one is
+        # about the developer's machine, not about the program.
+        reasons.insert(0, "писала в профиль, который ей дали: "
+                          + ", ".join(written[:4])
+                          + (" …" if len(written) > 4 else ""))
+    failed = done.returncode != 0 or bool(written)
+    return (("провал" if failed else "успех"), spent, tail,
             reasons[:4], inner[:4])
 
 

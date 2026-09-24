@@ -27,7 +27,13 @@ sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 sys.path.insert(0, os.path.join(
     r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
 
-from sandbox import neutralise
+from sandbox import isolate_storage, neutralise
+
+# The profile first, before the core is imported below: a store made on
+# the way in remembers the real one. Left alone here, this check wrote
+# the developer's commands, history and plugins files — found by the
+# suite handing it a profile of its own and looking afterwards.
+isolate_storage()
 
 # The real `ask` is kept before the sandbox replaces it.
 #
@@ -41,7 +47,7 @@ from sandbox import neutralise
 from core import llm as _llm
 
 _real_ask = _llm.ask
-neutralise(storage=False)
+neutralise()
 _llm.ask = _real_ask
 
 from console import use_utf8

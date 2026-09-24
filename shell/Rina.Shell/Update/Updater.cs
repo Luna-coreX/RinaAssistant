@@ -90,8 +90,7 @@ public sealed class Updater
 
     /// <summary>Where the verified and pending files are put.</summary>
     public static string Staging => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "RinaAssistant", "updates");
+        Platform.DataFolder.Local, "updates");
 
     /// <summary>
     /// Ask whether anything newer exists.

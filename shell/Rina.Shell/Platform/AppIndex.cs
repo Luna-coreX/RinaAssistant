@@ -410,9 +410,8 @@ public static class AppIndex
 
     // --------------------------------------------------------------- cache
 
-    private static string CachePath => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RinaAssistant", "app_index.json");
+    private static string CachePath =>
+        Path.Combine(DataFolder.Roaming, "app_index.json");
 
     /// <summary>How the cache file is shaped; grows when the format changes.</summary>
     private const int CacheVersion = 2;

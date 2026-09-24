@@ -32,6 +32,12 @@ ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
+# Isolated before anything of the core is imported. A store or a log
+# made first remembers the real profile, and isolating after it moves
+# nothing: measured, this check wrote into the developer's profile.
+from sandbox import isolate_storage
+isolate_storage()
+
 from core.wire import (Envelope, FrameDecoder, IdGenerator, MessageType,
                        Session, Side, encode_frame, new_trace_id)
 

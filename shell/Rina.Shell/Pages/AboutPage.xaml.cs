@@ -484,9 +484,7 @@ public partial class AboutPage : UserControl
     /// </remarks>
     private void BuildPlaces()
     {
-        var data = System.IO.Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RinaAssistant");
+        var data = Platform.DataFolder.Roaming;
 
         foreach (var (what, path) in new[]
         {

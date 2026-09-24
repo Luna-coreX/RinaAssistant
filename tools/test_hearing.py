@@ -25,6 +25,14 @@ import sys
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 
+# The model is read from the real profile, and nothing else is: its folder
+# is kept before the profile is moved, and everything the check writes —
+# the call journal among it — goes into a folder of its own. Measured, it
+# wrote `audit.db` into the developer's profile.
+REAL_APPDATA = os.environ.get("APPDATA", "")
+from sandbox import isolate_storage
+isolate_storage()
+
 from core.speech import RATE, Segmenter
 
 fails = 0
@@ -409,7 +417,7 @@ print("=== и на настоящей модели это стоит милли�
 from core.speech import VoskRecogniser
 
 vosk_model = os.path.join(
-    os.environ.get("APPDATA", ""), "RinaAssistant", "models",
+    REAL_APPDATA, "RinaAssistant", "models",
     "vosk-ru-small", "vosk-model-small-ru-0.22")
 here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 recording = os.path.join(here, "tools", "fixtures", "said-rina.wav")

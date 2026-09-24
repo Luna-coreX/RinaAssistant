@@ -74,9 +74,7 @@ public partial class CommandsPage : UserControl
             }
         }
 
-        Legend.Text = _programsFound > 0
-            ? S("СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}", _programsFound)
-            : S("СВОИ И ВСТРОЕННЫЕ");
+        ShowLegend();
         // Here the empty state does not take over the page: below it is a
         // list of what Rina can do without any commands of one's own, and
         // that is far more useful than emptiness.
@@ -227,12 +225,14 @@ public partial class CommandsPage : UserControl
     /// </remarks>
     private async Task ShowBuiltinAsync()
     {
-        // The program count first: it is read from the cache and comes
-        // instantly, while the built-in list waits for the core's answer.
-        // The other order would leave the heading without its number for
-        // the whole wait.
-        var found = await Task.Run(() => Platform.AppIndex.Get().Count);
-        _programsFound = found;
+        // **Both at once.** The count used to be taken first, on the belief
+        // that it comes out of a cache and instantly. On a first run there
+        // is no cache: the count is a whole walk of the machine, and the
+        // built-in list — what a new person most needs to see here — waited
+        // behind it. Found when the checks stopped borrowing the developer's
+        // warm cache. With a cache the count is still in before the core
+        // answers, and the page draws once, as it did.
+        var counting = Task.Run(() => Platform.AppIndex.Get().Count);
 
         var got = await Ask(Methods.CommandsBuiltin);
         _builtin.Clear();
@@ -242,10 +242,35 @@ public partial class CommandsPage : UserControl
         {
             _builtin.Add(item);
         }
+        if (counting.IsCompletedSuccessfully) _programsFound = counting.Result;
         DrawGroups();
+        ShowLegend();
 
         BuiltinCount = _builtin.Count;
+
+        if (counting.IsCompletedSuccessfully) return;
+        try
+        {
+            _programsFound = await counting;
+            ShowLegend();
+        }
+        catch (Exception)
+        {
+            // No count: the heading goes without a number, as it does
+            // before one arrives. Not worth a word to anybody.
+        }
     }
+
+    /// <summary>The heading over the lists, with the program count once there is one.</summary>
+    /// <remarks>
+    /// Its own method because it is set twice: when the list loads and when
+    /// the count arrives. Set only at the first, it never showed the number on
+    /// the first opening — the count came after it.
+    /// </remarks>
+    private void ShowLegend() =>
+        Legend.Text = _programsFound > 0
+            ? S("СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}", _programsFound)
+            : S("СВОИ И ВСТРОЕННЫЕ");
 
     /// <summary>How many built-in skills are shown — for the check.</summary>
     public int BuiltinCount { get; private set; }

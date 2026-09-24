@@ -13,6 +13,20 @@ import sys
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 os.chdir(r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 
+# Every side effect at once. Listing them by hand in every test — as the
+# first edition did — means forgetting one some day: back then the browser
+# was forgotten, and a "yes" without a question asked went into a web search
+# as a real tab on the developer's machine.
+#
+# And before the store below is touched. This block used to come after it,
+# so the store loaded the developer's own profile, took the settings this
+# check wants and saved them there: every run switched «Отвечать моделью»
+# off on the real machine, along with the commands, the reminders and the
+# history it emptied.
+from tools.sandbox import neutralise
+
+box = neutralise()
+
 from core import logging_setup
 logging_setup.setup()
 
@@ -20,14 +34,6 @@ from core.settings_store import settings
 settings.load()
 settings.update({"llm_enabled": False, "web_search_fallback": True,
                  "custom_commands": [], "reminders": [], "history": []})
-
-# Every side effect at once. Listing them by hand in every test — as the
-# first edition did — means forgetting one some day: back then the browser
-# was forgotten, and a "yes" without a question asked went into a web search
-# as a real tab on the developer's machine.
-from tools.sandbox import neutralise
-
-box = neutralise()
 
 from core.engine import RinaEngine
 from core.events import EventBus, bus as global_bus

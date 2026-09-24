@@ -78,6 +78,12 @@ ELSEWHERE = {
 # ===========================================================================
 # Surface 1 — launching programs
 # ===========================================================================
+# Isolated before anything of the core is imported. A store or a log
+# made first remembers the real profile, and isolating after it moves
+# nothing: measured, this check wrote into the developer's profile.
+from sandbox import isolate_storage
+isolate_storage()
+
 from core import data_transfer
 
 # T-18 · an imported command launches the wrong thing.

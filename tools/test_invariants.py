@@ -174,6 +174,12 @@ check("каждый вызов инструмента называет иниц�
 
 print()
 print("=== инвариант: объявленное и реализованное совпадают ===")
+# Isolated before anything of the core is imported. A store or a log
+# made first remembers the real profile, and isolating after it moves
+# nothing: measured, this check wrote into the developer's profile.
+from sandbox import isolate_storage
+isolate_storage()
+
 from core.toolbox import default_registry
 from core.toolrunner import IMPLEMENTATIONS
 

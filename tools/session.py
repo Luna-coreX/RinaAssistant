@@ -243,11 +243,13 @@ class SessionRecorder:
 # ---------------------------------------------------------------------------
 def build_engine():
     """A fresh core in the sandbox, with settings in memory."""
-    from core import logging_setup
-    logging_setup.setup()
-
+    # The sandbox before the log: set up first, the log opened in the
+    # developer's profile and wrote there for the rest of the run.
     from sandbox import neutralise
     box = neutralise()
+
+    from core import logging_setup
+    logging_setup.setup()
 
     from core.engine import RinaEngine
     from core.events import EventBus

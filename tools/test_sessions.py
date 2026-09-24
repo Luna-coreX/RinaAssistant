@@ -32,11 +32,13 @@ sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 sys.path.insert(0, os.path.join(
     r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
 
-# The checks do not touch the machine (`4.0-I04`); storage is left alone
-# because this one brings its own.
+# The checks do not touch the machine (`4.0-I04`), storage included. This
+# one brings its own settings, but not its own call journal or logs, and
+# those went into the developer's profile — measured: it wrote `audit.db`
+# there, the journal Rina answers «почему?» from.
 from sandbox import neutralise
 
-neutralise(storage=False)
+neutralise()
 
 from console import use_utf8
 from core.engine import RinaEngine

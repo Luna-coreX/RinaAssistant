@@ -34,9 +34,8 @@ public static class Journal
     /// <summary>Where the journal is written — so checks look in the same place.</summary>
     public static string Where => Path;
 
-    private static string Path => System.IO.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RinaAssistant", "logs", "security.log");
+    private static string Path =>
+        System.IO.Path.Combine(DataFolder.Roaming, "logs", "security.log");
 
     /// <summary>A launch: what, from where, with consent or not, how it ended.</summary>
     public static void Launch(string what, string kind, bool trusted, bool ok,

@@ -40,9 +40,8 @@ public static class Kept
     /// own: a person looking for "where Rina keeps her things" should
     /// find one place, and «о программе» already points them at it.
     /// </remarks>
-    private static string Where => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RinaAssistant", "shell.json");
+    private static string Where =>
+        Path.Combine(Platform.DataFolder.Roaming, "shell.json");
 
     /// <summary>How big the window should open.</summary>
     /// <param name="Width">Points across.</param>

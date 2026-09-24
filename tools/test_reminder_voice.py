@@ -33,9 +33,13 @@ sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 sys.path.insert(0, os.path.join(
     r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
 
+# Storage is moved as well. These tests bring their own settings, but
+# not their own call journal or logs, and those went into the
+# developer's profile — measured: every check left like this wrote
+# `audit.db` there, the journal Rina answers «почему?» from.
 from sandbox import neutralise
 
-neutralise(storage=False)
+neutralise()
 
 from console import use_utf8
 from core.engine import RinaEngine

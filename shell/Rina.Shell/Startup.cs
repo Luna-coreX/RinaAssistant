@@ -26,6 +26,9 @@ public partial class App
     //: check that swaps it to ask a question of another one.
     private string _finishAtStart = "silver";
 
+    /// <summary>Started by the suite: a check or a screenshot, not a person.</summary>
+    private bool _checking;
+
     private string? _shotPath;
     //: Whether a screenshot of the commands page should open the editor.
     private bool _shotEditor;
@@ -54,6 +57,16 @@ public partial class App
         Styles.Navigation.Watch();
 
         var args = e.Args;
+
+        // **A check keeps nothing of the person's.** Shell and core alike go
+        // into a folder of the check's own: the shell's files through
+        // `DataFolder`, the core through the sandboxed launcher. The
+        // screenshot mode belongs here too — nothing but the suite starts the
+        // shell with `--shot`, and it used to raise an ordinary Rina over the
+        // person's profile, core and all.
+        _checking = args.Any(one => one.StartsWith("--check-"))
+                    || Value(args, "--shot") is not null;
+        if (_checking) UseCheckFolder();
 
         // The language can be set from outside: a screenshot in another
         // language is the only way to see the translation whole rather than
@@ -385,7 +398,10 @@ public partial class App
             _hotkeys.Attach(window);
             _hotkeys.Refused += (name, why) => window.ShowNote($"{name}: {why}");
 
-            _link = new CoreLink(window, CoreLink.FindCore());
+            // Sandboxed only under a check (see `_checking`): a person's start
+            // never passes the arguments that set it.
+            _link = new CoreLink(window, _checking ? SandboxedCore()
+                                                   : CoreLink.FindCore());
             window.Link = _link;
 
             // Notifications: what a person cannot see, they are told. The
@@ -566,6 +582,72 @@ public partial class App
         Shutdown();
     }
 
+    /// <summary>
+    /// A core for a check: this machine's interpreter and code, a profile of
+    /// its own.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The developer's settings were being rewritten.</b> Six checks raised
+    /// the core with <see cref="CoreLink.FindCore"/> — the launch a person's
+    /// Rina uses, over that person's profile — and every one wrote into it:
+    /// the settings file, the call journal Rina answers «почему?» from, the
+    /// security log, the list of things to do. Nothing reported it; the
+    /// settings were simply not what they had been.
+    /// </para>
+    /// <para>
+    /// The launch the audio checks already used: the sandboxed runner, with a
+    /// folder shared by every core this process starts, so a check about
+    /// what survives a restart still has something to find. Removed when the
+    /// process ends; a folder the core still holds is left to the system's
+    /// temporary directory.
+    /// </para>
+    /// </remarks>
+    /// <summary>
+    /// Give this process — shell and every core it starts — a folder of its own.
+    /// </summary>
+    /// <remarks>
+    /// Set once, at the start, before anything reads a path: the shell's
+    /// store and journal are asked for lazily, but asked for early.
+    /// </remarks>
+    private static void UseCheckFolder()
+    {
+        var home = Path.Combine(Path.GetTempPath(),
+                                "rina-check-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(home);
+        Platform.DataFolder.UseForCheck(home);
+        Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", home);
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try { Directory.Delete(home, recursive: true); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        };
+    }
+
+    private static Rina.Protocol.CoreLaunch SandboxedCore()
+    {
+        var real = CoreLink.FindCore();
+        var home = Environment.GetEnvironmentVariable("RINA_SANDBOX_DIR");
+        if (string.IsNullOrEmpty(home))
+        {
+            home = Path.Combine(Path.GetTempPath(),
+                                "rina-check-" + Guid.NewGuid().ToString("N")[..8]);
+            Directory.CreateDirectory(home);
+            Environment.SetEnvironmentVariable("RINA_SANDBOX_DIR", home);
+            var made = home;
+            AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+            {
+                try { Directory.Delete(made, recursive: true); }
+                catch (IOException) { }
+                catch (UnauthorizedAccessException) { }
+            };
+        }
+        return new Rina.Protocol.CoreLaunch(real.Python,
+            Path.Combine(real.WorkingDirectory, "tools", "_core_sandboxed.py"),
+            real.WorkingDirectory);
+    }
+
     private async Task CheckCoreAsync(MainWindow window)
     {
         // Output to a file is buffered in blocks, and if the process is
@@ -591,7 +673,7 @@ public partial class App
                                         StringComparison.OrdinalIgnoreCase)
               || !Directory.Exists(Path.Combine(launch.WorkingDirectory, "venv")),
               "| иначе голосов и моделей у ядра не будет");
-        var link = new CoreLink(window, launch);
+        var link = new CoreLink(window, SandboxedCore());
         window.Link = link;
         var seen = new List<Rina.Protocol.CoreState>();
         window.CoreStateShown += state => seen.Add(state);
@@ -1145,7 +1227,7 @@ public partial class App
         }
 
         Console.WriteLine("=== Диалог: переписка, а не лента ===");
-        var link = new CoreLink(window, CoreLink.FindCore());
+        var link = new CoreLink(window, SandboxedCore());
         window.Link = link;
         await link.StartAsync();
         await Until(() => link.State == Rina.Protocol.CoreState.Ready, 12);
@@ -1292,7 +1374,7 @@ public partial class App
         }
 
         Console.WriteLine("=== Настройки: списки за кнопкой ===");
-        var link = new CoreLink(window, CoreLink.FindCore());
+        var link = new CoreLink(window, SandboxedCore());
         // Handed to the window, and that is not a formality: the settings
         // page asks **the window's** link, not whichever one a check
         // happens to be holding. Without this line the page found no core,
@@ -1666,7 +1748,7 @@ public partial class App
         }
 
         Console.WriteLine("=== Мастер первого запуска ===");
-        var link = new CoreLink(new MainWindow(), CoreLink.FindCore());
+        var link = new CoreLink(new MainWindow(), SandboxedCore());
         await link.StartAsync();
         for (var waited = 0; waited < 60
              && link.State != Rina.Protocol.CoreState.Ready; waited++)
@@ -2261,7 +2343,7 @@ public partial class App
             Console.WriteLine("=== I03: диагностический пакет ===");
 
             var window = new MainWindow();
-            var link = new CoreLink(window, CoreLink.FindCore());
+            var link = new CoreLink(window, SandboxedCore());
             window.Link = link;
             await link.StartAsync();
             for (var i = 0; i < 400
@@ -2509,9 +2591,7 @@ public partial class App
 
         Console.WriteLine();
         Console.WriteLine("=== U05: журнал ===");
-        var log = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RinaAssistant", "logs", "security.log");
+        var log = Path.Combine(Platform.DataFolder.Roaming, "logs", "security.log");
         // We read without getting in the way of writing: the journal is
         // open for appending, and an ordinary read trips over the shared
         // access. A check that falls over because the journal is being
@@ -3746,7 +3826,7 @@ public partial class App
         // measures a figure that only moves while the window is active.
         // Raised first, it turned three green assertions red and said
         // nothing about why.
-        var link = new CoreLink(window, CoreLink.FindCore());
+        var link = new CoreLink(window, SandboxedCore());
         window.Link = link;
         await link.StartAsync();
         await Until(() => link.State == Rina.Protocol.CoreState.Ready, 12);

@@ -30,11 +30,13 @@ sys.path.insert(0, os.path.join(
 # so that the ordinary run touches nothing; this check belongs to the
 # ordinary run.
 #
-# Storage is left alone: these tests bring their own, and moving it
-# would change what they measure rather than what they touch.
+# Storage is moved as well. These tests bring their own settings, but
+# not their own call journal or logs, and those went into the
+# developer's profile — measured: every check left like this wrote
+# `audit.db` there, the journal Rina answers «почему?» from.
 from sandbox import neutralise
 
-neutralise(storage=False)
+neutralise()
 
 from core.engine import RinaEngine
 from core.settings_api import MemorySettings
