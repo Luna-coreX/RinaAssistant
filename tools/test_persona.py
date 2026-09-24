@@ -187,6 +187,22 @@ finally:
     i18n.set_language("Русский")
 
 print()
+print("=== предлагается только то, что знает персону ===")
+# The reason Ukrainian, Spanish and German were withdrawn, turned into the
+# rule for bringing one back: a language is offered only when all of the
+# persona and everything the situation adds is translated into it. A
+# language added to `LANGUAGES` with its persona in Russian would be the
+# finding this began with, promised in the settings.
+every = [*llm.PERSONA, llm.NAMED, llm.PLAIN, llm.SPOKEN, *llm.ADDRESS.values()]
+for lang in i18n.LANGUAGES:
+    if lang == "Русский":
+        continue
+    table = i18n._TRANSLATIONS.get(lang) or {}
+    missing = [p for p in every if p not in table]
+    check(f"{lang}: персона переведена целиком", not missing,
+          f"| без перевода {len(missing)} из {len(every)}")
+
+print()
 print("=== свой характер ===")
 own = told(llm_persona="Отвечай как пират.")
 check("свой характер заменяет персону целиком",

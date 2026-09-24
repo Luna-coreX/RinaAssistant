@@ -147,7 +147,7 @@ See [`docs/plugins/WRITING-PLUGINS.md`](docs/plugins/WRITING-PLUGINS.md).
 
 ### Interface
 
-Three finishes (silver, black and graphite) with a choice of accent, five interface languages (Русский, English, Українська, Español, Deutsch), a floating command bar, tray integration, autostart, global hotkeys, and a full history with export.
+Three finishes (silver, black and graphite) with a choice of accent, two interface languages (Русский, English — Rina’s character included), a floating command bar, tray integration, autostart, global hotkeys, and a full history with export.
 
 The design is a document, not a mood: [`docs/design/SYSTEM.md`](docs/design/SYSTEM.md). Every colour pair is checked for contrast, and the drawn window is compared with the tokens pixel by pixel.
 

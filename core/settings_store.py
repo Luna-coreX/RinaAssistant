@@ -257,6 +257,7 @@ class SettingsStore:
 
         # bringing the data's shape up to the current schema version
         migrated = self._migrate_schema() or migrated
+        migrated = self._retire_language() or migrated
 
         if migrated:
             self.save_all()
@@ -412,6 +413,27 @@ class SettingsStore:
         if (legacy_lang in LANGUAGES
                 and self._data.get("ui_language") == DEFAULTS["ui_language"]):
             self._data["ui_language"] = legacy_lang
+
+    def _retire_language(self):
+        """
+        A language no longer offered becomes English (`4.0b-E14`).
+
+        Not a schema migration — the shape is the same — and so not a
+        version: it runs on every load and does nothing once the value is
+        one of `LANGUAGES`. Rewritten here rather than resolved on the fly,
+        because the shell reads the stored value too: left as «Deutsch»,
+        the core would answer in one language and the window show another.
+
+        English rather than Russian: it is the program's other complete
+        language, and picking Russian for somebody who chose Ukrainian,
+        Spanish or German would be a guess about them. Recognition follows
+        this setting (`Engine.lang_code`), so it moves to English as well.
+        """
+        from core.i18n import LANGUAGES
+        if self._data.get("ui_language") in LANGUAGES:
+            return False
+        self._data["ui_language"] = "English"
+        return True
 
     def _migrate_to_v2(self):
         """app_aliases: a path string -> a dict {path, kind, name}."""

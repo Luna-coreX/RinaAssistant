@@ -10,6 +10,12 @@ invented machine translation.
 
 How complete the coverage is can be seen with the core.i18n.coverage()
 function.
+
+**Not offered since `4.0b-E14`.** None of the three has Rina's persona,
+and a persona in Russian takes the other language away from the model, so
+they are kept here and left out of `core.i18n.LANGUAGES`. Bringing one back
+means translating the persona into it first — `tools/test_persona.py`
+fails otherwise.
 """
 
 # --- Ukrainian ---

@@ -879,9 +879,9 @@ _EN = {
 from core.i18n_langs import UK as _UK, ES as _ES, DE as _DE
 
 # The dictionaries by language. Russian is the language of the original
-# strings and needs no dictionary. English is translated in full, the rest
-# cover the main interface; everything untranslated is honestly shown in
-# Russian (see core/i18n_langs.py).
+# strings and needs no dictionary. English is translated in full; the rest
+# cover the main interface and are kept but not offered — see `LANGUAGES`
+# below and core/i18n_langs.py.
 _TRANSLATIONS = {
     "English": _EN,
     "Українська": _UK,
@@ -889,8 +889,16 @@ _TRANSLATIONS = {
     "Deutsch": _DE,
 }
 
-# The list of supported languages for the dropdown.
-LANGUAGES = ["Русский"] + list(_TRANSLATIONS.keys())
+#: The languages a person can pick (`4.0b-E14`).
+#:
+#: Not every language that has a table. Ukrainian, Spanish and German cover
+#: part of the interface and none of Rina's persona, and a persona in
+#: Russian takes the other language away from the model — spoken to in
+#: English it stopped answering at all. Offering them promised a language
+#: she does not speak. Their tables stay, so that bringing one back is a
+#: matter of finishing it rather than starting over; `test_persona.py`
+#: will not let one back with the persona untranslated.
+LANGUAGES = ["Русский", "English"]
 
 _current = {"lang": "Русский"}
 

@@ -1042,9 +1042,18 @@ speaker.ask("settings.options", {"keys": ["ui_language"]})
 langs = speaker.read(1)[0].payload["options"]["ui_language"]
 check("ядро перечисляет языки", len(langs) > 1,
       f"| {[o['value'] for o in langs]}")
-check("неполный перевод назван неполным, а не числом",
-      any("неполный" in o["title"] for o in langs),
-      "| ядро не знает про строки оболочки и доли не выдумывает")
+# This used to ask that a partial translation be *called* partial rather
+# than given as a percentage — Ukrainian, Spanish and German were on the
+# list at a fraction each. They were withdrawn (`4.0b-E14`): a language
+# whose persona is in Russian is a language the model will not answer in.
+# So the rule is now stronger than the label — nothing partial is offered —
+# and the label's own rule, no share as a number, still holds.
+check("предлагается только переведённое целиком",
+      not any("неполный" in o["title"] for o in langs),
+      f"| {[o['title'] for o in langs]}")
+check("и доли числом нигде нет",
+      not any(ch.isdigit() or ch == "%" for o in langs for ch in o["title"]),
+      f"| {[o['title'] for o in langs]}")
 
 speaker.ask("settings.set", {"values": {"ui_language": "English"}})
 verdict = speaker.read(1)[0].payload["verdicts"]["ui_language"]

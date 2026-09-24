@@ -203,9 +203,9 @@ def main() -> int:
     for one in left[:12]:
         print(f"        {one}")
 
-    # Every other language is allowed to be partial — that is stated in
-    # `i18n_langs` and shown in the settings as a percentage — but
-    # English is the second language of this program and is not.
+    # The other tables are allowed to be partial because they are not
+    # offered (`4.0b-E14`); English is the second language of this program
+    # and is not.
     check("английский вообще есть", len(_EN) > 0 and "English" in LANGUAGES)
 
     print()

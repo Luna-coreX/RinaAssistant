@@ -304,5 +304,49 @@ shutil.rmtree(clean_home, ignore_errors=True)
 shutil.rmtree(home, ignore_errors=True)
 
 print()
+print("=== язык, который больше не предлагается ===")
+
+# `4.0b-E14`. Ukrainian, Spanish and German were withdrawn, and somebody
+# who picked one — in 3.1.0 or in an earlier beta — still has it stored.
+# The shell reads the stored value as well as the core, so it has to be
+# rewritten, not merely ignored: ignored, the core would answer in one
+# language and the window show another.
+def store_with_language(lang):
+    where = tempfile.mkdtemp(prefix="rina-language-")
+    folder = os.path.join(where, "RinaAssistant")
+    os.makedirs(folder)
+    with io.open(os.path.join(folder, "settings.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump({"config_version": 2, "ui_language": lang}, f)
+    # A group file of its own: the shape of 4.0, so the monolith
+    # migration of 3.0.0 leaves this store alone.
+    with io.open(os.path.join(folder, "commands.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump({}, f)
+    return where, folder
+
+
+gone_home, gone_folder = store_with_language("Deutsch")
+_, gone = fresh_store(gone_home)
+gone.load()
+check("немецкий стал английским", gone.get("ui_language") == "English",
+      f"| {gone.get('ui_language')!r}")
+on_disk = json.load(io.open(os.path.join(gone_folder, "settings.json"),
+                            encoding="utf-8"))
+check("и это записано, а не только решено в памяти",
+      on_disk.get("ui_language") == "English",
+      f"| на диске {on_disk.get('ui_language')!r}")
+
+for kept_lang in ("Русский", "English"):
+    kept_home, _folder = store_with_language(kept_lang)
+    _, kept_store = fresh_store(kept_home)
+    kept_store.load()
+    check(f"«{kept_lang}» остаётся как есть",
+          kept_store.get("ui_language") == kept_lang,
+          f"| {kept_store.get('ui_language')!r}")
+    shutil.rmtree(kept_home, ignore_errors=True)
+shutil.rmtree(gone_home, ignore_errors=True)
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

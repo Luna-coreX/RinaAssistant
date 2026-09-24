@@ -241,14 +241,16 @@ def bundled():
 
 
 def tongues():
-    """The interface languages: the four translations plus the source one."""
-    with io.open(os.path.join(ROOT, "shell", "Rina.Shell", "Strings",
-                              "interface.json"), encoding="utf-8") as handle:
-        strings = json.load(handle)
-    found = set()
-    for value in strings.values():
-        found.update(value)
-    return len(found) + 1
+    """
+    The interface languages a person can pick — the core's offered list.
+
+    Counted from what is offered, not from what has a table. Ukrainian,
+    Spanish and German kept their tables when they were withdrawn
+    (`4.0b-E14`), and a count of tables would have gone on agreeing with
+    a page that promised five.
+    """
+    from core.i18n import LANGUAGES
+    return len(LANGUAGES)
 
 
 def utterances():
