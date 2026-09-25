@@ -133,6 +133,18 @@ public sealed class Microphone : IDisposable
         Captured?.Invoke(chunk);
     }
 
+    /// <summary>Below this a level is a room, not a voice.</summary>
+    /// <remarks>
+    /// One number for everything that asks whether somebody is speaking —
+    /// the figure on the home screen and the level strip. It was the home
+    /// page's alone, and the strip, knowing nothing of it, followed every
+    /// breath of the room: in a silent room it restarted an animation ten
+    /// times a second, for as long as listening was on, at the monitor's
+    /// rate. Measured, that alone kept the graphics card about nine per
+    /// cent busy with the window doing nothing.
+    /// </remarks>
+    public const double RoomFloor = 0.06;
+
     /// <summary>
     /// Loudness of a chunk: root mean square over the samples.
     /// </summary>

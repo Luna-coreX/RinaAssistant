@@ -485,7 +485,8 @@ public partial class MainWindow : Window
         Lift(System.Windows.Media.Effects.DropShadowEffect.ShadowDepthProperty,
              (double)FindResource("Lift.Floating.Y"), 0, span, ease);
         Lift(System.Windows.Media.Effects.DropShadowEffect.OpacityProperty,
-             (double)FindResource("Lift.Floating.Opacity"), 0, span, ease);
+             (double)FindResource("Lift.Floating.Opacity"), 0, span, ease,
+             settled: Unlift);
 
         foreach (var child in Sections.Children.OfType<RadioButton>())
             if ((string?)child.Tag == section && child.IsChecked != true)
@@ -694,15 +695,47 @@ public partial class MainWindow : Window
     /// <summary>One property of the settling shadow.</summary>
     private void Lift(DependencyProperty property, double from, double to,
                       Duration span,
-                      System.Windows.Media.Animation.IEasingFunction ease) =>
-        _paneLift.BeginAnimation(property,
-            new System.Windows.Media.Animation.DoubleAnimation
-            {
-                From = from,
-                To = to,
-                Duration = span,
-                EasingFunction = ease,
-            });
+                      System.Windows.Media.Animation.IEasingFunction ease,
+                      Action? settled = null)
+    {
+        var move = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = from,
+            To = to,
+            Duration = span,
+            EasingFunction = ease,
+        };
+        if (settled is not null) move.Completed += (_, _) => settled();
+        _paneLift.BeginAnimation(property, move);
+    }
+
+    /// <summary>Take the shadow off the panel once it has faded to nothing.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>An effect at zero is not no effect.</b> The shadow faded out as
+    /// the design asks — none in a still frame — and stayed attached to
+    /// the panel that holds the whole page. So every time the panel was
+    /// drawn, the whole page went to a surface of its own and through a
+    /// shadow shader nobody could see; and the living background makes
+    /// the window dirty twenty times a second. Measured with the window
+    /// idle in front: taking every shadow off saved about four per cent
+    /// of the graphics card, most of it this one. It also cost the page's
+    /// text its ClearType, which an effect switches off.
+    /// </para>
+    /// <para>
+    /// Asked of the value rather than trusted to the event: a transition
+    /// that starts before the last one ends takes the shadow up again,
+    /// and the older animation must not take it away from under it.
+    /// </para>
+    /// </remarks>
+    private void Unlift()
+    {
+        if (Pane.Effect == _paneLift && _paneLift.Opacity < 0.01)
+            Pane.Effect = null;
+    }
+
+    /// <summary>Is any effect still on the section panel — for the motion check.</summary>
+    public bool PaneHasEffect => Pane.Effect is not null;
 
     /// <summary>The section panel's opacity — for the motion check.</summary>
     public double PaneOpacity => Pane.Opacity;
@@ -858,7 +891,17 @@ public partial class MainWindow : Window
     /// </remarks>
     public void ShowLevel(float level)
     {
+        // **Still when nothing is being said.** A level under the room's
+        // floor is the room, and the strip rests at zero rather than
+        // following it; a change too small to see does not start a
+        // movement. Before both, a silent room kept a new animation going
+        // ten times a second for as long as listening was on — see
+        // `Microphone.RoomFloor` for what that cost.
+        if (level < Audio.Microphone.RoomFloor) level = 0;
         var wanted = Math.Clamp(level, 0f, 1f) * ActualWidth;
+        LevelShown = level;
+        if (Math.Abs(wanted - _levelTarget) < ActualWidth * 0.02) return;
+        _levelTarget = wanted;
         var now = Level.ActualWidth;
 
         // The rise takes the press duration: the strip is the microphone,
@@ -876,9 +919,16 @@ public partial class MainWindow : Window
             FillBehavior = global::System.Windows.Media.Animation
                 .FillBehavior.HoldEnd,
         };
+        // Thirty frames a second, not the monitor's rate: a strip a few
+        // points tall loses nothing a person can see, and every frame of
+        // it is a frame the whole window hands to the desktop.
+        global::System.Windows.Media.Animation.Timeline
+            .SetDesiredFrameRate(glide, 30);
         Level.BeginAnimation(WidthProperty, glide);
-        LevelShown = level;
     }
+
+    /// <summary>Where the strip was last sent — so a repeat does not restart it.</summary>
+    private double _levelTarget;
 
     /// <summary>Which level was shown last — for the end-to-end check.</summary>
     public float LevelShown { get; private set; }

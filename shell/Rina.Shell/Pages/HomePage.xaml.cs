@@ -221,13 +221,10 @@ public partial class HomePage : UserControl
         // sound — there are gaps between words — and without the lag the
         // figure would drop back to waiting inside every pause.
         _heard *= 0.90;
-        if (_mic && _heard > Floor) Retune(Doing.Listening, _heard);
+        if (_mic && _heard > Audio.Microphone.RoomFloor)
+            Retune(Doing.Listening, _heard);
         else Retune(Doing.Idle);
     }
-
-    //: Below this a level is a room, not a voice. Anything lower and the
-    //: figure answers the fridge.
-    private const double Floor = 0.06;
 
     private bool _mic;
     private bool _thinking;

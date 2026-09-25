@@ -141,6 +141,13 @@ public partial class Listening : Window
             RepeatBehavior = RepeatBehavior.Forever,
             EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
         };
+        // Twelve frames a second. The plaque is a transparent window, and
+        // such a window hands its whole picture to the desktop on every
+        // frame of an animation; at the monitor's rate, for as long as
+        // «always listening» was on, the dot's breathing alone cost about
+        // four per cent of the graphics card. A breath of over a second
+        // looks the same at twelve.
+        Timeline.SetDesiredFrameRate(beat, 12);
         Dot.BeginAnimation(OpacityProperty, beat);
     }
 

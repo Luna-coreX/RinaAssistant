@@ -5495,6 +5495,11 @@ public partial class App
         // the very thing the amendment refused to permit.
         Check("а в покое тени нет вовсе", window.PaneShadow < 0.01,
               $"| плотность {window.PaneShadow:0.00}");
+        // Nor the effect that made it. Faded to nothing and left on, it
+        // drew the whole page through an invisible shadow on every frame
+        // of the background — the check above was green all along.
+        Check("и эффекта на панели нет — невидимая тень ничего не стоит",
+              !window.PaneHasEffect, "| тень снята с глаз, но не с панели");
 
         // The second transition is a separate check, and not for
         // completeness. An animation that finishes with `HoldEnd` goes on
