@@ -1469,7 +1469,7 @@ public partial class App
         // design tokens, in Russian, and went to the screen as they
         // were. Both are the same fault: a name that never passed
         // through the table.
-        foreach (var key in new[] { "finish", "accent" })
+        foreach (var key in new[] { "finish", "accent", "frame_rate" })
         {
             var offered = Shown().Offered(key);
             var raw = offered.Where(one => one.Said == one.Value).ToArray();
@@ -1481,6 +1481,27 @@ public partial class App
                       : "| как есть: " + string.Join(", ",
                                                      raw.Select(o => o.Value)));
         }
+
+        // --- the frame rate: chosen here, painted there ---
+        //
+        // The one setting on this page whose effect is a cost rather than
+        // a look, so two things are asked of it: that choosing more frames
+        // says what they cost, and that the background actually takes
+        // them. The value goes through the core and comes back to the
+        // shell's side as it does for a person; the backdrop is read
+        // afterwards, not the setting.
+        await Shown().ChooseForCheck("frame_rate", "60");
+        var warned = Shown().Trouble;
+        var taken = window.BackdropRate;
+        await Shown().ChooseForCheck("frame_rate", "30");
+        Check("больше кадров — сказано, чего это стоит",
+              warned.Contains("вдвое") || warned.Contains("twice"),
+              $"| «{warned}»");
+        Check("и фон их берёт", Math.Abs(taken - 60) < 0.01,
+              $"| фон на {taken:0}, выбрано 60");
+        Check("и возвращается к умолчанию",
+              Math.Abs(window.BackdropRate - Backdrop.DefaultRate) < 0.01,
+              $"| фон на {window.BackdropRate:0}");
 
         // --- the search through forty settings ---
         //
@@ -3784,10 +3805,28 @@ public partial class App
             // a third of a frame is the same share the background is
             // held to, and the two of them run on the one clock.
             var figureFrame = home.FigureFrameMs;
-            var figureBudget = 1000.0 / (double)Application.Current
-                .FindResource("Background.Fps") / 3;
+            var figureBudget = 1000.0 / BudgetRate / 3;
             Check("и стоит не дороже трети кадра", figureFrame <= figureBudget,
                   $"| {figureFrame:0.0} мс, потолок {figureBudget:0.0}");
+
+            // And a change of state takes the flow's time, not a number of
+            // frames. Two figures told the same thing, one given the time
+            // as eight frames and the other as four frames twice as long:
+            // they must end in the same place. Eased per frame, every
+            // transition ran twice as quick at sixty frames a second, and
+            // nothing on the screen at the default rate could show it.
+            var often = new Figure(new System.Windows.Controls.Image());
+            var seldom = new Figure(new System.Windows.Controls.Image());
+            often.Show(Doing.Listening, 0.8);
+            seldom.Show(Doing.Listening, 0.8);
+            for (var frame = 0; frame < 8; frame++)
+                often.Advance(0, Figure.TunedStep);
+            for (var frame = 0; frame < 4; frame++)
+                seldom.Advance(0, Figure.TunedStep * 2);
+            Check("переход фигуры идёт по времени, а не по кадрам",
+                  Math.Abs(often.Swell - seldom.Swell) < 1e-6,
+                  $"| восемь кадров {often.Swell:0.0000}, "
+                  + $"четыре вдвое длиннее {seldom.Swell:0.0000}");
 
             Check("состояние читается вслух, хоть подписи и нет",
                   said.All(word => !string.IsNullOrWhiteSpace(word))
@@ -5052,6 +5091,45 @@ public partial class App
         Check("шва под полосой не видно", over <= 0,
               $"| перебор {over:0.00}");
 
+        // And which layer the glass is over, read off the picture. The line
+        // above cannot say: at the bar's lower edge the glass has faded to
+        // nothing, so glass over the wrong layer meets the page as softly
+        // as glass over the right one — broken on purpose, that check
+        // stayed green, and so did the flag the first line reads. Blurring
+        // keeps a region's average colour, so the bar with its glass and
+        // without it must average the same; over the vivid layer it would
+        // average the vivid palette.
+        (double R, double G, double B) Tint()
+        {
+            var (pixels, width, _) = Drawn(window, dpi0);
+            double r = 0, g = 0, b = 0;
+            var count = 0;
+            for (var y = (int)(8 * dpi0); y < (int)(18 * dpi0); y++)
+                for (var x = (int)(width * 0.3); x < (int)(width * 0.7); x++)
+                {
+                    var at = (y * width + x) * 4;
+                    b += pixels[at];
+                    g += pixels[at + 1];
+                    r += pixels[at + 2];
+                    count++;
+                }
+            return (r / count, g / count, b / count);
+        }
+        // No pause between the two: the picture is taken from the tree as
+        // it stands, so both readings are of one frame of the flow.
+        var glazed = Tint();
+        window.BarGlass.Visibility = Visibility.Collapsed;
+        window.UpdateLayout();
+        var plain = Tint();
+        window.BarGlass.Visibility = Visibility.Visible;
+        var apart = Math.Max(Math.Abs(glazed.R - plain.R),
+                             Math.Max(Math.Abs(glazed.G - plain.G),
+                                      Math.Abs(glazed.B - plain.B)));
+        Check("полоса того же цвета, что слой под ней, — только мягче",
+              apart <= 4,
+              $"| со стеклом {glazed.R:0},{glazed.G:0},{glazed.B:0}, "
+              + $"без {plain.R:0},{plain.G:0},{plain.B:0}");
+
         Console.WriteLine();
         Console.WriteLine("=== стекло: размытие под верхней полосой ===");
         window.ShowSectionFor("home");
@@ -5275,6 +5353,16 @@ public partial class App
     /// <summary>
     /// Motion is visible in time, not in a screenshot.
     /// </summary>
+    /// <summary>The rate a frame's cost is held to, whatever the setting says.</summary>
+    /// <remarks>
+    /// Sixty, not the default. The ceiling is a third of a frame, and it
+    /// has to hold at the rate a person is most likely to pick when they
+    /// want it smoother: a flow that fits thirty and not sixty would turn
+    /// that choice into a slideshow. It used to be read from the design
+    /// tokens, where the rate lived before it became a setting.
+    /// </remarks>
+    private const double BudgetRate = 60;
+
     private async Task CheckMotionAsync(MainWindow window)
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
@@ -5548,8 +5636,13 @@ public partial class App
             Check("окно перед человеком — фон живёт", window.BackdropRunning);
 
             var before = window.BackdropPhase;
-            await Task.Delay(500);
+            var watch = System.Diagnostics.Stopwatch.StartNew();
+            await Task.Delay(500);  // measured: фаза и её скорость за время
             var after = window.BackdropPhase;
+            // Periods a second: the phase wraps, so the way round is taken.
+            double Pace(double from, double to, TimeSpan spent)
+                => (to - from + 1) % 1 / spent.TotalSeconds;
+            var pace = Pace(before, after, watch.Elapsed);
             Check("и он действительно движется", Math.Abs(after - before) > 1e-6,
                   $"| фаза {before:0.0000} -> {after:0.0000}");
 
@@ -5583,10 +5676,74 @@ public partial class App
                   $"| {drift:0.00} значения за секунду");
 
             var frame = window.BackdropFrameMs;
-            var budget = 1000.0 / (double)Application.Current
-                .FindResource("Background.Fps") / 3;
+            var budget = 1000.0 / BudgetRate / 3;
             Check("и стоит не дороже обещанного", frame <= budget,
                   $"| {frame:0.0} мс на кадр, потолок {budget:0.0}");
+
+            // The pace, read off what was painted rather than what was
+            // asked for. Asked for is exactly what lied before: sixty was
+            // asked of a timer and thirty-two came out, and every check
+            // that read the request agreed with it.
+            //
+            // "No limit" first, because it is the display's own rate and
+            // the others are measured against it: 120 on a sixty-hertz
+            // monitor is sixty, and saying otherwise would fail the program
+            // for the monitor it runs on.
+            var usual = window.BackdropFramesPerSecond;
+            window.UseFrameRate("max");
+            var fromMax = window.BackdropPhase;
+            watch.Restart();
+            await Task.Delay(2300);  // measured: частота за целую секунду
+            var display = window.BackdropFramesPerSecond;
+            var paceMax = Pace(fromMax, window.BackdropPhase, watch.Elapsed);
+            window.UseFrameRate("60");
+            var fromSixty = window.BackdropPhase;
+            watch.Restart();
+            await Task.Delay(2300);  // measured: частота за целую секунду
+            var sixty = window.BackdropFramesPerSecond;
+            var paceSixty = Pace(fromSixty, window.BackdropPhase, watch.Elapsed);
+            window.UseFrameRate(Backdrop.DefaultRate.ToString(
+                System.Globalization.CultureInfo.InvariantCulture));
+
+            // Below by a quarter is a busy machine; above by a tenth is
+            // the promise broken — the rate a person picked is a ceiling
+            // on what they pay.
+            bool Near(double painted, double asked)
+            {
+                var can = Math.Min(asked, display);
+                return painted >= can * 0.75 && painted <= can * 1.1 + 1;
+            }
+            Check("по умолчанию — тридцать кадров, а не сколько даст таймер",
+                  Near(usual, Backdrop.DefaultRate),
+                  $"| {usual:0.0} кадра в секунду, монитор {display:0.0}");
+            Check("шестьдесят — это шестьдесят, если монитор может",
+                  Near(sixty, 60),
+                  $"| {sixty:0.0} кадра в секунду, монитор {display:0.0}");
+            // Only where the display can show the difference: over remote
+            // desktop it may itself be thirty, and then there is none.
+            if (display >= Backdrop.DefaultRate * 1.5)
+                Check("без ограничения — быстрее, чем по умолчанию",
+                      display > usual * 1.3,
+                      $"| {display:0.0} против {usual:0.0}");
+            else
+                Console.WriteLine($"  --    монитор даёт {display:0.0} кадра "
+                                  + "— разницы с умолчанием показать нечем");
+
+            // More frames, the same flow. The period is a promise about
+            // time, and the timer broke it for a fortnight: the flow moved
+            // by what was asked of the clock, so its speed was whatever the
+            // clock really gave. A fifth either way is a busy machine; a
+            // step taken per frame instead of per second is twice off at
+            // sixty and more with no limit.
+            var promised = 1.0 / (double)Application.Current
+                .FindResource("Background.Period");
+            bool Keeps(double measured)
+                => Math.Abs(measured - promised) <= promised * 0.2;
+            Check("поток держит свой период при любой частоте",
+                  Keeps(pace) && Keeps(paceSixty) && Keeps(paceMax),
+                  $"| периодов в секунду: 30 — {pace:0.0000}, "
+                  + $"60 — {paceSixty:0.0000}, без ограничения — "
+                  + $"{paceMax:0.0000}, обещано {promised:0.0000}");
 
             window.Hide();
             await Task.Delay(300);
@@ -6977,8 +7134,14 @@ public partial class App
         var values = await _link.GetAsync("autostart", "minimize_to_tray",
                                           "start_minimized", "hotkey",
                                           "action_hotkeys", "notifications",
-                                          "floating_command_bar", "watch_apps");
+                                          "floating_command_bar", "watch_apps",
+                                          "frame_rate");
         if (values is null) return;
+
+        // Before anything that might wait: the background has been running
+        // at its own default since the window opened, and a person who
+        // chose fewer frames should not pay for more while the rest loads.
+        window.UseFrameRate(values["frame_rate"]?.GetValue<string>() ?? "");
 
         var wanted = values["autostart"]?.GetValue<bool>() ?? false;
         if (wanted != Autostart.Enabled && !Autostart.Apply(wanted))
@@ -7136,6 +7299,9 @@ public partial class App
                 break;
             case "watch_apps":
                 FollowApps(value.GetValue<bool>());
+                break;
+            case "frame_rate":
+                window?.UseFrameRate(value.GetValue<string>());
                 break;
             case "action_hotkeys":
                 if (window is not null && value is JsonObject bound)

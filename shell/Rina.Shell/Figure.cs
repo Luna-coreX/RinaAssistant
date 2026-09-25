@@ -196,13 +196,20 @@ public sealed class Figure
         // saw the sphere's insides jump while its outside grew smoothly.
         // Half a transition looks worse than none: the smooth part makes
         // the jump conspicuous.
-        _shown = Follow(_shown, swell, swell > _shown ? 0.16 : 0.05);
-        _spin = Follow(_spin, spin, 0.06);
-        _twist = Follow(_twist, twist, 0.06);
-        _churn = Follow(_churn, churn, 0.06);
-        _burst = Follow(_burst, burst, burst > _burst ? 0.22 : 0.06);
-        _gloss = Follow(_gloss, gloss, 0.06);
-        _lamp = Follow(_lamp, lamp, 0.06);
+        //
+        // By the flow's time, not by the frame: the paces below are shares
+        // of the way per tick of the timer they were tuned on, and a frame
+        // now carries however many of those ticks it covers. Taken per
+        // frame, they made every transition twice as quick at sixty frames
+        // and quicker still with no limit.
+        var ticks = step / TunedStep;
+        _shown = Follow(_shown, swell, swell > _shown ? 0.16 : 0.05, ticks);
+        _spin = Follow(_spin, spin, 0.06, ticks);
+        _twist = Follow(_twist, twist, 0.06, ticks);
+        _churn = Follow(_churn, churn, 0.06, ticks);
+        _burst = Follow(_burst, burst, burst > _burst ? 0.22 : 0.06, ticks);
+        _gloss = Follow(_gloss, gloss, 0.06, ticks);
+        _lamp = Follow(_lamp, lamp, 0.06, ticks);
 
         _turn += step * _spin;
         _breath += step * (State is Doing.Idle ? 0.5 : 1.2);
@@ -219,8 +226,26 @@ public sealed class Figure
     }
 
     /// <summary>One value moving towards another. Nothing here jumps.</summary>
-    private static double Follow(double have, double want, double pace) =>
-        have + (want - have) * pace;
+    /// <remarks>
+    /// <paramref name="pace"/> is the share of the way covered in one
+    /// tuning tick; over several, what is left shrinks by the same share
+    /// each time, which is the power rather than the product.
+    /// </remarks>
+    private static double Follow(double have, double want, double pace,
+                                 double ticks) =>
+        have + (want - have) * (1 - Math.Pow(1 - pace, ticks));
+
+    /// <summary>How far the flow moved in one tick of the timer everything here was tuned on.</summary>
+    /// <remarks>
+    /// A sixtieth of a second of a nine-second period: what the old timer
+    /// asked for and moved the flow by, whichever rate it really ran at.
+    /// Every per-tick pace in the figure and on the home screen was chosen
+    /// by eye against that step, so it is the unit they are kept in.
+    /// Measured in the flow's periods, like <c>step</c> itself: the flow's
+    /// period in real seconds was set to what the old timer really gave, so
+    /// one of these still lasts as long as it did.
+    /// </remarks>
+    public const double TunedStep = 1.0 / 540;
 
     /// <summary>
     /// One frame of the sphere (<c>4.0b-E05</c>).

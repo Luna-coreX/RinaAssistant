@@ -10,7 +10,7 @@ window.RINA_FLOW = {
  "silver": {
   "scale": 3.2,
   "warp": 1.1,
-  "period": 9,
+  "period": 17,
   "drift": 3.0,
   "accents": {
    "amber": {
@@ -114,7 +114,7 @@ window.RINA_FLOW = {
  "black": {
   "scale": 3.2,
   "warp": 1.1,
-  "period": 9,
+  "period": 17,
   "drift": 3.0,
   "accents": {
    "amber": {
@@ -218,7 +218,7 @@ window.RINA_FLOW = {
  "graphite": {
   "scale": 3.2,
   "warp": 1.1,
-  "period": 9,
+  "period": 17,
   "drift": 3.0,
   "accents": {
    "amber": {

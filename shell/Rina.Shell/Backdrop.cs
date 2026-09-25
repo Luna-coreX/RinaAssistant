@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using System.Windows.Threading;
 
 namespace Rina.Shell;
 
@@ -49,6 +48,16 @@ namespace Rina.Shell;
 /// background while working, the window minimised or in the tray", and a
 /// window nobody sees has no right to turn frames.
 /// </para>
+/// <para>
+/// <b>Paced by the display, measured in real time.</b> Frames are taken
+/// from WPF's render loop and the flow moves by the time that actually
+/// passed. The first edition ran on a <c>DispatcherTimer</c> and moved by
+/// the interval it had asked for; Windows rounds such a timer up to its
+/// own tick of 15.6 ms, so sixty frames a second came out as thirty-two,
+/// and the flow travelled at half its period — or at the full one, on a
+/// machine where something had shortened the tick. How fast the
+/// background moved depended on what else was running.
+/// </para>
 /// </remarks>
 public sealed class Backdrop
 {
@@ -68,17 +77,44 @@ public sealed class Backdrop
     private const int Wide = 208;
     private const int High = 117;
 
+    /// <summary>The frame rate until the settings say otherwise.</summary>
+    /// <remarks>
+    /// The core's default for <c>frame_rate</c>, and what the flow was
+    /// really painted at before the rate became a setting — see the class
+    /// remarks on the timer that asked for sixty and got thirty-two.
+    /// </remarks>
+    public const double DefaultRate = 30;
+
     private readonly Image _view;
     private readonly Image? _calmView;
-    private readonly DispatcherTimer _clock = new();
     private readonly WriteableBitmap _film;
     private readonly WriteableBitmap? _calmFilm;
+    private readonly WriteableBitmap _glass;
     private readonly byte[] _pixels = new byte[Wide * High * 4];
     private readonly byte[] _calm = new byte[Wide * High * 4];
+    private readonly byte[] _glassPixels = new byte[Wide * High * 4];
+    private readonly float[] _glassPass = new float[Wide * High * 3];
     private readonly byte[] _before = new byte[Wide * High * 4];
     private readonly byte[] _mark = new byte[Wide * High * 4];
     private double _sinceMark;
+    private int _framesSinceMark;
     private bool _marked;
+
+    //: The pace. `_lastShown` is the render time of the last frame the
+    //: display produced, `_due` how long until the next one of ours is
+    //: owed, `_sincePainted` how much real time the next one must cover.
+    private bool _running;
+    private TimeSpan? _lastShown;
+    private double _due;
+    private double _sincePainted;
+    private double _rate = DefaultRate;
+
+    //: The glass: which layer it softens, and the kernels last used, kept
+    //: until the window changes size.
+    private bool _glassOnCalm;
+    private (double Wide, double High) _glassFor;
+    private float[] _kernelX = [];
+    private float[] _kernelY = [];
 
     /// <summary>The field, before it is turned into colour.</summary>
     /// <remarks>
@@ -130,11 +166,12 @@ public sealed class Backdrop
     {
         _view = view;
         _calmView = calmView;
-        _period = Token("Background.Period", 90);
-        var fps = Token("Background.Fps", 20);
+        _period = Token("Background.Period", 17);
 
         _film = new WriteableBitmap(Wide, High, 96, 96, PixelFormats.Bgra32,
                                     null);
+        _glass = new WriteableBitmap(Wide, High, 96, 96, PixelFormats.Bgra32,
+                                     null);
         _view.Source = _film;
         RenderOptions.SetBitmapScalingMode(_view, BitmapScalingMode.Fant);
 
@@ -146,9 +183,6 @@ public sealed class Backdrop
             RenderOptions.SetBitmapScalingMode(_calmView,
                                                BitmapScalingMode.Fant);
         }
-
-        _clock.Interval = TimeSpan.FromMilliseconds(1000.0 / Math.Max(1, fps));
-        _clock.Tick += (_, _) => Advance();
 
         // Windows says when its own settings change, and "show animations in
         // windows" is one of them. Without this, lifting reduced motion
@@ -169,8 +203,32 @@ public sealed class Backdrop
     /// </remarks>
     public double Phase { get; private set; }
 
-    /// <summary>Is the clock ticking right now.</summary>
-    public bool Running => _clock.IsEnabled;
+    /// <summary>Is the flow being painted right now.</summary>
+    public bool Running => _running;
+
+    /// <summary>
+    /// Frames a second the flow is painted at; zero means every frame the
+    /// display shows.
+    /// </summary>
+    /// <remarks>
+    /// Never more than the display shows, whatever is asked: a frame is
+    /// only painted when the display is about to show one. So on a sixty
+    /// hertz monitor 120 and "no limit" are both sixty.
+    /// </remarks>
+    public double Rate
+    {
+        get => _rate;
+        set => _rate = Math.Max(0, value);
+    }
+
+    /// <summary>How many frames were really painted over the last second.</summary>
+    /// <remarks>
+    /// Measured rather than taken from <see cref="Rate"/>, because the
+    /// rate asked for and the rate delivered already parted company once:
+    /// sixty was asked of a timer for a fortnight and thirty-two came out,
+    /// and nothing that read the request could have said so.
+    /// </remarks>
+    public double FramesPerSecond { get; private set; }
 
     /// <summary>How many stops the flow's ramp has.</summary>
     public int Steps => _ramp.Length;
@@ -333,6 +391,48 @@ public sealed class Backdrop
     /// </remarks>
     public Image Under => _view;
 
+    /// <summary>The flow softened for the title bar (<c>4.0b-E01</c>).</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Blurred here, on the processor, and not by a <c>BlurEffect</c>.</b>
+    /// The effect blurred the bar's picture after it had been enlarged to
+    /// the window, on the graphics card, on every frame of the flow — and
+    /// since the picture was laid out over the whole window and only then
+    /// cut to the bar, it blurred a window's worth of pixels to show forty
+    /// points of them. Here the same softening is done at the field's own
+    /// size and only for the rows that lie under the bar: a few thousand
+    /// points instead of most of a million.
+    /// </para>
+    /// <para>
+    /// Painted in the same pass as the flow itself, so the two can never be
+    /// a frame apart: a bar one frame behind the picture under it would
+    /// show its seam exactly where the bar ends.
+    /// </para>
+    /// </remarks>
+    public ImageSource Glass => _glass;
+
+    /// <summary>Which layer the glass softens: the calm one or the vivid one.</summary>
+    /// <remarks>
+    /// The bar must be glass over the layer the page is on, or on every
+    /// tab but the home screen it is a window onto a different background
+    /// from the one beneath it. Repainted at once when it changes: the flow
+    /// may be standing still, and a bar that waits for the next frame to
+    /// change layer would wait for as long as nobody looks.
+    /// </remarks>
+    public bool GlassOnCalm
+    {
+        get => _glassOnCalm;
+        set
+        {
+            if (_glassOnCalm == value) return;
+            _glassOnCalm = value;
+            // A check's picture is not repainted from the field: that would
+            // put the flow back under a check that froze it on purpose.
+            if (_frozen) PaintGlass(value ? _calm : _pixels);
+            else Paint();
+        }
+    }
+
     /// <summary>Stop the flow and paint a picture a check can recognise.</summary>
     /// <remarks>
     /// Only a check calls this, and it exists because the question the bar
@@ -343,9 +443,13 @@ public sealed class Backdrop
     /// a number can see. A picture with detail in it makes the difference
     /// measurable.
     ///
-    /// Frozen rather than merely stopped: the clock is restarted by every
-    /// reason the window has to think somebody is looking, and one tick
+    /// Frozen rather than merely stopped: the flow is restarted by every
+    /// reason the window has to think somebody is looking, and one frame
     /// would paint the answer over.
+    ///
+    /// The glass is painted from it too, in the same pass as the flow:
+    /// the check asks what the bar does to the picture, and a bar that
+    /// still showed the flow would answer about the wrong picture.
     /// </remarks>
     public void PaintForCheck(Func<int, int, (byte R, byte G, byte B)> ink)
     {
@@ -362,6 +466,7 @@ public sealed class Backdrop
                 _pixels[at + 3] = 255;
             }
         _film.WritePixels(new Int32Rect(0, 0, Wide, High), _pixels, Wide * 4, 0);
+        if (!_glassOnCalm) PaintGlass(_pixels);
     }
 
     /// <summary>Run or stop, to match whether there is anybody to look.</summary>
@@ -376,7 +481,7 @@ public sealed class Backdrop
         Settle();
     }
 
-    /// <summary>Bring the clock into line with both of its reasons.</summary>
+    /// <summary>Bring the pace into line with both of its reasons.</summary>
     /// <remarks>
     /// There are two inputs — whether anybody is looking, and whether the
     /// system was asked for less movement — and they change independently.
@@ -385,38 +490,90 @@ public sealed class Backdrop
     /// animations off in Windows kept a moving background until they next
     /// activated the window. The promise was kept eventually, and
     /// "eventually" is not what it says.
+    /// <para>
+    /// <b>Unsubscribed, not merely ignored, while standing.</b> While
+    /// anything listens to <c>CompositionTarget.Rendering</c>, WPF turns
+    /// frames at the display's rate for the whole application; a stopped
+    /// background that stayed subscribed would keep that going in a window
+    /// nobody is looking at.
+    /// </para>
     /// </remarks>
     private void Settle()
     {
         var wanted = _visible && !WantsStillness && !_frozen;
-        if (wanted == Running) return;
-        if (wanted) _clock.Start();
-        else _clock.Stop();
+        if (wanted == _running) return;
+        _running = wanted;
+        if (wanted)
+        {
+            // The time spent standing is not time the flow owes: the first
+            // frame after a pause only learns where the display's clock is.
+            _lastShown = null;
+            _sincePainted = 0;
+            _due = 0;
+            CompositionTarget.Rendering += OnFrame;
+        }
+        else
+        {
+            CompositionTarget.Rendering -= OnFrame;
+        }
     }
 
-    private void Advance()
+    /// <summary>The display is about to show a frame; is one of ours owed.</summary>
+    private void OnFrame(object? sender, EventArgs e)
     {
         // Stillness can be asked for while we are running, and then this is
-        // where we hear about it: one tick late at most.
+        // where we hear about it: one frame late at most.
         if (WantsStillness)
         {
             Settle();
             return;
         }
 
-        // A fraction of the period per tick, from the interval rather than
-        // from a count of ticks: a tick that arrived late must move the flow
-        // further, or the movement slows down under load instead of keeping
-        // its promised period.
+        // Raised more than once for one frame at times; the render time is
+        // what says which frame this is.
+        var shown = ((RenderingEventArgs)e).RenderingTime;
+        if (_lastShown == shown) return;
+        var gap = _lastShown is { } last ? (shown - last).TotalSeconds : 0;
+        _lastShown = shown;
+        if (gap <= 0) return;
+
+        _sincePainted += gap;
+        _due -= gap;
+
+        // Due to the nearest frame the display shows, with what is left
+        // over carried to the next. At thirty on a 144-hertz monitor a
+        // frame falls every 4.8 of the display's, and this comes out as
+        // fives and fours that average thirty. Without the carry it would
+        // be every fifth, 28.8; without the half-frame of slack, a frame
+        // due a hair after the display's would wait a whole one more.
+        if (_due > gap / 2) return;
+        var interval = _rate > 0 ? 1.0 / _rate : 0;
+        _due += interval;
+        // After a stall — the thread busy, the machine asleep — the debt is
+        // written off rather than paid back in a burst of frames.
+        if (_due < -interval) _due = 0;
+
+        // Real time, and capped. A frame that arrived late moves the flow
+        // further, or the movement would slow down under load instead of
+        // keeping its period; but a stall of a second is a pause, not
+        // movement, and paying it back at once would be a jump.
+        var seconds = Math.Min(_sincePainted, 0.1);
+        _sincePainted = 0;
+        Advance(seconds);
+    }
+
+    private void Advance(double seconds)
+    {
         // Two clocks, and they are not the same thing. `_elapsed` is where
         // the field is and only ever grows; `Phase` is how far round the
         // period we are, and it wraps. The checks watch the phase because a
         // number that wraps can be compared with itself.
-        var step = _clock.Interval.TotalSeconds / _period;
+        var step = seconds / _period;
         _step = step;
         _elapsed += step;
         Phase = (Phase + step) % 1.0;
         Repaint();
+        Measure(seconds);
 
         // Anything else that moves at the flow's pace hangs off this, and
         // not off a clock of its own. Every reason this one stops — the
@@ -531,7 +688,7 @@ public sealed class Backdrop
         });
     }
 
-    /// <summary>Turn the field into the two pictures.</summary>
+    /// <summary>Turn the field into the pictures: both layers and the glass.</summary>
     private void Paint()
     {
         if (_ramp.Length == 0) return;
@@ -543,8 +700,9 @@ public sealed class Backdrop
         // calm layer away, and until this line the window went on computing
         // and blurring a picture nobody could see — a third of the frame,
         // spent on the one screen where the frame is tightest.
-        if (_calmFilm is not null && _calmRamp.Length > 0
-            && _calmView?.Visibility == Visibility.Visible)
+        var calm = _calmFilm is not null && _calmRamp.Length > 0
+                   && _calmView?.Visibility == Visibility.Visible;
+        if (calm)
         {
             // The calm layer is the same field in the calm palette, and then
             // softened. Both halves matter: the palette alone would give a
@@ -553,10 +711,22 @@ public sealed class Backdrop
             // layer, and reading wants both.
             Ink(_field, _calmRamp, _calm);
             Soften(_calm);
-            _calmFilm.WritePixels(new Int32Rect(0, 0, Wide, High), _calm,
-                                  Wide * 4, 0);
+            _calmFilm!.WritePixels(new Int32Rect(0, 0, Wide, High), _calm,
+                                   Wide * 4, 0);
         }
 
+        PaintGlass(_glassOnCalm && calm ? _calm : _pixels);
+    }
+
+    /// <summary>Keep the numbers the motion check reads, for a frame that moved.</summary>
+    /// <remarks>
+    /// Only for frames that are steps in time. A repaint for a new accent
+    /// or a new layer under the glass is the same moment painted again,
+    /// and counting it would report a frame that did not move — or a rate
+    /// the display never showed.
+    /// </remarks>
+    private void Measure(double seconds)
+    {
         // How far the picture moved, before the new frame becomes the old
         // one. Every fourth pixel and one channel: this is a measure of
         // movement, not a comparison of images, and it is paid for on every
@@ -581,10 +751,16 @@ public sealed class Backdrop
             Array.Copy(_pixels, _mark, _pixels.Length);
             _marked = true;
             _sinceMark = 0;
+            _framesSinceMark = 0;
             return;
         }
 
-        _sinceMark += _clock.Interval.TotalSeconds;
+        // Real seconds. It used to add the interval the timer had been
+        // asked for, so "a second" was sixty ticks — two real seconds at
+        // the thirty-two the timer gave — and the drift it reported was
+        // two seconds' worth: 5.4 where the honest figure is 3.8.
+        _sinceMark += seconds;
+        _framesSinceMark++;
         if (_sinceMark >= 1.0)
         {
             var drifted = 0L;
@@ -592,9 +768,126 @@ public sealed class Backdrop
                 drifted += Math.Abs(_pixels[at] - _mark[at]);
             DriftPerSecond = drifted / (double)(_pixels.Length / 16)
                              / _sinceMark;
+            FramesPerSecond = _framesSinceMark / _sinceMark;
             Array.Copy(_pixels, _mark, _pixels.Length);
             _sinceMark = 0;
+            _framesSinceMark = 0;
         }
+    }
+
+    /// <summary>Soften the rows under the title bar into the glass.</summary>
+    /// <remarks>
+    /// <para>
+    /// A Gaussian, run once along each axis, with the strength the design
+    /// gives the glass (<c>Glass.Blur</c>, in points on the screen) carried
+    /// back to the field's own size. The field is stretched to the window
+    /// unevenly — its width and height are enlarged by different factors —
+    /// so each axis gets a kernel of its own; one kernel for both would
+    /// soften the bar more across than down.
+    /// </para>
+    /// <para>
+    /// The edges are clamped rather than faded. The effect saw nothing
+    /// beyond the picture and faded the bar's top edge towards
+    /// transparent, which let the sharp flow show through the first few
+    /// points of glass.
+    /// </para>
+    /// </remarks>
+    private void PaintGlass(byte[] source)
+    {
+        var shownWide = _view.ActualWidth > 0 ? _view.ActualWidth : 940;
+        var shownHigh = _view.ActualHeight > 0 ? _view.ActualHeight : 620;
+        if (_glassFor != (shownWide, shownHigh))
+        {
+            var deviation = Token("Glass.Blur", 18) / RadiusPerDeviation;
+            _kernelX = Kernel(deviation * Wide / shownWide);
+            _kernelY = Kernel(deviation * High / shownHigh);
+            _glassFor = (shownWide, shownHigh);
+        }
+
+        // Only as deep as the bar, and a margin for the smoothing that
+        // enlarges the picture: it reads a row beyond the last one shown.
+        var bar = Token("Size.Row", 40);
+        var rows = Math.Min(High, (int)Math.Ceiling(High * bar / shownHigh) + 2);
+        var reachX = _kernelX.Length / 2;
+        var reachY = _kernelY.Length / 2;
+        var across = Math.Min(High, rows + reachY);
+        var pass = _glassPass;
+        var kernelX = _kernelX;
+        var kernelY = _kernelY;
+
+        for (var y = 0; y < across; y++)
+        {
+            var row = y * Wide;
+            for (var x = 0; x < Wide; x++)
+            {
+                float blue = 0, green = 0, red = 0;
+                for (var k = -reachX; k <= reachX; k++)
+                {
+                    var from = (row + Math.Clamp(x + k, 0, Wide - 1)) * 4;
+                    var weight = kernelX[k + reachX];
+                    blue += source[from] * weight;
+                    green += source[from + 1] * weight;
+                    red += source[from + 2] * weight;
+                }
+                var at = (row + x) * 3;
+                pass[at] = blue;
+                pass[at + 1] = green;
+                pass[at + 2] = red;
+            }
+        }
+
+        for (var y = 0; y < rows; y++)
+            for (var x = 0; x < Wide; x++)
+            {
+                float blue = 0, green = 0, red = 0;
+                for (var k = -reachY; k <= reachY; k++)
+                {
+                    var from = (Math.Clamp(y + k, 0, across - 1) * Wide + x) * 3;
+                    var weight = kernelY[k + reachY];
+                    blue += pass[from] * weight;
+                    green += pass[from + 1] * weight;
+                    red += pass[from + 2] * weight;
+                }
+                var at = (y * Wide + x) * 4;
+                _glassPixels[at] = (byte)(blue + 0.5f);
+                _glassPixels[at + 1] = (byte)(green + 0.5f);
+                _glassPixels[at + 2] = (byte)(red + 0.5f);
+                _glassPixels[at + 3] = 255;
+            }
+
+        _glass.WritePixels(new Int32Rect(0, 0, Wide, rows), _glassPixels,
+                           Wide * 4, 0);
+    }
+
+    /// <summary>How many standard deviations the design's blur radius is.</summary>
+    /// <remarks>
+    /// Measured, not taken from the effect's documentation, which does not
+    /// say. The glass check's stripes — alternate rows of the field, the
+    /// finest detail it has — came through the old <c>BlurEffect</c> at
+    /// radius 18 with 12 of their 158 values of contrast left. Softening
+    /// the field and then enlarging it, as is done here, leaves 14 when the
+    /// deviation is the radius over 4.25 — as near as the two orders of
+    /// softening and enlarging allow. The radius over three left nothing:
+    /// a bar more frosted than the one a person had approved.
+    /// </remarks>
+    private const double RadiusPerDeviation = 4.25;
+
+    /// <summary>A normalised Gaussian of the given deviation, in field points.</summary>
+    private static float[] Kernel(double deviation)
+    {
+        if (deviation <= 0) return [1f];
+        var reach = Math.Max(1, (int)Math.Ceiling(deviation * 3));
+        var kernel = new float[reach * 2 + 1];
+        var total = 0.0;
+        for (var k = -reach; k <= reach; k++)
+        {
+            var weight = Math.Exp(-k * k / (2 * deviation * deviation));
+            kernel[k + reach] = (float)weight;
+            total += weight;
+        }
+        for (var at = 0; at < kernel.Length; at++)
+            kernel[at] = (float)(kernel[at] / total);
+        return kernel;
     }
 
     /// <summary>Colour a field with a palette.</summary>

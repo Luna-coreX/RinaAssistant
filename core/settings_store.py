@@ -69,6 +69,12 @@ GROUPS = {
     # Erasing them would mean destroying data for the sake of a tidy file.
     "theme": "Catppuccin Mocha",
         "accent": "Mauve",
+        # How often the background and the figure are painted. A string,
+        # because one of the values is not a number: "max" is every frame
+        # the display shows. Thirty is what the window really painted
+        # before this was a setting — the timer asked for sixty and
+        # Windows rounded it — so nobody's load changes by upgrading.
+        "frame_rate": "30",
         "ui_language": "Русский",
         "autostart": False,
         "minimize_to_tray": True,

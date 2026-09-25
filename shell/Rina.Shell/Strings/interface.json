@@ -11,8 +11,23 @@
   ", затем ": {
     "English": ", then "
   },
+  "120 кадров — высокая нагрузка": {
+    "English": "120 frames — high load"
+  },
+  "120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой.": {
+    "English": "120 frames: about four times the load of 30. If the monitor shows fewer frames, the background follows its rate."
+  },
   "19:30": {
     "English": "19:30"
+  },
+  "30 кадров": {
+    "English": "30 frames"
+  },
+  "60 кадров — нагрузка выше": {
+    "English": "60 frames — higher load"
+  },
+  "60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30.": {
+    "English": "60 frames: the background and the figure load the graphics card and the processor about twice as much as at 30."
   },
   "Enter — отправить, Esc — скрыть": {
     "English": "Enter — send, Esc — hide"
@@ -106,6 +121,12 @@
   },
   "Архивы (*.zip)|*.zip|Все файлы|*.*": {
     "English": "Archives (*.zip)|*.zip|All files|*.*"
+  },
+  "Без ограничения — наибольшая нагрузка": {
+    "English": "No limit — the highest load"
+  },
+  "Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать.": {
+    "English": "No limit: the background is redrawn on every frame the monitor shows. On a 144 Hz monitor or faster this is the heaviest setting, and the window may start to stutter."
   },
   "Бета-возможность: поведение может измениться в следующих версиях.": {
     "English": "A beta capability: its behaviour may change in later versions."
@@ -541,6 +562,9 @@
   },
   "Как к вам обращаться": {
     "English": "What to call you"
+  },
+  "Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка": {
+    "English": "How often the background and the figure are redrawn. More often is smoother and costs more"
   },
   "Какая программа": {
     "English": "Which program"
@@ -1411,6 +1435,9 @@
   },
   "Цвет, которым Рина обращает на себя внимание": {
     "English": "The colour Rina draws attention with"
+  },
+  "Частота кадров фона": {
+    "English": "Background frame rate"
   },
   "Чем Рина говорит. Офлайновые работают без интернета": {
     "English": "How Rina speaks. Offline engines work without the internet"

@@ -59,7 +59,11 @@ LOOKS = re.compile(r"\bCheck\(|\bwindow\.CurrentPage\b|\bis Pages\.")
 #: four more turned out to be measurements and are marked as such. The
 #: suite sleeps 63.3 seconds instead of 72.5 — the nine seconds were
 #: pure margin, and the flakiness went with them.
-ALLOWED = 106
+#:
+#: 105: the half-second the motion check waits to watch the phase is the
+#: measurement — it now also gives the flow's speed in periods a second —
+#: and is marked as such.
+ALLOWED = 105
 
 fails = 0
 

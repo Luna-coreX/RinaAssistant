@@ -231,6 +231,14 @@ public partial class SettingsPage : UserControl
                 continue;
             }
 
+            if (key == "frame_rate")
+            {
+                _options[key] = SettingsLayout.FrameRates
+                    .Select(one => (one.Value, S(one.Title), true, ""))
+                    .ToList();
+                continue;
+            }
+
             var devices = key == "input_device"
                 ? Audio.Microphone.Devices()
                 : Audio.Speaker.Devices();
@@ -459,6 +467,15 @@ public partial class SettingsPage : UserControl
         ? NoMatch.Text : "";
 
     /// <summary>Search for this — for the check.</summary>
+    /// <summary>Choose a value the way a person does — for the check.</summary>
+    /// <remarks>
+    /// Through the one path a dropdown takes: the core is asked, the
+    /// verdict is shown, and whatever the shell applies on its side is
+    /// applied. A check that wrote the value past this would check that a
+    /// value can be written.
+    /// </remarks>
+    public Task ChooseForCheck(string key, string value) => SaveAsync(key, value);
+
     public void FindForCheck(string asked)
     {
         Find.Text = asked;
@@ -2143,6 +2160,17 @@ public partial class SettingsPage : UserControl
         Note.SetResourceReference(ForegroundProperty,
             accepted && code.Length == 0 ? "C.InkFaint" : "C.Signal");
 
+        // A higher frame rate is accepted as asked and said out loud: what
+        // it costs is the shell's to know, because the shell paints it.
+        if (accepted && key == "frame_rate"
+            && SettingsLayout.FrameRates
+                   .FirstOrDefault(one => one.Value == value.GetValue<string>())
+                   .Cost is { Length: > 0 } cost)
+        {
+            Note.Text = S(cost);
+            Note.SetResourceReference(ForegroundProperty, "C.Signal");
+        }
+
         if (accepted)
         {
             _values[key] = value;
@@ -2174,7 +2202,7 @@ public partial class SettingsPage : UserControl
             // The shell's own toggles apply on the spot: a setting waiting
             // for a restart reads as a broken one.
             if (key is "floating_command_bar" or "notifications"
-                    or "minimize_to_tray" or "action_hotkeys"
+                    or "minimize_to_tray" or "action_hotkeys" or "frame_rate"
                 && System.Windows.Application.Current is App app)
                 app.ApplyShellSetting(key, value);
             // Changing the engine changes the set of voices: the lists are

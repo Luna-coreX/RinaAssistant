@@ -34,10 +34,35 @@ public static partial class Loc
                 {
                     ["English"] = ", then ",
                 },
+            ["120 кадров — высокая нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "120 frames — high load",
+                },
+            ["120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "120 frames: about four times the load of 30. If the monitor shows fewer frames, the background follows its rate.",
+                },
             ["19:30"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "19:30",
+                },
+            ["30 кадров"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "30 frames",
+                },
+            ["60 кадров — нагрузка выше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "60 frames — higher load",
+                },
+            ["60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "60 frames: the background and the figure load the graphics card and the processor about twice as much as at 30.",
                 },
             ["[слишком глубокая вложенность]"] =
                 new Dictionary<string, string>
@@ -198,6 +223,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "unnamed",
+                },
+            ["Без ограничения — наибольшая нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No limit — the highest load",
+                },
+            ["Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No limit: the background is redrawn on every frame the monitor shows. On a 144 Hz monitor or faster this is the heaviest setting, and the window may start to stutter.",
                 },
             ["бета"] =
                 new Dictionary<string, string>
@@ -967,6 +1002,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What to call you",
+                },
+            ["Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How often the background and the figure are redrawn. More often is smoother and costs more",
                 },
             ["Какая программа"] =
                 new Dictionary<string, string>
@@ -2607,6 +2647,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The colour Rina draws attention with",
+                },
+            ["Частота кадров фона"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Background frame rate",
                 },
             ["чем всё кончилось — если есть что сказать"] =
                 new Dictionary<string, string>

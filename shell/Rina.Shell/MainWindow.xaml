@@ -72,9 +72,10 @@
           ClipToBounds="True"
           Height="{StaticResource Size.Row}">
       <!--
-        The same picture as the background, blurred and clipped to the
-        bar. It works because the background is ours: a second view of the
-        same bitmap, laid out over the whole window and cut to this row,
+        The same flow as the background, softened and clipped to the bar.
+        It works because the background is ours: the backdrop paints a
+        blurred copy of the field in the same pass as the field itself, and
+        that copy, laid out over the whole window and cut to this row,
         shows exactly what is behind the bar and nothing else.
       -->
       <Image x:Name="BarGlass" Stretch="Fill" VerticalAlignment="Top"

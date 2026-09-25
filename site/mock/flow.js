@@ -134,13 +134,13 @@ window.RinaFlow = (function () {
     this.elapsed = 13.37;
 
     /* The program's values, from `docs/design/tokens.json` through
-       `flow-ramps.js`: period 9 seconds for a full rebuild, drift 3.0,
+       `flow-ramps.js`: period 17 seconds for a full rebuild, drift 3.0,
        scale 3.2, warp 1.1. Written here as defaults only so the file
        runs on its own; the page hands over the generated ones. */
     this.scale = 3.2;
     this.warp = 1.1;
     this.drift = 3.0;
-    this.period = 9;
+    this.period = 17;
     this.wanderX = 0;
     this.wanderY = 0;
     this.churnX = 0;

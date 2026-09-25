@@ -149,6 +149,11 @@ CONSTRAINTS: dict[str, Constraint] = {
     # left the person no way back.
     "finish": Constraint(choices=("silver", "black", "graphite")),
 
+    # The background's frame rate. The core stores which one and nothing
+    # else: what a rate costs and how it is painted is the shell's, which
+    # names the choices and warns about the load (ADR 0006).
+    "frame_rate": Constraint(choices=("30", "60", "120", "max")),
+
     # The language changes rarely and affects the whole window.
     # The languages are enumerated by the core: `core.i18n` knows the list,
     # and it also changes with which translations were assembled. A restart

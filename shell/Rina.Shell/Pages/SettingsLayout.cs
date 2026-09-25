@@ -221,6 +221,8 @@ public static class SettingsLayout
                 Word("Серебро, чёрный или графит — равноправные")),
             new("accent", Word("Акцент"),
                 Word("Цвет, которым Рина обращает на себя внимание")),
+            new("frame_rate", Word("Частота кадров фона"),
+                Word("Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка")),
             new("ui_language", Word("Язык интерфейса"),
                 Word("Язык окна и реплик Рины")),
         ]),
@@ -272,6 +274,39 @@ public static class SettingsLayout
         // «silver», «black», «graphite» — three English words in a
         // Russian window, and three lower-case ones in an English one.
         "finish",
+        // The rate is stored by the core as a bare value; what it costs
+        // is a property of the painting, and the painting is here.
+        "frame_rate",
+    ];
+
+    /// <summary>
+    /// The frame rates: what each is called in the list, and what it costs,
+    /// said once it is chosen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cost is in the name as well as in the warning after the choice:
+    /// a list that says only "120" invites picking the biggest number, and
+    /// the price of it is the one thing a number does not say.
+    /// </para>
+    /// <para>
+    /// The multiples are measured, not guessed: three rounds in turn with
+    /// the window in front, the graphics card's 3D share and the
+    /// processor's time for Rina alone. Sixty came out at twice thirty on
+    /// both, and a 75-hertz monitor with no limit at two and a third —
+    /// the cost follows the frames. The processor is named because it
+    /// pays the most: thirty already keeps several cores busy.
+    /// </para>
+    /// </remarks>
+    public static readonly (string Value, string Title, string Cost)[] FrameRates =
+    [
+        ("30", Word("30 кадров"), ""),
+        ("60", Word("60 кадров — нагрузка выше"),
+         Word("60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30.")),
+        ("120", Word("120 кадров — высокая нагрузка"),
+         Word("120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой.")),
+        ("max", Word("Без ограничения — наибольшая нагрузка"),
+         Word("Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать.")),
     ];
 
     /// <summary>What a finish is called.</summary>

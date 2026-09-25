@@ -112,20 +112,14 @@ public partial class MainWindow : Window
         // rather than an optimisation.
         _backdrop = new Backdrop(Backdrop, BackdropCalm);
 
-        // The bar shows the same picture, blurred (`4.0b-E01`). The same
-        // bitmap rather than a second one: two pictures of one flow would
-        // drift apart by a frame and the seam would show exactly where the
-        // bar ends.
+        // The bar shows the same flow, blurred (`4.0b-E01`) — softened by
+        // the backdrop itself, in the pass that paints the flow, so the two
+        // cannot drift apart by a frame and show a seam where the bar ends.
+        // See `Backdrop.Glass` for why that is not a `BlurEffect` any more.
         //
-        // *Which* picture is decided by `FollowGlass`: there are two
-        // layers and the bar must be on the one the page is on.
-        BarGlass.Effect = new System.Windows.Media.Effects.BlurEffect
-        {
-            Radius = (double)FindResource("Glass.Blur"),
-            KernelType = System.Windows.Media.Effects.KernelType.Gaussian,
-            RenderingBias = System.Windows.Media.Effects.RenderingBias
-                .Performance,
-        };
+        // *Which* layer it softens is decided by `FollowGlass`: there are
+        // two and the bar must be on the one the page is on.
+        BarGlass.Source = _backdrop.Glass;
         // Laid out over the whole window and cut to the bar by the row's
         // clip: that is what makes it show what is behind the bar rather
         // than the whole flow squeezed into forty points.
@@ -546,12 +540,32 @@ public partial class MainWindow : Window
     /// pictures.
     /// </remarks>
     private void FollowGlass()
-        => BarGlass.Source = BackdropCalm.Visibility == Visibility.Visible
-            ? BackdropCalm.Source : Backdrop.Source;
+        => _backdrop.GlassOnCalm = BackdropCalm.Visibility == Visibility.Visible;
 
     /// <summary>Which flow the bar is glass over — for the check.</summary>
-    public bool BarOnCalm => ReferenceEquals(BarGlass.Source,
-                                             BackdropCalm.Source);
+    public bool BarOnCalm => _backdrop.GlassOnCalm;
+
+    /// <summary>
+    /// Paint the background and the figure at this many frames a second.
+    /// </summary>
+    /// <remarks>
+    /// The value is the setting's own — <c>frame_rate</c>, which the core
+    /// stores and knows nothing else about. What the numbers mean for
+    /// drawing is the shell's business, so it is read here: "max" is
+    /// every frame the display shows, anything unknown is the default.
+    /// </remarks>
+    public void UseFrameRate(string rate)
+        => _backdrop.Rate = rate == "max" ? 0
+            : double.TryParse(rate, System.Globalization.NumberStyles.None,
+                              System.Globalization.CultureInfo.InvariantCulture,
+                              out var every) && every > 0
+                ? every : global::Rina.Shell.Backdrop.DefaultRate;
+
+    /// <summary>What the background was asked to paint at — for the check.</summary>
+    public double BackdropRate => _backdrop.Rate;
+
+    /// <summary>How many frames the background really painted last second — for the check.</summary>
+    public double BackdropFramesPerSecond => _backdrop.FramesPerSecond;
 
     //: The parts of the section that arrived last — for the check.
     private IReadOnlyList<UIElement> _arrived = [];

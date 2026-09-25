@@ -182,7 +182,7 @@ public partial class HomePage : UserControl
 
     private void OnTick(double elapsed, double step)
     {
-        if (!_held) Settle();
+        if (!_held) Settle(step / Figure.TunedStep);
         _figure.Advance(elapsed, step);
     }
 
@@ -206,7 +206,12 @@ public partial class HomePage : UserControl
     /// start to talk.
     /// </para>
     /// </remarks>
-    private void Settle()
+    /// <param name="ticks">
+    /// How much of the flow's time has passed, in the ticks the fall of the
+    /// voice was tuned on — see <see cref="Figure.TunedStep"/>. One when it
+    /// is asked outside the flow's own pace.
+    /// </param>
+    private void Settle(double ticks = 1)
     {
         if (_thinking) { Retune(Doing.Thinking); return; }
 
@@ -220,7 +225,7 @@ public partial class HomePage : UserControl
         // A floor, and a fall that lags the rise. Speech is not a steady
         // sound — there are gaps between words — and without the lag the
         // figure would drop back to waiting inside every pause.
-        _heard *= 0.90;
+        _heard *= Math.Pow(0.90, ticks);
         if (_mic && _heard > Audio.Microphone.RoomFloor)
             Retune(Doing.Listening, _heard);
         else Retune(Doing.Idle);
