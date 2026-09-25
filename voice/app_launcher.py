@@ -18,6 +18,12 @@ from voice.textmatch import normalize
 
 LAUNCH_VERBS = (
     "запусти", "запустить", "открой", "открыть", "включи", "включить",
+    # The polite forms are said too — and heard far more often than said:
+    # «запусти стим» and «запустите им» are one sound, and recognition
+    # settles on the longer verb. On the bench (`4.0b-V08`) five of the
+    # twenty-four commands that got through got through behind a polite
+    # verb — and launched nothing while the verb was not known.
+    "запустите", "откройте", "включите",
     "стартани", "launch", "open", "start", "run",
 )
 

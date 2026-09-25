@@ -474,8 +474,11 @@ class WhisperRecogniser:
     name = "whisper"
     streams = False
 
-    def __init__(self, size: str = "base"):
+    def __init__(self, size: str = "base", hints=None):
         self.size = size or "base"
+        #: Where the names to be ready for come from — see
+        #: `FasterWhisperRecogniser.hints`.
+        self.hints = hints
         self._model = None
         self._error = ""
 
@@ -527,7 +530,8 @@ class WhisperRecogniser:
                                     dtype=numpy.int16).astype(
                                         numpy.float32) / 32768.0
             said = self._model.transcribe(
-                wave, language=language or None, fp16=False)
+                wave, language=language or None, fp16=False,
+                initial_prompt=hinted(self.hints) or None)
             return Heard(text=str(said.get("text", "")).strip())
         except Exception as exc:                        # noqa: BLE001
             return Heard(ok=False, error=str(exc))
@@ -548,6 +552,24 @@ def installed(package: str) -> bool:
         return importlib.util.find_spec(package) is not None
     except (ImportError, ValueError):
         return False
+
+
+def hinted(hints) -> str:
+    """
+    The hints as one line — or nothing, never a reason not to hear.
+
+    They come from the program list, which is asked of the shell, and the
+    settings; either can fail, and a phrase recognised without hints is
+    still a phrase recognised. Nothing here is allowed to turn a missing
+    list into a missing answer.
+    """
+    if hints is None:
+        return ""
+    try:
+        return str(hints() or "")
+    except Exception:                                   # noqa: BLE001
+        log.debug("Подсказки распознаванию не собрались", exc_info=True)
+        return ""
 
 
 def wave_from(pcm: bytes):
@@ -585,8 +607,13 @@ class FasterWhisperRecogniser:
     #: model, not a thing left undone.
     streams = False
 
-    def __init__(self, size: str = "base"):
+    def __init__(self, size: str = "base", hints=None):
         self.size = size or "base"
+        #: The names recognition should be ready for (`4.0b-V08`): a
+        #: callable giving one line of them, asked on every phrase because
+        #: the programs and the wake words change while the model stays
+        #: loaded. See `core.apps.spoken_hints` for what goes in.
+        self.hints = hints
         self._model = None
         self._error = ""
 
@@ -640,7 +667,23 @@ class FasterWhisperRecogniser:
                 # the next is how "Рина" turns into "Рина, что ты? Рина,
                 # что ты?" — the repetition Whisper is known for, and it
                 # was in the journal.
-                condition_on_previous_text=False)
+                condition_on_previous_text=False,
+                # **The names it is about to hear** (`4.0b-V08`). Ordinary
+                # Russian came through well and the names of programs did
+                # not: «запусти Стим» three times in twenty, the rest
+                # «запустите им», «с тем», «запустисти». Hinted with how
+                # the installed programs are said, the recognition bench
+                # launched 24 of 28 commands against 13, and invented
+                # nothing on noise. `hotwords` rather than an initial
+                # prompt: the two measured the same, and this one says
+                # what it is.
+                hotwords=hinted(self.hints) or None,
+                # Text only. Timestamps are decoding steps whose answer
+                # nobody reads, and with hints in front they were what
+                # disturbed ordinary sentences: 11.9 per cent of
+                # characters wrong with them, 9.4 without — against 9.2
+                # with no hints at all.
+                without_timestamps=True)
             kept = [piece for piece in pieces
                     if getattr(piece, "no_speech_prob", 0.0) <= self.NOT_SPEECH]
             return Heard(text="".join(p.text for p in kept).strip())
@@ -665,10 +708,16 @@ class FasterWhisperRecogniser:
         being heard. Loading starts when the microphone opens, where a
         person is already expecting a moment's pause.
         """
-        return self.available() and self._load()
+        ready = self.available() and self._load()
+        if ready:
+            # The hints too: the first time they are asked for, the list of
+            # programs comes from the shell, and that wait belongs here
+            # rather than in front of the first phrase.
+            hinted(self.hints)
+        return ready
 
 
-def whisper_for(settings) -> Recogniser:
+def whisper_for(settings, hints=None) -> Recogniser:
     """
     Whichever Whisper is installed, the light one first.
 
@@ -677,8 +726,8 @@ def whisper_for(settings) -> Recogniser:
     them a question whose answer they have no way of having.
     """
     size = str(settings.get("whisper_model", "base") or "base")
-    fast = FasterWhisperRecogniser(size)
-    return fast if fast.available() else WhisperRecogniser(size)
+    fast = FasterWhisperRecogniser(size, hints)
+    return fast if fast.available() else WhisperRecogniser(size, hints)
 
 
 #: What each engine is called to a person.
@@ -705,18 +754,25 @@ STT_TITLES = {
 #: two together — a name that can be chosen and cannot be built is a defect
 #: the person meets as silence.
 RECOGNISERS = {
-    "vosk": lambda settings: VoskRecogniser(
+    "vosk": lambda settings, hints=None: VoskRecogniser(
         str(settings.get("vosk_model", "") or "")),
     "whisper": whisper_for,
-    "disabled": lambda settings: DisabledRecogniser(),
+    "disabled": lambda settings, hints=None: DisabledRecogniser(),
 }
 
 
-def recogniser_for(settings) -> Recogniser:
-    """Which recognition is chosen in the settings."""
+def recogniser_for(settings, hints=None) -> Recogniser:
+    """
+    Which recognition is chosen in the settings.
+
+    `hints` is where the names to be ready for come from; an engine that
+    cannot take them ignores them. Vosk could — its small models accept a
+    grammar — but a grammar is a list of everything that may be said, not
+    a nudge, and that is a different thing to build.
+    """
     engine = str(settings.get("stt_engine", "disabled") or "disabled")
     build = RECOGNISERS.get(engine)
-    return build(settings) if build else DisabledRecogniser()
+    return build(settings, hints) if build else DisabledRecogniser()
 
 
 # ---------------------------------------------------------------------------

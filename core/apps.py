@@ -47,7 +47,86 @@ SPOKEN_ALIASES = {
     "брейв": "brave", "эдж": "edge", "едж": "edge",
     "обсидиан": "obsidian", "стим": "steam",
     "терминал": "terminal", "командная строка": "cmd",
+    # On a Russian Windows the entry is called «Блокнот» and is found as
+    # it is; on an English one it is Notepad, and nothing transliterates
+    # one into the other.
+    "блокнот": "notepad",
 }
+
+#: How a program's name is said, written the way recognition should put it
+#: down (`4.0b-V08`).
+#:
+#: **Not the table above turned round.** `SPOKEN_ALIASES` carries what
+#: recognition gets wrong as well as what people say — «стимул» for Steam,
+#: «фотошок» for Photoshop — because those are what the matcher is handed.
+#: Offered to the model as hints, they would teach it to write the mistakes.
+#: This is one name per program, the one a Russian speaker says, and every
+#: one of them must lead back to its program through `find`:
+#: `tools/test_hearing.py` holds the two tables together.
+SAID_AS = {
+    "chrome": "Хром", "word": "Ворд", "excel": "Эксель",
+    "powerpoint": "Поверпоинт", "outlook": "Аутлук", "steam": "Стим",
+    "photoshop": "Фотошоп", "telegram": "Телеграм", "firefox": "Файрфокс",
+    "opera": "Опера", "yandex": "Яндекс", "skype": "Скайп", "zoom": "Зум",
+    "viber": "Вайбер", "whatsapp": "Ватсап", "spotify": "Спотифай",
+    "discord": "Дискорд", "obs": "ОБС",
+    "visual studio code": "Вижуал Студио Код",
+    "visual studio": "Вижуал Студио", "python": "Питон", "unity": "Юнити",
+    "unreal": "Анрил", "premiere": "Премьер", "illustrator": "Иллюстратор",
+    "autocad": "Автокад", "minecraft": "Майнкрафт",
+    "epic games": "Эпик Геймс", "explorer": "Проводник", "claude": "Клод",
+    "chatgpt": "ЧатГПТ", "brave": "Брейв", "edge": "Эдж",
+    "obsidian": "Обсидиан", "terminal": "Терминал", "notepad": "Блокнот",
+}
+
+#: How many hints recognition is given at most.
+#:
+#: Measured on the recognition bench (`4.0b-V08`): hinted with the
+#: twenty-one names installed on the machine it ran on, recognition
+#: launched more of those programs than hinted with the whole table of
+#: thirty-seven — 23 of 28 against 21. A hint that cannot occur only
+#: spreads the model's attention thinner, and the prompt it travels in
+#: holds some two hundred tokens.
+HINTS_AT_MOST = 30
+
+
+def _has(entries, name):
+    """Is something called this in the index — by whole words, never fuzzily.
+
+    Asked for every name in `SAID_AS` against every program, so the fuzzy
+    comparison `find` falls back on would cost more than the phrase it is
+    helping to hear. A path utility is not counted: hundreds of them sit
+    in `PATH` and none is what a person asks for by name.
+    """
+    wanted = f" {normalize(name)} "
+    for entry in entries:
+        if entry.source == "path":
+            continue
+        if wanted in f" {entry.key} ":
+            return True
+    return False
+
+
+def spoken_hints(entries, first=()):
+    """
+    The words recognition should be ready to hear (`4.0b-V08`).
+
+    `first` goes in front — the wake words and the person's own names for
+    programs, which matter whatever is installed. Then how the installed
+    programs are said, from `SAID_AS`. Programs that are not installed are
+    left out on purpose: a hint for something that cannot be launched is a
+    word the model is pushed towards for nothing.
+    """
+    said = []
+    for word in first:
+        word = str(word).strip()
+        if word and word not in said:
+            said.append(word)
+    for target, name in SAID_AS.items():
+        if name not in said and (_has(entries, target) or _has(entries, name)):
+            said.append(name)
+    return said[:HINTS_AT_MOST]
+
 
 # A browser is not a program's name but a role: one person has Brave
 # installed, another Edge. We look for the first installed one from the list

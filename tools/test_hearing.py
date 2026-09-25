@@ -611,6 +611,116 @@ else:
           "умеешь" in with_tail.text.lower(), f"| {with_tail.text!r}")
 
 print()
+print("=== имена программ: распознаванию подсказано, что установлено ===")
+# `4.0b-V08`. Ordinary Russian came through and the names of programs did
+# not: «запусти Стим» three times in twenty, the rest «запустите им»,
+# «с тем», «запустисти». Hinted with how the installed programs are said,
+# the recognition bench launched 24 commands of 28 instead of 13. These
+# are the joints of that: the table the hints come from, the choice of
+# what goes in, and — on the real model, where there is one — a phrase
+# that is misheard without them.
+from core import apps as apps_mod
+from voice import app_launcher
+
+# Every hint leads back to its program. A hint the matcher cannot use is a
+# word the model was taught for nothing: «Блокнот» was one, on a Windows
+# where the program is called Notepad.
+named = [apps_mod.AppEntry(target.title(), target, "file", "start_menu")
+         for target in apps_mod.SAID_AS]
+lost = [said for target, said in apps_mod.SAID_AS.items()
+        if target.title() not in [e.name for e in
+                                  apps_mod.find(said, limit=5, entries=named)]]
+check("каждая подсказка ведёт к своей программе", not lost,
+      f"| не ведут: {lost}")
+
+# And none of them is a mishearing. The table of spoken names carries
+# «стимул» for Steam because that is what the matcher is handed; offered
+# as a hint, it would teach the model to write the mistake.
+misheard = {"стимул", "фотошок", "телеграмм"}
+check("среди подсказок нет ослышек",
+      not misheard & {apps_mod.normalize(s) for s in apps_mod.SAID_AS.values()})
+
+steam = apps_mod.AppEntry("Steam", "steam.lnk", "file", "start_menu")
+# A helper in PATH that shares a word with a program is not the program:
+# counted, it would put «Хром» into the hints of a machine without Chrome.
+tool = apps_mod.AppEntry("chrome-helper", "helper.exe", "file", "path")
+given = apps_mod.spoken_hints([steam, tool], ("Рина", "код"))
+check("подсказано установленное, первым — имя и слова человека",
+      given[:3] == ["Рина", "код", "Стим"] and "Хром" not in given,
+      f"| {given}")
+check("и не больше предела",
+      len(apps_mod.spoken_hints(named, ("Рина",))) <= apps_mod.HINTS_AT_MOST)
+
+# The name she answers to, not the wake words: those carry the mishearings
+# a person added so that a misheard name still wakes her, and a hint is
+# what the model is pulled towards.
+engine_h = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [], "wake_words": ["Rina", "Рина", "Рена", "Рима"],
+    "app_aliases": {"код": "Visual Studio Code"},
+}))
+engine_h.apps_source = lambda: [steam.to_dict()]
+hinting = ProtocolServer.__new__(ProtocolServer)
+hinting.engine = engine_h
+hinting._hints, hinting._hints_for = "", None
+line = hinting._recognition_hints()
+check("ядро подсказывает имя, а не ослышки из слов активации",
+      line.startswith("Рина") and "Рена" not in line and "Рима" not in line
+      and "Стим" in line and "код" in line, f"| «{line}»")
+
+# «запусти стим» and «запустите им» are one sound, and recognition settles
+# on the longer verb. The name then comes through behind a polite verb,
+# and a verb the launcher does not know launches nothing.
+decided = app_launcher.decide("Рина, запустите Стим", apps=[steam])
+check("вежливая форма тоже запускает",
+      decided is not None and decided.entry is steam,
+      f"| {getattr(decided, 'status', None)}")
+
+if not whisper_at_hand():
+    print("     пропущено: модели whisper на этой машине нет")
+else:
+    # Said by Rina's own voice, so the recording can live here: the bench
+    # used four voices, and this is the one that belongs to the project.
+    # Without hints the model hears «Запусти вяжёл студия Кот». Chosen
+    # because it comes right under any list that holds the program — the
+    # program alone, five, or the twenty-one of the bench's machine. A
+    # phrase that came right under one list and not another would be a
+    # check on the list, and «Рина, запусти Стим» was exactly that.
+    import wave as wave_mod
+
+    from core import speech as speech_mod
+
+    here_fixtures = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                 "fixtures")
+    with wave_mod.open(os.path.join(here_fixtures, "said-launch-code.wav"),
+                       "rb") as f:
+        launch = f.readframes(f.getnframes())
+    with wave_mod.open(os.path.join(here_fixtures, "said-rina.wav"), "rb") as f:
+        asked = f.readframes(f.getnframes())
+    code = apps_mod.AppEntry("Visual Studio Code", "code.lnk", "file",
+                             "start_menu")
+    hinted_ear = speech_mod.whisper_for(
+        MemorySettings({"whisper_model": "base"}),
+        hints=lambda: ", ".join(apps_mod.spoken_hints([code], ("Рина",))))
+    heard_code = hinted_ear.recognise(launch)
+    check("с подсказкой имя программы слышно", "вижуал студио код" in
+          apps_mod.normalize(heard_code.text), f"| {heard_code.text!r}")
+    ran = app_launcher.decide(heard_code.text, apps=[code])
+    check("и фраза запускает её",
+          ran is not None and ran.entry is code, f"| {heard_code.text!r}")
+
+    # And a hint the list could not give — a broken shell, a settings store
+    # that threw — costs the hint, not the phrase.
+    def broken():
+        raise RuntimeError("оболочка не ответила")
+    shaky = speech_mod.whisper_for(
+        MemorySettings({"whisper_model": "base"}), hints=broken)
+    kept_on = shaky.recognise(asked)
+    check("сломанные подсказки не отнимают распознавание",
+          kept_on.ok and "умеешь" in kept_on.text.lower(),
+          f"| {kept_on.text!r}")
+
+print()
 print("=== предлагается только то, что можно построить ===")
 # A person chose `whisper` in the settings and heard "recognition is
 # unavailable": the list of choices came from the 3.1.0 engines, which open

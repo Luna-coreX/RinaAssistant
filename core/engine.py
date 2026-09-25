@@ -861,6 +861,15 @@ class RinaEngine:
                     # one name. Its defect, and it is already in its journal.
                     pass
 
+    def installed_apps(self):
+        """
+        The programs as the launcher sees them — for whoever else needs the
+        same list: recognition is hinted with how they are said
+        (`4.0b-V08`), and a second list would disagree with this one about
+        what is installed.
+        """
+        return self._apps()
+
     def _apps(self):
         """
         The list of programs: the shell's, if there is one, otherwise our own.

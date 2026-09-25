@@ -116,8 +116,13 @@ class ProtocolServer:
         #: Recognition and synthesis. Passed in from outside so that they
         #: can be substituted in a check: real models are not installed on
         #: every machine, and the wire has to be checked everywhere.
+        #: The names recognition is hinted with, and what they were
+        #: worked out from — see `_recognition_hints`.
+        self._hints = ""
+        self._hints_for = None
         self.recogniser = recogniser or speech.recogniser_for(
-            getattr(engine, "_settings", None) or {})
+            getattr(engine, "_settings", None) or {},
+            hints=self._recognition_hints)
         self.synthesiser = synthesiser or speech.synthesiser_for(
             getattr(engine, "_settings", None) or {})
         #: Those passed in from outside are not rebuilt: the check set them deliberately.
@@ -1669,6 +1674,35 @@ class ProtocolServer:
             return []
         return list(answer.get("entries") or [])
 
+    def _recognition_hints(self) -> str:
+        """
+        The names recognition should be ready for, as one line (`4.0b-V08`).
+
+        Who is being called, the person's own names for programs, and how
+        the installed programs are said. **The name, not the wake words.**
+        The wake words carry the mishearings a person added so that a
+        misheard name still wakes her — «Рена», «Рима» — and a hint is a
+        word the model is pulled towards; hinted with those, it would be
+        taught to mishear.
+
+        Worked out again only when one of the three changes: the list of
+        programs comes from the shell and is matched against a table, and
+        a phrase is not the place to redo that.
+        """
+        store = self._settings() or {}
+        own = str(store.get("personality", "") or "") == "own"
+        name = (" ".join(str(store.get("own_name", "") or "").split())
+                if own else "") or "Рина"
+        aliases = tuple(str(key) for key in (store.get("app_aliases") or {}))
+        entries = self.engine.installed_apps()
+        wanted = (name, aliases, id(entries), len(entries))
+        if wanted != self._hints_for:
+            from core.apps import spoken_hints
+
+            self._hints = ", ".join(spoken_hints(entries, (name, *aliases)))
+            self._hints_for = wanted
+        return self._hints
+
     def launch_app(self, launch: str, kind: str = "file") -> tuple[bool, str]:
         """Ask the shell to launch what was found."""
         try:
@@ -2216,7 +2250,8 @@ class ProtocolServer:
             # on one engine and finished on another is not a phrase.
             if self._streaming():
                 self.recogniser.reset()
-            self.recogniser = speech.recogniser_for(store)
+            self.recogniser = speech.recogniser_for(
+                store, hints=self._recognition_hints)
             self.segmenter.flush()
 
     def _is_her_own(self, said: str) -> bool:
