@@ -59,7 +59,21 @@ class RouterContext:
     """
 
     #: The index of installed programs (a list of AppEntry).
+    #:
+    #: Read through `programs(ctx)`, never directly, by the stages that
+    #: need it — see `apps_source` for why.
     apps: list = field(default_factory=list)
+    #: Where to get `apps` from when a stage first asks, if it was not
+    #: handed over ready.
+    #:
+    #: **A sum waited for the disk.** The core used to fetch the list for
+    #: every command before routing it, and a fresh shell builds that list
+    #: by checking the signature of every program installed — ten seconds
+    #: and more. So «посчитай 15 умножить на 12» took twelve seconds on a
+    #: first run, and the dialogue check, waiting twenty, failed whenever
+    #: the machine was a little slower. Only the stages about programs
+    #: need the list; the others no longer wait for it.
+    apps_source: "Callable[[], list] | None" = None
     #: The learned associations "as it was said" -> a program.
     aliases: dict = field(default_factory=dict)
     #: The unclosed question — a dict of the form core.dialog.Question.to_dict().
@@ -116,6 +130,19 @@ class RouterContext:
     todo_find: object = None
     #: Is a working session open right now (`4.0b-A02`).
     session_open: bool = False
+
+
+def programs(ctx):
+    """
+    The installed programs, fetched the first time a stage asks.
+
+    Kept in the context once fetched, so one command asks at most once
+    however many stages look.
+    """
+    if not ctx.apps and ctx.apps_source is not None:
+        source, ctx.apps_source = ctx.apps_source, None
+        ctx.apps = list(source() or [])
+    return ctx.apps
 
 
 def route(text, ctx=None):
@@ -403,7 +430,7 @@ def _when_app(candidate, ctx):
     plural = {}                      # size -> several candidates
     for size in range(1, len(words) + 1):
         found = apps_mod.find(" ".join(words[:size]), limit=5,
-                              entries=ctx.apps)
+                              entries=programs(ctx))
         if len(found) == 1:
             unique[size] = found[0]
         elif found:
@@ -625,7 +652,7 @@ def _teaching(word, app, ctx, word_said):
     if not word or not app:
         return None
 
-    found = apps_mod.find(app, limit=5, entries=ctx.apps)
+    found = apps_mod.find(app, limit=5, entries=programs(ctx))
     if not found:
         return Intent("alias.unknown", {"query": app, "word": word},
                       stage="teach")
@@ -653,7 +680,12 @@ def _teaching(word, app, ctx, word_said):
 def _launch(command, ctx):
     from voice import app_launcher
 
-    decision = app_launcher.decide(command, apps=ctx.apps,
+    # Asked before the list is: every command that gets this far passes
+    # through here, the sums on their way to `_builtin` among them, and a
+    # list fetched as an argument is fetched whatever `decide` then finds.
+    if app_launcher.extract_target(command) is None:
+        return None
+    decision = app_launcher.decide(command, apps=programs(ctx),
                                    aliases=ctx.aliases)
     if decision is None:
         return None

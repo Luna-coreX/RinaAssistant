@@ -22,8 +22,10 @@ machine's index, for the programs installed here, which is the one that
 matters; text invented on noise; seconds per phrase with the model warm.
 
 To run:
-    python tools/hearing_bench.py build        make the corpus
-    python tools/hearing_bench.py run [name]   measure; all when no name
+    python tools/hearing_bench.py build           make the corpus
+    python tools/hearing_bench.py run [name]      measure; all when no name
+    python tools/hearing_bench.py kept <folder>   a person's own phrases,
+                                                  kept by the core
 """
 import csv
 import io
@@ -351,10 +353,72 @@ def run(wanted):
                                 for i in sen) if sen else 0.0
         invented = sum(bool(norm(said[i["file"]])) for i in noise)
         times = sorted(spent[i["file"]] for i in cmd)
+        # The slowest of everything, not only of the commands: the long
+        # waits come from the decoder starting over on a phrase it could
+        # not make out, and that happens on sentences more than on
+        # commands. An average hides exactly that.
+        slowest = max(spent.values())
         print(f"{title:30s} команд точно {exact}/{len(cmd)}, имя {heard}/{len(named)}, "
               f"запустилось бы {launched}/{len(here)}, ошибок в фразах {wrong:.1%}, "
               f"выдумано на шуме {invented}/{len(noise)}, "
-              f"{statistics.mean(times):.2f} с на фразу", flush=True)
+              f"{statistics.mean(times):.2f} с на фразу, худшая {slowest:.2f} с",
+              flush=True)
+
+
+def kept(folder):
+    """
+    Phrases a person really said, through the same variants side by side.
+
+    Kept by the core with `RINA_KEEP_PHRASES` (see `docs/DEBUGGING.md`).
+    There is no right answer on file for them, so nothing is scored: the
+    variants are printed together for the one who said the phrases, who
+    knows what was said. The program's variant is given the hints the
+    program actually used, read from the record.
+    """
+    from faster_whisper import WhisperModel
+
+    from core import speech
+    from core.settings_api import MemorySettings
+
+    records = [json.loads(line) for line in
+               io.open(os.path.join(folder, "phrases.jsonl"), encoding="utf-8")
+               if line.strip()]
+    line = next((r["hints"] for r in records if r.get("hints")), "")
+    bare = WhisperModel("base", device="cpu", compute_type="int8")
+
+    def without_vad(pcm):
+        pieces, _ = bare.transcribe(
+            speech.wave_from(pcm), language="ru", vad_filter=False,
+            condition_on_previous_text=False, hotwords=line or None,
+            without_timestamps=True)
+        return "".join(p.text for p in pieces).strip()
+
+    small = speech.whisper_for(MemorySettings({"whisper_model": "small"}),
+                               hints=lambda: line)
+    # The recording says what the program heard **then**; this is what
+    # the code hears now, so a change can be read against the same phrase.
+    now = speech.whisper_for(MemorySettings({"whisper_model": "base"}),
+                             hints=lambda: line)
+    variants = {
+        "base сейчас": lambda pcm: now.recognise(pcm).text,
+        "без VAD": without_vad,
+        "small": lambda pcm: small.recognise(pcm).text,
+    }
+    # Loaded before the first phrase, or its time is the loading's.
+    now.warm()
+    small.warm()
+    without_vad(speech.silence(1.0))
+    for record in records:
+        with wave.open(os.path.join(folder, record["file"]), "rb") as f:
+            pcm = f.readframes(f.getnframes())
+        talking = ", она говорила" if record.get("she_was_talking") else ""
+        print(f"{record['file']}  {record['seconds']} с, громкость "
+              f"{record['level']}, пик {record['peak']}{talking}")
+        print(f"    в программе ({record['spent']:.2f} с): {record['text']!r}")
+        for title, hear in variants.items():
+            started = time.perf_counter()
+            said = hear(pcm)
+            print(f"    {title} ({time.perf_counter() - started:.2f} с): {said!r}")
 
 
 if __name__ == "__main__":
@@ -362,5 +426,7 @@ if __name__ == "__main__":
         build()
     elif sys.argv[1:2] == ["run"]:
         run(sys.argv[2:])
+    elif sys.argv[1:2] == ["kept"] and len(sys.argv) > 2:
+        kept(sys.argv[2])
     else:
         print(__doc__)

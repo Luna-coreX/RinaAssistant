@@ -190,5 +190,21 @@ a.say("когда я говорю код, запускай Visual Studio Code")
 check("соседнее ядро ничего не выучило", not b.learned, f"| {b.learned}")
 
 print()
+print("=== ядро не ждёт список программ ради суммы ===")
+# The router asks for the list only in the stages about programs; this is
+# the core's half of that promise — it hands over a way to get the list
+# rather than the list. Handed the list itself, every command waited for
+# the shell to build it.
+counted = Session()
+asked = []
+counted.engine.apps_source = lambda: asked.append(1) or [a.to_dict()
+                                                         for a in APPS]
+counted.say("посчитай 15 умножить на 12")
+check("сумма посчитана, а список программ не спрошен", not asked,
+      f"| спрошено {len(asked)} раз")
+counted.say("запусти хром")
+check("а запуск его спросил", len(asked) == 1, f"| спрошено {len(asked)} раз")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

@@ -18,6 +18,7 @@ The recogniser itself is not required. Whether a model is installed is the
 person's business and differs between machines; whether the sound reaches
 the recogniser is ours, and it is the same everywhere.
 """
+import io
 import math
 import os
 import struct
@@ -719,6 +720,52 @@ else:
     check("сломанные подсказки не отнимают распознавание",
           kept_on.ok and "умеешь" in kept_on.text.lower(),
           f"| {kept_on.text!r}")
+
+print()
+print("=== фразы сохраняются только по просьбе ===")
+# `RINA_KEEP_PHRASES` keeps every phrase as recognition got it — a
+# recording of somebody's voice, for a diagnosis (`4.0b-V08`). Nothing may
+# be written without it: not by a setting, not by a default.
+import json
+import tempfile
+
+from core.speech import Heard
+
+
+class HeardIt:
+    """A recogniser that hears one sentence, whatever it is given."""
+
+    @staticmethod
+    def available():
+        return True
+
+    @staticmethod
+    def recognise(pcm):
+        return Heard(text="что ты умеешь")
+
+
+keeper = ProtocolServer.__new__(ProtocolServer)
+keeper.engine = engine
+keeper.recogniser = HeardIt()
+keeper._hints = "Рина"
+keeper.heard = {"recognitions": 0, "texts": 0}
+kept_in = os.path.join(tempfile.mkdtemp(), "phrases")
+os.environ.pop(ProtocolServer.KEEP_PHRASES, None)
+keeper._recognise(sound(1.0))
+check("без переменной не сохраняется ничего", not os.path.exists(kept_in))
+os.environ[ProtocolServer.KEEP_PHRASES] = kept_in
+try:
+    keeper._recognise(sound(1.0))
+finally:
+    os.environ.pop(ProtocolServer.KEEP_PHRASES, None)
+listed = sorted(os.listdir(kept_in)) if os.path.isdir(kept_in) else []
+records = ([json.loads(line) for line in
+            io.open(os.path.join(kept_in, "phrases.jsonl"), encoding="utf-8")]
+           if "phrases.jsonl" in listed else [])
+check("с ней — звук и запись о нём",
+      len(records) == 1 and records[0]["file"] in listed
+      and records[0]["text"] == "что ты умеешь",
+      f"| {listed}")
 
 print()
 print("=== предлагается только то, что можно построить ===")

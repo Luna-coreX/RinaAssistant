@@ -925,7 +925,10 @@ class RinaEngine:
 
         question = self._dialog.current()
         return router_mod.RouterContext(
-            apps=self._apps(),
+            # Handed over as a way to get it, not got: see
+            # `RouterContext.apps_source` — a sum must not wait for the
+            # list of programs.
+            apps_source=self._apps,
             aliases=dict(self._settings.get("app_aliases", {}) or {}),
             pending=question.to_dict() if question else None,
             wake_words=tuple(get_wake_words(self._settings)),

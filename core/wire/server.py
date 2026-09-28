@@ -30,6 +30,7 @@ process nobody will close.
 
 import collections
 import contextvars
+import os
 import queue
 import secrets
 import threading
@@ -2158,8 +2159,10 @@ class ProtocolServer:
             self.heard["recognitions"] += 1
             # `None` — the sound was fed piece by piece while it was
             # being said, and what is left is to ask for the words.
+            started = time.monotonic()
             outcome = (self.recogniser.finish() if phrase is None
                        else self.recogniser.recognise(phrase))
+            self._keep_phrase(phrase, outcome, time.monotonic() - started)
             if not outcome.ok:
                 log.warning("Распознавание не сложилось: %s", outcome.error)
                 self.engine.bus.emit(
@@ -2253,6 +2256,62 @@ class ProtocolServer:
             self.recogniser = speech.recogniser_for(
                 store, hints=self._recognition_hints)
             self.segmenter.flush()
+
+    #: Where to keep every phrase handed to recognition, if anywhere.
+    #:
+    #: A diagnosis, not a feature (`4.0b-V08`). «Relaxed speech is not
+    #: understood» can only be answered from the sound a person actually
+    #: makes, as the segmenter cuts it — the bench is read aloud and
+    #: synthesised, and neither mumbles. An environment variable and
+    #: nothing else, so that no setting, no default and no update can
+    #: start recording anybody's voice: it is switched on by hand, for a
+    #: session, by whoever is looking at the problem. `docs/DEBUGGING.md`
+    #: says how.
+    KEEP_PHRASES = "RINA_KEEP_PHRASES"
+
+    def _keep_phrase(self, phrase: "bytes | None", outcome,
+                     spent: float) -> None:
+        """Keep the phrase, what came of it and the circumstances."""
+        folder = os.environ.get(self.KEEP_PHRASES, "")
+        if not folder or not phrase:
+            return
+        try:
+            import array
+            import json
+            import wave
+
+            os.makedirs(folder, exist_ok=True)
+            name = (time.strftime("%Y%m%d-%H%M%S")
+                    + f"-{self.heard['recognitions']:04d}.wav")
+            with wave.open(os.path.join(folder, name), "wb") as out:
+                out.setnchannels(1)
+                out.setsampwidth(speech.SAMPLE_BYTES)
+                out.setframerate(speech.RATE)
+                out.writeframes(phrase)
+            samples = array.array("h")
+            samples.frombytes(phrase[:len(phrase) - len(phrase) % 2])
+            record = {
+                "file": name,
+                "text": outcome.text if outcome.ok else "",
+                "error": "" if outcome.ok else outcome.error,
+                "seconds": round(len(phrase) / (speech.RATE
+                                                * speech.SAMPLE_BYTES), 2),
+                "level": round(speech.Segmenter.level(phrase), 4),
+                "peak": round(max((abs(v) for v in samples), default=0)
+                              / 32768, 4),
+                "spent": round(spent, 3),
+                # Her voice comes back through the microphone while she
+                # talks, and a phrase said over it is a different problem
+                # from a phrase said quietly.
+                "she_was_talking": bool(self._talking_out
+                                        or self._reply_running),
+                "hints": self._hints,
+            }
+            with open(os.path.join(folder, "phrases.jsonl"), "a",
+                      encoding="utf-8") as out:
+                out.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception:                               # noqa: BLE001
+            log.debug("Фразу сохранить не удалось", exc_info=True)
 
     def _is_her_own(self, said: str) -> bool:
         """Is this what Rina is saying right now, come back through the air?"""

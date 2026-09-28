@@ -42,6 +42,8 @@ neutralise()
 
 from console import use_utf8
 from core.engine import RinaEngine
+from core.events import EventBus
+from core.protocol import Events
 from core.settings_api import MemorySettings
 from voice import sessions as sessions_mod
 
@@ -65,9 +67,20 @@ class Session:
             "todo": [], "sessions": [], "custom_commands": [],
             "reminders": [], "history": [],
         })
-        self.engine = RinaEngine(settings=self.settings)
+        # A bus of its own: the shared one would carry every other core's
+        # answers into this one's list.
+        self.engine = RinaEngine(settings=self.settings, event_bus=EventBus())
         self.said = []
-        self.engine.voice_out = lambda text, **kw: self.said.append(text)
+        # **The answer, not the voice.** `say` speaks on a thread of its
+        # own, so reading what reached `voice_out` right after the command
+        # was a race — lost for years only because the core used to fetch
+        # the list of programs before every command, which happened to
+        # give the speaking thread time. Once it stopped (`4.0b-V08`),
+        # «сколько я работал над чем-то другим» came back empty every run.
+        # The answer event is sent before the thread starts.
+        self.engine.bus.on(Events.RESPONSE,
+                           lambda data: self.said.append(data["text"]))
+        self.engine.voice_out = lambda text, **kw: None
         self.opened = []
         self.engine.browser_out = lambda url: (self.opened.append(url),
                                                (True, ""))[1]

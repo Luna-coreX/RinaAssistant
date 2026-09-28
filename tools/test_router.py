@@ -567,6 +567,35 @@ for phrase in ("какие у нас задачи на сегодня", "как�
           f"| {route(phrase, ctx).name}")
 
 print()
+print("=== список программ спрашивается, только когда нужен ===")
+# A fresh shell builds the list by checking the signature of every
+# installed program — ten seconds and more — and the core used to ask for
+# it before every command. «Посчитай 15 умножить на 12» waited for it,
+# and the dialogue check, waiting twenty seconds, failed in the full run.
+asked = []
+
+
+def listing():
+    asked.append(1)
+    return APPS
+
+
+lazy = RouterContext(apps_source=listing)
+summed = route("посчитай 15 умножить на 12", lazy)
+check("сумма не спрашивает список программ", not asked,
+      f"| спрошено {len(asked)} раз, намерение {summed.name}")
+lazy = RouterContext(apps_source=listing)
+started = route("запусти телеграм", lazy)
+check("а запуск спрашивает, и один раз",
+      len(asked) == 1 and started.name == "app.launch",
+      f"| спрошено {len(asked)} раз, намерение {started.name}")
+# And keeps what it got. The core reads the list after routing — a
+# program not found sends it looking on the disk when the list is empty —
+# so a list fetched and not kept is a disk walk after every «not found».
+check("и полученное остаётся в контексте", lazy.apps == APPS,
+      f"| в контексте {len(lazy.apps)} из {len(APPS)}")
+
+print()
 print("=== неизменяемость намерения ===")
 i = route("запусти телеграм", ctx)
 try:

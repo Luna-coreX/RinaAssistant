@@ -531,7 +531,11 @@ class WhisperRecogniser:
                                         numpy.float32) / 32768.0
             said = self._model.transcribe(
                 wave, language=language or None, fp16=False,
-                initial_prompt=hinted(self.hints) or None)
+                initial_prompt=hinted(self.hints) or None,
+                # One pass, as in `FasterWhisperRecogniser`: on the same
+                # phrases this library's retries took eight and eleven
+                # seconds to invent «Да.» and «Ммм...».
+                temperature=0.0)
             return Heard(text=str(said.get("text", "")).strip())
         except Exception as exc:                        # noqa: BLE001
             return Heard(ok=False, error=str(exc))
@@ -683,7 +687,15 @@ class FasterWhisperRecogniser:
                 # disturbed ordinary sentences: 11.9 per cent of
                 # characters wrong with them, 9.4 without — against 9.2
                 # with no hints at all.
-                without_timestamps=True)
+                without_timestamps=True,
+                # **One pass, no second tries.** Unhappy with what it
+                # decoded, the model starts over hotter, up to six times,
+                # and on a phrase it cannot make out that is where the
+                # five- and fifteen-second waits in the journal came from:
+                # «Шапа, Залучие» took 4.97 s, and came out the same in
+                # 0.77 s with one pass. On the bench the retries changed
+                # no word anywhere and cost 4.63 s at worst against 1.19.
+                temperature=0.0)
             kept = [piece for piece in pieces
                     if getattr(piece, "no_speech_prob", 0.0) <= self.NOT_SPEECH]
             return Heard(text="".join(p.text for p in kept).strip())
