@@ -21,9 +21,11 @@ program you named even if you named it in the wrong alphabet, sets a timer,
 changes the volume, does the arithmetic, searches the web, or — if you switch it
 on — answers with a language model running on your own machine.
 
-**Everything runs on your computer.** No account, no cloud service, no
-telemetry. There is a page inside the program that lists every single thing it
-has remembered about you, and a button to make it forget any of it.
+**Everything runs on your computer.** No account, no cloud service. The beta
+has telemetry that is off until you switch it on: numbers once a day, never
+what you said, and gone in 4.0.0 Stable. There is a page inside the program
+that lists every single thing it has remembered about you, and a button to make
+it forget any of it.
 
 <p align="center">
   <img src="docs/screens/home.png" width="760"><br>
@@ -240,7 +242,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 83 checks, about six minutes
+python tools/regress.py          # 84 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 
@@ -275,7 +277,11 @@ confirmation of dangerous actions, the security journal, the protocol, and
 the base functionality. What could reasonably close later is a licence
 server, billing, and paid connectors — none of which is on your computer.
 
-There is no telemetry, no account, and nothing to opt out of.
+There is no account. Telemetry exists only in the beta and only if you switch
+it on — in the setup wizard or in settings. A report is counts and the
+program's own vocabulary: which features ran, error codes, how long
+recognition took; no phrase, path or name. Every report that left is shown in
+full on the privacy page. 4.0.0 Stable removes it entirely.
 
 ---
 
@@ -293,7 +299,7 @@ Full plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Security
 
-What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-four threats, and for each of them the **residual risk**
+What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-five threats, and for each of them the **residual risk**
 written down, because a defence without one has stopped being thought about.
 The sweep that walks that document rather than a list somebody maintains is
 `tools/test_security.py`.

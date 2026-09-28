@@ -1824,6 +1824,26 @@ public partial class App
         Check("и выбранный род тоже",
               wizard.FormChosen == picked, $"| «{wizard.FormChosen}»");
 
+        // `4.0b-D05`. The beta's telemetry is off until a person says
+        // otherwise, and the wizard's box is where most will say it: it
+        // must come unticked on a fresh profile, and a tick — or taking it
+        // away — must reach the core rather than stay a picture of a box.
+        // This core is sandboxed, so writing to it touches nobody's profile.
+        wizard.ShowFor(wizard.TelemetryStep);
+        Check("телеметрия беты по умолчанию не отмечена",
+              wizard.TelemetryTicked == false, $"| {wizard.TelemetryTicked}");
+        wizard.TelemetryTicked = true;
+        await wizard.KeepForCheck();
+        var telemetryOn = (await link.GetAsync("telemetry"))?["telemetry"]
+                          ?.GetValue<bool>();
+        wizard.TelemetryTicked = false;
+        await wizard.KeepForCheck();
+        var telemetryOff = (await link.GetAsync("telemetry"))?["telemetry"]
+                           ?.GetValue<bool>();
+        Check("отметка доходит до ядра, и снятая тоже",
+              telemetryOn == true && telemetryOff == false,
+              $"| отметили — {telemetryOn}, сняли — {telemetryOff}");
+
         // Counted on the step that has the boxes, which is the one just
         // opened. Asked before it, this counted the greeting's boxes —
         // there are none — and called that "nothing is ticked by default".

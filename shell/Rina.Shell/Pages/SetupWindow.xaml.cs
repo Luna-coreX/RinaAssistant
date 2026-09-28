@@ -71,6 +71,15 @@ public partial class SetupWindow : Window
             S("Что доустановить"),
             S("И слух, и голос работают по пакету и модели — их размер в установщик не помещается."),
             BuildModels));
+        // The beta's telemetry (`4.0b-D05`): asked here because a switch
+        // nobody is told about is a switch nobody turns on, and unticked
+        // because it is off until a person says otherwise. What leaves and
+        // what never does is on the step itself, not behind a link.
+        TelemetryStep = _steps.Count;
+        _steps.Add(new Step(
+            S("Помочь бете"),
+            S("Бета нужна, чтобы узнать, чем пользуются и где что-то не получается. Помочь можно, а можно и нет."),
+            BuildTelemetry, KeepTelemetry));
         _steps.Add(new Step(
             S("Готово"),
             S("Выбранное скачается в фоне. Пользоваться можно уже сейчас."),
@@ -153,6 +162,29 @@ public partial class SetupWindow : Window
 
     /// <summary>Which step asks for the name.</summary>
     public int NameStep { get; }
+
+    /// <summary>Which step asks about the beta's telemetry.</summary>
+    public int TelemetryStep { get; }
+
+    // The same pair for the telemetry: what is stored and what was ticked.
+    private bool _telemetryWas;
+    private bool? _telemetryNow;
+    private CheckBox? _telemetryBox;
+
+    /// <summary>Is the telemetry box ticked on the step shown — for the check.</summary>
+    public bool? TelemetryTicked
+    {
+        get => _telemetryBox?.IsChecked;
+        set
+        {
+            if (_telemetryBox is null) return;
+            _telemetryBox.IsChecked = value;
+            _telemetryNow = value == true;
+        }
+    }
+
+    /// <summary>Keep what the shown step holds, as «Дальше» would — for the check.</summary>
+    public Task KeepForCheck() => _steps[_at].Keep?.Invoke() ?? Task.CompletedTask;
 
     /// <summary>How many address forms the name step offers — for the check.</summary>
     public int FormsOffered => _form?.Items.Count ?? 0;
@@ -357,6 +389,56 @@ public partial class SetupWindow : Window
         }
     }
 
+    private FrameworkElement BuildTelemetry()
+    {
+        var stack = new StackPanel();
+        var box = new CheckBox
+        {
+            Style = (Style)FindResource("Toggle"),
+            Content = S("Отправлять обезличенную статистику беты"),
+            IsChecked = _telemetryNow ?? _telemetryWas,
+        };
+        box.Click += (_, _) => _telemetryNow = box.IsChecked == true;
+        _telemetryBox = box;
+        stack.Children.Add(box);
+        foreach (var (title, said) in new[]
+        {
+            (S("Уходит"),
+             S("Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки. Раз в сутки.")),
+            (S("Не уходит никогда"),
+             S("Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи.")),
+            (S("Где посмотреть и выключить"),
+             S("Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет.")),
+        })
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = title,
+                Style = (Style)FindResource("Text.Meta"),
+                Margin = new Thickness(0, 14, 0, 2),
+            });
+            stack.Children.Add(new TextBlock
+            {
+                Text = said,
+                Style = (Style)FindResource("Text.Body"),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 440,
+                HorizontalAlignment = HorizontalAlignment.Left,
+            });
+        }
+        return stack;
+    }
+
+    private async Task KeepTelemetry()
+    {
+        // Only a change is written, like the name: walking past the step on
+        // a wizard opened again leaves the choice as it was.
+        var wanted = _telemetryNow ?? _telemetryWas;
+        if (wanted != _telemetryWas
+            && await _link.SetAsync("telemetry", JsonValue.Create(wanted)))
+            _telemetryWas = wanted;
+    }
+
     private FrameworkElement BuildDone()
     {
         var stack = new StackPanel();
@@ -486,8 +568,10 @@ public partial class SetupWindow : Window
         var stored = await _link.AskAsync(Methods.SettingsGet, new JsonObject
         {
             ["keys"] = new JsonArray((JsonNode)"user_name",
-                                     (JsonNode)"address_form"),
+                                     (JsonNode)"address_form",
+                                     (JsonNode)"telemetry"),
         });
+        _telemetryWas = stored?["values"]?["telemetry"]?.GetValue<bool>() ?? false;
         _nameWas = stored?["values"]?["user_name"]?.GetValue<string>() ?? "";
         _formWas = stored?["values"]?["address_form"]?.GetValue<string>()
                    ?? "neutral";

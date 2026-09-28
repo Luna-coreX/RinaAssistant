@@ -171,6 +171,12 @@ class RinaEngine:
         # Everything that changes the world goes through the tool registry
         # (4.0-C03). The executor below does nothing itself — it turns
         # intents into calls.
+        # The beta's telemetry (`4.0b-D05`): counts nothing while it is off,
+        # which is the default. Before the tools, which count through it.
+        from core.telemetry import Telemetry
+
+        self.telemetry = Telemetry(settings)
+
         self._tools = ToolRunner(
             ToolContext(
                 settings=settings,
@@ -211,6 +217,7 @@ class RinaEngine:
                 registry=lambda: None,
             ),
             features=self._features,
+            telemetry=self.telemetry,
         )
 
         # And now that the runner exists, the two fields point at its own
@@ -1238,6 +1245,9 @@ class RinaEngine:
         # not to be addressed to her is not a command that was given.
         if intent.name != "silence":
             self._sessions.remember_command(text)
+            # What the command was understood as — a name from the
+            # catalogue, never the command (`core/telemetry.py`).
+            self.telemetry.intent(intent.name)
 
         if intent.name == "silence":
             # Said out loud in the journal, because from outside this is

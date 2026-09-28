@@ -254,6 +254,8 @@ class ProtocolServer:
         if self.channels.data is not None:
             threading.Thread(target=self.pump_data, name="rina-data",
                              daemon=True).start()
+        threading.Thread(target=self._report_now_and_then,
+                         name="rina-telemetry", daemon=True).start()
 
         try:
             while self._running:
@@ -270,10 +272,38 @@ class ProtocolServer:
             self.channels.close()
         return self.stopped_because or "остановлено"
 
+    def _report_now_and_then(self) -> None:
+        """
+        Send the beta's telemetry when it is due (`4.0b-D05`).
+
+        Asked every hour and the first time two minutes after start, so a
+        session that opens and closes at once sends nothing. Switched off,
+        `maybe_send` answers «off» before it touches anything — the thread
+        exists either way, and it is the telemetry that decides.
+        """
+        telemetry = getattr(self.engine, "telemetry", None)
+        if telemetry is None:
+            return
+        wait = 120
+        while self._running:
+            time.sleep(wait)
+            wait = 3600
+            if not self._running:
+                return
+            try:
+                outcome = telemetry.maybe_send()
+                if outcome in ("sent", "failed"):
+                    log.info("Телеметрия беты: %s", outcome)
+            except Exception:                           # noqa: BLE001
+                log.debug("Телеметрия беты не отправилась", exc_info=True)
+
     def stop(self, why: str = "остановлено") -> str:
         if self._running:
             self._running = False
             self.stopped_because = why
+            telemetry = getattr(self.engine, "telemetry", None)
+            if telemetry is not None:
+                telemetry.flush()
             if self._on_stop is not None:
                 self._on_stop()
         return why
@@ -699,6 +729,13 @@ class ProtocolServer:
                 for key, value in accepted.items():
                     store.set(key, value)
                 self._settle_voice(store, accepted, verdicts)
+                if accepted.get("telemetry") is False:
+                    # Off means forgotten: what was gathered and the random
+                    # identifier go, so switching it on again is somebody
+                    # new rather than the same person resumed.
+                    telemetry = getattr(self.engine, "telemetry", None)
+                    if telemetry is not None:
+                        telemetry.forget()
                 if "ui_language" in accepted:
                     # The language is not the sort of setting a program is
                     # restarted for. The replies switch here, the words of
@@ -2169,6 +2206,9 @@ class ProtocolServer:
             outcome = (self.recogniser.finish() if phrase is None
                        else self.recogniser.recognise(phrase))
             self._keep_phrase(phrase, outcome, time.monotonic() - started)
+            telemetry = getattr(self.engine, "telemetry", None)
+            if telemetry is not None and phrase is not None and outcome.ok:
+                telemetry.timing("recognition", time.monotonic() - started)
             if not outcome.ok:
                 log.warning("Распознавание не сложилось: %s", outcome.error)
                 self.engine.bus.emit(
@@ -2466,6 +2506,9 @@ class ProtocolServer:
                 self._first_sound = time.monotonic() - began
             self.send_speech(pcm, self.synthesiser.sample_rate)
 
+        telemetry = getattr(self.engine, "telemetry", None)
+        if telemetry is not None and self._first_sound is not None:
+            telemetry.timing("first_sound", self._first_sound)
         log.info("Речь (%s): до первого звука %s, вся реплика %d мс, "
                  "речи %.1f с, предложений %d",
                  getattr(self.synthesiser, "name", "?"),

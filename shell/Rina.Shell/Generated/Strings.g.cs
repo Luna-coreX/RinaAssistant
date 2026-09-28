@@ -239,6 +239,11 @@ public static partial class Loc
                 {
                     ["English"] = "beta",
                 },
+            ["Бета нужна, чтобы узнать, чем пользуются и где что-то не получается. Помочь можно, а можно и нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The beta is there to learn what people use and where things go wrong. You can help, or not.",
+                },
             ["Бета-возможность: поведение может измениться в следующих версиях."] =
                 new Dictionary<string, string>
                 {
@@ -296,6 +301,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "version {0}",
+                },
+            ["Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки. Раз в сутки."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The version of the program and of Windows, which commands and tools ran and how often, error codes, how long recognition and the first sound took, a random installation number. Once a day.",
                 },
             ["вид"] =
                 new Dictionary<string, string>
@@ -465,6 +475,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Where the model lives",
+                },
+            ["Где посмотреть и выключить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to see it and switch it off",
                 },
             ["ГДЕ ЧТО ЛЕЖИТ"] =
                 new Dictionary<string, string>
@@ -983,6 +998,11 @@ public static partial class Loc
                 {
                     ["English"] = "One combination each",
                 },
+            ["Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Every report that was sent is shown in full on the “What Rina knows about me” page. It is switched off in the settings, under “Privacy”. 4.0.0 Stable will have no telemetry.",
+                },
             ["Как вы называете программы — Рина запомнила это из ваших поправок."] =
                 new Dictionary<string, string>
                 {
@@ -1373,6 +1393,11 @@ public static partial class Loc
                 {
                     ["English"] = "could not ask the source: {0}",
                 },
+            ["Не уходит никогда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What is never sent",
+                },
             ["Непонятую фразу отправлять в поиск"] =
                 new Dictionary<string, string>
                 {
@@ -1493,6 +1518,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What should I remind you about?",
+                },
+            ["Обезличенные счётчики: что срабатывает и где ошибки. Без текста, звука и путей; каждый отчёт виден на странице «Что Рина знает обо мне». В Stable её не будет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Anonymous counters: what works and where errors happen. No text, sound or paths; every report is shown on the “What Rina knows about me” page. Stable will not have it",
                 },
             ["Обзор…"] =
                 new Dictionary<string, string>
@@ -1638,6 +1668,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Sent",
+                },
+            ["Отправлять обезличенную статистику беты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Send the beta's anonymous statistics",
                 },
             ["Очистить"] =
                 new Dictionary<string, string>
@@ -1790,6 +1825,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Show done",
+                },
+            ["Помочь бете"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Help the beta",
                 },
             ["попытка {0}"] =
                 new Dictionary<string, string>
@@ -2441,6 +2481,11 @@ public static partial class Loc
                 {
                     ["English"] = "The same questions as on the first run. Nothing is reset: you need not answer them again.",
                 },
+            ["Телеметрия беты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Beta telemetry",
+                },
             ["То, о чём вы просили напомнить."] =
                 new Dictionary<string, string>
                 {
@@ -2580,6 +2625,11 @@ public static partial class Loc
                 {
                     ["English"] = "The device Rina hears from",
                 },
+            ["Уходит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What is sent",
+                },
             ["файл .onnx"] =
                 new Dictionary<string, string>
                 {
@@ -2708,6 +2758,11 @@ public static partial class Loc
                 {
                     ["English"] = "Readable text (*.txt)|*.txt|Data (*.json)|*.json",
                 },
+            ["Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What you said or typed, sound, paths and file names, the names of your plugins, addresses, passwords and keys.",
+                },
             ["Что доустановить"] =
                 new Dictionary<string, string>
                 {
@@ -2717,6 +2772,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What to remember",
+                },
+            ["Что накоплено и ещё не ушло, и каждый отчёт, ушедший на сервер, — в том виде, в каком ушёл. В 4.0.0 Stable телеметрии не будет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What has been gathered and not yet sent, and every report sent to the server, exactly as it was sent. 4.0.0 Stable will have no telemetry.",
                 },
             ["Что ответить (необязательно)"] =
                 new Dictionary<string, string>

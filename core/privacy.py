@@ -236,6 +236,40 @@ def _folders(settings):
     } for path in (settings.get("program_folders", []) or [])]
 
 
+def _telemetry(settings):
+    """
+    The beta's telemetry: what is gathered now, and every report that left.
+
+    Shown whole, in the form the server received it — not summarised. A
+    person who switched it on is owed the exact thing that went, and a
+    summary would be this page's word against the wire's (`4.0b-D05`).
+    """
+    import json
+
+    from core.telemetry import Telemetry
+
+    telemetry = Telemetry(settings)
+    out = []
+    pending = telemetry.report()
+    if pending is not None:
+        out.append({
+            "id": "pending",
+            "what": tr("Накоплено, ещё не ушло"),
+            "detail": json.dumps(pending, ensure_ascii=False),
+            "where": "",
+            "when": 0.0,
+        })
+    for one in telemetry.sent():
+        out.append({
+            "id": str(one.get("at", "")),
+            "what": tr("Ушло на сервер"),
+            "detail": json.dumps(one.get("report", {}), ensure_ascii=False),
+            "where": "",
+            "when": float(one.get("at") or 0.0),
+        })
+    return out
+
+
 #: A group of the inventory: which keys of the store it accounts for, and
 #: how to read them out. The key list is what makes the walk below able to
 #: tell an accounted-for key from a new one.
@@ -249,6 +283,7 @@ GROUPS = (
     ("stats", ("command_stats",), _stats),
     ("plugins", ("enabled_plugins", "plugin_settings"), _plugins),
     ("folders", ("program_folders",), _folders),
+    ("telemetry", ("telemetry",), _telemetry),
 )
 
 
@@ -402,6 +437,34 @@ FORGETTABLE = {
 }
 
 
+def _forget_telemetry(settings, wanted):
+    import io
+    import json
+
+    from core.telemetry import SENT_FILE, Telemetry
+
+    telemetry = Telemetry(settings)
+    gone = 0
+    if wanted is None or "pending" in wanted:
+        if telemetry.report() is not None:
+            gone += 1
+        telemetry.forget()
+    kept = [one for one in telemetry.sent()
+            if wanted is not None and str(one.get("at", "")) not in wanted]
+    gone += len(telemetry.sent()) - len(kept)
+    path = telemetry._path(SENT_FILE)
+    try:
+        if kept:
+            with io.open(path, "w", encoding="utf-8") as f:
+                f.write("\n".join(json.dumps(one, ensure_ascii=False)
+                                  for one in kept) + "\n")
+        elif os.path.exists(path):
+            os.remove(path)
+    except OSError:
+        pass
+    return gone
+
+
 def forget(settings, group, ids=None):
     """
     Forget entries of one group, or the group entire.
@@ -417,6 +480,12 @@ def forget(settings, group, ids=None):
     displaying their data next to a button that quietly does nothing.
     """
     wanted = None if ids is None else {str(i) for i in ids}
+
+    if group == "telemetry":
+        # The records, not the choice: forgetting what was gathered and
+        # sent is not the same as switching it off, and a button that did
+        # both would decide the second for the person.
+        return _forget_telemetry(settings, wanted)
 
     if group == "settings":
         if wanted is None:

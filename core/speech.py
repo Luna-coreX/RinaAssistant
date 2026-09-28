@@ -639,8 +639,24 @@ class FasterWhisperRecogniser:
             # take about a quarter of the memory at a difference in wording
             # a person does not meet. There is no video card in the promise
             # this program makes.
-            self._model = WhisperModel(self.size, device="cpu",
-                                       compute_type="int8")
+            #
+            # **From the disk first, and the network only for a model that
+            # is not there.** Given a size, faster-whisper asks
+            # huggingface.co for the latest revision on every load, and
+            # uses the cache only when that request fails. Measured: each
+            # start of recognition knocked on huggingface.co, on a machine
+            # where the model had long been downloaded. The download on
+            # first use is what the person chose in the wizard; the check
+            # on every start after it is something nobody asked for
+            # (`4.0b-D05`: with telemetry off, no request the person did
+            # not make).
+            try:
+                self._model = WhisperModel(self.size, device="cpu",
+                                           compute_type="int8",
+                                           local_files_only=True)
+            except FileNotFoundError:
+                self._model = WhisperModel(self.size, device="cpu",
+                                           compute_type="int8")
             return True
         except Exception as exc:                        # noqa: BLE001
             self._error = str(exc)

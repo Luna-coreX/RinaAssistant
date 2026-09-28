@@ -846,8 +846,11 @@ class ToolRunner:
     """The only way to perform anything."""
 
     def __init__(self, context, registry=None, confirmations=None,
-                 features=None, audit=None):
+                 features=None, audit=None, telemetry=None):
         self._ctx = context
+        #: The beta's telemetry (`4.0b-D05`), counted at the same place as
+        #: the journal and for the same reason: every call passes here.
+        self._telemetry = telemetry
         self._registry = registry or default_registry()
         self._confirmations = confirmations or ConfirmationLedger()
         self._features = features
@@ -1003,6 +1006,12 @@ class ToolRunner:
     def _write(self, tool, args, source, permissions, ok, error_code,
                started, confirmation_id, trace_id, reason=""):
         """An entry in the call journal. A journal failure does not get in the way of work."""
+        if self._telemetry is not None:
+            try:
+                self._telemetry.tool(getattr(tool, "name", tool), ok,
+                                     error_code, reason)
+            except Exception:                           # noqa: BLE001
+                log.debug("Телеметрия не сосчитала вызов", exc_info=True)
         if self._audit is None:
             return
         try:

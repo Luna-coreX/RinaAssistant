@@ -72,7 +72,7 @@
 <hr class="seam">
 <h2 id="say-it-and-it-happens">Say it, and it happens</h2>
 <p><strong>Rina Assistant</strong> listens, works out what you asked for, and does it: opens the program you named even if you named it in the wrong alphabet, sets a timer, changes the volume, does the arithmetic, searches the web, or — if you switch it on — answers with a language model running on your own machine.</p>
-<p><strong>Everything runs on your computer.</strong> No account, no cloud service, no telemetry. There is a page inside the program that lists every single thing it has remembered about you, and a button to make it forget any of it.</p>
+<p><strong>Everything runs on your computer.</strong> No account, no cloud service. The beta has telemetry that is off until you switch it on: numbers once a day, never what you said, and gone in 4.0.0 Stable. There is a page inside the program that lists every single thing it has remembered about you, and a button to make it forget any of it.</p>
 <p>She is one shape when waiting, another when listening, another when answering — the window says what is happening without a word for it.</p>
 <hr class="seam">
 <h2 id="try-it-in-five-minutes">Try it in five minutes</h2>
@@ -168,7 +168,7 @@ dotnet run --project shell/Rina.Shell -c Release</pre>
 <p>Rina talks to <code>http://localhost:11434</code> by default and warns you plainly if you point her anywhere that is not local.</p>
 <hr class="seam">
 <h2 id="development">Development</h2>
-<pre>python tools/regress.py          # 83 checks, about six minutes
+<pre>python tools/regress.py          # 84 checks, about six minutes
 python tools/regress.py --list   # what they are</pre>
 <p>Behaviour is pinned by a golden set of 134 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.</p>
 <p>How to debug two processes at once — <a href="/docs/debugging/"><code>docs/DEBUGGING.md</code></a>.</p>
@@ -178,7 +178,7 @@ python tools/regress.py --list   # what they are</pre>
 <p>Said once, plainly, because the alternative is saying it later and having it read as a change of mind:</p>
 <ul class="plain"><li><strong>The beta is free.</strong> All of it. Nothing is held back behind a plan, and there is no payment code in the program to hold anything back with.</li><li><strong>The local base stays free.</strong> Everything that runs on your machine — voice in and out, launching programs, commands, reminders, plugins, the local model, the privacy page — is the product, not a trial of it. It is Apache-2.0, and a licence cannot be taken back from a copy you already have.</li><li><strong>Some advanced capabilities may be paid later.</strong> Most likely candidates are things that cost money to run — a service on somebody&#x27;s server, a connector to a paid third party. If that happens it will be <em>additional</em>, and this list is the promise it will be measured against.</li></ul>
 <p><strong>What is open stays open</strong>, and that is decided rather than hoped: the code that handles audio and your data, the safe launching of programs, the confirmation of dangerous actions, the security journal, the protocol, and the base functionality. What could reasonably close later is a licence server, billing, and paid connectors — none of which is on your computer.</p>
-<p>There is no telemetry, no account, and nothing to opt out of.</p>
+<p>There is no account. Telemetry exists only in the beta and only if you switch it on — in the setup wizard or in settings. A report is counts and the program&#x27;s own vocabulary: which features ran, error codes, how long recognition took; no phrase, path or name. Every report that left is shown in full on the privacy page. 4.0.0 Stable removes it entirely.</p>
 <hr class="seam">
 <h2 id="roadmap">Roadmap</h2>
 <p><strong>4.0.0-port — separation and redesign.</strong> Nearly complete: the core is a standalone service, the shell and system layer are C#, the protocol is between them, the interface is redesigned. What remains is the installer.</p>
@@ -187,7 +187,7 @@ python tools/regress.py --list   # what they are</pre>
 <p>Full plan: <a href="/docs/plan/"><code>docs/ROADMAP.md</code></a>.</p>
 <hr class="seam">
 <h2 id="security">Security</h2>
-<p>What we defend against, from whom, and with what — <a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>. Six surfaces, twenty-four threats, and for each of them the <strong>residual risk</strong> written down, because a defence without one has stopped being thought about. The sweep that walks that document rather than a list somebody maintains is <code>tools/test_security.py</code>.</p>
+<p>What we defend against, from whom, and with what — <a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>. Six surfaces, twenty-five threats, and for each of them the <strong>residual risk</strong> written down, because a defence without one has stopped being thought about. The sweep that walks that document rather than a list somebody maintains is <code>tools/test_security.py</code>.</p>
 <p>Reporting a vulnerability: <a href="/docs/security/"><code>SECURITY.md</code></a>.</p>
 <hr class="seam">
 <h2 id="contributing-and-feedback">Contributing and feedback</h2>

@@ -128,6 +128,9 @@
   "Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать.": {
     "English": "No limit: the background is redrawn on every frame the monitor shows. On a 144 Hz monitor or faster this is the heaviest setting, and the window may start to stutter."
   },
+  "Бета нужна, чтобы узнать, чем пользуются и где что-то не получается. Помочь можно, а можно и нет.": {
+    "English": "The beta is there to learn what people use and where things go wrong. You can help, or not."
+  },
   "Бета-возможность: поведение может измениться в следующих версиях.": {
     "English": "A beta capability: its behaviour may change in later versions."
   },
@@ -154,6 +157,9 @@
   },
   "Версии, ссылки, из чего собрана": {
     "English": "Versions, links, what it’s made of"
+  },
+  "Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки. Раз в сутки.": {
+    "English": "The version of the program and of Windows, which commands and tools ran and how often, error codes, how long recognition and the first sound took, a random installation number. Once a day."
   },
   "Внешний вид": {
     "Deutsch": "Darstellung",
@@ -256,6 +262,9 @@
   },
   "Где лежит модель": {
     "English": "Where the model lives"
+  },
+  "Где посмотреть и выключить": {
+    "English": "Where to see it and switch it off"
   },
   "Главная": {
     "English": "Home"
@@ -551,6 +560,9 @@
   "Каждому своё сочетание": {
     "English": "One combination each"
   },
+  "Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет.": {
+    "English": "Every report that was sent is shown in full on the “What Rina knows about me” page. It is switched off in the settings, under “Privacy”. 4.0.0 Stable will have no telemetry."
+  },
   "Как вы называете программы — Рина запомнила это из ваших поправок.": {
     "English": "What you call your programs — Rina learned this from your corrections."
   },
@@ -731,6 +743,9 @@
   "Не удалось спросить": {
     "English": "Could not ask"
   },
+  "Не уходит никогда": {
+    "English": "What is never sent"
+  },
   "Непонятую фразу отправлять в поиск": {
     "English": "Send a phrase that was not understood to a search"
   },
@@ -781,6 +796,9 @@
   },
   "ОБНОВЛЕНИЯ": {
     "English": "UPDATES"
+  },
+  "Обезличенные счётчики: что срабатывает и где ошибки. Без текста, звука и путей; каждый отчёт виден на странице «Что Рина знает обо мне». В Stable её не будет": {
+    "English": "Anonymous counters: what works and where errors happen. No text, sound or paths; every report is shown on the “What Rina knows about me” page. Stable will not have it"
   },
   "Обзор…": {
     "Deutsch": "Durchsuchen…",
@@ -859,6 +877,9 @@
   },
   "Отправлено": {
     "English": "Sent"
+  },
+  "Отправлять обезличенную статистику беты": {
+    "English": "Send the beta's anonymous statistics"
   },
   "Очистить": {
     "English": "Clear"
@@ -958,6 +979,9 @@
   },
   "Показывать сделанные": {
     "English": "Show done"
+  },
+  "Помочь бете": {
+    "English": "Help the beta"
   },
   "Последовательность · шагов {0}": {
     "English": "Sequence · {0} steps"
@@ -1322,6 +1346,9 @@
   "Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно.": {
     "English": "The same questions as on the first run. Nothing is reset: you need not answer them again."
   },
+  "Телеметрия беты": {
+    "English": "Beta telemetry"
+  },
   "То, о чём вы просили напомнить.": {
     "English": "The things you asked to be reminded of."
   },
@@ -1406,6 +1433,9 @@
   "Устройство, с которого Рина слышит": {
     "English": "The device Rina hears from"
   },
+  "Уходит": {
+    "English": "What is sent"
+  },
   "Файл голоса .onnx": {
     "English": "The .onnx voice file"
   },
@@ -1457,11 +1487,17 @@
   "Что Рина знает обо мне": {
     "English": "What Rina knows about me"
   },
+  "Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи.": {
+    "English": "What you said or typed, sound, paths and file names, the names of your plugins, addresses, passwords and keys."
+  },
   "Что доустановить": {
     "English": "What else is needed"
   },
   "Что запомнить": {
     "English": "What to remember"
+  },
+  "Что накоплено и ещё не ушло, и каждый отчёт, ушедший на сервер, — в том виде, в каком ушёл. В 4.0.0 Stable телеметрии не будет.": {
+    "English": "What has been gathered and not yet sent, and every report sent to the server, exactly as it was sent. 4.0.0 Stable will have no telemetry."
   },
   "Что ответить (необязательно)": {
     "English": "What to answer (optional)"

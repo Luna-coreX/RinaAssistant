@@ -201,6 +201,8 @@ WATCHED = frozenset({
     "watch_apps",
     "save_history",
     "web_search_fallback",
+    # What leaves the machine on its own: the beta's telemetry.
+    "telemetry",
 })
 
 

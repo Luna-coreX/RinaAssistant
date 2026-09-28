@@ -777,6 +777,8 @@ _EN = {
     'приложений {n}': '{n} applications',
     'идёт': 'running',
     'закрыта': 'closed',
+    'Накоплено, ещё не ушло': 'Gathered, not sent yet',
+    'Ушло на сервер': 'Sent to the server',
 
     # --- the download catalogue (`core/models.py`, `4.0b-A14`) ---
     #

@@ -32,8 +32,8 @@ from console import use_utf8  # noqa: E402
 use_utf8()
 
 #: What the program is made of.
-SOURCES = ["shell", "core", "voice", "plugins", "tools", "rina_core.py",
-           "requirements.txt"]
+SOURCES = ["shell", "core", "voice", "plugins", "tools", "server",
+           "rina_core.py", "requirements.txt"]
 
 #: What is built or cached there, and is right to be ignored.
 PRODUCED = {"bin", "obj", "__pycache__"}

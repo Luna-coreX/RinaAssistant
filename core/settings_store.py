@@ -147,6 +147,10 @@ GROUPS = {
         # it is written only with explicit consent and only at DEBUG level.
         "log_level": "INFO",
         "log_texts": False,
+        # Telemetry for the beta (`4.0b-D05`): off until a person switches
+        # it on, and gone in Stable (`4.0-S04`). See `core/telemetry.py`
+        # for what is counted and what never is.
+        "telemetry": False,
         "config_version": 0,
         "first_run": True,
     },

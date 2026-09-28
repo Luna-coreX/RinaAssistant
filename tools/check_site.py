@@ -370,7 +370,16 @@ WORDS = {
     22: {"русская": "двадцать две", "английская": "twenty-two"},
     23: {"русская": "двадцать три", "английская": "twenty-three"},
     24: {"русская": "двадцать четыре", "английская": "twenty-four"},
+    25: {"русская": "двадцать пять", "английская": "twenty-five"},
 }
+
+
+def russian_noun(number, forms):
+    """Which of a Russian noun's three counted forms a number takes."""
+    if number % 100 in range(11, 15):
+        return forms[2]
+    return forms[{1: 0, 2: 1, 3: 1, 4: 1}.get(number % 10, 2)]
+
 
 model = read(os.path.join(ROOT, "docs", "security", "THREAT-MODEL.md"))
 threats = len(re.findall(r"^### T-", model, re.MULTILINE))
@@ -388,7 +397,8 @@ PROSE = [
      {"русская": "{} поверхностей", "английская": "{} surfaces"},
      "поверхностей в модели угроз", LANDING),
     (threats,
-     {"русская": "{} угрозы", "английская": "{} threats"},
+     {"русская": ("{} угроза", "{} угрозы", "{} угроз"),
+      "английская": "{} threats"},
      "угроз в модели угроз", LANDING),
     (len(PAGE_KINDS),
      {"русская": "{} видов", "английская": "{} kinds"},
@@ -403,7 +413,13 @@ for number, templates, what, where_all in PROSE:
         continue
     for where in where_all:
         tongue = "английская" if where.startswith("английская") else "русская"
-        phrase = templates[tongue].format(word[tongue])
+        template = templates[tongue]
+        # A Russian noun changes with the number: twenty-four takes one
+        # form, twenty-five another. A fixed template went wrong the day
+        # the count of threats moved from 24 to 25.
+        if isinstance(template, tuple):
+            template = russian_noun(number, template)
+        phrase = template.format(word[tongue])
         check(f"{where}: {what} — «{phrase}»", phrase in lower[where],
               "| число на странице отстало от кода")
 
@@ -1825,14 +1841,16 @@ SAID = {
         ("локальная база останется бесплатной",
          "локальная база останется бесплатной"),
         ("открытое остаётся открытым", "открытым остаётся"),
-        ("телеметрии нет", "телеметрии нет"),
+        ("телеметрия только в бете", "телеметрия есть только в бете"),
+        ("и выключена, пока её не включат", "пока вы её не включите"),
         ("страница без скриптов", "не выполняет скриптов"),
     ],
     "английская": [
         ("the beta is free", "the beta is free"),
         ("the local base stays free", "the local base stays free"),
         ("what stays open", "what stays open"),
-        ("no telemetry", "there is no telemetry"),
+        ("telemetry only in the beta", "telemetry exists only in the beta"),
+        ("and off until switched on", "off until you switch it on"),
         ("no scripts on the page", "runs no scripts"),
     ],
 }
