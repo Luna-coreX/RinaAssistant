@@ -295,7 +295,8 @@ public static class SettingsLayout
     /// processor's time for Rina alone. Sixty came out at twice thirty on
     /// both, and a 75-hertz monitor with no limit at two and a third —
     /// the cost follows the frames. The processor is named because it
-    /// pays the most: thirty already keeps several cores busy.
+    /// pays the most: about a core at thirty in a Release build, three to
+    /// four times that in Debug.
     /// </para>
     /// </remarks>
     public static readonly (string Value, string Title, string Cost)[] FrameRates =

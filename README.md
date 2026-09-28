@@ -41,8 +41,12 @@ Requires **Windows**, **Python 3.10+** and **.NET 9**.
 git clone https://github.com/Luna-coreX/RinaAssistant.git
 cd RinaAssistant
 pip install -r requirements.txt
-dotnet run --project shell/Rina.Shell
+dotnet run --project shell/Rina.Shell -c Release
 ```
+
+`-c Release` matters: the living background and the figure are computed on
+the processor, and a Debug build does that three to four times slower —
+about three cores busy instead of one. Debug is for stepping through code.
 
 The shell starts the core itself — you never run it separately. On the first
 launch a short wizard asks which voice and which recognition you want and
