@@ -668,6 +668,66 @@ line = hinting._recognition_hints()
 check("ядро подсказывает имя, а не ослышки из слов активации",
       line.startswith("Рина") and "Рена" not in line and "Рима" not in line
       and "Стим" in line and "код" in line, f"| «{line}»")
+# And the name goes into the hints but not into the programs: counted as
+# one, «Рина, Стим» — a call and a program — would read as two names and
+# be dropped as a recitation.
+check("«Рина, Стим» — зов, а не пересказ подсказок",
+      not apps_mod.recited("Рина, Стим", hinting._hint_programs),
+      f"| программы: {hinting._hint_programs}")
+
+# The hints read back instead of a phrase. Met in a person's session —
+# «Код, Геймс, Поверпоинт, Терп, Поверпоинт» — and on a knock and a
+# filtered phrase while the diagnosis ran. These three are what the rule
+# was set on; the ones that must pass are what a person really says.
+mine = ["код", "Стим", "Ворд", "Эксель", "Поверпоинт", "Аутлук", "Вижуал Студио Код",
+        "Эпик Геймс", "Клод", "Терминал"]
+reading_back = ["Код, Геймс, Поверпоинт, Терп, Поверпоинт,",
+                "Аутлук, Аутлук, Клод, Клод, Волбь, Эгсель, Троп,",
+                "Эксель, Поверпоинт, Верпоинт,"]
+missed = [t for t in reading_back if not apps_mod.recited(t, mine)]
+check("пересказ подсказок узнаётся", not missed, f"| пропущены: {missed}")
+said_for_real = ["Запусти Стим", "Рина, Стим", "Открой Вижуал Студио Код",
+                 "в Ворде и Экселе у меня файлы", "Код, Велик",
+                 "Рина, запусти сессию над проектом", "Что нового у тебя?"]
+taken = [t for t in said_for_real if apps_mod.recited(t, mine)]
+check("а сказанное по-настоящему — нет", not taken, f"| приняты за пересказ: {taken}")
+
+# And the core acts on it: a recitation reaches neither the window nor the
+# commands. Asked through the real `_recognise`, with a phrase that must get
+# through beside it, or a core that dropped everything would pass.
+from core.events import EventBus
+
+
+class Says:
+    """A recogniser that hears whatever it is told to."""
+
+    def __init__(self):
+        self.line = ""
+
+    @staticmethod
+    def available():
+        return True
+
+    def recognise(self, pcm):
+        return Heard(text=self.line)
+
+
+shown = []
+listener = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": []}), event_bus=EventBus())
+listener.bus.on("speech.recognized", lambda data: shown.append(data["text"]))
+listening = ProtocolServer.__new__(ProtocolServer)
+listening.engine = listener
+listening.recogniser = Says()
+listening._hints, listening._hint_programs = "Рина, " + ", ".join(mine), mine
+listening.heard = {"recognitions": 0, "texts": 0}
+listening.recogniser.line = reading_back[0]
+listening._recognise(sound(1.0))
+check("пересказ не доходит ни до окна, ни до команды", not shown, f"| {shown}")
+listening.recogniser.line = "Открой блокнот"
+listening._recognise(sound(1.0))
+check("а обычная фраза доходит", shown == ["Открой блокнот"], f"| {shown}")
 
 # «запусти стим» and «запустите им» are one sound, and recognition settles
 # on the longer verb. The name then comes through behind a polite verb,

@@ -117,15 +117,59 @@ def spoken_hints(entries, first=()):
     left out on purpose: a hint for something that cannot be launched is a
     word the model is pushed towards for nothing.
     """
-    said = []
+    said, seen = [], set()
+    # Compared as spoken, not as spelled: a person's alias «стим» and the
+    # table's «Стим» are one word to the model, and offered twice it is
+    # pulled towards twice as hard.
     for word in first:
         word = str(word).strip()
-        if word and word not in said:
+        if word and normalize(word) not in seen:
             said.append(word)
+            seen.add(normalize(word))
     for target, name in SAID_AS.items():
-        if name not in said and (_has(entries, target) or _has(entries, name)):
+        if normalize(name) not in seen and (_has(entries, target)
+                                            or _has(entries, name)):
             said.append(name)
+            seen.add(normalize(name))
     return said[:HINTS_AT_MOST]
+
+
+#: How much of a phrase has to be hinted names for it to be a recitation.
+RECITED_SHARE = 0.6
+
+
+def recited(text, programs):
+    """
+    Is this the hints read back rather than something said (`4.0b-V08`)?
+
+    **A hint is a word the model is pulled towards, and on a phrase it
+    cannot make out it sometimes gives the pull back as the answer.** In a
+    person's session «Код, Геймс, Поверпоинт, Терп, Поверпоинт» — the
+    installed programs, recited; on a knock «Аутлук, Аутлук, Клод, Клод,
+    Волбь, Эгсель, Троп». Nobody asked for Office. With a launch verb in
+    front, one such line would open a program nobody named.
+
+    A recitation has no verb and is mostly names: at least two of its words
+    are like the programs' names, and they are at least `RECITED_SHARE` of
+    it. Set on what was at hand — the three recitations met, and 509 real
+    phrases (a person's history and session, the phrases kept for the
+    diagnosis, everything the recognition bench heard), of which this
+    takes none. A phrase with a launch verb is never one: a real command
+    starts with one, and the price of letting a recitation with a verb
+    through is lower than that of losing a command.
+
+    `programs` are the names only — not the name she answers to: «Рина,
+    Стим» is a call and a program, not a list.
+    """
+    from voice.app_launcher import LAUNCH_VERBS
+
+    words = normalize(text).split()
+    if not words or any(word in LAUNCH_VERBS for word in words):
+        return False
+    vocabulary = {word for name in programs for word in normalize(name).split()}
+    named = [word for word in words
+             if any(similar(word, known) for known in vocabulary)]
+    return len(named) >= 2 and len(named) / len(words) >= RECITED_SHARE
 
 
 # A browser is not a program's name but a role: one person has Brave

@@ -114,13 +114,16 @@ class ProtocolServer:
         #: between "said" and "heard".
         self.credit_window = 64 * 1024
         self.receiver = None
-        #: Recognition and synthesis. Passed in from outside so that they
-        #: can be substituted in a check: real models are not installed on
-        #: every machine, and the wire has to be checked everywhere.
         #: The names recognition is hinted with, and what they were
         #: worked out from — see `_recognition_hints`.
         self._hints = ""
         self._hints_for = None
+        #: The programs among them, without her name — what a recitation
+        #: is recognised by (`core.apps.recited`).
+        self._hint_programs: list = []
+        #: Recognition and synthesis. Passed in from outside so that they
+        #: can be substituted in a check: real models are not installed on
+        #: every machine, and the wire has to be checked everywhere.
         self.recogniser = recogniser or speech.recogniser_for(
             getattr(engine, "_settings", None) or {},
             hints=self._recognition_hints)
@@ -1700,7 +1703,10 @@ class ProtocolServer:
         if wanted != self._hints_for:
             from core.apps import spoken_hints
 
-            self._hints = ", ".join(spoken_hints(entries, (name, *aliases)))
+            programs = spoken_hints(entries, aliases)
+            self._hints = ", ".join([name] + [p for p in programs
+                                             if p.lower() != name.lower()])
+            self._hint_programs = programs
             self._hints_for = wanted
         return self._hints
 
@@ -2172,6 +2178,16 @@ class ProtocolServer:
             if not outcome.text:
                 log.info("Фраза распозналась пустой — тишина или шум")
                 return          # silence is neither an error nor worth reporting
+
+            # The hints read back instead of a phrase — see `core.apps.recited`.
+            # Nobody said it, so it is treated as nobody saying anything: no
+            # line in the window, no command, no search.
+            from core.apps import recited
+
+            if recited(outcome.text, getattr(self, "_hint_programs", [])):
+                log.info("Распознаны одни подсказки, а не фраза: %s",
+                         safe(outcome.text))
+                return
 
             if self._is_her_own(outcome.text):
                 # Her own voice, through the open microphone. Said at
