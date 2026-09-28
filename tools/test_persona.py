@@ -211,6 +211,24 @@ for lang in i18n.LANGUAGES:
           f"| без перевода {len(missing)} из {len(every)}")
 
 print()
+print("=== подоплёка не проникает в манеру ===")
+# `PRODUCT.md`: the image is a tool and the manner is her own — a warm
+# tone is allowed, the author's universe is not. `design/RINA.md` keeps
+# the backstory as a reason for decisions and never as content, and a
+# persona that told the model where she came from would put it into every
+# answer. Asked of every language she speaks, not only of the Russian.
+LORE = re.compile(r"nexora|некс|дезертир|сбежа|ликвидац|"
+                  r"deserter|escaped|in hiding|x0\b", re.IGNORECASE)
+spoken = [*llm.RINA]
+for lang in i18n.LANGUAGES:
+    table = i18n._TRANSLATIONS.get(lang) or {}
+    spoken += [table[p] for p in llm.RINA if p in table]
+leaked = sorted({m.group(0).lower() for line in spoken
+                 for m in LORE.finditer(line)})
+check("персона Рины не рассказывает, откуда она", not leaked,
+      f"| найдено: {leaked}")
+
+print()
 print("=== личность ===")
 # Rina, or one of the person's own. What was here the evening before —
 # «тёплая» and «сдержанная» — were two moods of one Rina, where
