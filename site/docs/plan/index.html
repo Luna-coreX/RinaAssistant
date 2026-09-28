@@ -43,8 +43,8 @@
     </div>
     <div class="strip">
       <div><b>102/102</b><span>4.0-port</span></div>
-      <div><b>36/71</b><span>4.0-beta</span></div>
-      <div><b>0/7</b><span>4.0-stable</span></div>
+      <div><b>36/68</b><span>4.0-beta</span></div>
+      <div><b>0/11</b><span>4.0-stable</span></div>
       <div><b>0/2</b><span>4.1+</span></div>
       <div><b>0/44</b><span>5.0.0</span></div>
       <div><b>0/46</b><span>RinaNeuro</span></div>
@@ -545,6 +545,10 @@
 <details>
 <summary><strong>4.0-S02 · Threat model</strong> — M — D02, H07 — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
 <p><a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>: четыре поверхности, семнадцать угроз, у каждой — нарушитель, защита и <strong>названный остаток</strong>. Сверяется <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/check_threat_model.py"><code>tools/check_threat_model.py</code></a>.</p>
+</details>
+<details>
+<summary><strong>4.0-S04 · Телеметрия беты уходит из Stable</strong> — S — 4.0b-D05 — <strong>[stable]</strong></summary>
+<p>Решено 2026-09-29: необязательная телеметрия (<code>4.0b-D05</code>) живёт только в бете. В Stable она убирается целиком: код отправки, настройка, пункт на странице приватности, адрес сервера. Обещание «без телеметрии» на странице продукта и в README возвращается без оговорок.</p>
 </details>
 <details>
 <summary><strong>4.0-S03 · Границы 4.0 зафиксированы</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
@@ -1058,6 +1062,7 @@
 </details>
 <hr class="seam">
 <h2 id="trek-v-golos-idet-parallelno-s-4-x-ne-zhdet-5-0-0">ТРЕК V — голос (идёт параллельно с 4.x, не ждёт 5.0.0)</h2>
+<p><strong>Решено 2026-09-29: свой голос Рины — в 4.0.0 Stable, не в бете.</strong> Так же сказано человеку в настройках, под выбором личности: «У Рины пока нет своего голоса — он появится в 4.0.0 Stable». Снимок границ держал V-04, V-08 и V-09 в бете, и одно из двух было неправдой; оставшиеся пункты трека перенесены в <code>[stable]</code>. Бета выходит с Edge.</p>
 <p>Самый долгий компонент, потому что это данные и итерации обучения, а не код. Отложить на «после 5.0.0» = отложить голос ещё на год.</p>
 <details>
 <summary><strong>V-01 · ADR: что значит «свой голос»</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
@@ -1072,7 +1077,7 @@
 <p>Список пересобран 22 сентября 2026: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>voice/CANDIDATES.md</code></a>. Прогнаны трое. Двое отпали, третий — VoxCPM2 — прошёл условие ADR 0003 по замеру; ещё два прогона переносили найденный голос в быстрый движок. Голос выбран и сохранён: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>. Создан словесным описанием, без единой чужой записи, дальше от каждого из восьми живых дикторов, чем они друг от друга, и говорит на двух языках одним голосом.</p>
 </details>
 <details>
-<summary><strong>V-04 · ADR: стриминг против выразительности</strong> — S — V-03</summary>
+<summary><strong>V-04 · ADR: стриминг против выразительности</strong> — S — V-03 — <strong>[stable]</strong></summary>
 <p><strong>Ключевое решение всего трека.</strong> Лучшая модель эмоций для русского не стримит, а диалог без стриминга ощущается мёртвым. От выбора зависят и аудио-конвейер оболочки, и форма протокола. Возможен гибрид: стримящая модель для диалога, выразительная — для длинных или эмоционально важных реплик.</p>
 </details>
 <details>
@@ -1088,11 +1093,11 @@
 <p>Обучение. Piper дообучен от <code>ru_RU/irina/medium</code>: 257 эпох на процессоре рабочей машины, около 10 минут каждая, и ещё 300 на арендованной RTX 4090 — около 8 секунд на эпоху. Итог — чекпойнт <code>epoch=4696</code>.</p>
 </details>
 <details>
-<summary><strong>V-08 · Оценка</strong> — M — V-07 — слепое сравнение, консистентность тембра, узнаваемость</summary>
+<summary><strong>V-08 · Оценка</strong> — M — V-07 — слепое сравнение, консистентность тембра, узнаваемость — <strong>[stable]</strong></summary>
 <p>Облачный результат померен 25 сентября 2026 (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>CANDIDATES.md</code></a>, пятый замер). На 28 репликах Рины против эпохи 4396: сходство с каноном стоит (0.780 → 0.783), устойчивость подросла (0.750 → 0.768), худшая реплика поднялась с 0.477 — ниже границы «другой человек» — до 0.611; до ближайшего живого 0.31, голос ничей. Дикция померена распознаванием: ошибок в буквах 9.6% → 8.2%, слабым местом остаётся латиница. Динамика не сдвинулась, крест 6.8 при 7.9 у эталона.</p>
 </details>
 <details>
-<summary><strong>V-09 · Интеграция как движок ядра</strong> — M — V-07, 5.0-A06</summary>
+<summary><strong>V-09 · Интеграция как движок ядра</strong> — M — V-07, 5.0-A06 — <strong>[stable]</strong></summary>
 <p>Движок Piper в ядре уже есть (настройка <code>piper_model</code>), так что задача сводится к поставке модели голосом по умолчанию, а не к новому движку.</p>
 </details>
 <hr class="seam">

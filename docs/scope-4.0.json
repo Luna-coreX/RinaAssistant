@@ -569,6 +569,12 @@
     "size": "S",
     "title": "Границы 4.0 зафиксированы"
   },
+  "4.0-S04": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Телеметрия беты уходит из Stable"
+  },
   "4.0-U01": {
     "done": true,
     "milestone": "4.0-port",
@@ -673,7 +679,7 @@
   },
   "V-04": {
     "done": false,
-    "milestone": "4.0-beta",
+    "milestone": "4.0-stable",
     "size": "S",
     "title": "ADR: стриминг против выразительности"
   },
@@ -697,13 +703,13 @@
   },
   "V-08": {
     "done": false,
-    "milestone": "4.0-beta",
+    "milestone": "4.0-stable",
     "size": "M",
     "title": "Оценка"
   },
   "V-09": {
     "done": false,
-    "milestone": "4.0-beta",
+    "milestone": "4.0-stable",
     "size": "M",
     "title": "Интеграция как движок ядра"
   }
