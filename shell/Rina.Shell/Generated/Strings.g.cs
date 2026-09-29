@@ -302,15 +302,25 @@ public static partial class Loc
                 {
                     ["English"] = "version {0}",
                 },
-            ["Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки. Раз в сутки."] =
+            ["Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "The version of the program and of Windows, which commands and tools ran and how often, error codes, how long recognition and the first sound took, a random installation number. Once a day.",
+                    ["English"] = "The program and Windows versions, which commands and tools ran and how often, error codes, recognition and first-sound times, a random installation number.",
                 },
             ["вид"] =
                 new Dictionary<string, string>
                 {
                     ["English"] = "look",
+                },
+            ["Включить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Switch on",
+                },
+            ["Включить телеметрию беты?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Switch on beta telemetry?",
                 },
             ["Внешний вид"] =
                 new Dictionary<string, string>
@@ -1028,6 +1038,11 @@ public static partial class Loc
                 {
                     ["English"] = "What to call you",
                 },
+            ["Как часто"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How often",
+                },
             ["Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка"] =
                 new Dictionary<string, string>
                 {
@@ -1343,6 +1358,11 @@ public static partial class Loc
                 {
                     ["English"] = "Start minimised",
                 },
+            ["Не включать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Leave it off",
+                },
             ["не выбрана"] =
                 new Dictionary<string, string>
                 {
@@ -1402,6 +1422,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What is never sent",
+                },
+            ["Не чаще раза в сутки. Первый отчёт — через сутки после включения; если Рина в это время выключена, то вскоре после следующего запуска."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No more than once a day. The first report goes a day after switching on; if Rina is closed at that moment, soon after her next start.",
                 },
             ["Непонятую фразу отправлять в поиск"] =
                 new Dictionary<string, string>
@@ -2012,6 +2037,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Equal to what",
+                },
+            ["Раз в сутки Рина будет отправлять разработчику короткий отчёт: чем пользовались и где что-то не сработало."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Once a day Rina will send the developer a short report: what was used and where something did not work.",
                 },
             ["Раз в сутки спрашивает api.github.com, нет ли новой версии"] =
                 new Dictionary<string, string>

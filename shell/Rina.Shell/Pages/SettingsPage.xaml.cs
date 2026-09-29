@@ -476,6 +476,40 @@ public partial class SettingsPage : UserControl
     /// </remarks>
     public Task ChooseForCheck(string key, string value) => SaveAsync(key, value);
 
+    /// <summary>
+    /// A toggle was clicked.
+    /// </summary>
+    /// <remarks>
+    /// Switching the beta's telemetry on is asked about once more
+    /// (<see cref="TelemetryConsent"/>): refused, the toggle goes back and
+    /// nothing reaches the core. Every other toggle is written as it is.
+    /// </remarks>
+    private async Task ToggledAsync(string key, CheckBox toggle)
+    {
+        if (key == "telemetry" && toggle.IsChecked == true
+            && !TelemetryConsent.Ask(Window.GetWindow(this)))
+        {
+            toggle.IsChecked = false;
+            return;
+        }
+        await SaveAsync(key, toggle.IsChecked == true);
+    }
+
+    /// <summary>Click a toggle as a person would — for the check.</summary>
+    public async Task ToggleForCheck(string key, bool on)
+    {
+        if (!_editors.TryGetValue(key, out var editor)
+            || editor is not CheckBox toggle)
+            return;
+        toggle.IsChecked = on;
+        await ToggledAsync(key, toggle);
+    }
+
+    /// <summary>Is the toggle for this key on — for the check.</summary>
+    public bool? ToggledForCheck(string key) =>
+        _editors.TryGetValue(key, out var editor) && editor is CheckBox toggle
+            ? toggle.IsChecked : null;
+
     public void FindForCheck(string asked)
     {
         Find.Text = asked;
@@ -1428,8 +1462,7 @@ public partial class SettingsPage : UserControl
                 IsChecked = value?.GetValue<bool>() ?? false,
                 VerticalAlignment = VerticalAlignment.Center,
             };
-            toggle.Click += async (_, _) =>
-                await SaveAsync(key, toggle.IsChecked == true);
+            toggle.Click += async (_, _) => await ToggledAsync(key, toggle);
             return toggle;
         }
 

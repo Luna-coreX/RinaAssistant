@@ -123,7 +123,11 @@ public partial class App
 
         // The media register is asked once, at start: it is the system's,
         // not ours, and the home page is rebuilt on every visit.
-        _ = StartRemoteAsync();
+        // Not for a screenshot: the register is the system's, and what it
+        // holds is whatever the person is listening to — which a picture for
+        // the README published once, cover art and all. The home check
+        // starts the register itself when it is about the remote.
+        if (Value(args, "--shot") is null) _ = StartRemoteAsync();
 
         var window = new MainWindow();
         window.ShowFinish(finish);
@@ -656,6 +660,16 @@ public partial class App
     /// </remarks>
     private static void UseCheckFolder()
     {
+        // A folder given from outside is used as it is and left behind: that
+        // is how the README's screenshots are taken over a prepared profile
+        // (`tools/take_screens.py`) rather than over an empty one — or the
+        // person's.
+        var given = Environment.GetEnvironmentVariable("RINA_SANDBOX_DIR");
+        if (!string.IsNullOrEmpty(given) && Directory.Exists(given))
+        {
+            Platform.DataFolder.UseForCheck(given);
+            return;
+        }
         var home = Path.Combine(Path.GetTempPath(),
                                 "rina-check-" + Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(home);
@@ -913,6 +927,21 @@ public partial class App
         {
             window.ShowSectionFor(_shotSection);
             await Task.Delay(800);
+            // The figure is drawn by its own tick, and the picture used to
+            // be taken before the first one: the home screen without the
+            // thing the home screen is for.
+            // And the home screen is photographed as a person sees it: with
+            // the menu folded away, which is when the figure is drawn at all.
+            if (window.CurrentPage is Pages.HomePage homeShown)
+            {
+                window.ShowMenu(false);
+                await Until(() => window.MenuWidth < 1, 5);
+                // The figure moves on the background's tick, and that
+                // ticks only while the window is active (see the home check).
+                window.Activate();
+                await Until(() => window.BackdropRunning, 5);
+                await Until(() => homeShown.FigureFrameMs > 0, 5);
+            }
             // A plugin's page is drawn from a description sent by another
             // process, and it can only be seen with one's eyes by opening
             // it: a screenshot of an empty list shows neither cards nor
@@ -1580,6 +1609,38 @@ public partial class App
               Math.Abs(window.BackdropRate - Backdrop.DefaultRate) < 0.01,
               $"| фон на {window.BackdropRate:0}");
 
+        // --- the beta's telemetry is asked about once more ---
+        //
+        // Asked for by the person: switching it on is one click, and what
+        // it starts is a report a day to somebody else's server. The
+        // question stands in for a person (a modal window would wait for a
+        // click nobody makes), but it is still counted — "asked and
+        // refused" and "never asked" are different failures.
+        async Task<bool?> Stored() =>
+            (await link.GetAsync("telemetry"))?["telemetry"]?.GetValue<bool>();
+        var askedBefore = Pages.TelemetryConsent.Asked;
+        Pages.TelemetryConsent.Answer = () => false;
+        await Shown().ToggleForCheck("telemetry", true);
+        var refusedShown = Shown().ToggledForCheck("telemetry");
+        var refusedStored = await Stored();
+        Pages.TelemetryConsent.Answer = () => true;
+        await Shown().ToggleForCheck("telemetry", true);
+        var agreedStored = await Stored();
+        var askedOn = Pages.TelemetryConsent.Asked - askedBefore;
+        await Shown().ToggleForCheck("telemetry", false);
+        var askedOff = Pages.TelemetryConsent.Asked - askedBefore - askedOn;
+        var offStored = await Stored();
+        Pages.TelemetryConsent.Answer = null;
+        Check("включение телеметрии спрашивается ещё раз",
+              askedOn == 2, $"| спрошено {askedOn} раз на два включения");
+        Check("отказ оставляет её выключенной — и на странице, и в ядре",
+              refusedShown == false && refusedStored == false,
+              $"| на странице {refusedShown}, в ядре {refusedStored}");
+        Check("согласие включает", agreedStored == true, $"| {agreedStored}");
+        Check("а выключение не спрашивает ни о чём",
+              askedOff == 0 && offStored == false,
+              $"| спрошено {askedOff}, в ядре {offStored}");
+
         // --- the search through forty settings ---
         //
         // Asked for. Measured on what is left standing rather than on
@@ -1920,6 +1981,31 @@ public partial class App
         Check("отметка доходит до ядра, и снятая тоже",
               telemetryOn == true && telemetryOff == false,
               $"| отметили — {telemetryOn}, сняли — {telemetryOff}");
+
+        // And the box, clicked as a person clicks it, asks once more: a
+        // refusal takes the tick away and nothing reaches the core.
+        var askedAtStart = Pages.TelemetryConsent.Asked;
+        Pages.TelemetryConsent.Answer = () => false;
+        wizard.ClickTelemetryForCheck(true);
+        await wizard.KeepForCheck();
+        var refusedTick = wizard.TelemetryTicked;
+        var refusedCore = (await link.GetAsync("telemetry"))?["telemetry"]
+                          ?.GetValue<bool>();
+        Pages.TelemetryConsent.Answer = () => true;
+        wizard.ClickTelemetryForCheck(true);
+        var agreedTick = wizard.TelemetryTicked;
+        var askedTicking = Pages.TelemetryConsent.Asked - askedAtStart;
+        wizard.ClickTelemetryForCheck(false);
+        var askedClearing = Pages.TelemetryConsent.Asked - askedAtStart
+                            - askedTicking;
+        await wizard.KeepForCheck();
+        Pages.TelemetryConsent.Answer = null;
+        Check("отметка в мастере спрашивает ещё раз, и отказ её снимает",
+              askedTicking == 2 && refusedTick == false && refusedCore == false,
+              $"| спрошено {askedTicking}, отметка {refusedTick}, в ядре {refusedCore}");
+        Check("согласие оставляет отметку, снятие ни о чём не спрашивает",
+              agreedTick == true && askedClearing == 0,
+              $"| отметка {agreedTick}, спрошено при снятии {askedClearing}");
 
         // Counted on the step that has the boxes, which is the one just
         // opened. Asked before it, this counted the greeting's boxes —

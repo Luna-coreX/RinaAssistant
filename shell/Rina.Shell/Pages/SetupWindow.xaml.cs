@@ -398,18 +398,10 @@ public partial class SetupWindow : Window
             Content = S("Отправлять обезличенную статистику беты"),
             IsChecked = _telemetryNow ?? _telemetryWas,
         };
-        box.Click += (_, _) => _telemetryNow = box.IsChecked == true;
+        box.Click += (_, _) => TelemetryClicked();
         _telemetryBox = box;
         stack.Children.Add(box);
-        foreach (var (title, said) in new[]
-        {
-            (S("Уходит"),
-             S("Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки. Раз в сутки.")),
-            (S("Не уходит никогда"),
-             S("Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи.")),
-            (S("Где посмотреть и выключить"),
-             S("Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет.")),
-        })
+        foreach (var (title, said) in TelemetryConsent.Explained())
         {
             stack.Children.Add(new TextBlock
             {
@@ -427,6 +419,25 @@ public partial class SetupWindow : Window
             });
         }
         return stack;
+    }
+
+    /// <summary>
+    /// The box was clicked: a tick is asked about once more, a clearing is not.
+    /// </summary>
+    private void TelemetryClicked()
+    {
+        if (_telemetryBox is null) return;
+        if (_telemetryBox.IsChecked == true && !TelemetryConsent.Ask(this))
+            _telemetryBox.IsChecked = false;
+        _telemetryNow = _telemetryBox.IsChecked == true;
+    }
+
+    /// <summary>Click the telemetry box as a person would — for the check.</summary>
+    public void ClickTelemetryForCheck(bool on)
+    {
+        if (_telemetryBox is null) return;
+        _telemetryBox.IsChecked = on;
+        TelemetryClicked();
     }
 
     private async Task KeepTelemetry()
