@@ -1869,6 +1869,20 @@ for where, promises in SAID.items():
         check(f"{where}: сказано — {what}", phrase.lower() in lower[where],
               "| обещание пропало со страницы")
 
+# And the opposite promise is not made anywhere while it is false. The lead
+# was rewritten for the beta's telemetry and the meta description — what a
+# search engine and a link preview show — went on saying «без телеметрии»
+# for a day. Asked of the code, not of the plan: once `4.0-S04` takes the
+# client out of the core, the old promise may come back, and this lets it.
+TELEMETRY_CLIENT = os.path.join(ROOT, "core", "telemetry.py")
+if os.path.exists(TELEMETRY_CLIENT):
+    for where in LANDING:
+        denied = [one for one in ("без телеметрии", "no telemetry",
+                                  "телеметрии нет", "there is no telemetry")
+                  if one in lower[where]]
+        check(f"{where}: нигде не сказано «без телеметрии», пока она есть",
+              not denied, f"| на странице: {denied}")
+
 # ---------------------------------------------------------------------------
 # The download says what is true today
 # ---------------------------------------------------------------------------
