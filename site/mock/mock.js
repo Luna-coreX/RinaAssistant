@@ -112,7 +112,10 @@
       return;
     }
     field.advance(gap);
-    if (win.dataset.section === "home") { orb.advance(gap); }
+    /* The figure takes the flow's step, as in the program: seconds over
+       the flow's period. Given seconds, it breathed and turned seventeen
+       times too fast. */
+    if (win.dataset.section === "home") { orb.advance(gap / field.period); }
 
     owed += gap;
     if (owed < PACE) { return; }

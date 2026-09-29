@@ -43,6 +43,12 @@
 /mock/*
   Content-Security-Policy: default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
 
+# Черновик нового первого экрана рисует ту же фигуру и то же поле теми
+# же скриптами макета — и получает ровно ту же политику, не шире.
+
+/sanctuary/*
+  Content-Security-Policy: default-src 'none'; script-src 'self'; img-src 'self'; style-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
+
 # Шрифты порождены из хранилища и меняются вместе с выпуском, а не сами
 # по себе.
 

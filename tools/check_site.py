@@ -137,6 +137,8 @@ expected |= {"docs/%s/index.html" % slug
 expected |= {"mock/index.html", "mock/mock.js", "mock/flow.js",
              "mock/figure.js", "mock/cases.js", "mock/flow-ramps.js",
              "mock/finishes.css", "mock/window.css"}
+expected |= {"sanctuary/index.html", "sanctuary/sanctuary.css",
+             "sanctuary/sanctuary.js"}
 
 found = set()
 for here, dirs, names in os.walk(SITE):
@@ -775,41 +777,53 @@ FORBIDDEN = {
     # right here and loses its spacing there.
     'style="': "inline-стиль, который не переживёт политику ответов",
 }
-#: The one page that runs a script, and what it owes for that.
+#: The pages that run a script, and what each owes for that.
 #:
 #: The promise used to be one sentence about the whole site. It is now
 #: about paths, because the mock-up cannot answer without a script and
 #: a mock-up that does not answer is a picture. Narrowing a promise is
 #: allowed; narrowing it quietly is not — so the page says it outright,
 #: the policy is written for that path alone, and everything else is
-#: held to the old rule.
-RUNS_A_SCRIPT = "mock/index.html"
+#: held to the old rule. The draft of the new first screen draws the
+#: same figure with the mock-up's own scripts and owes the same.
+#:
+#: Each page is named with the words it has to say about its scripts.
+RUNS_A_SCRIPT = {
+    "mock": ("эта страница выполняет скрипт",),
+    "sanctuary": ("скрипты здесь свои и в сеть не ходят",),
+}
 
 for where in pages:
     for mark, what in FORBIDDEN.items():
         check(f"{where}: нет — {what}", mark not in lower[where],
               f"| найдено «{mark}»")
 
-mock = read(os.path.join(SITE, "mock", "index.html"))
-plain = mock.lower()
-for mark, what in FORBIDDEN.items():
-    if mark == "<script":
-        continue
-    check(f"макет: нет — {what}", mark not in plain, f"| найдено «{mark}»")
+for folder, says in RUNS_A_SCRIPT.items():
+    page = read(os.path.join(SITE, folder, "index.html"))
+    plain = " ".join(page.lower().split())
+    for mark, what in FORBIDDEN.items():
+        if mark == "<script":
+            continue
+        check(f"{folder}: нет — {what}", mark not in plain,
+              f"| найдено «{mark}»")
 
-check("макет выполняет скрипт", "<script" in plain,
-      "| без него окно не отвечает, и страница обещает, что он есть")
-check("и говорит об этом прямо",
-      "единственная страница сайта, которая" in plain
-      and "выполняет скрипт" in plain,
-      "| страница со скриптом обязана сказать это первой")
-check("скрипт у макета свой",
-      plain.count("<script") == plain.count('<script src="'),
-      "| встроенный скрипт политика не пропустит, и читать его негде")
-for one in re.findall(r'<script src="([^"]+)"', mock):
-    check(f"макет: скрипт {one} лежит здесь же",
-          os.path.isfile(os.path.join(SITE, "mock", one)),
-          "| страница просит скрипт, которого нет")
+    check(f"{folder}: выполняет скрипт", "<script" in plain,
+          "| скрипта нет, а политика и страница говорят, что он есть")
+    check(f"{folder}: и говорит об этом прямо",
+          all(one in plain for one in says),
+          "| страница со скриптом обязана сказать это сама")
+    check(f"{folder}: скрипт свой",
+          plain.count("<script") == plain.count('<script src="'),
+          "| встроенный скрипт политика не пропустит, и читать его негде")
+    for one in re.findall(r'<script src="([^"]+)"', page):
+        # A script from another host is what the promise is about, and
+        # `script-src 'self'` would refuse it anyway — on the live host,
+        # not here.
+        check(f"{folder}: скрипт {one} лежит на сайте",
+              "//" not in one and ":" not in one
+              and os.path.isfile(os.path.normpath(
+                  os.path.join(SITE, folder, one))),
+              "| страница просит скрипт, которого на сайте нет")
 
 # No other page refers to a script, the generated ones included.
 for name, text in pages.items():
@@ -855,22 +869,26 @@ check("политика ответов объявлена", bool(policies),
 check("под «/*» политики нет", "/*" not in policies,
       "| общее правило и исключение дадут две политики на один запрос")
 
-STRICT = "/mock/*"
+STRICT = {"/%s/*" % folder for folder in RUNS_A_SCRIPT}
 for name, said in sorted(policies.items()):
     check(f"{name}: запрещает всё, чего на странице нет",
           "default-src 'none'" in said and "frame-ancestors 'none'" in said,
           "| _headers перестал держать обещание страницы")
-    if name == STRICT:
+    if name in STRICT:
         check(f"{name}: разрешает только свой скрипт",
-              "script-src 'self'" in said,
-              "| у макета нет разрешения на собственный скрипт")
+              "script-src 'self'" in said
+              and said.count("script-src") == 1,
+              "| у страницы нет разрешения на собственный скрипт")
     else:
         check(f"{name}: скрипты не разрешены", "script-src" not in said,
-              "| разрешение расползлось с макета")
+              "| разрешение расползлось со страниц, где скрипт есть")
 
-shape = {one for name, one in policies.items() if name != STRICT}
-check("у всех страниц, кроме макета, политика одна и та же",
+shape = {one for name, one in policies.items() if name not in STRICT}
+check("у всех страниц без скрипта политика одна и та же",
       len(shape) == 1, f"| разных вариантов: {len(shape)}")
+scripted = {one for name, one in policies.items() if name in STRICT}
+check("и у страниц со скриптом — тоже одна",
+      len(scripted) == 1, f"| разных вариантов: {len(scripted)}")
 
 # Every folder with a page is named. A page without a policy is a page
 # without the promise, and the only place that shows is the live host.
