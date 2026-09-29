@@ -71,6 +71,8 @@ ELSEWHERE = {
     "T-12": "поверхность 5.0 — там же",
     "T-14": "--check-updates · подпись и целостность обновления",
     "T-15": "--check-diagnostics · состав диагностического пакета",
+    "T-22": "tools/test_sessions.py · хроника приложений по двум выключателям, "
+            "в диагностический пакет не едет",
     "T-23": "tools/test_websearch.py · поиск по просьбе модели, один раз",
     "T-24": "tools/test_telemetry.py · выключено — ни счёта, ни соединения; "
             "включено — ни одной буквы сказанного, сборщик берёт только словарь",
@@ -190,7 +192,7 @@ about("T-10", "получившийся путь остаётся внутри �
       escaped == [], f"| вышло наружу {escaped}")
 
 
-# T-22 · a scenario looks at what a person is busy with.
+# T-25 · a scenario looks at what a person is busy with.
 #
 # The same information as `T-19` — what is open — but reached by a question
 # from inside a command the person wrote, not by a subscription. What must
@@ -207,7 +209,7 @@ def watcher(question, about=""):
 
 held = _condition_holds("app_active", "chrome", "",
                         {"vars": {}, "machine": watcher})
-about("T-22", "условие спрашивает у оболочки и получает ответ", held,
+about("T-25", "условие спрашивает у оболочки и получает ответ", held,
       f"| {seen_questions}")
 
 # Nothing is kept: the state a run carries holds variables and nothing
@@ -218,10 +220,10 @@ _condition_holds("app_active", "chrome", "", carried)
 _condition_holds("app_running", "chrome", "", carried)
 leftovers = [key for key, value in carried.items()
              if key != "machine" and "chrome" in str(value).lower()]
-about("T-22", "об открытой программе ничего не оседает", leftovers == [],
+about("T-25", "об открытой программе ничего не оседает", leftovers == [],
       f"| осело в {leftovers}")
 
-about("T-22", "без оболочки условие о машине ложно",
+about("T-25", "без оболочки условие о машине ложно",
       not _condition_holds("app_running", "chrome", "", {"vars": {}}))
 
 

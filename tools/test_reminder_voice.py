@@ -43,6 +43,8 @@ neutralise()
 
 from console import use_utf8
 from core.engine import RinaEngine
+from core.events import EventBus
+from core.protocol import Events
 from core.settings_api import MemorySettings
 from voice import reminders as reminders_mod
 
@@ -64,9 +66,16 @@ class Session:
             "todo": [], "sessions": [], "custom_commands": [],
             "reminders": [], "history": [], **extra,
         })
-        self.engine = RinaEngine(settings=self.settings)
+        self.engine = RinaEngine(settings=self.settings, event_bus=EventBus())
         self.said = []
-        self.engine.voice_out = lambda text, **kw: self.said.append(text)
+        # The answer, not the voice: `say` speaks on a thread of its own,
+        # and reading what reached `voice_out` right after the command is
+        # a race (the one tools/test_sessions.py lost once the core stopped
+        # fetching programs before every command). The answer event is
+        # sent before that thread starts; the bus is this engine's own.
+        self.engine.bus.on(Events.RESPONSE,
+                           lambda data: self.said.append(data["text"]))
+        self.engine.voice_out = lambda text, **kw: None
 
     def say(self, phrase):
         self.said = []
@@ -220,6 +229,18 @@ s.engine._reminders.add("reminder", time.time() + 30 * 3600, "завтрашне
 answer = s.say("какие задачи на сегодня")
 check("завтрашнее в «сегодня» не попадает",
       "завтрашнее" not in answer, f"| {answer}")
+
+# A zero part is not said. «Засекла 10 мин 0 с» stood in the README's
+# screenshot of the privacy page: how a clock reads out, not how a person
+# says ten minutes.
+print()
+print("=== длительность без нулевых частей ===")
+said = {s: reminders_mod.humanize_left(s) for s in (600, 7200, 3900, 605, 45)}
+check("ровные минуты и часы — без нулей",
+      said[600] == "10 мин" and said[7200] == "2 ч", f"| {said}")
+check("а неровные — целиком",
+      said[3900] == "1 ч 5 мин" and said[605] == "10 мин 5 с"
+      and said[45] == "45 с", f"| {said}")
 
 print()
 print("ИТОГО ошибок:", fails)

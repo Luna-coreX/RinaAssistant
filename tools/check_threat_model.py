@@ -80,6 +80,7 @@ SECURITY_ITEMS = {
     "4.0-H07": "плагин в отдельном процессе",
     "4.0-I03": "диагностический пакет",
     "4.0-U04": "скачивание и целостность",
+    "4.0b-A02": "рабочие сессии — запись того, чем человек был занят",
     "4.0b-A03": "наблюдение за тем, какие программы открыты",
     "4.0b-A09": "проба несохранённой команды — карточка вместо ссылки",
     "4.0b-A15":
@@ -99,11 +100,18 @@ roadmap = io.open(ROADMAP, encoding="utf-8").read()
 #: Parsing the prose more finely would mean introducing a second
 #: description language beside the first.
 threats = {}
+#: Every heading's id in order, repeats included. The dict above keeps one
+#: entry per id, so two threats under one number collapsed into one and
+#: "numbering without gaps" stayed green: `T-22` named both the sessions'
+#: chronicle and a scenario looking at the machine, and the first of them
+#: was never checked at all — its line was overwritten by the second.
+seen_ids = []
 current = None
 for line in text.split("\n"):
     head = re.match(r"### (T-\d+) · (.+)", line.strip())
     if head:
         current = head.group(1)
+        seen_ids.append(current)
         threats[current] = {"name": head.group(2), "why": "", "rest": False}
         continue
     if current is None:
@@ -117,6 +125,9 @@ for line in text.split("\n"):
 
 print("=== модель прочитана ===")
 check("угрозы найдены", len(threats) >= 10, f"| {len(threats)}")
+repeated = sorted({one for one in seen_ids if seen_ids.count(one) > 1})
+check("номер у каждой угрозы свой", not repeated,
+      f"| повторяются: {repeated} — номер это имя, на него ссылаются план и код")
 check("нумерация без дыр",
       sorted(threats) == [f"T-{i:02d}" for i in range(1, len(threats) + 1)],
       f"| {sorted(threats)}")

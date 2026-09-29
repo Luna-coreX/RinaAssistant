@@ -129,6 +129,8 @@ print("=== предложенное Риной принимается или о�
 # parsing. A second implementation of consent is a second place where
 # something can be switched on that nobody asked for.
 from core.engine import RinaEngine
+from core.events import EventBus
+from core.protocol import Events
 from core.settings_api import MemorySettings
 
 
@@ -136,9 +138,13 @@ def someone(**values):
     store = MemorySettings(dict(
         {"custom_commands": [], "reminders": [], "history": [], "todo": []},
         **values))
-    engine = RinaEngine(settings=store)
+    engine = RinaEngine(settings=store, event_bus=EventBus())
     spoken = []
-    engine.voice_out = lambda text, **rest: spoken.append(text)
+    # The answer, not the voice: `say` speaks on a thread of its own, and
+    # reading `voice_out` right after the offer is a race. The answer event
+    # is sent before that thread starts; the bus is this engine's own.
+    engine.bus.on(Events.RESPONSE, lambda data: spoken.append(data["text"]))
+    engine.voice_out = lambda text, **rest: None
     applied = []
     engine.settings_changed = lambda: applied.append(True)
     return engine, store, spoken, applied

@@ -38,6 +38,7 @@ from sandbox import neutralise
 neutralise()
 
 from core.engine import RinaEngine
+from core.events import EventBus
 from core.protocol import Events
 from core.settings_api import MemorySettings
 from voice.app_index import AppEntry
@@ -67,14 +68,21 @@ class Session:
             "watch_apps": watch, "app_aliases": {}, "custom_commands": [],
             "reminders": [], "history": [],
         })
-        self.engine = RinaEngine(settings=self.settings)
+        self.engine = RinaEngine(settings=self.settings, event_bus=EventBus())
         # Nothing is opened on anybody's machine: see `test_learning.py`.
         self.opened = []
         self.engine.browser_out = lambda url: (self.opened.append(url),
                                                (True, ""))[1]
         self.engine.apps_source = lambda: [a.to_dict() for a in APPS]
         self.said = []
-        self.engine.voice_out = lambda text, **kw: self.said.append(text)
+        # The answer, not the voice: `say` speaks on a thread of its own,
+        # and reading what reached `voice_out` right after the command is
+        # a race (the one tools/test_sessions.py lost once the core stopped
+        # fetching programs before every command). The answer event is
+        # sent before that thread starts; the bus is this engine's own.
+        self.engine.bus.on(Events.RESPONSE,
+                           lambda data: self.said.append(data["text"]))
+        self.engine.voice_out = lambda text, **kw: None
         self.fired = []
         self.engine.bus.on(Events.REMINDER_FIRED,
                            lambda data: self.fired.append(data["item"]))

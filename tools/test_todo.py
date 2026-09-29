@@ -39,6 +39,8 @@ neutralise()
 
 from console import use_utf8
 from core.engine import RinaEngine
+from core.events import EventBus
+from core.protocol import Events
 from core.settings_api import MemorySettings
 
 use_utf8()
@@ -60,9 +62,16 @@ class Session:
         self.settings = MemorySettings({
             "todo": [], "custom_commands": [], "reminders": [], "history": [],
         })
-        self.engine = RinaEngine(settings=self.settings)
+        self.engine = RinaEngine(settings=self.settings, event_bus=EventBus())
         self.said = []
-        self.engine.voice_out = lambda text, **kw: self.said.append(text)
+        # The answer, not the voice: `say` speaks on a thread of its own,
+        # and reading what reached `voice_out` right after the command is
+        # a race (the one tools/test_sessions.py lost once the core stopped
+        # fetching programs before every command). The answer event is
+        # sent before that thread starts; the bus is this engine's own.
+        self.engine.bus.on(Events.RESPONSE,
+                           lambda data: self.said.append(data["text"]))
+        self.engine.voice_out = lambda text, **kw: None
         # Nothing is opened on the machine this is run on.
         self.opened = []
         self.engine.browser_out = lambda url: (self.opened.append(url),
