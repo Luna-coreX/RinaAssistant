@@ -6926,6 +6926,12 @@ public partial class App
             Check("и появилось в списке",
                   reminders.PlannedCount == before + 1,
                   $"| было {before}, стало {reminders.PlannedCount}");
+            // Time left, said as time left: bare "14:59" is a time of day.
+            var said = reminders.WhenShown;
+            Check("остаток назван остатком, а не временем на часах",
+                  said.Count > 0 && said.All(one => one.StartsWith("через ")
+                                                    || one.StartsWith("in ")),
+                  $"| {string.Join(", ", said)}");
 
             // Two ways of saying when, and only one of them acted upon.
             // The typed time has always won inside `OnCreate`; the

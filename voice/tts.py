@@ -100,7 +100,10 @@ class SilentEngine(TTSEngine):
         return True
 
     def voices(self):
-        return [("none", "— нет голоса —")]
+        # `default`, the value a profile starts with: no voice to choose
+        # is still an answer, and a stored value outside the list reads
+        # as a broken setting (see `settings_schema.options_for`).
+        return [("default", "— нет голоса —")]
 
     def render(self, text, voice=None, volume=75, rate=100):
         return None

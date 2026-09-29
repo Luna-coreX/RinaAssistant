@@ -182,6 +182,25 @@ check("и номера не задвоились",
       len({c["id"] for c in survived}) == len(survived),
       f"| {len({c['id'] for c in survived})} разных из {len(survived)}")
 
+# The voice every profile starts with is among the voices offered, for every
+# engine. It was offered by none of them, and the settings page showed the
+# stored `default` as «default — сейчас недоступно» on a fresh installation.
+print()
+print("=== голос по умолчанию есть в списке у каждого движка ===")
+from core import settings_schema
+from core.settings_store import DEFAULTS
+from voice import tts as tts_module
+
+started_with = DEFAULTS["voice"]
+missing = []
+for engine_id in [one.id for one in tts_module.all_engines()]:
+    offered = [o["value"] for o in settings_schema.options_for(
+        "voice", MemorySettings({"tts_engine": engine_id}))]
+    if started_with not in offered:
+        missing.append(engine_id)
+check("сохранённое по умолчанию значение предлагается всеми движками",
+      not missing, f"| нет у: {missing} (значение {started_with!r})")
+
 print()
 print("ИТОГО ошибок:", fails)
 

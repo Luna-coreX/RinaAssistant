@@ -1799,6 +1799,9 @@
   "через 5 минут": {
     "English": "in 5 minutes"
   },
+  "через {0}": {
+    "English": "in {0}"
+  },
   "через час": {
     "English": "in an hour"
   },

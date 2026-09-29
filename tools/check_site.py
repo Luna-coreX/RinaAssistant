@@ -954,6 +954,18 @@ for slug, source, title, _lead, _lang in gen_site.PAPERS:
     check(f"{title}: источник на месте",
           os.path.isfile(os.path.join(ROOT, source.replace("/", os.sep))),
           f"| нет файла {source}")
+    # Markup from the document printed as text: the README's screenshot
+    # table came out as six lines of `<img src=…>` on the page, and
+    # `--check` of the generator compared the page with itself and was
+    # content. Code blocks are where escaped markup belongs, so they are
+    # taken out before asking.
+    if here:
+        prose = re.sub(r"<pre>.*?</pre>|<code>.*?</code>", "",
+                       read(path), flags=re.S)
+        printed = re.findall(r"&lt;/?(?:img|p|a|br|div|sub|sup|table|span)\b",
+                             prose)
+        check(f"{title}: разметка документа не печатается текстом",
+              not printed, f"| {len(printed)} раз: {printed[:3]}")
     for where in LANDING:
         check(f"{where} ведёт к /docs/{slug}/",
               f'href="/docs/{slug}/"' in pages[where],

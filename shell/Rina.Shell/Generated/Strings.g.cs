@@ -2783,6 +2783,11 @@ public static partial class Loc
                 {
                     ["English"] = "in 5 minutes",
                 },
+            ["через {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in {0}",
+                },
             ["через час"] =
                 new Dictionary<string, string>
                 {

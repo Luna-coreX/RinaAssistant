@@ -53,7 +53,12 @@ _VOLATILE = (
     # The time by the clock: "02:15".
     (re.compile(r"\b\d{1,2}:\d{2}\b"), "ЧЧ:ММ"),
     # A countdown: "9 мин 59 с" — it depends on a fraction of a second.
-    (re.compile(r"\b\d+ мин \d+ с\b"), "N мин N с"),
+    # A zero part is not said since 2026-09-29 ("10 мин", "2 ч"), so both
+    # shapes are one here: which of them a replay gets depends on the same
+    # fraction of a second. The wording itself is asked of `humanize_left`
+    # in tools/test_reminder_voice.py.
+    (re.compile(r"\b\d+ ч(?: \d+ мин)?\b"), "N ч N мин"),
+    (re.compile(r"\b\d+ мин(?: \d+ с)?\b"), "N мин N с"),
     (re.compile(r"\b\d+ с\b"), "N с"),
 )
 

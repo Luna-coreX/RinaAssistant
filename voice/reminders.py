@@ -584,10 +584,14 @@ def humanize_left(seconds):
     seconds = max(0, int(seconds))
     hours, rest = divmod(seconds, 3600)
     minutes, secs = divmod(rest, 60)
+    # A zero part is not said: «Засекла 10 мин 0 с» is how a clock reads
+    # out, not how a person says ten minutes.
     if hours:
-        return tr("{h} ч {m} мин", h=hours, m=minutes)
+        return (tr("{h} ч {m} мин", h=hours, m=minutes) if minutes
+                else tr("{h} ч", h=hours))
     if minutes:
-        return tr("{m} мин {s} с", m=minutes, s=secs)
+        return (tr("{m} мин {s} с", m=minutes, s=secs) if secs
+                else tr("{m} мин", m=minutes))
     return tr("{s} с", s=secs)
 
 

@@ -319,8 +319,16 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
         return out
     if key == "voice":
         engine = tts.get_engine(str(settings.get("tts_engine", "silent")))
+        voices = list(engine.voices())
+        # `default` is the value every profile starts with and every engine
+        # understands — its own default voice — and it was offered by none
+        # of them. So the settings page showed the stored value as one that
+        # is not in the list: «default — сейчас недоступно», on the very
+        # first screen of a fresh installation.
+        if not any(value == "default" for value, _ in voices):
+            voices.insert(0, ("default", tr("По умолчанию")))
         return [{"value": i, "title": named(t), "available": True}
-                for i, t in engine.voices()]
+                for i, t in voices]
     if key == "action_hotkeys":
         # Here "values" means what a hotkey can be assigned to, not the
         # hotkeys themselves: a person invents those, and they cannot be

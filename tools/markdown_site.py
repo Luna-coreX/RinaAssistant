@@ -204,16 +204,28 @@ def render(source, link):
 
         found = ROW.match(line)
         if found and at + 1 < end and SPLIT.match(lines[at + 1]):
-            head = [one.strip() for one in found.group(1).split("|")]
+            # Raw HTML in a cell follows the rule for raw HTML anywhere
+            # (below): the words stay, the markup does not. Escaped instead,
+            # the README's screenshot table came out as six lines of
+            # `<img src=…>` printed on the page. A row left with nothing in
+            # it — a row of pictures — is not drawn at all.
+            def cell(one):
+                return " ".join(TAG.sub(" ", one).split())
+
+            head = [cell(one) for one in found.group(1).split("|")]
             at += 2
             body = []
             while at < end and ROW.match(lines[at]):
-                body.append([one.strip() for one in
-                             ROW.match(lines[at]).group(1).split("|")])
+                cells = [cell(one) for one in
+                         ROW.match(lines[at]).group(1).split("|")]
+                if any(cells):
+                    body.append(cells)
                 at += 1
-            rows = ["<table>", "<thead><tr>"]
-            rows += ["<th>%s</th>" % prose(one) for one in head]
-            rows.append("</tr></thead>")
+            rows = ["<table>"]
+            if any(head):
+                rows.append("<thead><tr>")
+                rows += ["<th>%s</th>" % prose(one) for one in head]
+                rows.append("</tr></thead>")
             if body:
                 rows.append("<tbody>")
                 for cells in body:

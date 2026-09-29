@@ -513,6 +513,7 @@ _EN = {
     '{m} мин {s} с': '{m} min {s} s',
     '{s} с': '{s} s',
     'Засекла {left}.': 'Timer set for {left}.',
+    'По умолчанию': 'Default',
     'Напомню через {left}: {text}.': 'I’ll remind you in {left}: {text}.',
     'Напомню в {time}: {text}.': 'I’ll remind you at {time}: {text}.',
     'Разбужу в {time}.': 'I’ll wake you at {time}.',

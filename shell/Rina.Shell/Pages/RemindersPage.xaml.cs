@@ -212,6 +212,9 @@ public partial class RemindersPage : UserControl
     /// <summary>How many reminders are shown — for the end-to-end check.</summary>
     public int PlannedCount => _items.Count;
 
+    /// <summary>What each planned item says about when — for the check.</summary>
+    public IReadOnlyList<string> WhenShown => _items.Select(one => one.When).ToList();
+
     /// <summary>
     /// Set up a reminder from outside — for the end-to-end check.
     /// </summary>
@@ -235,15 +238,19 @@ public partial class RemindersPage : UserControl
     /// An instrument reading must not twitch when the value changes, so the
     /// digits are monospaced (§3) and the format is of constant width:
     /// "09:59" and "10:00" take up the same room.
+    ///
+    /// Said with «через» in front. Bare, "19:32" read as a time of day —
+    /// twenty minutes left looked like half past seven in the evening, on
+    /// a page whose own field takes times of day in exactly that shape.
     /// </remarks>
     private static string Until(double fireAt)
     {
         var left = DateTimeOffset.FromUnixTimeMilliseconds((long)(fireAt * 1000))
                    - DateTimeOffset.UtcNow;
         if (left < TimeSpan.Zero) return S("сейчас");
-        return left.TotalHours >= 1
+        return S("через {0}", left.TotalHours >= 1
             ? $"{(int)left.TotalHours:00}:{left.Minutes:00}:{left.Seconds:00}"
-            : $"{left.Minutes:00}:{left.Seconds:00}";
+            : $"{left.Minutes:00}:{left.Seconds:00}");
     }
 
     private async void OnCancel(object sender, RoutedEventArgs e)
