@@ -46,11 +46,12 @@ public static class Framing
 /// anyway.
 /// </para>
 /// <para>
-/// <b>Access rights are an open debt.</b> ADR 0002 chose a named pipe
-/// precisely because it has a security descriptor, and promised to restrict
-/// access to the session's user. Here the pipe is created with defaults: that
-/// is to be done before release, plan item <c>4.0-G07</c>, and while the
-/// shell is unreleased the debt is visible — not forgotten.
+/// <b>Only this user may open it</b> (<see cref="PipeAccess.Options"/>).
+/// ADR 0002 chose a named pipe precisely because it has a security
+/// descriptor, and promised to restrict access to the session's user. That
+/// stood as a debt until 2026-09-29 — pointed at plan item <c>4.0-G07</c>,
+/// which is about transliteration, so nothing that tracked the plan ever
+/// saw it.
 /// </para>
 /// </remarks>
 public sealed class ControlChannel : IDisposable
@@ -66,8 +67,11 @@ public sealed class ControlChannel : IDisposable
         PipeName = $"rina.{session}.{channel}";
         _pipe = new NamedPipeServerStream(
             PipeName, PipeDirection.InOut, 1,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            PipeTransmissionMode.Byte, PipeAccess.Options);
     }
+
+    /// <summary>Who the pipe lets in — for the check.</summary>
+    public IReadOnlyList<string> Grantees() => PipeAccess.Grantees(_pipe);
 
     /// <summary>Wait for the core to connect.</summary>
     public async Task AcceptAsync(CancellationToken token = default) =>

@@ -379,6 +379,10 @@ public sealed class CoreConnection : IAsyncDisposable
         get { lock (_coreLog) return string.Join(Environment.NewLine, _coreLog); }
     }
 
+    /// <summary>Who both pipes let in — for the check.</summary>
+    public IReadOnlyList<string> PipeGrantees() =>
+        _control.Grantees().Concat(_data.Grantees()).Distinct().ToList();
+
     /// <summary>The core's process id. Needed by the supervisor and the
     /// journal: with two processes, "which of the cores" is a question
     /// asked often.</summary>

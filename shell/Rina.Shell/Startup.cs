@@ -743,6 +743,22 @@ public partial class App
         Check("ядро на связи", link.State == Rina.Protocol.CoreState.Ready,
               $"| {link.State}");
 
+        // **The pipes let in this user and nobody else** (ADR 0002). With
+        // defaults every account on the machine could read them — and they
+        // carry what a person says and the orders to launch programs. The
+        // token's owner is allowed beside the user: run elevated, Windows
+        // makes the Administrators group the owner of what the process
+        // creates, and that is still this person.
+        using (var me = System.Security.Principal.WindowsIdentity.GetCurrent())
+        {
+            var mine = new[] { me.User?.Value, me.Owner?.Value };
+            var let = link.Connection?.PipeGrantees() ?? [];
+            var strangers = let.Where(one => !mine.Contains(one)).ToList();
+            Check("трубы к ядру открыты только этому пользователю",
+                  let.Count > 0 && strangers.Count == 0,
+                  $"| допущены: {string.Join(", ", let)}");
+        }
+
         // **And it brought no window with it.** Reported by a person: "a
         // command prompt opens when the program starts". Asked of the
         // desktop rather than of the launch options: `CreateNoWindow` is

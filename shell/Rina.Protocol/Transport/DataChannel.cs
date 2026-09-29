@@ -46,8 +46,11 @@ public sealed class DataChannel : IDisposable
         PipeName = $"rina.{session}.data";
         _pipe = new NamedPipeServerStream(
             PipeName, PipeDirection.InOut, 1,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous);
+            PipeTransmissionMode.Byte, PipeAccess.Options);
     }
+
+    /// <summary>Who the pipe lets in — for the check.</summary>
+    public IReadOnlyList<string> Grantees() => PipeAccess.Grantees(_pipe);
 
     public Task AcceptAsync(CancellationToken token = default) =>
         _pipe.WaitForConnectionAsync(token);
