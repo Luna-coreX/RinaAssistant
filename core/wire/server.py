@@ -474,11 +474,31 @@ class ProtocolServer:
         would be lost.
         """
         text = str(message.payload.get("text", ""))
+        self._warm_voice()
         self.engine.handle_command_async(
             text,
             require_wake=bool(message.payload.get("require_wake", False)),
             source=str(message.payload.get("source", "typed")))
         return {"accepted": True}
+
+    def _warm_voice(self) -> None:
+        """
+        A reply is coming: let the voice get ready for it (`4.0b-E11`).
+
+        For Edge that is opening the connection while the command is still
+        being understood — the reply is seconds away, and the connection
+        costs the person's round trip three times over. Called where it is
+        already known that she was spoken to, never on every phrase in the
+        room: an open socket to somebody else's server is a signal that
+        somebody near the microphone said something.
+        """
+        warm = getattr(getattr(self, "synthesiser", None), "warm", None)
+        if not callable(warm):
+            return
+        try:
+            warm()
+        except Exception:                               # noqa: BLE001
+            log.debug("Голос не прогрет", exc_info=True)
 
     def _command_by_id(self, message: Envelope) -> dict:
         self.engine.run_command_by_id(str(message.payload.get("command_id")))
@@ -2254,6 +2274,8 @@ class ProtocolServer:
                 outcome.text, wake_mod.get_wake_words(self._settings() or {}))[0])
             if hushed or named:
                 self.hush()
+            if (named or not self.engine.is_always_listen()) and not hushed:
+                self._warm_voice()
             if hushed:
                 # "Stop" is not a command to carry out afterwards: it
                 # was about the talking, and the talking has stopped.

@@ -1078,6 +1078,21 @@ class EngineSynthesiser:
         except Exception:                               # noqa: BLE001
             return False
 
+    def warm(self) -> None:
+        """
+        Get ready for a reply that is on its way (`4.0b-E11`).
+
+        Only an engine with something to get ready answers: Edge opens its
+        connection to the service. The rest have nothing to open and are
+        not asked.
+        """
+        try:
+            warm = getattr(self._engine(), "warm", None)
+        except Exception:                               # noqa: BLE001
+            return
+        if callable(warm):
+            warm()
+
     def stream(self, text: str, voice: str = "", rate: int = 100):
         """The same speech as `synthesize`, in pieces, as it is made."""
         engine = self._engine()

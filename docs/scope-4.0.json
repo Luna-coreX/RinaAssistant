@@ -924,9 +924,9 @@
     "title": "Потоковый синтез"
   },
   "4.0b-E11": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
-    "size": "S",
+    "size": "M",
     "title": "Тёплая связь с Edge"
   },
   "4.0b-E12": {

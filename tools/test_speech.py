@@ -772,6 +772,132 @@ check("молчащую не перебивают", "speech.stop" not in silent.
 check("а фраза всё равно разбирается",
       silent.routed == ["рина сколько времени"], f"| {silent.routed}")
 
+# ---------------------------------------------------------------------------
+# 4.0b-E11: the voice is got ready when she is spoken to — and only then
+# ---------------------------------------------------------------------------
+print()
+print("=== голос готовится, когда к ней обратились, и только тогда ===")
+
+
+class Warmed:
+    def __init__(self):
+        self.times = 0
+
+    def warm(self):
+        self.times += 1
+
+
+called = listening("рина сколько времени", talking=False)
+called.synthesiser = Warmed()
+called._recognise(b"\x00\x00")
+check("имя в «всегда слушать» — голос готовится к ответу",
+      called.synthesiser.times == 1, f"| {called.synthesiser.times}")
+chatter = listening("какая сегодня погода", talking=False)
+chatter.synthesiser = Warmed()
+chatter._recognise(b"\x00\x00")
+check("чужой разговор в комнате — не готовится",
+      chatter.synthesiser.times == 0,
+      "| открытое соединение с чужим сервером говорит, что у микрофона "
+      f"кто-то заговорил ({chatter.synthesiser.times})")
+
+# ---------------------------------------------------------------------------
+# 4.0b-E11: one connection to the speech service, opened ahead
+# ---------------------------------------------------------------------------
+#
+# Asked of a stand-in service on this machine that speaks the same protocol
+# — a config message, the SSML, audio frames, `turn.end` — so the question
+# is about the program and not about Microsoft or the network in between.
+print()
+print("=== Edge: одно соединение, открытое заранее ===")
+import asyncio
+import threading
+
+from aiohttp import WSMsgType, web
+from edge_tts import communicate as edge_parts
+
+from voice import tts as tts_mod
+
+service = {"connections": 0, "drop_after_turn": False}
+
+
+async def speaking(request):
+    socket = web.WebSocketResponse()
+    await socket.prepare(request)
+    service["connections"] += 1
+    async for message in socket:
+        if message.type != WSMsgType.TEXT or "Path:ssml" not in message.data:
+            continue
+        header = b"X-RequestId:1\r\nContent-Type:audio/mpeg\r\nPath:audio\r\n"
+        for piece in (b"AUDIO-1", b"AUDIO-2"):
+            await socket.send_bytes(len(header).to_bytes(2, "big") + header + piece)
+        await socket.send_str("X-RequestId:1\r\nPath:turn.end\r\n\r\n{}")
+        if service["drop_after_turn"]:
+            await socket.close()
+    return socket
+
+
+loop = asyncio.new_event_loop()
+threading.Thread(target=loop.run_forever, daemon=True).start()
+
+
+async def serve():
+    app = web.Application()
+    app.router.add_get("/edge", speaking)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    return runner, site._server.sockets[0].getsockname()[1]
+
+
+runner, port = asyncio.run_coroutine_threadsafe(serve(), loop).result(10)
+real_url = edge_parts.WSS_URL
+edge_parts.WSS_URL = f"ws://127.0.0.1:{port}/edge?TrustedClientToken=x"
+try:
+    link = tts_mod._EdgeLink()
+    link.warm(None)
+    link._opening.result(timeout=10)
+    check("прогрев открыл соединение до ответа",
+          link.ready(None) and service["connections"] == 1,
+          f"| соединений {service['connections']}")
+    first = b"".join(link.stream("Первое предложение.", "ru-RU-SvetlanaNeural",
+                                 "+0%", "+0%", None))
+    second = b"".join(link.stream("Второе.", "ru-RU-SvetlanaNeural",
+                                  "+0%", "+0%", None))
+    check("звук пришёл по этому соединению",
+          first == b"AUDIO-1AUDIO-2" and second == first, f"| {first!r}")
+    check("и второе предложение не открыло нового",
+          service["connections"] == 1 and link.opened == 1,
+          f"| соединений {service['connections']}")
+
+    service["drop_after_turn"] = True
+    b"".join(link.stream("Сервис закроет после этого.", "ru-RU-SvetlanaNeural",
+                         "+0%", "+0%", None))
+    try:
+        after = b"".join(link.stream("А это пойдёт по новому.",
+                                     "ru-RU-SvetlanaNeural", "+0%", "+0%", None))
+    except Exception as lost:                             # noqa: BLE001
+        after = f"реплика потеряна: {type(lost).__name__}: {lost}"
+    check("закрытое сервисом соединение заменяется, и реплика не теряется",
+          after == b"AUDIO-1AUDIO-2" and service["connections"] >= 2,
+          f"| {after!r}, соединений {service['connections']}")
+    link.close()
+
+    # And when the link cannot be had at all, the reply goes the way it
+    # went before rather than not at all.
+    edge_parts.WSS_URL = "ws://127.0.0.1:9/edge?TrustedClientToken=x"
+    engine_edge = tts_mod.EdgeTTSEngine()
+    tts_mod.EdgeTTSEngine._shared_link = None
+    engine_edge._through = lambda: None
+    engine_edge._stream_communicate = lambda *a, **k: iter([b"OLD-PATH"])
+    fell_back = b"".join(engine_edge.stream("Привет."))
+    check("своё соединение не вышло — ответ идёт старым путём",
+          fell_back == b"OLD-PATH", f"| {fell_back!r}")
+finally:
+    edge_parts.WSS_URL = real_url
+    tts_mod.EdgeTTSEngine._shared_link = None
+    asyncio.run_coroutine_threadsafe(runner.cleanup(), loop).result(10)
+
 print()
 print("=== перебитое не договаривается ===")
 # Stopping the sending leaves up to a second of sound already in the

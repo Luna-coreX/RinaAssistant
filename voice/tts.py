@@ -387,6 +387,240 @@ def _play_now(path):
         return False
 
 
+class _EdgeLink:
+    """
+    One connection to Microsoft's speech service, opened ahead and kept a
+    while (`4.0b-E11`).
+
+    **Measured 2026-09-29, and the old reading of it was wrong.** The
+    second before the first sound was put down to HTTPS inspection on the
+    developer's machine. It is the path: every host answers a request in
+    about 200 ms from there, Russian ones included, and TCP "connects" in
+    2–4 ms because a tunnel completes it locally and opens the real one
+    when TLS arrives. So a cold connection costs its round trips — the
+    hidden TCP, TLS 1.3, the WebSocket upgrade — and here that is 800 ms,
+    every reply, before the service is even asked. On a direct line with
+    a 30 ms round trip it would be about 100. The saving is the person's
+    round trip times three; worth having wherever it is not small.
+
+    **The service takes one request after another on one socket.** Three
+    turns on one connection, the third after eight seconds of silence:
+    each gave its first audio in 200 ms against 1000 ms cold. So the
+    connection is opened when a command comes in — the reply is seconds
+    away, the model is still thinking — and every sentence of the reply
+    goes down it (`4.0b-E09` speaks sentence by sentence, and each of
+    them used to open a connection of its own).
+
+    `edge-tts` cannot do this: `Communicate` owns its session and closes
+    it with the reply. The protocol is small — a config message, the SSML,
+    audio frames, `turn.end` — and its pieces (the URL, the token, the
+    headers, the SSML) are taken from `edge-tts` itself, so there is one
+    source for them. If those pieces are not there (another version) the
+    engine goes back to `Communicate`, which is the path before this.
+
+    Closed after `IDLE` seconds unused: a socket held open for nothing is
+    a connection to somebody else's server that nobody asked for.
+    """
+
+    #: How long an unused connection is kept.
+    IDLE = 60.0
+
+    #: The format asked for, the one the decoder expects (`stream_format`).
+    CONFIG = ('{"context":{"synthesis":{"audio":{"metadataoptions":{'
+              '"sentenceBoundaryEnabled":"true","wordBoundaryEnabled":"false"},'
+              '"outputFormat":"audio-24khz-48kbitrate-mono-mp3"}}}}')
+
+    def __init__(self):
+        self._loop = None
+        self._session = None
+        self._socket = None
+        self._proxy = None
+        self._used = 0.0
+        self._opening = None
+        self._turns = None
+        self._guard = threading.RLock()
+        #: How many connections were opened — for the check.
+        self.opened = 0
+
+    # -- the loop the socket lives in ----------------------------------------
+    def _run(self, work):
+        import asyncio
+
+        with self._guard:
+            if self._loop is None:
+                loop = asyncio.new_event_loop()
+                threading.Thread(target=loop.run_forever,
+                                 name="rina-edge-link", daemon=True).start()
+                self._loop = loop
+        return asyncio.run_coroutine_threadsafe(work, self._loop)
+
+    def ready(self, proxy):
+        """Is there an open connection that can be used as it is."""
+        import time
+
+        return (self._socket is not None and not self._socket.closed
+                and self._proxy == proxy
+                and time.monotonic() - self._used < self.IDLE)
+
+    def warm(self, proxy):
+        """Open the connection now, without waiting for it."""
+        with self._guard:
+            if self.ready(proxy) or (self._opening is not None
+                                     and not self._opening.done()):
+                return
+            self._opening = self._run(self._open(proxy))
+
+    async def _open(self, proxy):
+        import asyncio
+        import time
+
+        import aiohttp
+        from edge_tts import communicate as c
+
+        await self._close()
+        # `trust_env` off and the proxy passed explicitly: with it on and
+        # no proxy given, aiohttp asks `proxy_bypass`, which on Windows is
+        # a reverse lookup — fifteen seconds on one machine (see `_bypassed`).
+        session = aiohttp.ClientSession(trust_env=False)
+        try:
+            socket = await session.ws_connect(
+                f"{c.WSS_URL}&ConnectionId={c.connect_id()}"
+                f"&Sec-MS-GEC={c.DRM.generate_sec_ms_gec()}"
+                f"&Sec-MS-GEC-Version={c.SEC_MS_GEC_VERSION}",
+                compress=15, proxy=proxy,
+                headers=c.DRM.headers_with_muid(c.WSS_HEADERS),
+                ssl=c._SSL_CTX)
+        except BaseException:
+            await session.close()
+            raise
+        self._session, self._socket, self._proxy = session, socket, proxy
+        self._used = time.monotonic()
+        self.opened += 1
+        asyncio.get_running_loop().call_later(
+            self.IDLE + 1, lambda: asyncio.ensure_future(self._close_if_idle()))
+        return socket
+
+    async def _close_if_idle(self):
+        import time
+
+        if self._socket is not None and time.monotonic() - self._used >= self.IDLE:
+            await self._close()
+
+    async def _close(self):
+        socket, session = self._socket, self._session
+        self._socket = self._session = None
+        for one in (socket, session):
+            if one is not None:
+                try:
+                    await one.close()
+                except Exception:                       # noqa: BLE001
+                    pass
+
+    def close(self):
+        """Close the connection now (the core is going)."""
+        if self._loop is not None:
+            try:
+                self._run(self._close()).result(timeout=3)
+            except Exception:                           # noqa: BLE001
+                pass
+
+    # -- one reply -----------------------------------------------------------
+    @classmethod
+    async def _turn(cls, socket, text, config):
+        """Ask for one piece of text; give the audio as it comes."""
+        import aiohttp
+        from edge_tts import communicate as c
+
+        await socket.send_str(
+            f"X-Timestamp:{c.date_to_string()}\r\n"
+            "Content-Type:application/json; charset=utf-8\r\n"
+            "Path:speech.config\r\n\r\n" + cls.CONFIG + "\r\n")
+        await socket.send_str(c.ssml_headers_plus_data(
+            c.connect_id(), c.date_to_string(), c.mkssml(config, text)))
+        async for received in socket:
+            if received.type == aiohttp.WSMsgType.BINARY:
+                data = received.data
+                if len(data) < 2:
+                    continue
+                headers, audio = c.get_headers_and_data(
+                    data, int.from_bytes(data[:2], "big"))
+                if headers.get(b"Path") == b"audio" and audio:
+                    yield audio
+            elif received.type == aiohttp.WSMsgType.TEXT:
+                if "Path:turn.end" in received.data:
+                    return
+            else:
+                raise ConnectionError(f"соединение закрылось: {received.type}")
+        raise ConnectionError("соединение закрылось посреди ответа")
+
+    def stream(self, text, voice_id, rate, volume, proxy):
+        """
+        The audio for this text, in pieces, as the service makes them.
+
+        A warm socket that the service has closed meanwhile is found out
+        by the first send, and then — before anything was said — the
+        request goes down a fresh one. After the first audio a failure is
+        a failure: half a sentence again from the start would be heard.
+        """
+        import asyncio
+
+        coming = queue.Queue()
+        done = object()
+
+        async def work():
+            import aiohttp
+            from edge_tts import communicate as c
+            from edge_tts.data_classes import TTSConfig
+
+            if self._turns is None:
+                self._turns = asyncio.Lock()
+            async with self._turns:
+                try:
+                    opening = self._opening
+                    if opening is not None and not opening.done():
+                        try:
+                            await asyncio.wrap_future(opening)
+                        except Exception:               # noqa: BLE001
+                            pass                        # cold, then
+                    config = TTSConfig(voice_id, rate, volume, "+0Hz",
+                                       "SentenceBoundary")
+                    for piece in c.split_text_by_byte_length(
+                            c.escape(c.remove_incompatible_characters(text)),
+                            4096):
+                        said = False
+                        for attempt in (0, 1):
+                            reused = self.ready(proxy)
+                            socket = self._socket if reused \
+                                else await self._open(proxy)
+                            try:
+                                async for audio in self._turn(socket, piece,
+                                                              config):
+                                    said = True
+                                    coming.put(audio)
+                                break
+                            except (aiohttp.ClientError, ConnectionError,
+                                    asyncio.TimeoutError):
+                                await self._close()
+                                if said or not reused or attempt:
+                                    raise
+                        import time
+
+                        self._used = time.monotonic()
+                except Exception as trouble:            # noqa: BLE001
+                    coming.put(trouble)
+                finally:
+                    coming.put(done)
+
+        self._run(work())
+        while True:
+            piece = coming.get()
+            if piece is done:
+                return
+            if isinstance(piece, Exception):
+                raise piece
+            yield piece
+
+
 class EdgeTTSEngine(TTSEngine):
     """
     Microsoft Edge Neural TTS (edge-tts): free, online, very natural neural
@@ -554,9 +788,72 @@ class EdgeTTSEngine(TTSEngine):
         except Exception:
             return None
 
+    #: The one connection every reply shares (`4.0b-E11`).
+    _shared_link = None
+
+    @classmethod
+    def link(cls):
+        if cls._shared_link is None:
+            cls._shared_link = _EdgeLink()
+        return cls._shared_link
+
+    def warm(self):
+        """Open the connection for a reply that is on its way (`4.0b-E11`)."""
+        if self._try_import() is None:
+            return
+        try:
+            self.link().warm(self._through())
+        except Exception as trouble:                    # noqa: BLE001
+            log.debug("Edge не прогрет: %s", trouble)
+
     def stream(self, text, voice=None, volume=75, rate=100):
         """
-        The same speech, but given out as it arrives.
+        The speech, given out as it arrives — down the kept connection.
+
+        Down `_EdgeLink` first. If that fails before any audio — another
+        `edge-tts` without the pieces it borrows, a service that refused
+        the socket — the reply goes the way it went before, through
+        `Communicate`, so the worst this can do is what was already done.
+        """
+        if self._try_import() is None:
+            return
+        voice_id, rate_str, vol_str = self._asked(voice, volume, rate)
+        through = self._through()
+
+        import time as _time
+
+        link = self.link()
+        how = "тёплое" if link.ready(through) else "холодное"
+        began = _time.monotonic()
+        first = None
+        chunks = 0
+        try:
+            for piece in link.stream(text, voice_id, rate_str, vol_str,
+                                     through):
+                if first is None:
+                    first = _time.monotonic() - began
+                chunks += 1
+                yield piece
+        except Exception as trouble:                    # noqa: BLE001
+            if chunks:
+                log.warning("Edge оборвался: %s", trouble)
+                return
+            log.warning("Своё соединение с Edge не вышло (%s: %s), "
+                        "иду через Communicate", type(trouble).__name__,
+                        trouble)
+            yield from self._stream_communicate(text, voice, volume, rate)
+            return
+        log.info("Edge (%s, соединение %s): первый звук через %s, кусков %d, "
+                 "поток %d мс", through or "напрямую", how,
+                 ("%d мс" % (first * 1000)) if first is not None
+                 else "не пришёл", chunks,
+                 (_time.monotonic() - began) * 1000)
+
+    def _stream_communicate(self, text, voice=None, volume=75, rate=100):
+        """
+        The same speech through `edge-tts`'s own `Communicate`.
+
+        The path before `4.0b-E11`, kept as the fallback.
 
         **Why the thread.** edge-tts is asynchronous and the core's
         speech path is not; bridging by making the whole path async
