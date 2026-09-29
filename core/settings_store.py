@@ -38,7 +38,8 @@ APP_NAME = "RinaAssistant"
 #   0 — configs before 2.0 (the version was not written down)
 #   1 — the recognition language merged with the interface language (ui_language)
 #   2 — app_aliases stores a dict {path, kind, name} rather than a path string
-CONFIG_VERSION = 2
+#   3 — check_updates reset: before it the switch did nothing
+CONFIG_VERSION = 3
 
 
 # Default values, grouped by file.
@@ -82,12 +83,17 @@ GROUPS = {
         "floating_command_bar": False,
         "notifications": True,
         "sound_effects": True,
-        "check_updates": True,
+        # Off until asked for: on, it is a request to api.github.com once
+        # a day that nobody made by pressing anything (`4.0b-D05`).
+        "check_updates": False,
         "hotkey": "Ctrl+Shift+R",
         "action_hotkeys": {},
         "save_history": True,
         "search_engine": "google",
-        "web_search_fallback": True,
+        # Off until asked for (decided 2026-09-29): an unrecognised phrase
+        # opened a search engine with that phrase in it, while the product
+        # page says every such thing is switched on by the person.
+        "web_search_fallback": False,
         "program_folders": [],
         "app_aliases": {},
         "wake_sensitivity": 0.8,
@@ -415,6 +421,8 @@ class SettingsStore:
             self._migrate_to_v1()
         if stored < 2:
             self._migrate_to_v2()
+        if stored < 3:
+            self._migrate_to_v3()
 
         self._data["config_version"] = CONFIG_VERSION
         return True
@@ -492,6 +500,19 @@ class SettingsStore:
                 upgraded[key] = value
             # the rest (broken entries) we discard
         self._data["app_aliases"] = upgraded
+
+    def _migrate_to_v3(self):
+        """
+        check_updates is reset to off.
+
+        Until the automatic check existed the switch did nothing, and it
+        stood on by default: the store wrote every key, so each profile
+        holds a True nobody chose. Left alone, it would turn into a request
+        to the internet at every start the day the check appeared.
+        `web_search_fallback` is not touched: that one worked, and what a
+        profile holds is what the person used.
+        """
+        self._data["check_updates"] = False
 
     def _load_group(self, group):
         path = self._group_path(group)

@@ -72,9 +72,13 @@ class Session:
     """A core with a stand-in store and a stand-in launcher."""
 
     def __init__(self):
+        # The search on an unrecognised phrase is off by default since
+        # 2026-09-29; the seam below is about what happens when it is on,
+        # so it is switched on here rather than inherited.
         self.settings = MemorySettings({
             "app_aliases": {}, "custom_commands": [],
             "reminders": [], "history": [],
+            "web_search_fallback": True,
         })
         self.engine = RinaEngine(settings=self.settings)
         self.engine.apps_source = lambda: [a.to_dict() for a in APPS]

@@ -116,6 +116,45 @@ public static class Kept
         }
     }
 
+    /// <summary>When the automatic update check last got an answer (UTC).</summary>
+    public static DateTime? UpdatesAskedAt()
+    {
+        try
+        {
+            if (!File.Exists(Where)) return null;
+            var said = JsonNode.Parse(File.ReadAllText(Where))?["updates_asked_at"]
+                               ?.GetValue<string>();
+            return DateTime.TryParse(said, null,
+                       System.Globalization.DateTimeStyles.RoundtripKind, out var at)
+                ? at : null;
+        }
+        catch (Exception exc)                            // noqa
+        {
+            Journal($"shell store unreadable: {exc.GetType().Name}");
+            return null;
+        }
+    }
+
+    /// <summary>Remember that the automatic update check got an answer now.</summary>
+    public static void UpdatesAskedAt(DateTime at)
+    {
+        try
+        {
+            var folder = Path.GetDirectoryName(Where);
+            if (folder is not null) Directory.CreateDirectory(folder);
+            var all = File.Exists(Where)
+                ? JsonNode.Parse(File.ReadAllText(Where)) as JsonObject ?? []
+                : [];
+            all["updates_asked_at"] = at.ToUniversalTime().ToString("O");
+            File.WriteAllText(Where, all.ToJsonString(
+                new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception exc)                            // noqa
+        {
+            Journal($"shell store unwritable: {exc.GetType().Name}");
+        }
+    }
+
     /// <summary>
     /// Fit a size to the screen it will open on.
     /// </summary>

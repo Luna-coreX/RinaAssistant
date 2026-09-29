@@ -92,6 +92,36 @@ public sealed class Updater
     public static string Staging => Path.Combine(
         Platform.DataFolder.Local, "updates");
 
+    /// <summary>How often the automatic check asks.</summary>
+    public static readonly TimeSpan Every = TimeSpan.FromDays(1);
+
+    /// <summary>
+    /// Whether the automatic check should ask now.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Off means never — not "rarely", not "only when it matters". The
+    /// setting is off until the person turns it on (<c>4.0b-D05</c>: no
+    /// request nobody made), and the button on the About page asks
+    /// whatever this says.
+    /// </para>
+    /// <para>
+    /// A last check in the future is treated as none: a clock moved back
+    /// would otherwise silence the check for as long as it was moved.
+    /// </para>
+    /// </remarks>
+    public static bool Due(bool enabled, DateTime? lastAsked, DateTime now) =>
+        enabled && (lastAsked is not { } last || last > now || now - last >= Every);
+
+    /// <summary>The automatic check: asks only when due, null when it did not ask.</summary>
+    public async Task<Found?> CheckIfDueAsync(bool enabled, DateTime? lastAsked,
+                                              DateTime now, string shellVersion,
+                                              string coreVersion, int dataSchema,
+                                              CancellationToken token = default)
+        => Due(enabled, lastAsked, now)
+            ? await CheckAsync(shellVersion, coreVersion, dataSchema, token)
+            : null;
+
     /// <summary>
     /// Ask whether anything newer exists.
     /// </summary>

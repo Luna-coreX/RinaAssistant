@@ -2674,6 +2674,37 @@ public partial class App
               $"| {App.ShellVersion}");
 
         Console.WriteLine();
+        Console.WriteLine("=== автоматическая проверка: только включённая и раз в сутки ===");
+
+        // The switch used to do nothing while it stood on by default. Now it
+        // does something, so what it does is asked: off never asks, on asks
+        // once a day, and a clock moved back does not silence it.
+        var now = new DateTime(2026, 9, 29, 12, 0, 0, DateTimeKind.Utc);
+        Check("выключенная не спрашивает никогда",
+              !Update.Updater.Due(false, null, now)
+              && !Update.Updater.Due(false, now.AddDays(-30), now));
+        Check("включённая спрашивает, если ещё не спрашивала",
+              Update.Updater.Due(true, null, now));
+        Check("и не раньше, чем через сутки",
+              !Update.Updater.Due(true, now.AddHours(-23), now)
+              && Update.Updater.Due(true, now.AddHours(-25), now));
+        Check("часы, отведённые назад, её не глушат",
+              Update.Updater.Due(true, now.AddDays(3), now));
+
+        var counted = new Update.Fake()
+            .Says(Update.Updater.Source, Update.Fake.Release("https://x/manifest.json"))
+            .Says("https://x/manifest.json", Manifest("4.0.0", "4.0.0", "[1]", "[1]", 2));
+        var quiet = await new Update.Updater([1], new HttpClient(counted))
+            .CheckIfDueAsync(false, null, now, "4.0.0", "4.0.0", 2);
+        Check("выключенная — ни одного запроса", quiet is null && counted.Asked == 0,
+              $"| запросов {counted.Asked}");
+        var asked = await new Update.Updater([1], new HttpClient(counted))
+            .CheckIfDueAsync(true, null, now, "4.0.0", "4.0.0", 2);
+        Check("включённая — спросила и получила ответ",
+              asked?.Verdict == Update.Verdict.UpToDate && counted.Asked > 0,
+              $"| {asked?.Verdict} запросов {counted.Asked}");
+
+        Console.WriteLine();
         Console.WriteLine("=== U03: четыре сценария ===");
 
         Check("свежее некуда",

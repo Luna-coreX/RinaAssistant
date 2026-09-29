@@ -13,14 +13,14 @@ its own and the tile answers from memory — with a caption saying how old
 the answer is, because a number without a date is a number nobody can
 judge.
 
-**Where the numbers come from.** The Central Bank of Russia publishes
-them once a working day. The official endpoint is
-`cbr.ru/scripts/XML_daily.asp`; this plugin reads the JSON mirror at
-`cbr-xml-daily.ru`, which serves the same data in UTF-8 and carries the
-previous day's value as well — and yesterday's value is what turns a
-number into a direction. The official XML is the fallback: a mirror is
-somebody's goodwill, and a plugin that dies with it would be a plugin
-that trusted the wrong thing.
+**Where the numbers come from: the Central Bank itself, and nobody
+else.** It publishes them once a working day at
+`cbr.ru/scripts/XML_daily.asp`. This plugin used to read a JSON mirror
+at `cbr-xml-daily.ru` first, for its UTF-8 and its "previous" field —
+which meant a third party saw every request, while the product page
+said "a request to the central bank's website". Decided 2026-09-29: the
+bank only. Yesterday's value, which turns a number into a direction, is
+asked of the same endpoint for the day before the document's date.
 
 **Permission.** `network.external` stands in the manifest, and the
 person grants it before the first run; without it the core refuses to
@@ -33,18 +33,17 @@ registers ([ADR 0010](../../docs/adr/0010-plugin-api.md)), and a
 plugin that declared nothing and went to the network anyway would be
 lying to the person rather than to the machine.
 """
-import json
 import re
 import threading
 import time
 import urllib.request
+from datetime import date, timedelta
 
 from plugins.api import Plugin, PluginTool
 from plugins.page_spec import Card, Note, Row, Text
 
-#: Where the numbers come from, best first.
-MIRROR = "https://www.cbr-xml-daily.ru/daily_json.js"
-OFFICIAL = "https://www.cbr.ru/scripts/XML_daily.asp"
+#: Where the numbers come from.
+SOURCE = "https://www.cbr.ru/scripts/XML_daily.asp"
 
 #: How long to wait for somebody else's server. Short on purpose: this
 #: runs on a thread of its own, but a thread that waits a minute is a
@@ -165,11 +164,19 @@ class RatesPlugin(Plugin):
 
     def _fetch(self):
         try:
-            got = self._from_mirror()
-            if not got:
-                got = self._from_official()
-            if got:
-                self._rates = got
+            today, dated = self._from_bank()
+            if today:
+                previous = {}
+                if dated is not None:
+                    # The direction is a nicety: a day that cannot be
+                    # asked about leaves the tile without an arrow, not
+                    # without a rate.
+                    try:
+                        previous, _ = self._from_bank(dated - timedelta(days=1))
+                    except Exception:                    # noqa: BLE001
+                        previous = {}
+                self._rates = {code: (value, previous.get(code, 0.0))
+                               for code, value in today.items()}
                 self._asked_at = time.time()
                 self._trouble = ""
             else:
@@ -184,45 +191,24 @@ class RatesPlugin(Plugin):
         finally:
             self._asking = False
 
-    def _from_mirror(self):
-        with urllib.request.urlopen(MIRROR, timeout=PATIENCE) as answer:
-            data = json.loads(answer.read().decode("utf-8"))
-        out = {}
-        for code in SHOWN:
-            one = (data.get("Valute") or {}).get(code)
-            if not one:
-                continue
-            nominal = float(one.get("Nominal") or 1) or 1
-            out[code] = (float(one["Value"]) / nominal,
-                         float(one.get("Previous") or 0) / nominal)
-        return out
-
-    def _from_official(self):
+    def _from_bank(self, day=None):
         """
-        The Central Bank's own XML, when the mirror is silent.
+        The Central Bank's XML: {code: roubles per unit}, and its date.
 
         Parsed with a regular expression rather than an XML library, and
         that is a deliberate smallness: three fields of a document whose
-        shape has not changed since the two thousands. Windows-1251, a
-        comma for a decimal point, and no previous day — hence the
-        mirror first.
+        shape has not changed since the two thousands. Windows-1251 and a
+        comma for a decimal point. `day` asks for the rates set for that
+        date; without it, for today.
         """
+        url = SOURCE
+        if day is not None:
+            url += "?date_req=" + day.strftime("%d/%m/%Y")
         request = urllib.request.Request(
-            OFFICIAL, headers={"User-Agent": "RinaAssistant"})
+            url, headers={"User-Agent": "RinaAssistant"})
         with urllib.request.urlopen(request, timeout=PATIENCE) as answer:
             page = answer.read().decode("windows-1251", "replace")
-
-        out = {}
-        for block in re.findall(r"<Valute\b.*?</Valute>", page, re.S):
-            code = re.search(r"<CharCode>(\w+)</CharCode>", block)
-            value = re.search(r"<Value>([\d,\.]+)</Value>", block)
-            nominal = re.search(r"<Nominal>(\d+)</Nominal>", block)
-            if not code or not value or code.group(1) not in SHOWN:
-                continue
-            per = float(nominal.group(1)) if nominal else 1.0
-            out[code.group(1)] = (
-                float(value.group(1).replace(",", ".")) / (per or 1.0), 0.0)
-        return out
+        return parse_bank(page)
 
     def _said_when(self):
         if not self._asked_at:
@@ -231,6 +217,34 @@ class RatesPlugin(Plugin):
         if ago < 90:
             return "Центробанк, только что"
         return f"Центробанк, {ago // 60} мин назад"
+
+
+def parse_bank(page):
+    """
+    The bank's document: ({code: roubles per unit}, the date it is for).
+
+    Separate from the fetching so that it can be asked about without a
+    network. The date is `<ValCurs Date="30.09.2026">`; a document without
+    one gives no date, and the day before it is then not asked for.
+    """
+    dated = None
+    found = re.search(r'<ValCurs[^>]*\bDate="(\d{2})\.(\d{2})\.(\d{4})"', page)
+    if found:
+        try:
+            dated = date(int(found.group(3)), int(found.group(2)),
+                         int(found.group(1)))
+        except ValueError:
+            dated = None
+    out = {}
+    for block in re.findall(r"<Valute\b.*?</Valute>", page, re.S):
+        code = re.search(r"<CharCode>(\w+)</CharCode>", block)
+        value = re.search(r"<Value>([\d,\.]+)</Value>", block)
+        nominal = re.search(r"<Nominal>(\d+)</Nominal>", block)
+        if not code or not value or code.group(1) not in SHOWN:
+            continue
+        per = float(nominal.group(1)) if nominal else 1.0
+        out[code.group(1)] = float(value.group(1).replace(",", ".")) / (per or 1.0)
+    return out, dated
 
 
 def money(value):

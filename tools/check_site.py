@@ -1271,7 +1271,7 @@ NOT_A_DESTINATION = {
 #: Host -> the words the page uses for it.
 #:
 #: A word, not an address: the page writes "the central bank's
-#: website", and making it write `www.cbr-xml-daily.ru` would be
+#: website", and making it write `www.cbr.ru` would be
 #: editing the text to suit the check. The addresses a person is better
 #: off seeing in full are written in full.
 HOST_WORDS = {
@@ -1281,8 +1281,6 @@ HOST_WORDS = {
     "yandex.ru": {"русская": "Веб-поиск", "английская": "Web search"},
     "www.youtube.com": {"русская": "YouTube", "английская": "YouTube"},
     "www.cbr.ru": {"русская": "Центробанка", "английская": "central bank"},
-    "www.cbr-xml-daily.ru": {"русская": "Центробанка",
-                             "английская": "central bank"},
     "alphacephei.com": {"русская": "alphacephei.com",
                         "английская": "alphacephei.com"},
     "huggingface.co": {"русская": "huggingface.co",

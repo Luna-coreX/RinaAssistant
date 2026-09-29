@@ -383,6 +383,29 @@ for label, values, wanted in cases:
           f"| {loaded.get('personality')!r}")
     shutil.rmtree(where, ignore_errors=True)
 
+# Version 3. `check_updates` did nothing and stood on by default, so every
+# profile holds a True nobody chose; the day the automatic check appeared
+# it would have become a request at every start. `web_search_fallback`
+# worked, and what a profile holds is what the person used — kept.
+print()
+print("=== v3: проверка обновлений выключается, поиск остаётся как был ===")
+where, loaded = store_with({"check_updates": True, "web_search_fallback": True})
+check("сохранённое «проверять обновления» сброшено",
+      loaded.get("check_updates") is False, f"| {loaded.get('check_updates')!r}")
+check("а поиск неузнанного остался, как человек им пользовался",
+      loaded.get("web_search_fallback") is True,
+      f"| {loaded.get('web_search_fallback')!r}")
+shutil.rmtree(where, ignore_errors=True)
+
+blank = tempfile.mkdtemp(prefix="rina-blank-")
+_, new = fresh_store(blank)
+new.load()
+check("у нового профиля и то и другое выключено",
+      new.get("check_updates") is False
+      and new.get("web_search_fallback") is False,
+      f"| {new.get('check_updates')!r} {new.get('web_search_fallback')!r}")
+shutil.rmtree(blank, ignore_errors=True)
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

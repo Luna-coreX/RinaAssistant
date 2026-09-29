@@ -583,6 +583,78 @@ check("всё, что ядро просит, есть у обоих менедж
       else f"| проверено имён: {len(asked)}")
 
 
+# ---------------------------------------------------------------------------
+# «Курс» asks the Central Bank and nobody else
+# ---------------------------------------------------------------------------
+#
+# It used to ask a third-party mirror first while the product page said "a
+# request to the central bank's website". Decided 2026-09-29: the bank
+# only, and yesterday's value — the arrow — from the bank as well.
+print()
+print("=== «Курс»: только Центробанк ===")
+import importlib.util
+import urllib.request
+
+spec = importlib.util.spec_from_file_location(
+    "rates_main", os.path.join(plugins_dir(), "rates", "main.py"))
+rates = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(rates)
+
+
+def bank_page(day, usd, eur):
+    return (f'<?xml version="1.0" encoding="windows-1251"?>'
+            f'<ValCurs Date="{day}" name="Foreign Currency Market">'
+            f'<Valute ID="R01235"><NumCode>840</NumCode><CharCode>USD</CharCode>'
+            f'<Nominal>1</Nominal><Name>Доллар США</Name><Value>{usd}</Value></Valute>'
+            f'<Valute ID="R01239"><NumCode>978</NumCode><CharCode>EUR</CharCode>'
+            f'<Nominal>1</Nominal><Name>Евро</Name><Value>{eur}</Value></Valute>'
+            f'<Valute ID="R01375"><NumCode>156</NumCode><CharCode>CNY</CharCode>'
+            f'<Nominal>10</Nominal><Name>Юань</Name><Value>113,5</Value></Valute>'
+            f'</ValCurs>').encode("windows-1251")
+
+
+class _Answer(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+dialled = []
+
+
+def fake_open(request, timeout=None):
+    url = request.full_url if hasattr(request, "full_url") else str(request)
+    dialled.append(url)
+    if "date_req=29/09/2026" in url:
+        return _Answer(bank_page("29.09.2026", "81,5000", "95,0000"))
+    return _Answer(bank_page("30.09.2026", "82,1234", "94,5000"))
+
+
+parsed, dated = rates.parse_bank(bank_page("30.09.2026", "82,1234", "94,5000")
+                                 .decode("windows-1251"))
+check("документ банка разобран: запятая, номинал, дата",
+      abs(parsed.get("USD", 0) - 82.1234) < 1e-6 and "CNY" not in parsed
+      and str(dated) == "2026-09-30", f"| {parsed} {dated}")
+
+real_open = urllib.request.urlopen
+urllib.request.urlopen = fake_open
+try:
+    plugin = rates.RatesPlugin.__new__(rates.RatesPlugin)
+    plugin._rates, plugin._asked_at, plugin._asking, plugin._trouble = {}, 0.0, False, ""
+    plugin.log = lambda *a, **k: None
+    plugin._fetch()
+finally:
+    urllib.request.urlopen = real_open
+hosts = sorted({url.split("/")[2] for url in dialled})
+check("запросы только к www.cbr.ru", hosts == ["www.cbr.ru"], f"| {hosts}")
+check("вчерашний курс спрошен за день до даты документа",
+      any("date_req=29/09/2026" in url for url in dialled), f"| {dialled}")
+check("и стал стрелкой: сегодня и вчера рядом",
+      plugin._rates.get("USD") == (82.1234, 81.5)
+      and plugin._rates.get("EUR") == (94.5, 95.0), f"| {plugin._rates}")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

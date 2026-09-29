@@ -241,7 +241,7 @@ public static class SettingsLayout
         new(Word("Обновления"),
         [
             new("check_updates", Word("Проверять обновления"),
-                Word("Появится вместе с обновлениями")),
+                Word("Раз в сутки спрашивает api.github.com, нет ли новой версии")),
         ]),
     ];
 

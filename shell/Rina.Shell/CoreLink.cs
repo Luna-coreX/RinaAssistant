@@ -75,6 +75,8 @@ public sealed class CoreLink : IAsyncDisposable
         // function does the carrying into the window's thread.
         _boss.Connected += connection => OnUi(
             () => { _ = LoadFinishAsync(connection); });
+        _boss.Connected += connection => OnUi(
+            () => { _ = CheckUpdatesIfDueAsync(connection); });
 
         _boss.Connected += connection => OnUi(
             () => { _ = LoadLanguageAsync(connection); });
@@ -266,6 +268,45 @@ public sealed class CoreLink : IAsyncDisposable
     }
 
     private const string LanguageKey = "ui_language";
+
+    /// <summary>
+    /// The automatic update check, when the person turned it on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked on every connection and gated by <see cref="Update.Updater.Due"/>:
+    /// a reconnect after a crash is not a reason to ask again. The time is
+    /// kept only for an answer — up to date, newer, or not installable. No
+    /// answer at all (the network is down) means asking again at the next
+    /// start rather than a day later.
+    /// </para>
+    /// <para>
+    /// It tells rather than installs: a found update is a notification,
+    /// and the About page is where it is looked at. Installing is a
+    /// decision, and it stays the person's.
+    /// </para>
+    /// </remarks>
+    private async Task CheckUpdatesIfDueAsync(CoreConnection connection)
+    {
+        try
+        {
+            var values = await GetAsync("check_updates");
+            var enabled = values?["check_updates"]?.GetValue<bool>() == true;
+            var found = await new Update.Updater([ProtocolVersion.Current])
+                .CheckIfDueAsync(enabled, Kept.UpdatesAskedAt(), DateTime.UtcNow,
+                                 App.ShellVersion, connection.CoreVersion,
+                                 connection.DataVersion);
+            if (found is null || found.Verdict == Update.Verdict.Unknown) return;
+            Kept.UpdatesAskedAt(DateTime.UtcNow);
+            if (found.Verdict is Update.Verdict.UpToDate
+                or Update.Verdict.Incompatible) return;
+            _window.Tray?.Notify(S("Есть обновление Рины"), found.Explanation);
+        }
+        catch (Exception error)
+        {
+            Platform.ShellLog.Error("automatic update check", error);
+        }
+    }
 
     /// <summary>Ask the core for the chosen finish and apply it.</summary>
     private async Task LoadFinishAsync(CoreConnection connection)

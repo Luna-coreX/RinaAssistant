@@ -383,6 +383,9 @@
   "Есть новое ядро {0}.": {
     "English": "There is a new core {0}."
   },
+  "Есть обновление Рины": {
+    "English": "A Rina update is available"
+  },
   "Есть обновление: оболочка {0}, ядро {1}.": {
     "English": "An update is available: shell {0}, core {1}."
   },
@@ -998,9 +1001,6 @@
   "Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.": {
     "English": "Almost silent: {0}%. Check that the right microphone is selected."
   },
-  "Появится вместе с обновлениями": {
-    "English": "Arrives together with updates"
-  },
   "Править": {
     "English": "Edit"
   },
@@ -1072,6 +1072,9 @@
   },
   "Равно чему": {
     "English": "Equal to what"
+  },
+  "Раз в сутки спрашивает api.github.com, нет ли новой версии": {
+    "English": "Once a day, asks api.github.com whether there is a new version"
   },
   "Развернуть": {
     "English": "Maximise"

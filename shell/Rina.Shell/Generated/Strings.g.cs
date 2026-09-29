@@ -676,6 +676,11 @@ public static partial class Loc
                 {
                     ["English"] = "There is a new core {0}.",
                 },
+            ["Есть обновление Рины"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A Rina update is available",
+                },
             ["Есть обновление: оболочка {0}, ядро {1}."] =
                 new Dictionary<string, string>
                 {
@@ -1861,11 +1866,6 @@ public static partial class Loc
                 {
                     ["English"] = "Almost silent: {0}%. Check that the right microphone is selected.",
                 },
-            ["Появится вместе с обновлениями"] =
-                new Dictionary<string, string>
-                {
-                    ["English"] = "Arrives together with updates",
-                },
             ["Править"] =
                 new Dictionary<string, string>
                 {
@@ -2012,6 +2012,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Equal to what",
+                },
+            ["Раз в сутки спрашивает api.github.com, нет ли новой версии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Once a day, asks api.github.com whether there is a new version",
                 },
             ["разбор команд, память, речь"] =
                 new Dictionary<string, string>
