@@ -77,6 +77,16 @@ public sealed class CoreSupervisor : IAsyncDisposable
     public int Restarts { get; private set; }
 
     /// <summary>
+    /// The last lines a core wrote before its link was given up.
+    /// </summary>
+    /// <remarks>
+    /// Kept here because the connection that held them is disposed a
+    /// moment later: a core that died used to take its last words with
+    /// it, and the shell could say only "reconnecting".
+    /// </remarks>
+    public string LastCoreLog { get; private set; } = "";
+
+    /// <summary>
     /// Which attempt is in progress. One means the first.
     /// </summary>
     /// <remarks>
@@ -152,6 +162,7 @@ public sealed class CoreSupervisor : IAsyncDisposable
             }
             catch (Exception e)
             {
+                LastCoreLog = connection.CoreLog;
                 await connection.DisposeAsync().ConfigureAwait(false);
                 Move(CoreState.Reconnecting, e.Message);
                 if (attempt == MaxAttempts) break;
@@ -223,6 +234,7 @@ public sealed class CoreSupervisor : IAsyncDisposable
             var old = Connection;
             Connection = null;
             Restarts++;
+            LastCoreLog = old?.CoreLog ?? "";
             // Technical text, not a phrase for a person: an exit code and a
             // system error are what the developer reads in the log. Whether
             // any of it reaches the panel, and in what words, is the

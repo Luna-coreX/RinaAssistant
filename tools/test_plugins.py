@@ -402,6 +402,75 @@ finally:
     shutil.rmtree(sample, ignore_errors=True)
     shutil.rmtree(crashing, ignore_errors=True)
 
+# --- the greedy one and the chatty one -----------------------------------
+#
+# A plugin that announces a frame of four gigabytes. The decoder refuses
+# such a length before allocating; the host used to read the whole body
+# first and hand it over afterwards, which undid the refusal. What is asked
+# is that the length is judged at once — the plugin is stopped with its
+# reason, not left to time out, and not read.
+#
+# And one that prints a lot. `plugins/host.py` sends `print` to the error
+# stream, which nobody read: after a few kilobytes the plugin hung inside
+# `print`, and from here that looked like a plugin that stopped answering.
+greedy = os.path.join(plugins_dir(), "проверка_жадного")
+chatty = os.path.join(plugins_dir(), "проверка_болтливого")
+try:
+    for folder, pid, body in (
+            (greedy, "жадный",
+             "import sys, time\n"
+             "from plugins.api import Plugin\n\n\n"
+             "class Greedy(Plugin):\n"
+             "    def on_command(self, text):\n"
+             "        sys.__stdout__.buffer.write(b'\\xff\\xff\\xff\\xf0' + b'x' * 16)\n"
+             "        sys.__stdout__.buffer.flush()\n"
+             "        time.sleep(30)\n"),
+            (chatty, "болтливый",
+             "from plugins.api import Plugin\n\n\n"
+             "class Chatty(Plugin):\n"
+             "    def on_command(self, text):\n"
+             "        for i in range(20000):\n"
+             "            print('строка отладки номер', i)\n"
+             "        return True\n")):
+        os.makedirs(folder, exist_ok=True)
+        io.open(os.path.join(folder, "plugin.json"), "w",
+                encoding="utf-8").write(json.dumps(
+                    {"id": pid, "name": pid.title(), "api_version": 4},
+                    ensure_ascii=False))
+        io.open(os.path.join(folder, "main.py"), "w",
+                encoding="utf-8").write(body)
+
+    fourth = HostedPlugins(settings=store)
+    fourth.discover()
+    fourth.enable("проверка_жадного")
+    fourth.enable("проверка_болтливого")
+    fourth.enable("clock")
+
+    hungry = fourth.plugins["проверка_жадного"]
+    started = time.monotonic()
+    reply = hungry.ask("plugin.command", {"text": "съешь память"}, timeout=8.0)
+    spent = time.monotonic() - started
+    check("кадр сверх предела останавливает плагин сразу, а не по сроку",
+          reply is None and spent < 4.0 and not hungry.alive,
+          f"| {spent:.1f} с, жив: {hungry.alive}")
+    check("и причина названа", "слишком большое" in (hungry.error or ""),
+          f"| {hungry.error}")
+
+    talker = fourth.plugins["проверка_болтливого"]
+    reply = talker.ask("plugin.command", {"text": "болтай"}, timeout=8.0)
+    check("болтливый плагин отвечает, а не виснет в print",
+          reply is not None and reply.get("handled") is True,
+          f"| {reply} {talker.error}")
+    check("и хвост его вывода виден в его журнале",
+          any("строка отладки" in line for line in talker.logs),
+          f"| {talker.logs[-2:]}")
+    check("соседний плагин цел и после них",
+          fourth.plugins["clock"].alive)
+    fourth.stop_all()
+finally:
+    shutil.rmtree(greedy, ignore_errors=True)
+    shutil.rmtree(chatty, ignore_errors=True)
+
 hosted.stop_all()
 check("после остановки не осталось процессов",
       not any(h.alive for h in hosted.plugins.values()))

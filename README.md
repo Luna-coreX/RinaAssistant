@@ -287,11 +287,11 @@ full on the privacy page. 4.0.0 Stable removes it entirely.
 
 ## Roadmap
 
-**4.0.0-port — separation and redesign.** Nearly complete: the core is a standalone service, the shell and system layer are C#, the protocol is between them, the interface is redesigned. What remains is the installer.
+**4.0.0-port — separation and redesign.** Done: the core is a standalone service, the shell and system layer are C#, the protocol is between them, the interface is redesigned, and there is an installer.
 
-**4.0-beta — public free beta.** Whether the product is useful, and real scenarios.
+**4.0-beta — public free beta.** Whether the product is useful, and real scenarios. Built: conversation with a local model, speech that starts with the first sentence and can be interrupted, work sessions, the privacy page. What remains is publishing it.
 
-**5.0.0 — platform.** End-to-end streaming (speech starts while the answer is still being generated, and can be interrupted), persistent memory, controlling the computer under granular permissions.
+**5.0.0 — platform.** End-to-end streaming (speech starts while the model is still writing the answer, and she can be interrupted by voice), persistent memory, controlling the computer under granular permissions.
 
 Full plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 

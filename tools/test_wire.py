@@ -1372,6 +1372,60 @@ back = decode(encode(carried))
 check("и доезжает через конверт целым", back.payload["item"] == fired)
 check("событие объявлено в каталоге", "reminder.fired" in EVENTS)
 
+# ---------------------------------------------------------------------------
+# A channel closed mid-send is "closed", not a crash
+# ---------------------------------------------------------------------------
+#
+# `send` looked at the file before taking the lock and wrote after. A close
+# that landed between the two gave `'NoneType' object has no attribute
+# 'write'` — an ERROR with a traceback in the journal at shutdown, twice on
+# 22 September. Asked deterministically: the lock itself closes the
+# channel as it is taken, which is the worst moment the close can come.
+print()
+print("=== канал, закрытый посреди отправки, — это «закрыт», а не сбой ===")
+from core.wire.transport import PipeClientTransport, TransportClosed
+
+
+class _Sink:
+    def write(self, data):
+        pass
+
+    def flush(self):
+        pass
+
+    def close(self):
+        pass
+
+
+class _ClosingLock:
+    """A lock during whose acquisition the channel gets closed."""
+
+    def __init__(self, transport):
+        self.transport = transport
+
+    def __enter__(self):
+        self.transport._file = None
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+pipe = PipeClientTransport.__new__(PipeClientTransport)
+pipe.name = "test"
+pipe._file = _Sink()
+pipe._peek = None
+pipe._lock = _ClosingLock(pipe)
+try:
+    pipe.send(b"abc")
+    outcome = "ушло в закрытый канал"
+except TransportClosed:
+    outcome = "closed"
+except Exception as exc:                                  # noqa: BLE001
+    outcome = f"{type(exc).__name__}: {exc}"
+check("закрытие между проверкой и записью даёт TransportClosed",
+      outcome == "closed", f"| {outcome}")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

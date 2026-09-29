@@ -57,9 +57,13 @@ public static class Diagnostics
     public static string SuggestedName() =>
         $"rina-diagnostics-{DateTime.Now:yyyy-MM-dd-HHmm}.zip";
 
-    private static string DataDir => Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-        "RinaAssistant");
+    /// <remarks>
+    /// Through <see cref="DataFolder"/>, like the rest of the shell. It was
+    /// the known folder asked of Windows directly, which a check's own
+    /// folder does not move — so the diagnostics check packed the person's
+    /// real journals rather than its own.
+    /// </remarks>
+    private static string DataDir => DataFolder.Roaming;
 
     /// <summary>
     /// Collect the bundle.
@@ -122,16 +126,54 @@ public static class Diagnostics
                 using var source = new FileStream(
                     file, FileMode.Open, FileAccess.Read,
                     FileShare.ReadWrite | FileShare.Delete);
+                using var reader = new StreamReader(source, Encoding.UTF8);
                 var entry = archive.CreateEntry(
                     "logs/" + Path.GetFileName(file));
-                using var target = entry.Open();
-                source.CopyTo(target);
+                using var target = new StreamWriter(entry.Open(),
+                                                    new UTF8Encoding(false));
+                target.Write(Anonymised(reader.ReadToEnd()));
             }
             catch (IOException)
             {
                 // One journal read short is no reason to end up with no bundle.
             }
         }
+    }
+
+    /// <summary>
+    /// A journal with the person's account name taken out of it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The journals travel whole — that is what they are for — and they
+    /// are full of paths: where the settings were read from, every launch
+    /// in the security journal. The page promises the bundle is
+    /// anonymised, and the settings were; the journals carried the Windows
+    /// account name in every other line.
+    /// </para>
+    /// <para>
+    /// The profile folder becomes <c>%USERPROFILE%</c>, and any other
+    /// <c>Users</c> folder's name becomes <c>&lt;user&gt;</c>. In every
+    /// spelling a journal has: one backslash, the doubled one a Python
+    /// <c>repr</c> writes, and the forward slash.
+    /// </para>
+    /// </remarks>
+    public static string Anonymised(string text)
+    {
+        var home = Environment.GetFolderPath(
+            Environment.SpecialFolder.UserProfile).TrimEnd('\\');
+        if (home.Length > 3)
+        {
+            foreach (var spelling in new[]
+                     {
+                         home, home.Replace(@"\", @"\\"), home.Replace('\\', '/'),
+                     })
+                text = text.Replace(spelling, "%USERPROFILE%",
+                                    StringComparison.OrdinalIgnoreCase);
+        }
+        return System.Text.RegularExpressions.Regex.Replace(
+            text, @"(?i)([a-z]:(?:\\\\|\\|/)users(?:\\\\|\\|/))[^\\/\s'"":]+",
+            "$1<user>");
     }
 
     private static string Versions(CoreConnection? connection)
@@ -294,7 +336,8 @@ public static class Diagnostics
                          + "схемы данных, сведения о системе");
         lines.AppendLine("  state.txt     состояние связи и список плагинов");
         lines.AppendLine("  settings.txt  настройки (см. ниже про значения)");
-        lines.AppendLine("  logs/         журналы обоих слоёв как есть");
+        lines.AppendLine("  logs/         журналы обоих слоёв; папка вашего "
+                         + "профиля заменена на %USERPROFILE%");
         lines.AppendLine();
 
         lines.AppendLine("Чего внутри нет");

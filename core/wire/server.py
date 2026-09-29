@@ -44,8 +44,9 @@ from core.protocol import ALL_EVENTS
 from core.wire.data import (DataFrameDecoder, DataReceiver, DataSender,
                             capability_for_kind)
 from core.wire.envelope import Envelope, FrameDecoder, IdGenerator, encode_frame
-from core.wire.errors import (ERROR_INVALID_PAYLOAD, ERROR_UNKNOWN_METHOD,
-                              ProtocolFault, fault, make)
+from core.wire.errors import (ERROR_INVALID_PAYLOAD, ERROR_INVALID_STATE,
+                              ERROR_UNKNOWN_METHOD, ProtocolFault, fault,
+                              make)
 from core.wire.events import StreamSender, event, validate_event
 from core.wire.handshake import CORE_CAPABILITIES, Session, Side
 from core.wire.liveness import Liveness, VolatileState
@@ -2605,6 +2606,19 @@ class ProtocolServer:
             pcm, sample_rate = waiting.get()
             try:
                 self._push_speech(pcm, sample_rate)
+            except (TransportClosed, ProtocolFault) as exc:
+                # **Nobody to speak to is not a failure.** The shell closed
+                # the stream — it was interrupted, or it is going away — or
+                # the channel itself went at shutdown. Both used to reach
+                # the journal as an ERROR with a traceback, at every exit
+                # that fell in the middle of a reply. A protocol fault of
+                # any other kind is still a fault and says so.
+                if isinstance(exc, ProtocolFault) and \
+                        exc.error.code != ERROR_INVALID_STATE:
+                    log.exception("Отправка речи сорвалась")
+                else:
+                    log.debug("Речь не досказана: слушать её некому (%s)",
+                              exc)
             except Exception:                           # noqa: BLE001
                 # The thread is the only one there is: letting it die
                 # would mean a silent Rina for the rest of the session.

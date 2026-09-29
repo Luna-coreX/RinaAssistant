@@ -25,7 +25,9 @@ import io
 import json
 import os
 import random
+import shutil
 import sys
+import tempfile
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 sys.path.insert(0, os.path.join(
@@ -262,6 +264,31 @@ for name in ["nul", "con", "prn", "aux", "com1", "lpt9", "NUL", "Con",
         pass
 check("плагины: имя устройства Windows не становится плагином",
       devices == [], f"| прошло {devices}")
+
+# An archive of a hundred kilobytes that unpacks to sixty megabytes of
+# zeros. The manifest is read only after extraction, so without a limit
+# the disk fills first and the refusal comes afterwards.
+import zipfile
+from plugins.manager import ARCHIVE_UNPACKED_LIMIT, install_plugin
+
+bomb_dir = tempfile.mkdtemp()
+bomb = os.path.join(bomb_dir, "bomb.zip")
+with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED) as archive:
+    archive.writestr("plugin.json", '{"id": "bomb", "api_version": 4}')
+    archive.writestr("main.py", "")
+    archive.writestr("zeros.bin", b"\0" * (ARCHIVE_UNPACKED_LIMIT + 10 * 1024 * 1024))
+try:
+    install_plugin(bomb)
+    refused = ""
+except PluginInstallError as e:
+    refused = str(e)
+check("плагины: архив, распаковывающийся сверх предела, отклонён",
+      "велик" in refused, f"| {refused or 'установлен'} ({os.path.getsize(bomb)} байт)")
+check("и в каталоге плагинов от него ничего не осталось",
+      not os.path.exists(os.path.join(base, "bomb")))
+shutil.rmtree(bomb_dir, ignore_errors=True)
+# Whatever the verdict, the repository's plugins directory is left as found.
+shutil.rmtree(os.path.join(base, "bomb"), ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------

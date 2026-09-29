@@ -90,6 +90,16 @@ def redact_args(tool, args, verbatim=False):
     for key, value in (args or {}).items():
         param = tool.param(key) if tool is not None else None
 
+        # A list of records — the conversation handed to the model — is
+        # counted even when texts may be written. Each of those lines is
+        # already in the journal where it was said; written again inside
+        # every call it filled the journal with the whole history, once
+        # per question, and pushed a megabyte file into rotation in an
+        # evening.
+        if isinstance(value, (list, tuple)) and any(
+                isinstance(one, dict) for one in value):
+            out[key] = f"<{len(value)} эл.>"
+            continue
         if verbatim or isinstance(value, (int, float, bool)):
             out[key] = value
             continue

@@ -29,6 +29,12 @@ public partial class App
     /// <summary>Started by the suite: a check or a screenshot, not a person.</summary>
     private bool _checking;
 
+    /// <summary>This process's claim on the profile; null in a check.</summary>
+    private Platform.SingleInstance? _single;
+
+    /// <summary>How many interface faults were survived this session.</summary>
+    private int _uiFaults;
+
     private string? _shotPath;
     //: Whether a screenshot of the commands page should open the editor.
     private bool _shotEditor;
@@ -67,6 +73,43 @@ public partial class App
         _checking = args.Any(one => one.StartsWith("--check-"))
                     || Value(args, "--shot") is not null;
         if (_checking) UseCheckFolder();
+
+        // **The shell's own failures are written down** (`ShellLog`). There
+        // was no handler at all: a fault in the window closed it without a
+        // line anywhere Rina keeps. A person's Rina keeps running after a
+        // fault in one handler — losing the assistant over a failed click
+        // is worse than the click — up to a limit, past which something is
+        // failing in a loop and going on would only fill the journal. A
+        // check is left to fall: that is how its fault turns red.
+        DispatcherUnhandledException += (_, fault) =>
+        {
+            Platform.ShellLog.Error("interface", fault.Exception);
+            if (!_checking && ++_uiFaults <= 50) fault.Handled = true;
+        };
+        AppDomain.CurrentDomain.UnhandledException += (_, fault) =>
+            Platform.ShellLog.Error("process",
+                fault.ExceptionObject as Exception
+                ?? new Exception(fault.ExceptionObject?.ToString()));
+        TaskScheduler.UnobservedTaskException += (_, fault) =>
+        {
+            Platform.ShellLog.Error("background task", fault.Exception);
+            fault.SetObserved();
+        };
+
+        // One Rina per profile (see `SingleInstance`). A check has a folder
+        // of its own and is never turned away by the person's Rina.
+        if (!_checking)
+        {
+            _single = Platform.SingleInstance.Claim(Platform.DataFolder.Roaming);
+            if (!_single.IsFirst)
+            {
+                _single.AskFirstToShow();
+                _single.Dispose();
+                _single = null;
+                Shutdown();
+                return;
+            }
+        }
 
         // The language can be set from outside: a screenshot in another
         // language is the only way to see the translation whole rather than
@@ -393,6 +436,7 @@ public partial class App
             _tray = new Tray(window);
             _tray.ExitRequested += () => Shutdown();
             window.Tray = _tray;
+            _single?.OnAsked(() => Dispatcher.BeginInvoke(() => _tray?.Show()));
 
             _hotkeys = new Hotkeys();
             _hotkeys.Attach(window);
@@ -930,6 +974,39 @@ public partial class App
             // action: it has no right to leave a plugin switched on behind
             // it, because the settings under it are real, a person's own.
             if (shown is not null) await shown.RestoreAsync();
+        }
+
+        // **A core that dies is written down.** It used to be restarted and
+        // shown as "reconnecting" with nothing kept: its exit and its last
+        // lines went with the process. Killed here the way a failure would
+        // kill it, and the shell's journal is asked what it saw.
+        if (_shotPath is null)
+        {
+            Console.WriteLine("=== журнал оболочки: потеря ядра записана ===");
+            string Read() => File.Exists(Platform.ShellLog.Where)
+                ? File.ReadAllText(Platform.ShellLog.Where) : "";
+            var before = Read();
+            var dying = link.Connection?.CorePid;
+            try
+            {
+                if (dying is int victim)
+                    System.Diagnostics.Process.GetProcessById(victim)
+                          .Kill(entireProcessTree: true);
+            }
+            catch (Exception error)
+            {
+                Console.WriteLine($"     ядро не убито: {error.GetType().Name}");
+            }
+            await Until(() => link.State == Rina.Protocol.CoreState.Ready
+                              && link.Connection?.CorePid is { } now
+                              && now != dying, 60);
+            var after = Read();
+            var added = after.Length >= before.Length
+                ? after[before.Length..] : after;
+            Check("потеря ядра записана в журнал оболочки",
+                  added.Contains("core Reconnecting"),
+                  $"| {added.Trim().Replace(Environment.NewLine, " ⏎ ")[..Math.Min(200, added.Trim().Length)]}");
+            Check("и его возвращение тоже", added.Contains("core back"));
         }
 
         window.Hide();
@@ -2409,6 +2486,17 @@ public partial class App
                     }, TimeSpan.FromSeconds(10));
             }
 
+            // The account name, in every spelling a journal has, written
+            // where the bundle collects from — the shell's journal is one
+            // of them. The bundle must carry none of it.
+            var home = Environment.GetFolderPath(
+                Environment.SpecialFolder.UserProfile).TrimEnd('\\');
+            var account = Path.GetFileName(home);
+            Platform.ShellLog.Warn($"check: {home}\\x | "
+                                   + $"{home.Replace(@"\", @"\\")}\\y | "
+                                   + $"{home.Replace('\\', '/')}/z | "
+                                   + @"C:\Users\someone.else\w");
+
             Directory.CreateDirectory(folder);
             var zip = Path.Combine(folder, "package.zip");
             var made = await Platform.Diagnostics.CollectAsync(zip, link);
@@ -2443,6 +2531,18 @@ public partial class App
                   inside.Keys.Any(k => k.StartsWith("logs/")),
                   "| " + string.Join(", ", inside.Keys.Where(
                       k => k.StartsWith("logs/"))));
+            var journals = string.Join("\n", inside.Where(
+                pair => pair.Key.StartsWith("logs/")).Select(pair => pair.Value));
+            Check("журнал оболочки едет в пакете",
+                  inside.ContainsKey("logs/shell.log"));
+            Check("имени учётной записи в журналах пакета нет",
+                  account.Length > 0
+                  && !journals.Contains(account, StringComparison.OrdinalIgnoreCase)
+                  && !journals.Contains("someone.else"),
+                  $"| {account}");
+            Check("а на месте профиля — %USERPROFILE%",
+                  journals.Contains(@"%USERPROFILE%\x")
+                  && journals.Contains(@"%USERPROFILE%/z"));
 
             var versions = inside.GetValueOrDefault("versions.txt", "");
             Check("версия ядра названа, а не прочерк",
@@ -4037,6 +4137,41 @@ public partial class App
               inside.Fits, $"| {inside.Said}");
         Check("и подсказка поля видна", inside.Hinted,
               $"| «{inside.Hint}»");
+
+        // --- a plugin cannot take the home screen ---
+        //
+        // Four elements per tile was the only limit, and an element is a
+        // card with any number of children. Six such tiles, each a card of
+        // sixty notes and a list of three hundred, used to push the
+        // figure out of its own screen.
+        var greedy = new JsonArray();
+        for (var t = 0; t < 6; t++)
+        {
+            var notes = new JsonArray();
+            for (var n = 0; n < 60; n++)
+                notes.Add(new JsonObject { ["kind"] = "note", ["text"] = $"строка {n}" });
+            var many = new JsonArray();
+            for (var n = 0; n < 300; n++) many.Add($"пункт {n}");
+            greedy.Add(new JsonObject
+            {
+                ["id"] = $"жадный{t}",
+                ["elements"] = new JsonArray(
+                    new JsonObject { ["kind"] = "card", ["text"] = "Всё сразу",
+                                     ["children"] = notes },
+                    new JsonObject { ["kind"] = "items", ["items"] = many }),
+            });
+        }
+        shown.ShowTilesForCheck(greedy);
+        await Until(() => shown.TilesShown == greedy.Count, 5);
+        var tiled = shown.TileRoomForCheck();
+        Check("плитка не выше своего предела",
+              tiled.Tallest <= Pages.HomePage.TileHeight + 0.5,
+              $"| {tiled.Tallest:0} при пределе {Pages.HomePage.TileHeight:0}");
+        Check("а все плитки вместе — не больше своей доли экрана",
+              tiled.Room <= window.ActualHeight * Pages.HomePage.TilesShare,
+              $"| {tiled.Room:0} при окне {window.ActualHeight:0}");
+        Check("и фигуре остаётся её место", tiled.Figure >= 264,
+              $"| строка фигуры {tiled.Figure:0}, фигура 264");
 
         shown.ShowTilesForCheck([]);
         await Until(() => shown.TilesShown == 0, 5);
@@ -5973,6 +6108,42 @@ public partial class App
         Check("системная программа подписана",
               Platform.AppEntry.HasSignature(signed),
               $"| {Platform.AppEntry.CatalogTrace(signed)}");
+
+        // A certificate expires; a timestamped signature does not. The
+        // check above uses a file whose certificate is still valid, and it
+        // stayed green while a flag made every expired one "unsigned" —
+        // 466 programs of 1237 on the developer's machine. Microsoft
+        // timestamps what it ships, so a Microsoft file past its
+        // certificate is the case to ask about. Which file that is depends
+        // on the machine; its absence is said aloud, not counted.
+        // --- one Rina per profile ---
+        var profileA = Path.Combine(Path.GetTempPath(), "rina-single-a");
+        var profileB = Path.Combine(Path.GetTempPath(), "rina-single-b");
+        using (var first = Platform.SingleInstance.Claim(profileA))
+        {
+            var asked = new ManualResetEventSlim();
+            first.OnAsked(() => asked.Set());
+            using (var second = Platform.SingleInstance.Claim(profileA))
+            {
+                Check("второй экземпляр на тот же профиль не проходит",
+                      first.IsFirst && !second.IsFirst);
+                second.AskFirstToShow();
+                Check("и просит первый показаться",
+                      asked.Wait(TimeSpan.FromSeconds(3)));
+            }
+            using (var other = Platform.SingleInstance.Claim(profileB))
+                Check("другой профиль — не помеха (проверки идут рядом с Риной)",
+                      other.IsFirst);
+        }
+        using (var again = Platform.SingleInstance.Claim(profileA))
+            Check("закрытый экземпляр профиль отпускает", again.IsFirst);
+
+        var expired = ExpiredButSigned();
+        if (expired is null)
+            Console.WriteLine("     пропущено: нет файла Microsoft с истёкшим сертификатом");
+        else
+            Check("подпись переживает свой сертификат",
+                  Platform.AppEntry.HasSignature(expired), $"| {expired}");
         var unsigned = Path.Combine(Path.GetTempPath(), "rina-unsigned.exe");
         try
         {
@@ -6039,6 +6210,47 @@ public partial class App
     /// check is possible — "set up" would otherwise mean leaving a trace in
     /// somebody else's data.
     /// </remarks>
+    /// <summary>
+    /// A Microsoft file whose signing certificate has already expired.
+    /// </summary>
+    /// <remarks>
+    /// Looked for rather than named: which one exists depends on the
+    /// machine. The .NET host comes first because a machine that builds
+    /// this shell has it; the system folder is the fallback. The search is
+    /// bounded — a check that walks the disk is a check nobody runs.
+    /// </remarks>
+    private static string? ExpiredButSigned()
+    {
+        var places = new List<string>();
+        var dotnet = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+            "dotnet");
+        if (Directory.Exists(dotnet))
+            places.AddRange(Directory.EnumerateFiles(dotnet, "*.exe"));
+        places.AddRange(Directory.EnumerateFiles(
+            Environment.GetFolderPath(Environment.SpecialFolder.System),
+            "*.exe").Take(400));
+        foreach (var path in places)
+        {
+            try
+            {
+#pragma warning disable SYSLIB0057 // reading the signer, not trusting it
+                using var signer = new System.Security.Cryptography.X509Certificates
+                    .X509Certificate2(System.Security.Cryptography.X509Certificates
+                        .X509Certificate.CreateFromSignedFile(path));
+#pragma warning restore SYSLIB0057
+                if (signer.NotAfter < DateTime.Now
+                    && signer.Subject.Contains("O=Microsoft Corporation"))
+                    return path;
+            }
+            catch
+            {
+                // No embedded signature: a catalogue member, or unsigned.
+            }
+        }
+        return null;
+    }
+
     /// <summary>
     /// Run a check and never let it die in silence.
     /// </summary>
@@ -7392,6 +7604,8 @@ public partial class App
         _hotkeys?.Dispose();
         _tray?.Dispose();
         _link?.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(6));
+        // Last: the profile is free only once the core has let go of it.
+        _single?.Dispose();
         base.OnExit(e);
     }
 

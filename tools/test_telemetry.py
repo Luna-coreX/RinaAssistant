@@ -158,6 +158,10 @@ sender = tm.Telemetry(settings, folder=folder, endpoint="https://example.invalid
 sender.intent("calc")
 sender.timing("recognition", 0.61)
 install = sender.report()["install"]
+plain = tm.Telemetry(settings, folder=folder, endpoint="http://example.invalid/r",
+                     post=lambda url, body: posted.append(body) or True)
+check("по http отчёт не уходит вовсе",
+      plain.maybe_send(True) == "insecure" and not posted, f"| {posted}")
 check("сервер не принял — счёт ждёт", sender.maybe_send(True) == "failed"
       and sender.report()["features"].get("calc") == 1)
 check("принял — отправлено", sender.maybe_send(True) == "sent", f"| {posted[-1:]}")

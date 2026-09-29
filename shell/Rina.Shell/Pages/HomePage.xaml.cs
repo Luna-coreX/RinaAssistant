@@ -65,6 +65,8 @@ public partial class HomePage : UserControl
         // stream, and a plugin that wants to change it says so by the
         // ordinary means — the page is rebuilt on every visit anyway.
         Loaded += async (_, _) => await ShowTilesAsync();
+        Screen.SizeChanged += (_, size) =>
+            TileRoom.MaxHeight = Math.Max(0, size.NewSize.Height * TilesShare);
 
         _remote = App.Remote;
         if (_remote is not null)
@@ -339,7 +341,7 @@ public partial class HomePage : UserControl
             var view = new PluginView(_link, id);
             view.Draw(elements);
             view.Margin = new Thickness(0, 0, 12, 12);
-            view.MaxWidth = TileWidth;
+            Fit(view);
             Tiles.Items.Add(view);
         }
     }
@@ -411,6 +413,38 @@ public partial class HomePage : UserControl
     /// </remarks>
     private const double TileWidth = 320;
 
+    /// <summary>How tall one tile may be.</summary>
+    /// <remarks>
+    /// Four elements a tile was always limited to — but an element is a
+    /// card with any number of children, or a list of any length, and the
+    /// height was never asked about. A tile is a glance; what does not fit
+    /// in this is what the plugin's own page is for.
+    /// </remarks>
+    public const double TileHeight = 240;
+
+    /// <summary>The share of the screen all tiles together may take.</summary>
+    public const double TilesShare = 0.4;
+
+    private static void Fit(PluginView view)
+    {
+        view.MaxWidth = TileWidth;
+        view.MaxHeight = TileHeight;
+        view.ClipToBounds = true;
+    }
+
+    /// <summary>
+    /// The tallest tile, the tiles' room and the figure's — for the check.
+    /// </summary>
+    public (double Tallest, double Room, double Figure) TileRoomForCheck()
+    {
+        UpdateLayout();
+        var tallest = Tiles.Items.OfType<PluginView>()
+                           .Select(view => view.ActualHeight)
+                           .DefaultIfEmpty(0).Max();
+        return (tallest, TileRoom.ActualHeight,
+                Screen.RowDefinitions[0].ActualHeight);
+    }
+
     /// <summary>How many tiles are showing — for the check.</summary>
     public int TilesShown => Tiles.Items.Count;
 
@@ -433,7 +467,7 @@ public partial class HomePage : UserControl
                 || elements.Count == 0) continue;
             var view = new PluginView(_link, one["id"]?.GetValue<string>() ?? "");
             view.Draw(elements);
-            view.MaxWidth = TileWidth;
+            Fit(view);
             Tiles.Items.Add(view);
         }
     }

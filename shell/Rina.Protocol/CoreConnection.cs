@@ -48,7 +48,15 @@ public sealed class CoreConnection : IAsyncDisposable
     private readonly DataChannel _data;
     private readonly ConcurrentDictionary<string, TaskCompletionSource<Envelope>>
         _pending = new();
-    private readonly System.Text.StringBuilder _coreLog = new();
+    /// <summary>The tail of the core's error stream.</summary>
+    /// <remarks>
+    /// A tail and not everything: it used to be a builder that only grew,
+    /// for as long as the core lived, and the core writes every warning
+    /// there as well as whatever its libraries print. What is read from it
+    /// is the last words before a failure, and two hundred lines hold them.
+    /// </remarks>
+    private readonly Queue<string> _coreLog = new();
+    private const int CoreLogLines = 200;
     private readonly CancellationTokenSource _stopping = new();
     private Process? _core;
     private Task? _pump;
@@ -142,7 +150,12 @@ public sealed class CoreConnection : IAsyncDisposable
         // intelligible thing to show when it breaks.
         _core.ErrorDataReceived += (_, e) =>
         {
-            if (e.Data is not null) lock (_coreLog) _coreLog.AppendLine(e.Data);
+            if (e.Data is null) return;
+            lock (_coreLog)
+            {
+                _coreLog.Enqueue(e.Data);
+                while (_coreLog.Count > CoreLogLines) _coreLog.Dequeue();
+            }
         };
         _core.BeginErrorReadLine();
 
@@ -361,7 +374,10 @@ public sealed class CoreConnection : IAsyncDisposable
 
     /// <summary>What the core has written to its error stream by
     /// now.</summary>
-    public string CoreLog { get { lock (_coreLog) return _coreLog.ToString(); } }
+    public string CoreLog
+    {
+        get { lock (_coreLog) return string.Join(Environment.NewLine, _coreLog); }
+    }
 
     /// <summary>The core's process id. Needed by the supervisor and the
     /// journal: with two processes, "which of the cores" is a question

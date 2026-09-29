@@ -414,7 +414,14 @@ public static class AppIndex
         Path.Combine(DataFolder.Roaming, "app_index.json");
 
     /// <summary>How the cache file is shaped; grows when the format changes.</summary>
-    private const int CacheVersion = 2;
+    /// <remarks>
+    /// Also when what is stored stops being true: version 3 came with the
+    /// signature check that no longer takes an expired certificate for no
+    /// signature, and an index built before it holds hundreds of wrong
+    /// <c>Signed</c> flags that would otherwise live until the next full
+    /// rebuild.
+    /// </remarks>
+    private const int CacheVersion = 3;
 
     private static List<AppEntry>? _memory;
 

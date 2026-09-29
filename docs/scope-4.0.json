@@ -263,6 +263,12 @@
     "size": "M",
     "title": "Настройки по протоколу"
   },
+  "4.0-E06a": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: кто владеет представлением настроек"
+  },
   "4.0-E07": {
     "done": true,
     "milestone": "4.0-port",
@@ -274,6 +280,12 @@
     "milestone": "4.0-port",
     "size": "S",
     "title": "ADR: UI-фреймворк — WPF"
+  },
+  "4.0-F01b": {
+    "done": true,
+    "milestone": "4.0-port",
+    "size": "S",
+    "title": "ADR: библиотека контролов"
   },
   "4.0-F02": {
     "done": true,
@@ -658,6 +670,348 @@
     "milestone": "4.1+",
     "size": "M",
     "title": "Certificate pinning и CDN"
+  },
+  "4.0b-A01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Решение: какая функция станет лицом беты"
+  },
+  "4.0b-A02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Рабочие сессии и проектный контекст"
+  },
+  "4.0b-A03": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Контекстные напоминания"
+  },
+  "4.0b-A04": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Обучение на исправлениях"
+  },
+  "4.0b-A05": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Режим фокуса"
+  },
+  "4.0b-A06": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Глубина в оформлении"
+  },
+  "4.0b-A07": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Новая главная вкладка"
+  },
+  "4.0b-A08": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Минимум две новые возможности"
+  },
+  "4.0b-A09": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Конструктор команд: удобнее и визуальнее"
+  },
+  "4.0b-A10": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Настройки в порядок"
+  },
+  "4.0b-A11": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Остальные вкладки в порядок"
+  },
+  "4.0b-A12": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Диалог как переписка"
+  },
+  "4.0b-A13": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Список дел"
+  },
+  "4.0b-A14": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Экран первичной настройки"
+  },
+  "4.0b-A15": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Мастер ставит пакеты, а не только модели"
+  },
+  "4.0b-B01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "«Что Рина знает обо мне»"
+  },
+  "4.0b-B02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "«Забудь это»"
+  },
+  "4.0b-B03": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Экспорт всех данных"
+  },
+  "4.0b-B04": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "«Почему?»"
+  },
+  "4.0b-C01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Сквозная проверка безопасности"
+  },
+  "4.0b-C02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Краш- и фаззинг-тесты"
+  },
+  "4.0b-C02a": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Конверт у выгрузки команд и истории"
+  },
+  "4.0b-C03": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Документация приватности и границ доверия"
+  },
+  "4.0b-C04": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "README как продуктовая страница"
+  },
+  "4.0b-C05": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Документы сообщества"
+  },
+  "4.0b-C06": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Канал обратной связи"
+  },
+  "4.0b-C07": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Ясное публичное сообщение"
+  },
+  "4.0b-D01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Страница продукта"
+  },
+  "4.0b-D02": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Публикация"
+  },
+  "4.0b-D03": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Статьи"
+  },
+  "4.0b-D04": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Вопросы к пользователям"
+  },
+  "4.0b-D05": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Необязательная телеметрия"
+  },
+  "4.0b-E01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Блюр у верхней полосы"
+  },
+  "4.0b-E02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Всплывающее — со скруглением и стеклом"
+  },
+  "4.0b-E03": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Наведение на кнопку"
+  },
+  "4.0b-E04": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Анимации по всей оболочке"
+  },
+  "4.0b-E05": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Фигура объёмная"
+  },
+  "4.0b-E06": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Разговор, а не команды"
+  },
+  "4.0b-E07": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Распознавание по ходу фразы"
+  },
+  "4.0b-E08": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Поток речи ждёт кредита, а не обрывает"
+  },
+  "4.0b-E09": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Синтез по предложениям"
+  },
+  "4.0b-E10": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Потоковый синтез"
+  },
+  "4.0b-E11": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Тёплая связь с Edge"
+  },
+  "4.0b-E12": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Перебивание"
+  },
+  "4.0b-E13": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Модель смотрит в интернете"
+  },
+  "4.0b-E14": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Персона на разных языках и имя собеседника"
+  },
+  "4.0b-V01": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Распознавание в несколько потоков"
+  },
+  "4.0b-V02": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "«Всегда слушать» не переживало перезапуск"
+  },
+  "4.0b-V02b": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Та же ложь через другую дверь"
+  },
+  "4.0b-V03": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Плитки плагинов не работали ни разу"
+  },
+  "4.0b-V04": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Чужая папка принималась за модель"
+  },
+  "4.0b-V05": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Говорить было нечем"
+  },
+  "4.0b-V06": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Она отвечала на шум"
+  },
+  "4.0b-V07": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Разовое слушание закрывало микрофон под режимом"
+  },
+  "4.0b-V08": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Распознавание стало хуже, чем было в 3.1"
+  },
+  "4.0b-V09": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Проверки шли не тем питоном, что ядро"
+  },
+  "4.0b-V10": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Голос Edge не умеет по-английски"
   },
   "V-01": {
     "done": true,

@@ -255,7 +255,8 @@ class Telemetry:
         Send what was gathered, if it is time. Returns what happened.
 
         `off` — switched off, nothing touched; `no_endpoint` — nowhere to
-        send yet; `not_due` — too soon; `sent` — the server took it;
+        send yet; `insecure` — the address is not `https://`, so nothing
+        is sent; `not_due` — too soon; `sent` — the server took it;
         `failed` — it did not, and the counts wait for the next try.
         """
         if not self.enabled:
@@ -264,6 +265,12 @@ class Telemetry:
             self._save()
             if not self._endpoint:
                 return "no_endpoint"
+            # Over TLS or not at all. A report holds nothing a person said,
+            # but it does hold an identifier and a day's habits, and an
+            # `http://` typed into `ENDPOINT` by mistake would have sent
+            # them in the clear without a word.
+            if not self._endpoint.lower().startswith("https://"):
+                return "insecure"
             if not force and not self.due():
                 return "not_due"
             report = self.report()

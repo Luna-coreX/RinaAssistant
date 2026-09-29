@@ -55,7 +55,53 @@ public sealed record AppEntry
     private const uint ChoiceFile = 1;
     private const uint StateActionVerify = 1;
     private const uint StateActionClose = 2;
-    private const uint SafeLifetimeSigning = 0x00000800;
+
+    /// <summary>
+    /// Revocation is looked up in what the machine already has, never
+    /// fetched (<c>WTD_CACHE_ONLY_URL_RETRIEVAL</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured: a reindex checks well over a thousand files, and each
+    /// check without this flag may go to the certificate authorities for
+    /// revocation lists — through the person's proxy, at every start, for
+    /// every program they have. Nobody asked for that, and what it tells
+    /// the authorities is which software is installed (<c>4.0b-D05</c>:
+    /// no request the person did not make).
+    /// </para>
+    /// <para>
+    /// This replaced <c>WTD_LIFETIME_SIGNING_FLAG</c> (0x800), which stood
+    /// here under a comment promising the opposite of what it does: it
+    /// checks the chain at the current time and ignores the timestamp, so
+    /// a program signed with a certificate that has since expired counted
+    /// as unsigned. On the developer's machine that was 466 of 1237
+    /// indexed programs — <c>dotnet.exe</c> among them — and it would have
+    /// been every catalogue-signed system file once the catalogue's
+    /// certificate expired. A warning shown for the whole system teaches
+    /// a person to click through it.
+    /// </para>
+    /// </remarks>
+    private const uint CacheOnlyUrlRetrieval = 0x00001000;
+
+    /// <summary>
+    /// Whether a verdict of <c>WinVerifyTrust</c> means "signed".
+    /// </summary>
+    /// <remarks>
+    /// With revocation taken from the cache only, a chain whose list is
+    /// not cached comes back "revocation unknown". The signature itself
+    /// was verified; what is unknown is whether it was withdrawn since,
+    /// and an online check offline would have said the same. A revoked
+    /// certificate the machine knows about is still refused
+    /// (<c>CERT_E_REVOKED</c> is not in this list).
+    /// </remarks>
+    private static bool Accepted(int verdict) => verdict switch
+    {
+        0 => true,
+        unchecked((int)0x80092013) => true,   // CRYPT_E_REVOCATION_OFFLINE
+        unchecked((int)0x800B010E) => true,   // CERT_E_REVOCATION_FAILURE
+        unchecked((int)0x80092012) => true,   // CRYPT_E_NO_REVOCATION_CHECK
+        _ => false,
+    };
 
     [StructLayout(LayoutKind.Sequential)]
     private struct FileInfoBlock
@@ -249,14 +295,14 @@ public sealed record AppEntry
                     UnionChoice = ChoiceCatalog,
                     FileInfoPointer = block,
                     StateAction = StateActionVerify,
-                    ProviderFlags = SafeLifetimeSigning,
+                    ProviderFlags = CacheOnlyUrlRetrieval,
                 };
                 var action = VerifyAction;
                 var verdict = WinVerifyTrust(IntPtr.Zero, ref action, ref data);
 
                 data.StateAction = StateActionClose;
                 WinVerifyTrust(IntPtr.Zero, ref action, ref data);
-                return verdict == 0;
+                return Accepted(verdict);
             }
             finally
             {
@@ -285,10 +331,11 @@ public sealed record AppEntry
     /// doing that ourselves means doing it worse than it is already done.
     /// </para>
     /// <para>
-    /// The "signature stays valid past certificate expiry" flag is on
-    /// deliberately: the certificate a program was signed with three years
-    /// ago has long expired, and the program did not become unsigned
-    /// because of it.
+    /// A signature outlives its certificate when it carries a timestamp:
+    /// the certificate a program was signed with three years ago has long
+    /// expired, and the program did not become unsigned because of it.
+    /// That is the system's default, and no flag here changes it — see
+    /// <see cref="CacheOnlyUrlRetrieval"/> for the one that used to.
     /// </para>
     /// </remarks>
     public static bool HasSignature(string path)
@@ -312,7 +359,7 @@ public sealed record AppEntry
                 UnionChoice = ChoiceFile,
                 FileInfoPointer = pointer,
                 StateAction = StateActionVerify,
-                ProviderFlags = SafeLifetimeSigning,
+                ProviderFlags = CacheOnlyUrlRetrieval,
             };
 
             var action = VerifyAction;
@@ -327,7 +374,7 @@ public sealed record AppEntry
             // No embedded signature — the file may be signed by a
             // catalogue. This order deliberately: embedded is the cheaper
             // check, and most third-party programs have exactly that.
-            return verdict == 0 || SignedByCatalog(path);
+            return Accepted(verdict) || SignedByCatalog(path);
         }
         catch
         {

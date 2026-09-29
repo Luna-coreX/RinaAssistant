@@ -327,6 +327,16 @@ kept_verbatim = redact_args(None, {"query": "секрет"}, verbatim=True)
 about("T-16", "дословно — только по явно включённой настройке",
       kept_verbatim.get("query") == "секрет", f"| {kept_verbatim}")
 
+# The history handed to the model is counted even then: each line of it is
+# in the journal where it was said, and copied into every call it filled a
+# megabyte of journal in an evening.
+history = redact_args(None, {"question": "вопрос", "context": [
+    {"kind": "user", "text": "первая реплика"},
+    {"kind": "assistant", "text": "ответ Рины"}]}, verbatim=True)
+about("T-16", "история разговора в вызове модели пишется числом",
+      history.get("context") == "<2 эл.>" and "реплика" not in str(history),
+      f"| {history}")
+
 # T-17 · a dangerous action from a misheard phrase.
 ledger = ConfirmationLedger()
 granted = ledger.issue("power_action", {"action": "sleep"})

@@ -310,7 +310,18 @@ public sealed class MediaRemote
     /// `check_strings.py` cannot tell the difference and is right not to
     /// be able to: a Russian literal here looks exactly like a label that
     /// forgot to go through the translation.
+    ///
+    /// Into the shell's journal, once per message per session: the remote
+    /// is polled, and a register that cannot be read says so on every
+    /// poll. The first time is information; the hundredth is noise that
+    /// pushes the useful lines out of a rotated file.
     /// </remarks>
-    private static void Log(string said) =>
-        System.Diagnostics.Debug.WriteLine($"[media] {said}");
+    private static void Log(string said)
+    {
+        lock (Said)
+            if (!Said.Add(said)) return;
+        Platform.ShellLog.Warn($"[media] {said}");
+    }
+
+    private static readonly HashSet<string> Said = [];
 }

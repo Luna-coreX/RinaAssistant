@@ -135,6 +135,6 @@ public static class Kept
 
     private static void Journal(string said)
     {
-        try { Console.Error.WriteLine(said); } catch { /* nowhere to say it */ }
+        Platform.ShellLog.Warn(said);
     }
 }

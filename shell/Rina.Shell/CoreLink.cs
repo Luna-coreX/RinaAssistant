@@ -46,6 +46,28 @@ public sealed class CoreLink : IAsyncDisposable
         _boss.StateChanged += (state, why) => OnUi(() =>
             _window.ShowCoreState(state, why));
 
+        // Every loss of the core goes into the shell's journal with its
+        // reason and the core's last lines. A reconnect with no reason
+        // yet is the attempt starting, not a loss — it is not written.
+        _boss.StateChanged += (state, why) =>
+        {
+            if (state == CoreState.Ready)
+            {
+                if (_boss.Restarts > 0 || _boss.Attempt > 1)
+                    Platform.ShellLog.Info($"core back: {why}");
+                return;
+            }
+            if (state is not (CoreState.Reconnecting or CoreState.Failed)
+                || why.Length == 0)
+                return;
+            var tail = string.Join(Environment.NewLine,
+                _boss.LastCoreLog.Split('\n').TakeLast(15)
+                     .Select(line => "    " + line.TrimEnd('\r')));
+            Platform.ShellLog.Warn(
+                $"core {state}: {why}"
+                + (tail.Trim().Length > 0 ? Environment.NewLine + tail : ""));
+        };
+
         // Not `OnUi(async () => ...)`: the `Func<Task>` overload called
         // itself, because `() => _ = work()` is a `Func<Task>` too. A stack
         // overflow on the very first connection. The overload is gone: the
@@ -347,8 +369,7 @@ public sealed class CoreLink : IAsyncDisposable
             // A wizard that cannot open is a wizard that did not run. It is
             // not a reason to take the assistant with it: everything it
             // offers can be done in the settings afterwards.
-            System.Diagnostics.Debug.WriteLine(
-                $"[setup] wizard would not open: {exc.GetType().Name}");
+            Platform.ShellLog.Error("setup wizard would not open", exc);
             return;
         }
 

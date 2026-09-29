@@ -547,6 +547,7 @@ _EN = {
     'Файл или папка не найдены': 'File or folder not found',
     'Нужна папка плагина или .zip': 'A plugin folder or .zip is required',
     'Не удалось распаковать архив: ': 'Couldn’t unpack the archive: ',
+    'Архив слишком велик для плагина': 'The archive is too large for a plugin',
     'В плагине нет файла plugin.json': 'The plugin has no plugin.json',
     'В плагине нет файла main.py': 'The plugin has no main.py',
     'Битый plugin.json: ': 'Broken plugin.json: ',

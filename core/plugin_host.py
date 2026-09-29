@@ -29,10 +29,10 @@ import sys
 import threading
 import time
 
-from core.logging_setup import get_logger
+from core.logging_setup import get_logger, security_log
 from core.trace import NO_TRACE, current_trace
-from core.wire.envelope import (Envelope, FrameDecoder, IdGenerator,
-                                MessageType, encode_frame)
+from core.wire.envelope import (CONTROL_FRAME_LIMIT, Envelope, FrameDecoder,
+                                IdGenerator, MessageType, encode_frame)
 
 log = get_logger("plugins")
 
@@ -141,6 +141,12 @@ class HostedPlugin:
         self._decoder = FrameDecoder()
         self._reader = threading.Thread(target=self._read_forever, daemon=True)
         self._reader.start()
+        # The error stream is read as well, always. `plugins/host.py` sends
+        # a plugin's `print` there, and a pipe nobody reads fills after a
+        # few kilobytes: the plugin then hangs inside `print`, and from
+        # here that looks exactly like a plugin that stopped answering.
+        threading.Thread(target=self._drain_errors, args=(self._proc,),
+                         daemon=True).start()
 
         answer = self.ask("plugin.hello", {}, timeout=START_TIMEOUT)
         if answer is None:
@@ -247,6 +253,26 @@ class HostedPlugin:
             return None
         return answer
 
+    def _drain_errors(self, proc):
+        """
+        Keep the tail of what the plugin wrote to its error stream.
+
+        Into the plugin's own log, shown on its page, and not into Rina's
+        journal: it is somebody else's output, and nothing promises it holds
+        no text a person said.
+        """
+        source = proc.stderr if proc else None
+        if source is None:
+            return
+        try:
+            for raw in iter(source.readline, b""):
+                line = raw.decode("utf-8", "replace").rstrip()
+                if line:
+                    self.logs.append(line[:500])
+                    del self.logs[:-100]
+        except (OSError, ValueError):
+            pass
+
     def _forget(self, request_id):
         with self._lock:
             self._pending.pop(request_id, None)
@@ -261,13 +287,28 @@ class HostedPlugin:
             if not header or len(header) < 4:
                 break
             size = int.from_bytes(header, "big")
-            body = b""
+            # **The length is judged before a byte of the body is read.**
+            # The decoder does the same, and says why: a limit checked after
+            # the allocation protects against nothing. Reading the whole
+            # body first and handing it over afterwards undid exactly that
+            # — a plugin announcing four gigabytes had the core read them
+            # into memory (`T-08`: a plugin must not take Rina down).
+            if size > CONTROL_FRAME_LIMIT:
+                security_log().warning(
+                    "Плагин «%s» прислал кадр в %d байт при пределе %d и "
+                    "остановлен", self.manifest.id, size, CONTROL_FRAME_LIMIT)
+                self.error = ("Плагин прислал слишком большое сообщение "
+                              "и был остановлен.")
+                self.enabled = False
+                self.kill()
+                break
+            body = bytearray()
             while len(body) < size:
                 piece = source.read(size - len(body))
                 if not piece:
                     break
                 body += piece
-            for message in self._decoder.feed(header + body):
+            for message in self._decoder.feed(header + bytes(body)):
                 self._on_message(message)
 
         # The wire has ended — the process is gone. Those waiting must be

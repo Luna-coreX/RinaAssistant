@@ -244,9 +244,14 @@ class PipeClientTransport(Transport):
             f"канал {self.name} не открылся за {timeout} с: {last}")
 
     def send(self, data: bytes) -> None:
-        if self._file is None:
-            raise TransportClosed("канал не открыт")
+        # The check is inside the lock, where `close` clears the file. Made
+        # outside it, a close between the two turned "the channel is
+        # closed" into `'NoneType' object has no attribute 'write'` — an
+        # error with a traceback in the journal at every shutdown that
+        # happened to fall in the middle of a reply.
         with self._lock:
+            if self._file is None:
+                raise TransportClosed("канал не открыт")
             try:
                 self._file.write(data)
                 self._file.flush()

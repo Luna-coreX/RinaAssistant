@@ -73,7 +73,14 @@ ORDER = ("4.0-port", "4.0-beta", "4.0-stable", "4.1+")
 #: different shapes — some carry a milestone mark, some do not, some carry
 #: a completion date. Demanding one shape would mean editing the plan for
 #: the comparison's convenience.
-TASK = re.compile(r"^\*\*(4\.0-[A-Z]\d+|V-\d+) · ([^*]+?)\*\*(.*)$", re.M)
+#:
+#: `4.0b-` and a letter after the number are part of the name. Without them
+#: the beta's own items — fifty-seven of them — and the ones that split off
+#: (`4.0-E06a`, `4.0b-C02a`) were not in the snapshot at all: "the beta, 6
+#: of 6" counted only the voice track, and a beta item could be dropped or
+#: moved with nothing here to notice.
+TASK = re.compile(r"^\*\*(4\.0b?-[A-Z]\d+[a-z]?|V-\d+) · ([^*]+?)\*\*(.*)$",
+                  re.M)
 
 #: The size estimate right after the name: "— M —" or "— L —".
 SIZE = re.compile(r"^\s*—\s*([SML])\s*(?:—|$)")
@@ -110,7 +117,10 @@ def current():
                 # section with a [stable] mark belongs to stable — that is
                 # how it is read.
                 "milestone": (BY_MARK[mark.group(1)] if mark else name),
-                "done": "ВЫПОЛНЕНО" in tail,
+                # The beta's tracks write "сделано" where the port wrote
+                # "ВЫПОЛНЕНО"; both are done, and reading one of them only
+                # would count the other as open work.
+                "done": "ВЫПОЛНЕНО" in tail or "**сделано**" in tail,
             }
     return scope
 

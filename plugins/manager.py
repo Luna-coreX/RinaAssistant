@@ -30,6 +30,15 @@ log = get_logger("plugins")
 #: the home screen, not about drawing.
 HOME_TILE_LIMIT = 4
 
+#: How much an archive may unpack to.
+#:
+#: A plugin is code and a manifest — kilobytes. Without a limit an archive
+#: of a few hundred kilobytes that unpacks to a disk's worth of zeros fills
+#: the drive before anything has been checked: the manifest is read only
+#: after `extractall`. The sizes an archive declares are summed before a
+#: byte is written.
+ARCHIVE_UNPACKED_LIMIT = 50 * 1024 * 1024
+
 
 def plugins_dir() -> str:
     """The plugins' directory (next to the project)."""
@@ -101,6 +110,14 @@ def install_plugin(source_path):
         elif source_path.lower().endswith(".zip"):
             try:
                 with zipfile.ZipFile(source_path) as archive:
+                    unpacked = sum(info.file_size for info in archive.infolist())
+                    if unpacked > ARCHIVE_UNPACKED_LIMIT:
+                        security_log().warning(
+                            "Архив плагина распаковывается в %d байт при "
+                            "пределе %d и не установлен", unpacked,
+                            ARCHIVE_UNPACKED_LIMIT)
+                        raise PluginInstallError(
+                            tr("Архив слишком велик для плагина"))
                     archive.extractall(tmp)
             except (zipfile.BadZipFile, OSError) as e:
                 raise PluginInstallError(tr("Не удалось распаковать архив: ") + str(e))

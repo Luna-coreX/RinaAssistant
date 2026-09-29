@@ -98,15 +98,24 @@
            hundred and forty was set when a tile was two lines of text;
            a field with a button beside it does not fit in half of that,
            and the window is no longer nine hundred points wide either. -->
-      <ItemsControl x:Name="Tiles" Grid.Row="2"
+      <!-- **The figure keeps its room.** The tiles' row is sized by what
+           is in it and the figure's row takes what is left; a plugin with
+           a tall tile — or many plugins — used to squeeze the figure to
+           nothing. So the tiles scroll inside a share of the screen, set
+           from code as the window changes size (HomePage.TilesShare), and
+           a single tile is capped as well (HomePage.TileHeight). -->
+      <ScrollViewer x:Name="TileRoom" Grid.Row="2"
                     HorizontalAlignment="Center" Margin="0,0,0,16"
-                    MaxWidth="680">
-        <ItemsControl.ItemsPanel>
-          <ItemsPanelTemplate>
-            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
-          </ItemsPanelTemplate>
-        </ItemsControl.ItemsPanel>
-      </ItemsControl>
+                    VerticalScrollBarVisibility="Auto"
+                    HorizontalScrollBarVisibility="Disabled">
+        <ItemsControl x:Name="Tiles" MaxWidth="680">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </ScrollViewer>
 
       <!--
         A remote for whatever is already playing (4.0b-A07). Hidden when
