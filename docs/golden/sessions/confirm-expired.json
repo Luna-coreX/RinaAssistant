@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "title": "Вопрос протух: между вопросом и «да» прошла минута с лишним",
+  "baseline": "3.1.0",
+  "steps": [
+    {
+      "say": "выключи компьютер",
+      "source": "typed",
+      "wake": false,
+      "after": 0,
+      "response": "Точно выключить компьютер?",
+      "effects": {},
+      "question": "confirm_action"
+    },
+    {
+      "say": "да",
+      "source": "typed",
+      "wake": false,
+      "after": 75,
+      "response": "Не нашла такой команды — поищу «да» в интернете.",
+      "effects": {
+        "opened": [
+          "https://www.google.com/search?q=%D0%B4%D0%B0"
+        ]
+      },
+      "question": null
+    }
+  ]
+}

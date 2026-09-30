@@ -1,0 +1,66 @@
+{
+  "format": 1,
+  "title": "Цепочка: поставить два напоминания, посмотреть список, отменить всё",
+  "baseline": "3.1.0",
+  "steps": [
+    {
+      "say": "поставь таймер на 10 минут",
+      "source": "typed",
+      "wake": false,
+      "after": 0,
+      "response": "Засекла N мин N с.",
+      "effects": {
+        "reminders": [
+          {
+            "kind": "timer",
+            "text": ""
+          }
+        ]
+      },
+      "question": null
+    },
+    {
+      "say": "напомни через 20 минут проверить тесты",
+      "source": "typed",
+      "wake": false,
+      "after": 2,
+      "response": "Напомню через N мин N с: проверить тесты.",
+      "effects": {
+        "reminders": [
+          {
+            "kind": "reminder",
+            "text": "проверить тесты"
+          }
+        ]
+      },
+      "question": null
+    },
+    {
+      "say": "какие таймеры",
+      "source": "typed",
+      "wake": false,
+      "after": 2,
+      "response": "Запланировано: Таймер — ЧЧ:ММ (N мин N с); Напоминание: проверить тесты — ЧЧ:ММ (N мин N с)",
+      "effects": {},
+      "question": null
+    },
+    {
+      "say": "отмени все таймеры",
+      "source": "typed",
+      "wake": false,
+      "after": 2,
+      "response": "Отменила: 2.",
+      "effects": {},
+      "question": null
+    },
+    {
+      "say": "какие таймеры",
+      "source": "typed",
+      "wake": false,
+      "after": 1,
+      "response": "Ничего не запланировано.",
+      "effects": {},
+      "question": null
+    }
+  ]
+}

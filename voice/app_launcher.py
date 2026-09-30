@@ -81,6 +81,72 @@ def forget(query):
     return True
 
 
+def alias_lookup(target, aliases):
+    """
+    Запомненная программа под запрос — из переданного словаря.
+
+    Чистая: ничего не читает из настроек и, в отличие от alias_entry, не
+    вычищает устаревшие записи. Роутеру нужно решение, а не уборка.
+    """
+    saved = (aliases or {}).get(normalize(target))
+    if not saved:
+        return None
+    if isinstance(saved, str):
+        saved = {"path": saved, "kind": "file",
+                 "name": os.path.splitext(os.path.basename(saved))[0]}
+    path = saved.get("path")
+    if not path:
+        return None
+    kind = saved.get("kind", "file")
+    if kind == "file" and not os.path.exists(path):
+        return None
+    return app_index.AppEntry(
+        saved.get("name") or os.path.splitext(os.path.basename(path))[0],
+        path, kind, "learned")
+
+
+class LaunchDecision:
+    """Что запустить — до всякого запуска."""
+
+    def __init__(self, status, entry=None, options=None, query=""):
+        self.status = status          # "launch" | "ambiguous" | "not_found"
+        self.entry = entry
+        self.options = options or []
+        self.query = query
+
+
+def decide(text, apps=None, aliases=None):
+    """
+    Чистое решение о запуске: что бы запустили, ничего не запуская.
+
+    Ровно та же логика выбора, что в resolve(), но без побочных эффектов —
+    ради роутера (4.0-B02). resolve() остаётся тем же самым решением плюс
+    исполнение.
+    """
+    target = extract_target(text)
+    if not target:
+        return None
+
+    learned = alias_lookup(target, aliases)
+    if learned is not None:
+        return LaunchDecision("launch", entry=learned, query=target)
+
+    candidates = app_index.find(target, limit=5, entries=apps)
+    if not candidates:
+        return LaunchDecision("not_found", query=target)
+
+    decisive = len(candidates) == 1 or app_index.is_browser_query(target)
+    if not decisive:
+        top = app_index.find(target, limit=2, entries=apps)
+        if len(top) >= 2:
+            scores = [_candidate_score(target, e) for e in top[:2]]
+            decisive = (scores[0] - scores[1]) >= DECISIVE_GAP
+
+    if decisive:
+        return LaunchDecision("launch", entry=candidates[0], query=target)
+    return LaunchDecision("ambiguous", options=candidates[:3], query=target)
+
+
 def alias_entry(target):
     """Запомненная программа под этот запрос (или None)."""
     saved = _aliases().get(normalize(target))

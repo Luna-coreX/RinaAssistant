@@ -9,7 +9,7 @@ A desktop voice assistant for Windows — launches your apps, keeps your timers,
 </h3>
 
 <p align="center">
-  <b>Version 3.1.0</b> · Windows · Python 3.10+ · MIT
+  <b>Version 3.1.0</b> · Windows · Python 3.10+ · Apache-2.0
 </p>
 
 ---
@@ -160,7 +160,7 @@ Rina talks to `http://localhost:11434` by default and checks the connection from
 
 ## Contributing
 
-Issues and pull requests are welcome. When reporting a bug, include the version, what you said or typed, and what happened instead.
+Issues and pull requests are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md). When reporting a bug, include the version, what you said or typed, and what happened instead.
 
 ---
 
@@ -172,7 +172,9 @@ See [`CHANGELOG.md`](CHANGELOG.md). Security policy and trust boundaries: [`SECU
 
 ## License
 
-MIT — see [`LICENSE`](LICENSE).
+Apache License 2.0 — see [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE).
+
+Releases up to and including 3.1.0 were published under the MIT licence; copies obtained under those terms keep them. Contributions are accepted under Apache-2.0 with no separate agreement — see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [ADR 0001](docs/adr/0001-license-and-contributions.md).
 
 ---
 

@@ -142,19 +142,38 @@ def handle_builtin_command(text):
     # APPS/_launch остались как запасной каталог для систем без индекса.
 
     # --- простые встроенные ответы ---
-    if ("как тебя зовут" in low or "твоё имя" in low or "твое имя" in low
-            or "your name" in low or "who are you" in low):
-        return tr("Меня зовут Рина, я твой голосовой ассистент.")
+    topic = match_answer(low)
+    if topic:
+        return ANSWERS[topic]()
 
-    if ("спасибо" in low or "благодарю" in low
-            or "thank" in low or "thanks" in low):
-        return tr("Всегда пожалуйста!")
+    return None
 
-    if ("что ты умеешь" in low or "твои возможности" in low
-            or "what can you do" in low or "your capabilities" in low):
-        return tr("Я могу запускать приложения, считать, искать в интернете и "
-                  "выполнять команды плагинов. Попробуй сказать: запусти браузер.")
 
+# Тема -> как ответить. Отдельной таблицей, чтобы роутер (4.0-B02) мог
+# определить тему, не получая готовую фразу: намерение и его озвучка — разные
+# вещи, и после разделения текст ответа собирает ядро, а не разбор.
+ANSWERS = {
+    "name": lambda: tr("Меня зовут Рина, я твой голосовой ассистент."),
+    "thanks": lambda: tr("Всегда пожалуйста!"),
+    "capabilities": lambda: tr(
+        "Я могу запускать приложения, считать, искать в интернете и "
+        "выполнять команды плагинов. Попробуй сказать: запусти браузер."),
+}
+
+ANSWER_PHRASES = {
+    "name": ("как тебя зовут", "твоё имя", "твое имя", "your name",
+             "who are you"),
+    "thanks": ("спасибо", "благодарю", "thank", "thanks"),
+    "capabilities": ("что ты умеешь", "твои возможности", "what can you do",
+                     "your capabilities"),
+}
+
+
+def match_answer(low):
+    """Тема встроенного ответа или None. Чистая функция."""
+    for topic, phrases in ANSWER_PHRASES.items():
+        if any(phrase in low for phrase in phrases):
+            return topic
     return None
 
 

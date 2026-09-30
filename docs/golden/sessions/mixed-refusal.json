@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "title": "«Нет, давай» на подтверждении читается как отказ (странность 3.1.0)",
+  "baseline": "3.1.0",
+  "steps": [
+    {
+      "say": "усыпи компьютер",
+      "source": "typed",
+      "wake": false,
+      "after": 0,
+      "response": "Точно отправить компьютер в спящий режим?",
+      "effects": {},
+      "question": "confirm_action"
+    },
+    {
+      "say": "нет, давай",
+      "source": "typed",
+      "wake": false,
+      "after": 2,
+      "response": "Хорошо, отменяю.",
+      "effects": {},
+      "question": null
+    }
+  ]
+}
