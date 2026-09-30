@@ -16,9 +16,12 @@ must not hold a single Cyrillic letter, because every phrase this core
 hears is Russian.
 
 The collector is asked the same thing from its side: `validate` in
-`server/telemetry/worker.js`, run by Node, must take the reports this core
+`server/telemetry/validate.js`, run by Node, must take the reports this core
 really builds and refuse ones with a phrase, a name or a stranger's id in
-them. Without Node that part is skipped, and says so.
+them. Its two functions (`collector.js`) are driven with a store of the
+test's own: a report is kept under the day it arrived, a spoiled or
+oversized one is not, and the nightly clean-up answers only its secret.
+Without Node that part is skipped, and says so.
 
 And the path the shell takes is asked of a live core: switched on with
 `settings.set`, counting a command, writing its counts down when the shell
@@ -253,8 +256,12 @@ def spoiled(change):
     return copy
 
 
-worker = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                      "server", "telemetry", "worker.js")
+collector_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                             "server", "telemetry")
+
+
+def module_url(name):
+    return json.dumps("file:///" + os.path.join(collector_dir, name).replace(os.sep, "/"))
 tampered = [
     ("лишнее поле с текстом", spoiled(lambda r: r.update(text="запусти стим"))),
     ("слово не из словаря", spoiled(lambda r: r["features"].update({"запусти": 1}))),
@@ -267,7 +274,7 @@ scratch = tempfile.mkdtemp()
 runner = os.path.join(scratch, "run.mjs")
 listed = os.path.join(scratch, "reports.json")
 io.open(runner, "w", encoding="utf-8").write("\n".join((
-    "import { validate } from %s;" % json.dumps("file:///" + worker.replace(os.sep, "/")),
+    "import { validate } from %s;" % module_url("validate.js"),
     "import { readFileSync } from 'node:fs';",
     "const reports = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
     "console.log(JSON.stringify(reports.map(validate)));",
@@ -291,6 +298,87 @@ else:
           verdicts[0] == "" and verdicts[1] == "", f"| {verdicts[:2]}")
     for (label, _one), verdict in zip(tampered, verdicts[2:]):
         check(f"отклоняется: {label}", verdict != "", f"| {verdict!r}")
+
+# The collector's two functions, with a store that only writes down what it
+# was asked. The clock is fixed, so the days are known here in advance.
+import datetime
+
+print()
+print("=== сборщик: что хранит и кого пускает чистить ===")
+NOW = datetime.datetime(2026, 10, 1, 12, 0, tzinfo=datetime.timezone.utc)
+CUTOFF = (NOW - datetime.timedelta(days=180)).date().isoformat()
+scratch = tempfile.mkdtemp()
+runner = os.path.join(scratch, "collect.mjs")
+io.open(runner, "w", encoding="utf-8").write("\n".join((
+    "import { receive, clean } from %s;" % module_url("collector.js"),
+    "import { readFileSync } from 'node:fs';",
+    "const report = readFileSync(process.argv[2], 'utf8');",
+    "const now = %d;" % int(NOW.timestamp() * 1000),
+    "const asked = [];",
+    "const store = {",
+    "  keep: async (...args) => { asked.push(['keep', ...args]); },",
+    "  dropBefore: async (...args) => { asked.push(['dropBefore', ...args]); },",
+    "};",
+    "const post = (body) => new Request('https://c.test/api/v1/report', { method: 'POST', body });",
+    "const get = (auth) => new Request('https://c.test/api/clean',",
+    "  auth === null ? {} : { headers: { authorization: auth } });",
+    "const out = {};",
+    # A thunk, not a promise: the call must start after `before` is taken,
+    # or a store call made before its first `await` is missed.
+    "async function run(name, call) {",
+    "  const before = asked.length;",
+    "  const response = await call();",
+    "  out[name] = { status: response.status, body: await response.text(),",
+    "                asked: asked.slice(before) };",
+    "}",
+    "const spoiled = JSON.parse(report); spoiled.text = 'запусти стим';",
+    "await run('valid', () => receive(post(report), store, now));",
+    "await run('spoiled', () => receive(post(JSON.stringify(spoiled)), store, now));",
+    "await run('broken', () => receive(post('{not json'), store, now));",
+    "await run('huge', () => receive(post('x'.repeat(17 * 1024)), store, now));",
+    "await run('clean_none', () => clean(get(null), store, 's3cret-s3cret-s3', now));",
+    "await run('clean_wrong', () => clean(get('Bearer nope'), store, 's3cret-s3cret-s3', now));",
+    "await run('clean_unset', () => clean(get('Bearer '), store, '', now));",
+    "await run('clean_right', () => clean(get('Bearer s3cret-s3cret-s3'), store, 's3cret-s3cret-s3', now));",
+    "console.log(JSON.stringify(out));",
+    "")))
+listed = os.path.join(scratch, "report.json")
+io.open(listed, "w", encoding="utf-8").write(json.dumps(posted[-1], ensure_ascii=False))
+try:
+    ran = subprocess.run(["node", runner, listed], capture_output=True,
+                         text=True, encoding="utf-8", timeout=60)
+    seen = json.loads(ran.stdout) if ran.returncode == 0 else None
+    trouble = ran.stderr.strip()[-300:]
+except (OSError, ValueError, subprocess.TimeoutExpired) as failed:
+    seen, trouble = None, str(failed)
+shutil.rmtree(scratch, ignore_errors=True)
+if seen is None:
+    print("     пропущено: node не запустился — сборщик не проверен |", trouble)
+else:
+    kept = seen["valid"]["asked"]
+    check("отчёт ядра принят", seen["valid"]["status"] == 204, f"| {seen['valid']}")
+    check("и сохранён один раз, под днём получения и своей установкой",
+          len(kept) == 1 and kept[0][:3] == ["keep", NOW.date().isoformat(),
+                                             posted[-1]["install"]],
+          f"| {kept}")
+    check("сохранён тот же отчёт, без добавлений",
+          len(kept) == 1 and json.loads(kept[0][3]) == posted[-1])
+    for name, label, status in (("spoiled", "испорченный", 400),
+                                ("broken", "не JSON", 400),
+                                ("huge", "больше предела", 413)):
+        check(f"{label} — отказ {status} и ничего не сохранено",
+              seen[name]["status"] == status and not seen[name]["asked"],
+              f"| {seen[name]}")
+    for name, label in (("clean_none", "без секрета"),
+                        ("clean_wrong", "с чужим секретом"),
+                        ("clean_unset", "пока секрет не задан")):
+        check(f"чистка {label} — 401, база не тронута",
+              seen[name]["status"] == 401 and not seen[name]["asked"],
+              f"| {seen[name]}")
+    check("чистка со своим секретом удаляет старше 180 дней",
+          seen["clean_right"]["status"] == 204
+          and seen["clean_right"]["asked"] == [["dropBefore", CUTOFF]],
+          f"| {seen['clean_right']}")
 
 # ---------------------------------------------------------------------------
 # The path the shell takes, through a live core

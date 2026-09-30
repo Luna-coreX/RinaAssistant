@@ -35,12 +35,12 @@ import secrets
 import threading
 import time
 
-#: Where reports go. Empty until the collecting worker is deployed
+#: Where reports go. Empty until the collector is deployed
 #: (`server/telemetry/`); while it is empty nothing is sent, and the privacy
 #: page says so rather than letting a person believe otherwise.
 ENDPOINT = ""
 
-#: The shape of a report. The worker refuses any other.
+#: The shape of a report. The collector refuses any other.
 SCHEMA = 1
 
 #: How often at most a report goes out.

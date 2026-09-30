@@ -1,0 +1,3 @@
+# Written by `vercel link` and `npm install`; neither belongs in the repository.
+.vercel/
+node_modules/

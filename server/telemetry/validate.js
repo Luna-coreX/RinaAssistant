@@ -1,19 +1,15 @@
-// The beta's telemetry collector (`4.0b-D05`), on Cloudflare Workers.
+// The shape of a telemetry report, as the collector accepts it (`4.0b-D05`).
 //
-// It takes one thing — a report in the shape `core/telemetry.py` builds —
-// and refuses everything else. The check here is as strict as the building
-// there, and for the same reason: a field this side accepts is a field
-// somebody could fill with a phrase, a path or a name, and the promise on
-// the product page is that nothing of the kind is ever received.
+// The check here is as strict as the building in `core/telemetry.py`, and
+// for the same reason: a field this side accepts is a field somebody could
+// fill with a phrase, a path or a name, and the promise on the product page
+// is that nothing of the kind is ever received.
 //
-// What is kept: the day it arrived and the report. Not the address it came
-// from, not the time of day. One report per installation per day.
-// Everything older than RETAIN_DAYS is deleted every night, and the whole
-// collector goes with 4.0.0 Stable (`4.0-S04`).
+// No dependencies and no platform: `tools/test_telemetry.py` runs this file
+// under plain Node against the reports the core really builds.
 
-const SCHEMA = 1;
-const MAX_BYTES = 16 * 1024;
-const RETAIN_DAYS = 180;
+export const SCHEMA = 1;
+export const MAX_BYTES = 16 * 1024;
 
 const FIELDS = ["schema", "install", "app", "os", "language", "days",
   "engines", "features", "tools", "errors", "reasons", "timings"];
@@ -40,8 +36,7 @@ function isCount(n) {
   return Number.isInteger(n) && n >= 0 && n <= 1_000_000;
 }
 
-// Why a report was refused, or "" if it is acceptable. Exported for the
-// check, which feeds it the reports the core really builds.
+// Why a report was refused, or "" if it is acceptable.
 export function validate(report) {
   if (!sameKeys(report, FIELDS)) return "fields";
   if (report.schema !== SCHEMA) return "schema";
@@ -82,40 +77,3 @@ export function validate(report) {
   }
   return "";
 }
-
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-export default {
-  async fetch(request, env) {
-    const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/v1/report") {
-      return new Response(null, { status: 404 });
-    }
-    const body = await request.text();
-    if (body.length > MAX_BYTES) return new Response(null, { status: 413 });
-
-    let report;
-    try {
-      report = JSON.parse(body);
-    } catch {
-      return new Response(null, { status: 400 });
-    }
-    const refused = validate(report);
-    if (refused) return new Response(refused, { status: 400 });
-
-    // One a day from one installation: a second is ignored, not an error —
-    // the program retries what it thinks did not arrive.
-    await env.DB.prepare(
-      "INSERT OR IGNORE INTO reports (day, install, report) VALUES (?, ?, ?)"
-    ).bind(today(), report.install, JSON.stringify(report)).run();
-    return new Response(null, { status: 204 });
-  },
-
-  async scheduled(event, env) {
-    const cutoff = new Date(Date.now() - RETAIN_DAYS * 86400 * 1000)
-      .toISOString().slice(0, 10);
-    await env.DB.prepare("DELETE FROM reports WHERE day < ?").bind(cutoff).run();
-  },
-};
