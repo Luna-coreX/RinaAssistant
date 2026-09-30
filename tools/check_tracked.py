@@ -36,7 +36,18 @@ SOURCES = ["shell", "core", "voice", "plugins", "tools", "server",
            "rina_core.py", "requirements.txt"]
 
 #: What is built or cached there, and is right to be ignored.
-PRODUCED = {"bin", "obj", "__pycache__"}
+PRODUCED = {"bin", "obj", "__pycache__", "node_modules"}
+
+#: What a deploy tool writes beside the code for one machine, and what must
+#: never reach the repository: Vercel's link to a project (`.vercel/`) and
+#: the files `vercel env pull` writes (`.env`, `.env.local`), which hold the
+#: telemetry database's connection string with its password. A template
+#: (`.env.example`) is a source like any other and is not excused.
+LOCAL = {".vercel"}
+
+
+def local_secret(name):
+    return name == ".env" or (name.startswith(".env.") and not name.endswith(".example"))
 
 fails = 0
 
@@ -61,6 +72,8 @@ def ignored_sources():
     for path in listed.stdout.splitlines():
         parts = path.strip().strip("/").split("/")
         if not parts or PRODUCED & set(parts) or path.endswith(".pyc"):
+            continue
+        if LOCAL & set(parts) or local_secret(parts[-1]):
             continue
         found.append(path.strip())
     return found

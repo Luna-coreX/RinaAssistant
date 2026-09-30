@@ -79,7 +79,6 @@ NOT_A_CHECK = {
     "build_release.py": "собирает выпуск; сверяет его check_release.py",
     "console.py": "общая мелочь: вывод в UTF-8",
     "hearing_bench.py": "стенд распознавания: меряет, а не проверяет",
-    "markdown_site.py": "разметка документов в HTML; ею пользуется gen_site.py",
     "coreproc.py": "живое ядро в отдельном процессе; им говорят проверки",
     "nebula.py": "арифметика цвета живого фона; ею пользуются генератор и проверки",
     "regress.py": "этот файл",
@@ -102,7 +101,7 @@ NEEDS_RELEASE = {
 
 #: Generators: their check is to compare what was generated with its source.
 GENERATORS = ("gen_csharp_contract.py", "gen_shell_strings.py",
-              "gen_site.py", "gen_xaml_tokens.py")
+              "gen_xaml_tokens.py")
 
 #: The checks that are not called by a file name.
 BY_HAND = {

@@ -564,7 +564,7 @@ public partial class AboutPage : UserControl
     {
         foreach (var (title, url) in new[]
         {
-            (S("Сайт"), "https://neurosync-foundry-portal.pages.dev/"),
+            (S("Сайт"), "https://www.rina-assistant.com/"),
             (S("Исходники"), "https://github.com/Luna-coreX/RinaAssistant"),
             (S("Сообщить о неполадке"),
              "https://github.com/Luna-coreX/RinaAssistant/issues"),

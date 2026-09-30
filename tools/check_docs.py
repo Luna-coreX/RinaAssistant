@@ -479,7 +479,8 @@ if os.path.exists(triage):
 # sentence stayed. The same sentence stood on the product page, and both
 # were written from the same memory of the 3.1 list.
 #
-# The page is now checked (`tools/check_site.py`); this is the other half.
+# The product page now lives in a repository of its own
+# (rina-assistant.com); this is the README's half, checked here.
 print()
 print("=== движки в README против настроек ===")
 

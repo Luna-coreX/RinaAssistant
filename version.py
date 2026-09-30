@@ -10,8 +10,8 @@ APP_VERSION = "4.0.0-beta"
 BUILD = "2026.09"
 
 LINKS = {
-    "site": "https://neurosync-foundry-portal.pages.dev/",
+    "site": "https://www.rina-assistant.com/",
     "source": "https://github.com/Luna-coreX/RinaAssistant",
-    "docs": "",
+    "docs": "https://www.rina-assistant.com/dev/",
     "issues": "https://github.com/Luna-coreX/RinaAssistant/issues",
 }

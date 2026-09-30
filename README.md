@@ -242,7 +242,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 84 checks, about six minutes
+python tools/regress.py          # 82 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 
@@ -339,6 +339,7 @@ Releases up to and including 3.1.0 were published under the MIT licence; copies 
 
 ## Links
 
+- **Site** — https://www.rina-assistant.com/
 - **NeuroSync Foundry** — https://neurosync-foundry-portal.pages.dev/
 - **Repository** — https://github.com/Luna-coreX/RinaAssistant
 - **Issues** — https://github.com/Luna-coreX/RinaAssistant/issues
