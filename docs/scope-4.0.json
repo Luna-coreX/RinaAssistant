@@ -1025,12 +1025,6 @@
     "size": "M",
     "title": "Проверки шли не тем питоном, что ядро"
   },
-  "4.0b-V10": {
-    "done": false,
-    "milestone": "4.0-beta",
-    "size": "M",
-    "title": "Голос Edge не умеет по-английски"
-  },
   "V-01": {
     "done": true,
     "milestone": "4.0-beta",
