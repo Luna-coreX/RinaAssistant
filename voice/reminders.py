@@ -1,13 +1,15 @@
 """
-Таймеры, будильники и напоминания.
+Timers, alarms and reminders.
 
-Разбирает фразы вида «поставь таймер на 10 минут», «напомни через полчаса
-позвонить маме», «разбуди в 7:30» и хранит запланированное между запусками —
-напоминание должно пережить перезапуск приложения, иначе ему нельзя доверять.
+Parses phrases of the form "поставь таймер на 10 минут", "напомни через
+полчаса позвонить маме", "разбуди в 7:30" and keeps what is planned between
+runs — a reminder must survive a restart of the application, or it cannot be
+trusted.
 
-Здесь только разбор фраз и хранилище. Срок наступления проверяет ядро
-(RinaEngine.start_reminders) раз в секунду в фоновом потоке: один общий опрос
-дешевле и надёжнее, чем поток на каждое напоминание.
+Here there is only phrase parsing and the store. The core
+(RinaEngine.start_reminders) checks the due time once a second in a
+background thread: one shared poll is cheaper and more reliable than a
+thread per reminder.
 """
 
 import math
@@ -20,7 +22,7 @@ from voice.textmatch import normalize
 
 
 # ---------------------------------------------------------------------------
-# Разбор фраз
+# Parsing phrases
 # ---------------------------------------------------------------------------
 TIMER_WORDS = ("таймер", "засеки", "засечь", "timer")
 REMIND_WORDS = ("напомни", "напоминание", "напомнить", "remind")
@@ -31,7 +33,7 @@ CANCEL_WORDS = ("отмени таймер", "отмени напоминани�
                 "убери таймер", "убери напоминания", "отмени все таймеры",
                 "удали напоминания", "сбрось таймер")
 
-# Речь редко даёт цифры — числительные приходится понимать словами.
+# Speech rarely gives digits — the numerals have to be understood as words.
 NUM_WORDS = {
     "один": 1, "одну": 1, "одна": 1, "полторы": 1.5, "полтора": 1.5,
     "два": 2, "две": 2, "три": 3, "четыре": 4, "пять": 5, "шесть": 6,
@@ -42,7 +44,28 @@ NUM_WORDS = {
     "пятьдесят": 50, "шестьдесят": 60, "девяносто": 90,
 }
 
-# Больше года вперёд — почти наверняка ошибка распознавания
+#: "когда открою VS Code", "как открою студию", "при запуске блокнота".
+#:
+#: Only about a program being opened: a closed list of occasions (see
+#: `TRIGGER_KINDS`) is a promise the code keeps. Widening it with words
+#: before the shell can tell those apart would mean creating a reminder
+#: that will never fire.
+WHEN_APP = re.compile(
+    r"[,\s]*(?:когда|как только|как|при)\s+"
+    r"(?:я\s+)?(?:открою|открываю|запущу|запускаю|включу|"
+    r"открытии|запуске|включении)\s+"
+    # Everything after the verb is a **candidate**, not a name. The
+    # condition is also put at the front of the phrase — "напомни, когда
+    # открою студию, проверить почту" — and there is nothing here to draw
+    # the boundary between the program and the thing to do. There is no
+    # comma: `normalize` removes it before this point, and speech gives no
+    # commas at all. The boundary is drawn by the router, from the index of
+    # what is installed — knowledge the parsing does not have and should
+    # not have.
+    r"(?P<app>.+)$",
+    re.IGNORECASE)
+
+# More than a year ahead is almost certainly a recognition error
 MAX_DELAY_SECONDS = 365 * 24 * 3600
 
 UNIT_SECONDS = {
@@ -55,26 +78,34 @@ UNIT_SECONDS = {
 
 
 class Parsed:
-    """Что распознали во фразе."""
+    """What was recognised in the phrase."""
 
-    def __init__(self, action, delay=None, at=None, text="", kind="timer"):
+    def __init__(self, action, delay=None, at=None, text="", kind="timer",
+                 when_app=""):
         self.action = action      # "create" | "list" | "cancel"
-        self.delay = delay        # через сколько секунд
-        self.at = at              # абсолютное время (timestamp)
-        self.text = text          # о чём напомнить
+        self.delay = delay        # in how many seconds
+        self.at = at              # an absolute time (timestamp)
+        self.text = text          # what to remind about
         self.kind = kind          # "timer" | "reminder" | "alarm"
+        #: The named program, if the reminder is bound to it rather than
+        #: to a time (`4.0b-A03`). Here it is **the word that was said**:
+        #: parsing a phrase does not know which programs are on the machine
+        #: and must not — otherwise it stops being pure and cannot be
+        #: checked without an index. The router resolves the word into a
+        #: program.
+        self.when_app = when_app
 
 
 def _duration_seconds(text):
-    """«10 минут», «полчаса», «пять секунд» -> секунды (или None)."""
+    """"10 минут", "полчаса", "пять секунд" -> seconds (or None)."""
     if re.search(r"\bполчаса\b", text):
         return 1800
     if re.search(r"\bполтора часа\b", text):
         return 5400
 
-    # Число (цифрами или словом) + единица. Складываем ВСЕ пары, а не
-    # только первую: «1 час 30 минут» — это полтора часа, и раньше
-    # пользователь узнавал об ошибке через час.
+    # A number (in digits or in words) plus a unit. We add up ALL the pairs
+    # rather than only the first: "1 час 30 минут" is an hour and a half,
+    # and the user used to find out about the mistake an hour later.
     pattern = r"(\d+(?:[.,]\d+)?|[а-яё]+)\s*(" + "|".join(UNIT_SECONDS) + r")\b"
     seconds = 0.0
     found = False
@@ -85,24 +116,24 @@ def _duration_seconds(text):
         except ValueError:
             amount = NUM_WORDS.get(raw)
             if amount is None:
-                # «через час», «на минуту» — числительное опущено
+                # "через час", "на минуту" — the numeral is omitted
                 amount = 1
         seconds += amount * UNIT_SECONDS[unit]
         found = True
 
     if not found:
         return None
-    # очень длинное число даёт inf, а int(inf) — исключение. Заодно отсекаем
-    # бессмысленные сроки: «через 99999999 минут» — это не напоминание.
+    # a very long number gives inf, and int(inf) is an exception. We also cut
+    # off meaningless spans: "через 99999999 минут" is not a reminder.
     if not math.isfinite(seconds) or seconds <= 0:
         return None
     return int(min(seconds, MAX_DELAY_SECONDS))
 
 
 def _absolute_time(text):
-    """«в 15:00», «в 7 30», «в 9 утра» -> ближайший такой момент (timestamp)."""
-    # «в 15:00» и «на 8 утра». Отрицательный просмотр вперёд не даёт спутать
-    # с длительностью: «на 10 минут» — это таймер, а не время 10:00.
+    """"в 15:00", "в 7 30", "в 9 утра" -> the nearest such moment (a timestamp)."""
+    # "в 15:00" and "на 8 утра". The negative lookahead prevents confusion
+    # with a duration: "на 10 минут" is a timer, not the time 10:00.
     match = re.search(
         r"\b(?:в|на)\s+(\d{1,2})(?:[:.\s](\d{2}))?\b"
         r"(?!\s*(?:секунд|минут|час|сек|мин))", text)
@@ -113,7 +144,7 @@ def _absolute_time(text):
     if hour > 23 or minute > 59:
         return None
 
-    # «в 7 вечера» -> 19:00
+    # "в 7 вечера" -> 19:00
     if re.search(r"\bвечера\b", text) and hour < 12:
         hour += 12
     if re.search(r"\bночи\b", text) and hour == 12:
@@ -124,16 +155,16 @@ def _absolute_time(text):
                                hour, minute, 0, 0, 0, -1))
     stamp = time.mktime(target)
     if stamp <= time.time():
-        stamp += 24 * 3600          # время уже прошло — значит, завтра
+        stamp += 24 * 3600          # the time has passed, so tomorrow
     if re.search(r"\bзавтра\b", text):
         stamp += 24 * 3600
     return stamp
 
 
 def _reminder_text(text):
-    """Что именно напомнить: хвост фразы после времени."""
+    """What exactly to remind about: the tail of the phrase after the time."""
     cleaned = re.sub(r"^.*?(напомни(?:ть)?|напоминание)\s*", "", text)
-    # отрезаем время: «через 15 минут», «через час», «завтра в 9», «в 15:00»
+    # we cut off the time: "через 15 минут", "через час", "завтра в 9", "в 15:00"
     cleaned = re.sub(
         r"^(?:завтра|сегодня)?\s*"
         r"(через\s+.*?(?:секунд\w*|минут\w*|час\w*|полчаса)"
@@ -143,8 +174,31 @@ def _reminder_text(text):
     return cleaned.strip(" ,.—-")
 
 
+def asked_for_one(text) -> bool:
+    """
+    Was this a request about time at all — whatever came of parsing it.
+
+    Needed apart from `parse`, which answers "did it come out". The two
+    differ exactly where it matters: "напомни позвонить маме" is a
+    request with no time in it, and treating the failure to parse as
+    "not about reminders" sent the phrase off to a web search.
+    """
+    low = normalize(text or "")
+    if not low:
+        return False
+    # **Only at the front of the phrase.** A request begins with the
+    # asking: "напомни позвонить маме", "поставь будильник". The same
+    # words further in belong to a sentence about them — "что такое
+    # напоминание в психологии" is a question, and answering it with
+    # "Не поняла, когда напомнить" is a worse failure than the search
+    # this was written to prevent.
+    head = low.split()[:2]
+    return any(word in head for word in
+               TIMER_WORDS + REMIND_WORDS + ALARM_WORDS)
+
+
 def parse(text):
-    """Распознаёт команду про время. Возвращает Parsed или None."""
+    """Recognises a command about time. Returns Parsed or None."""
     if not text:
         return None
     low = normalize(text)
@@ -162,9 +216,19 @@ def parse(text):
     if not (is_timer or is_remind or is_alarm):
         return None
 
+    # The occasion is parsed **before** the time and cut off the phrase:
+    # otherwise "когда открою студию" would stay in the reminder's text,
+    # and the person would hear their own condition read back to them
+    # instead of the thing to do.
+    when = WHEN_APP.search(low)
+    when_app = ""
+    if when:
+        when_app = when.group("app").strip(" ,.?!«»\"'")
+        low = low[:when.start()].strip(" ,")
+
     delay = _duration_seconds(low)
     at = _absolute_time(low)
-    if delay is None and at is None:
+    if delay is None and at is None and not when_app:
         return None
 
     if is_alarm:
@@ -175,38 +239,105 @@ def parse(text):
         kind = "timer"
 
     label = _reminder_text(low) if is_remind else ""
-    # у абсолютного времени приоритет: «напомни в 15:00» — это не «через 15»
+    # absolute time has priority: "напомни в 15:00" is not "через 15"
     if at is not None and (is_alarm or is_remind or not is_timer):
         delay = None
-    return Parsed("create", delay=delay, at=at, text=label, kind=kind)
+    # The occasion beats the clock: "напомни через час, когда открою
+    # студию" is a phrase in which the person contradicts themselves, and
+    # one of the two has to be picked. What was named last is picked,
+    # because that is the qualification.
+    if when_app:
+        delay = at = None
+    return Parsed("create", delay=delay, at=at, text=label, kind=kind,
+                  when_app=when_app)
 
 
 # ---------------------------------------------------------------------------
-# Хранилище
+# The store
 # ---------------------------------------------------------------------------
+#: The occasions Rina can wait for (`4.0b-A03`).
+#:
+#: The list is closed and lies next to the parsing: an occasion that is not
+#: here is not stored. Otherwise an entry saying "waiting for event X"
+#: would outlive the version in which X meant something, and would go on
+#: waiting for ever — silently, because a reminder that did not fire shows
+#: nothing of itself.
+TRIGGER_KINDS = ("app.foreground",)
+
+
+def clean_trigger(on):
+    """
+    An occasion -> a dict brought to the expected form, or None.
+
+    One door for both the store and the comparison: different reading rules
+    in two places are a way to create a reminder that will never fire and
+    never find out about it.
+    """
+    if not isinstance(on, dict):
+        return None
+    kind = str(on.get("kind") or "")
+    launch = str(on.get("launch") or "")
+    if kind not in TRIGGER_KINDS or not launch:
+        return None
+    return {"kind": kind, "launch": launch,
+            "app": str(on.get("app") or "")}
+
+
+def _same_trigger(saved, want):
+    """
+    The same occasion.
+
+    The path is compared case-insensitively: Windows does not tell
+    `Code.exe` from `code.exe`, and the shell takes the path from the
+    window rather than from our index — so it may return any spelling.
+    """
+    return (saved.get("kind") == want.get("kind")
+            and saved.get("launch", "").casefold()
+            == want.get("launch", "").casefold())
+
+
 class ReminderStore:
-    """Запланированное, переживающее перезапуск приложения."""
+    """What is planned, surviving a restart of the application."""
 
     def __init__(self, settings):
         self._settings = settings
 
     def all(self):
-        """Запланированное, приведённое к ожидаемому виду (см. HistoryStore.all)."""
+        """What is planned, brought to the expected form (see HistoryStore.all)."""
         clean = []
         for item in (self._settings.get("reminders", []) or []):
             if not isinstance(item, dict) or not item.get("id"):
                 continue
+            on = clean_trigger(item.get("on"))
             try:
                 fire_at = float(item.get("fire_at", 0) or 0)
             except (TypeError, ValueError):
-                continue        # без внятного времени напоминание бессмысленно
+                fire_at = 0.0
+            # A reminder has to know when to fire: by the clock or by an
+            # event. With neither there is nothing to wait for, and such an
+            # entry is rubbish that survived until it was read.
+            #
+            # "No clock" used to mean "throw away", and that was right
+            # while no other occasions existed. It is wrong now: an entry
+            # bound to an event has no clock by construction, and the old
+            # rule would have swept it away silently.
+            if not fire_at and on is None:
+                continue
             clean.append({
                 "id": str(item["id"]),
                 "kind": str(item.get("kind", "reminder")),
                 "text": str(item.get("text", "")),
                 "fire_at": fire_at,
+                "on": on,
                 "created_at": item.get("created_at", 0),
                 "done": bool(item.get("done")),
+                # Which advance warnings have already been said. Kept on
+                # the entry rather than in the scheduler: the scheduler
+                # is restarted with the program, and a person who left
+                # Rina running overnight would hear "in three hours"
+                # again every morning.
+                "warned": [int(one) for one in (item.get("warned") or [])
+                           if str(one).lstrip("-").isdigit()],
             })
         return clean
 
@@ -214,28 +345,52 @@ class ReminderStore:
         return [r for r in self.all() if not r.get("done")]
 
     def save_all(self, items):
-        self._settings.set("reminders", items)
-        self._settings.save()
+        """
+        Write the list as a whole — under a transaction.
 
-    MAX_FUTURE = 10 * 365 * 24 * 3600      # дальше десяти лет — заведомо ошибка
+        Both the scheduler marking what has fired and the person creating
+        something new come here: two threads, one write. The same rule as
+        for the user's own commands.
+        """
+        with self._settings.transaction():
+            self._settings.set("reminders", items)
+            self._settings.save()
 
-    def add(self, kind, fire_at, text=""):
-        try:
-            fire_at = float(fire_at)
-        except (TypeError, ValueError):
-            fire_at = time.time()
-        fire_at = min(fire_at, time.time() + self.MAX_FUTURE)
+    MAX_FUTURE = 10 * 365 * 24 * 3600      # beyond ten years is knowingly a mistake
+
+    def add(self, kind, fire_at, text="", on=None):
+        on = clean_trigger(on)
+        if on is not None:
+            # Something bound to an event has no clock at all, rather
+            # than a "zero": `fire_at = 0` is in the past, and the
+            # scheduler would consider such a reminder fifty years
+            # overdue.
+            fire_at = 0.0
+        else:
+            try:
+                fire_at = float(fire_at)
+            except (TypeError, ValueError):
+                fire_at = time.time()
+            fire_at = min(fire_at, time.time() + self.MAX_FUTURE)
         item = {
             "id": "rem_" + uuid.uuid4().hex[:6],
             "kind": kind,
             "text": text,
             "fire_at": float(fire_at),
+            "on": on,
             "created_at": time.time(),
             "done": False,
+            # Written here rather than left for `all()` to fill in. The
+            # shape the store puts down and the shape §10 describes are
+            # checked against each other, and a field that appears only
+            # on the way out makes the two disagree — the event would
+            # carry a set of fields the document does not promise.
+            "warned": [],
         }
-        # чтение и запись — одной операцией: планировщик в фоновом потоке
-        # помечает сработавшее ровно тогда же, когда пользователь добавляет
-        # новое, и без блокировки одно затирает другое
+        # reading and writing in one operation: the scheduler in a
+        # background thread marks what has fired at exactly the moment the
+        # user adds something new, and without a lock one overwrites the
+        # other
         with self._settings.transaction():
             items = self.all()
             items.append(item)
@@ -262,34 +417,192 @@ class ReminderStore:
 
     def due(self, now=None):
         now = now or time.time()
-        return [r for r in self.active() if r.get("fire_at", 0) <= now]
+        return [r for r in self.active()
+                if r.get("on") is None and r.get("fire_at", 0) <= now]
+
+    def ahead_due(self, now=None):
+        """
+        Which warnings are owed, as `(item, lead)`.
+
+        A lead is owed when its moment has passed, it has not been said,
+        and — the part that matters — the reminder was **created before
+        that moment**. Without the last condition "remind me in fifteen
+        minutes" would answer with "in an hour: …" the same second,
+        because an hour before it is already the past.
+        """
+        now = now if now is not None else time.time()
+        owed = []
+        for item in self.active():
+            if item.get("on") is not None or not item.get("fire_at"):
+                continue
+            for lead in AHEAD:
+                moment = item["fire_at"] - lead
+                if moment > now:
+                    continue
+                if lead in item.get("warned", []):
+                    continue
+                if float(item.get("created_at") or 0) > moment:
+                    continue
+                # Only the nearest owed lead. Coming back to a machine
+                # that slept through both, a person wants "in an hour",
+                # not "in three hours" followed by "in an hour".
+                owed.append((item, lead))
+                break
+        return owed
+
+    def mark_warned(self, item_id, lead):
+        with self._settings.transaction():
+            items = self.all()
+            for item in items:
+                if item.get("id") == item_id:
+                    said = list(item.get("warned") or [])
+                    # Everything larger is closed at the same time. A
+                    # lead that was slept through is not owed later: its
+                    # moment is the point of it.
+                    for one in AHEAD:
+                        if one >= lead and one not in said:
+                            said.append(one)
+                    item["warned"] = said
+            self.save_all(items)
+
+    def triggered(self, event):
+        """
+        What is waiting for this event (`4.0b-A03`).
+
+        Matched by the launch path, not by name. A person says the name
+        however it comes out — "код", "вээс код", "студия" — and comparing
+        what was said with what the shell sees in a window would mean
+        guessing twice. The path is resolved once, at the moment the
+        reminder is created, by the same index as a launch: after that the
+        comparison is exact.
+        """
+        want = clean_trigger(event)
+        if want is None:
+            return []
+        return [r for r in self.active()
+                if r.get("on") and _same_trigger(r["on"], want)]
 
 
-# Планировщик живёт в ядре (core/engine.py): здесь только разбор фраз,
-# хранилище и формулировки — модуль не зависит от интерфейса.
+# The scheduler lives in the core (core/engine.py): here there is only
+# phrase parsing, the store and the wordings — the module does not depend on
+# the interface.
 
 # ---------------------------------------------------------------------------
-# Формулировки
+# The wordings
 # ---------------------------------------------------------------------------
+#: How long before the hour Rina says something.
+#:
+#: A closed list in the code, like the occasions in `TRIGGER_KINDS` and
+#: the packages in `PACKAGES`: everything that makes her speak of her
+#: own accord is named in advance.
+#:
+#: Two, and both large. A warning is worth having when there is still
+#: time to act on it — three hours to change a plan, an hour to set
+#: off — and worthless at five minutes, when the thing itself is about
+#: to say the same words. The cost of a third, smaller lead is not
+#: code: it is one more interruption in somebody's afternoon.
+AHEAD = (3 * 60 * 60, 60 * 60)
+
+
+def ahead_word(lead):
+    """How a lead time is said."""
+    if lead >= 3600 and lead % 3600 == 0:
+        hours = lead // 3600
+        return (tr("час") if hours == 1
+                else tr("{h} часа", h=hours) if hours < 5
+                else tr("{h} часов", h=hours))
+    return tr("{m} мин", m=lead // 60)
+
+
+def say_fired(item):
+    """What she says when the hour comes."""
+    titles = {"timer": tr("Таймер"), "reminder": tr("Напоминание"),
+              "alarm": tr("Будильник")}
+    title = titles.get(item.get("kind"), tr("Напоминание"))
+    text = (item.get("text") or "").strip()
+    if not text:
+        return tr("{title}. Время вышло.", title=title)
+    # A capital after the full stop. The text was stored as it was said
+    # — «выключить духовку» — and «Напоминание. выключить духовку» reads
+    # as a sentence that lost its beginning.
+    return "%s. %s%s" % (title, text[0].upper(), text[1:])
+
+
+def say_ahead(item, lead):
+    """The warning itself."""
+    what = item.get("text") or tr("запланированное")
+    return tr("Через {lead}: {what}. В {when}.",
+              lead=ahead_word(lead), what=what,
+              when=when_text(item.get("fire_at", 0)))
+
+
+def today(items, now=None):
+    """
+    What is still ahead today, by the clock.
+
+    Only what has a time: something waiting for an occasion has no
+    "today" — it happens when it happens. And only what is still ahead:
+    a plan that has already passed is not a plan any more.
+    """
+    now = now if now is not None else time.time()
+    stamp = time.localtime(now)
+    out = []
+    for item in items:
+        if item.get("done") or item.get("on") is not None:
+            continue
+        fire_at = float(item.get("fire_at") or 0)
+        if fire_at <= now:
+            continue
+        when = time.localtime(fire_at)
+        if (when.tm_year, when.tm_mon, when.tm_mday) !=                 (stamp.tm_year, stamp.tm_mon, stamp.tm_mday):
+            continue
+        out.append(item)
+    out.sort(key=lambda one: one["fire_at"])
+    return out
+
+
+def say_today(items):
+    """
+    Today's plans in one sentence, or nothing at all.
+
+    Nothing rather than "ничего не запланировано": this is said as an
+    addition to an answer about something else, and an addition that
+    reports an absence turns every answer into two. Silence when there
+    is nothing is what makes it worth saying when there is.
+    """
+    if not items:
+        return ""
+    listed = "; ".join(
+        tr("{what} в {when}", what=one.get("text") or tr("запланированное"),
+           when=when_text(one["fire_at"]))
+        for one in items[:5])
+    return tr("На сегодня запланировано: {listed}.", listed=listed)
+
+
 def humanize_left(seconds):
-    """«через 1 ч 5 мин» — сколько осталось."""
+    """"через 1 ч 5 мин" — how much is left."""
     seconds = max(0, int(seconds))
     hours, rest = divmod(seconds, 3600)
     minutes, secs = divmod(rest, 60)
+    # A zero part is not said: «Засекла 10 мин 0 с» is how a clock reads
+    # out, not how a person says ten minutes.
     if hours:
-        return tr("{h} ч {m} мин", h=hours, m=minutes)
+        return (tr("{h} ч {m} мин", h=hours, m=minutes) if minutes
+                else tr("{h} ч", h=hours))
     if minutes:
-        return tr("{m} мин {s} с", m=minutes, s=secs)
+        return (tr("{m} мин {s} с", m=minutes, s=secs) if secs
+                else tr("{m} мин", m=minutes))
     return tr("{s} с", s=secs)
 
 
 def when_text(fire_at):
-    """Время срабатывания в читаемом виде."""
+    """The firing time in a readable form."""
     try:
         stamp = time.localtime(fire_at)
     except (OSError, OverflowError, ValueError):
-        # дата вне разумного диапазона: строку показать всё равно надо,
-        # иначе одна такая запись рушила бы всю вкладку и её нельзя было снять
+        # a date outside a sensible range: the string has to be shown all
+        # the same, or one such entry would wreck the whole tab and it could
+        # not be removed
         return "—"
     today = time.localtime()
     clock = time.strftime("%H:%M", stamp)
@@ -300,7 +613,7 @@ def when_text(fire_at):
 
 
 def describe(item):
-    """Строка для списка: «Таймер — 14:30 (через 5 мин)»."""
+    """A line for the list: "Таймер — 14:30 (через 5 мин)"."""
     titles = {"timer": tr("Таймер"), "reminder": tr("Напоминание"),
               "alarm": tr("Будильник")}
     title = titles.get(item.get("kind"), tr("Напоминание"))

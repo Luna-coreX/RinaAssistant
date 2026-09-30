@@ -1,25 +1,24 @@
 """
-Исполнитель: намерение -> действие -> результат.
+The executor: intent -> tool call -> result.
 
-Задача плана 4.0-B04. Единственное место, где происходят побочные эффекты:
-запускаются программы, меняется громкость, пишутся напоминания, открывается
-браузер, спрашивается языковая модель.
+Plan item 4.0-B04, reworked for 4.0-C03.
 
-Зачем сводить в одну точку. Пока побочные эффекты разбросаны по конвейеру,
-нельзя ни перечислить их, ни поставить перед ними проверку разрешений, ни
-показать предпросмотр опасного действия. Всё это — 4.0-C03, C04 и C05, и все
-они опираются на то, что путь исполнения ровно один.
+The executor used to produce the side effects itself: it called
+`app_index.launch`, `system_control.run`, opened the browser. Now it **does
+nothing itself** — it turns an intent into a tool call and hands it to
+`ToolRunner`, which checks the arguments, the permissions and the
+confirmation.
 
-Что исполнитель НЕ делает: не разбирает текст (это роутер) и не решает, задан
-ли вопрос (это core/dialog.py). Он получает готовое намерение.
+The split is for one reason: while a side effect is reachable from the
+executor directly, any gates before it rest on discipline. C03's criterion —
+"the executor has not one path of execution around the registry" — is
+checked mechanically (tools/test_registry_only.py), and it can be checked
+only if there is exactly one path.
 
-Зависимости приходят снаружи — хранилища, озвучка, шина событий. Поэтому
-исполнителя можно собрать в тесте с подставными хранилищами и проверить, что
-он сделал, не поднимая приложение.
+What is left to the executor: knowing which tool answers each intent, and
+turning the result into a line. The lines are here, because after 4.0-F08
+the text of Rina's answers is assembled in the core, not in the shell.
 """
-
-import threading
-import time
 
 from core.i18n import t as tr
 from core.intent import Result
@@ -30,21 +29,20 @@ log = get_logger("executor")
 
 
 class Executor:
-    """Выполняет намерения. Всё, что меняет мир, происходит здесь."""
+    """Turns intents into tool calls."""
 
-    def __init__(self, *, say, emit, settings, reminders_store,
-                 command_store, host=None, on_alias=None):
+    def __init__(self, *, say, tools, emit=None):
         self._say = say
+        self._tools = tools          # ToolRunner
         self._emit = emit
-        self._settings = settings
-        self._reminders = reminders_store
-        self._commands = command_store
-        self._host = host
-        self._on_alias = on_alias          # запомнить выбор программы
+
+    @property
+    def tools(self):
+        return self._tools
 
     # ------------------------------------------------------------------
     def execute(self, intent, source="typed"):
-        """Namespace намерения -> метод. Возвращает Result."""
+        """An intent's namespace -> a method. Returns a Result."""
         handler = getattr(self, "_do_" + intent.name.replace(".", "_"), None)
         if handler is None:
             log.warning("Нечем исполнить намерение %s", intent.name)
@@ -52,25 +50,12 @@ class Executor:
         log.debug("Исполняю %s для %s", intent.name, safe(intent.text))
         return handler(intent, source)
 
-    # ---------- запуск программ ----------
+    # ---------- programs ----------
     def _do_app_launch(self, intent, source):
-        from voice import app_index
-
-        name = intent.arg("app")
-        entry = self._find_entry(name)
-        if entry is None:
-            return self._fail(tr("Не нашла программу «{name}».", name=name),
-                              "app.not_found")
-        if not app_index.launch(entry):
-            return self._fail(
-                tr("Не получилось запустить {app} — программу удалили "
-                   "или перенесли.", app=entry.name), "app.launch_failed")
-
-        # Выбор из нескольких запоминается: в следующий раз без вопроса.
-        query = intent.arg("query")
-        if query and self._on_alias:
-            self._on_alias(query, entry)
-        return self._ok(tr("Запускаю {app}.", app=entry.name))
+        return self._run("launch_app", {
+            "name": intent.arg("app"),
+            "query": intent.arg("query") or "",
+        }, source=source)
 
     def _do_app_ambiguous(self, intent, source):
         names = ", ".join(o.get("name", "") for o in
@@ -82,121 +67,269 @@ class Executor:
         from core.protocol import Events
 
         query = intent.arg("query")
-        result = self._fail(tr("Не нашла программу «{name}».", name=query),
-                            "app.not_found")
-        if query:
+        if query and self._emit:
             self._emit(Events.APP_NOT_FOUND, query=query)
-        return result
+        return self._fail(tr("Не нашла программу «{name}».", name=query),
+                          "app.not_found")
+
+    # ---------- what was learned (4.0b-A04) ----------
+    def _do_alias_teach(self, intent, source):
+        """
+        Remember the rule that was stated.
+
+        Telling "I knew that already" apart from "learned it" is not
+        decoration: a person who states a rule twice has to understand that
+        the second time changed nothing, rather than decide they were not
+        heard.
+        """
+        return self._run("teach_alias", {
+            "word": intent.arg("word"),
+            "name": intent.arg("app"),
+            "launch": intent.arg("launch"),
+            "kind": intent.arg("kind") or "file",
+        }, source=source)
+
+    def _do_alias_ambiguous(self, intent, source):
+        """
+        The named program is itself ambiguous — we ask rather than guess.
+
+        What is learned lives for years, and a mistake in it surfaces the
+        later the more rarely the person says that word. A launch can be
+        replayed by the next phrase; a rule cannot, until you remember that
+        it exists.
+        """
+        names = ", ".join(o.get("name", "") for o in intent.arg("options"))
+        return self._ok(
+            tr("Не одна такая: {names}. Какую запомнить под «{word}»?",
+               names=names, word=intent.arg("word")))
+
+    def _do_alias_unknown(self, intent, source):
+        return self._fail(
+            tr("Не нашла программу «{name}» — нечего запоминать.",
+               name=intent.arg("query")), "app.not_found")
 
     def _do_app_launch_failed(self, intent, source):
         return self._fail(
             tr("Не получилось запустить {app} — программу удалили "
                "или перенесли.", app=intent.arg("app")), "app.launch_failed")
 
-    def _find_entry(self, name):
-        from voice import app_index
+    # ---------- the system ----------
+    #: A 3.1.0 action -> (tool, arguments).
+    _SYSTEM = {
+        "volume_up": ("set_volume", {"action": "up"}),
+        "volume_down": ("set_volume", {"action": "down"}),
+        "volume_mute": ("set_volume", {"action": "mute"}),
+        "media_next": ("media_control", {"action": "next"}),
+        "media_prev": ("media_control", {"action": "previous"}),
+        "media_play_pause": ("media_control", {"action": "play_pause"}),
+        "lock": ("lock_screen", {}),
+        "screenshot": ("take_screenshot", {}),
+        "shutdown": ("power_action", {"action": "shutdown"}),
+        "restart": ("power_action", {"action": "restart"}),
+        "sleep": ("power_action", {"action": "sleep"}),
+    }
 
-        for entry in app_index.cached_index() or []:
-            if entry.name == name:
-                return entry
-        return None
-
-    # ---------- напоминания ----------
-    def _do_reminder_create(self, intent, source):
-        from voice import reminders
-
-        seconds = intent.arg("seconds")
-        at = intent.arg("at")
-        text = intent.arg("text") or ""
-        fire_at = at if at else time.time() + (seconds or 0)
-        self._reminders.add(intent.arg("kind"), fire_at, text)
-
-        if seconds:
-            left = reminders.humanize_left(seconds)
-            if text:
-                return self._ok(tr("Напомню через {left}: {text}.",
-                                   left=left, text=text))
-            return self._ok(tr("Засекла {left}.", left=left))
-
-        when = reminders.when_text(fire_at)
-        if text:
-            return self._ok(tr("Напомню в {time}: {text}.", time=when,
-                               text=text))
-        return self._ok(tr("Разбужу в {time}.", time=when))
-
-    def _do_reminder_list(self, intent, source):
-        from voice import reminders
-
-        items = sorted(self._reminders.active(),
-                       key=lambda r: r.get("fire_at", 0))
-        if not items:
-            return self._ok(tr("Ничего не запланировано."))
-        return self._ok(tr("Запланировано: ") + "; ".join(
-            reminders.describe(i) for i in items[:5]))
-
-    def _do_reminder_cancel(self, intent, source):
-        removed = self._reminders.clear_active()
-        if not removed:
-            return self._ok(tr("Нечего отменять."))
-        return self._ok(tr("Отменила: {count}.", count=removed))
-
-    # ---------- система ----------
     def _do_system_action(self, intent, source):
-        from core.protocol import Events
+        mapping = self._SYSTEM.get(intent.arg("action"))
+        if mapping is None:
+            return Result.failure(error_code="internal")
+        name, args = mapping
+        return self._run(name, args,
+                         confirmation_id=intent.arg("confirmation_id"),
+                         source=source)
+
+    def _do_system_confirm(self, intent, source):
+        """
+        Ask about a dangerous action.
+
+        The confirmation is issued here and now and returned in the Result:
+        the core puts its identifier into the question asked and will
+        present it when the person agrees. That way consent is bound to a
+        particular call rather than to the mere fact that a question was
+        once asked.
+        """
         from voice import system_control
 
         action = intent.arg("action")
-        # Снимок экрана делает оболочка: сообщаем ей через СВОЮ шину.
-        if action in system_control.WINDOW_ACTIONS:
-            self._emit(Events.WINDOW_ACTION, action=action)
-            return self._ok(system_control.run(action))
-
-        message = system_control.run(action)
-        if message is None:
+        mapping = self._SYSTEM.get(action)
+        if mapping is None:
             return Result.failure(error_code="internal")
-        failed = message == tr("Не получилось выполнить действие.")
-        return (self._fail(message, "internal") if failed
-                else self._ok(message))
 
-    def _do_system_confirm(self, intent, source):
-        from voice import system_control
+        name, args = mapping
+        question = system_control.confirm_question(action)
+        confirmation = self._tools.request_confirmation(
+            name, args, preview=question)
+        result = self._ok(question)
+        return result.with_data(confirmation_id=confirmation.id)
 
-        return self._ok(system_control.confirm_question(intent.arg("action")))
+    # ---------- reminders ----------
+    def _do_reminder_create(self, intent, source):
+        args = {"kind": intent.arg("kind")}
+        # `on` is an occasion instead of a clock (`4.0b-A03`). The list of
+        # keys here is closed, and this is exactly the case where an
+        # argument the router added is lost silently: the intent is right,
+        # the call is without it.
+        for key in ("seconds", "at", "text", "on"):
+            value = intent.arg(key)
+            if value:
+                args[key] = value
+        return self._run("create_reminder", args, source=source)
 
-    def _do_command_confirm(self, intent, source):
-        return self._ok(intent.arg("question") or tr("Точно выполнить?"))
+    def _do_reminder_ambiguous(self, intent, source):
+        """
+        There is more than one candidate — we ask (`4.0b-A03`).
 
-    # ---------- пользовательские команды ----------
+        The reason is the same as with learning: a reminder that did not
+        fire shows nothing of itself. The person finds out about the
+        mistake at exactly the moment when they were counting on the
+        opposite — and by then it is too late to set the reminder again.
+        """
+        names = ", ".join(o.get("name", "") for o in intent.arg("options"))
+        return self._ok(
+            tr("Не одна такая: {names}. К какой привязать?", names=names))
+
+    def _do_reminder_unknown_app(self, intent, source):
+        return self._fail(
+            tr("Не нашла программу «{name}» — не к чему привязать.",
+               name=intent.arg("query")), "app.not_found")
+
+    def _do_reminder_list(self, intent, source):
+        return self._run("list_reminders", {}, source=source)
+
+    def _do_reminder_no_time(self, intent, source):
+        """
+        Asked to remind, did not say when.
+
+        Says what is missing, in the same shape as "«запиши» без
+        продолжения": a person who is told what was not understood says
+        the missing half, and a person who is shown search results says
+        nothing and stops asking.
+        """
+        return self._fail(tr("Не поняла, когда напомнить."), "internal")
+
+    def _do_reminder_cancel(self, intent, source):
+        return self._run("cancel_reminder", {}, source=source)
+
+    # ---------- "Why?" (4.0b-B04) ----------
+    def _do_why_last(self, intent, source):
+        return self._run("explain_last", {}, source=source)
+
+    # ---------- working sessions (4.0b-A02) and focus (4.0b-A05) ------
+    def _do_session_start(self, intent, source):
+        return self._run("start_session", {"goal": intent.arg("goal")},
+                         source=source)
+
+    def _do_session_busy(self, intent, source):
+        """
+        One is already open — so say which, rather than swap it.
+
+        The answer names the open one and what closes it. A person who
+        meant to switch tasks has one sentence to say; a person who
+        forgot a session was running has just been told.
+        """
+        return self._run("which_session", {}, source=source)
+
+    def _do_session_finish(self, intent, source):
+        return self._run("finish_session", {"note": intent.arg("note") or ""},
+                         source=source)
+
+    def _do_session_note(self, intent, source):
+        return self._run("note_session", {"text": intent.arg("text")},
+                         source=source)
+
+    def _do_session_folder(self, intent, source):
+        return self._run("folder_session", {"path": intent.arg("path")},
+                         source=source)
+
+    def _do_session_current(self, intent, source):
+        return self._run("which_session", {}, source=source)
+
+    def _do_session_last(self, intent, source):
+        return self._run("last_session", {}, source=source)
+
+    def _do_session_worked(self, intent, source):
+        return self._run("worked_on", {"query": intent.arg("query")},
+                         source=source)
+
+    def _do_session_focus_on(self, intent, source):
+        return self._run("set_focus", {"on": True}, source=source)
+
+    def _do_session_focus_off(self, intent, source):
+        return self._run("set_focus", {"on": False}, source=source)
+
+    # ---------- things to do (4.0b-A13) ----------
+    def _do_todo_add(self, intent, source):
+        return self._run("add_todo", {"text": intent.arg("text")},
+                         source=source)
+
+    def _do_todo_list(self, intent, source):
+        return self._run("list_todo", {}, source=source)
+
+    def _do_todo_done(self, intent, source):
+        return self._run("close_todo", {"todo_id": intent.arg("todo_id")},
+                         source=source)
+
+    def _do_todo_ambiguous(self, intent, source):
+        """
+        Several things fit — so ask, rather than close one of them.
+
+        Closing the wrong thing is the mistake a person does not catch:
+        a closed thing simply leaves the list, and nothing says which one
+        went. Asking costs a sentence.
+        """
+        names = "; ".join(o.get("text", "") for o in
+                          (intent.arg("options") or []))
+        return self._ok(tr("Таких дел несколько: {names}. Какое закрыть?",
+                           names=names))
+
+    def _do_todo_not_found(self, intent, source):
+        """
+        There is no such thing on the list.
+
+        An answer of its own rather than "nothing on the list": a person who
+        hears the second instead of the first will decide the whole list has
+        gone.
+        """
+        return self._fail(
+            tr("Не нашла дело «{query}».", query=intent.arg("query")),
+            "internal")
+
+    # ---------- user commands and plugins ----------
     def _do_user_command(self, intent, source):
-        command_id = intent.arg("command_id")
-        for command in self._commands.all():
-            if command.get("id") == command_id:
-                return self.run_user_command(command)
-        return Result.failure(error_code="internal")
+        return self._run("run_user_command",
+                         {"command_id": intent.arg("command_id")},
+                         confirmation_id=intent.arg("confirmation_id"),
+                         source=source)
 
-    def run_user_command(self, command):
+    def dispatch_plugins(self, text, source="typed"):
+        """Hand the phrase to the plugins. True means a plugin took it."""
+        result = self._tools.call("dispatch_plugin_command", {"text": text},
+                                  source=source)
+        return bool(result.value)
+
+    def run_user_command(self, command, source="shell"):
         """
-        Выполняет пользовательскую команду.
+        Perform a command by object — for the "Run" button in the list.
 
-        Последовательности уходят в фоновый поток: между шагами бывает пауза,
-        а вызывающий поток блокировать нельзя.
+        The source is "shell" by default: a button was pressed, not a phrase
+        said. In the call journal these are different initiators, and
+        telling them apart matters.
         """
-        from voice.user_commands import execute
+        return self._run("run_user_command",
+                         {"command_id": command.get("id")}, source=source)
 
-        self._commands.bump_stat(command.get("id"))
-        if command.get("type") == "sequence":
-            def worker():
-                _ok, response = execute(command, self._host,
-                                        self._emit)
-                self._say(response)
-            threading.Thread(target=worker, daemon=True).start()
-            return Result.success()
+    def try_user_command(self, command, source="shell"):
+        """
+        Try a command that has not been saved (`4.0b-A09`).
 
-        ok, response = execute(command, self._host, self._emit)
-        self._say(response, sound="response" if ok else "error")
-        return Result(ok=ok, response=response)
+        Whole rather than by identifier: there is no identifier yet. The
+        card is narrowed inside the tool, by the same function the import
+        path uses.
+        """
+        return self._run("try_user_command", {"command": command},
+                         source=source)
 
-    # ---------- ответы ----------
+    # ---------- answers ----------
     def _do_calc(self, intent, source):
         return self._ok(tr("Получается {result}.",
                            result=intent.arg("result")))
@@ -212,16 +345,28 @@ class Executor:
             return Result.failure(error_code="internal")
         return self._ok(make())
 
-    def _do_websearch(self, intent, source):
-        from voice import websearch
+    # ---------- music (`4.0b-E06`) ----------
+    def _do_music_ask(self, intent, source):
+        """
+        Asked for music without saying which — so ask, and suggest.
 
-        engine = self._settings.get("search_engine", websearch.DEFAULT_ENGINE)
-        query = intent.arg("query")
-        if websearch.open_search(query, engine):
-            return self._ok(tr("Ищу «{query}» в {engine}.", query=query,
-                               engine=websearch.engine_label(engine)))
-        return self._fail(tr("Не удалось открыть браузер для поиска."),
-                          "internal")
+        The suggestions are suggestions: the question takes any answer,
+        because a question that only accepts what it named is not a
+        question. See `dialog.ASKED`.
+        """
+        from voice import music
+
+        names = " или ".join(music.SUGGESTED)
+        return self._ok(tr("Какую музыку? Могу предложить {names}.",
+                           names=names))
+
+    def _do_music_play(self, intent, source):
+        return self._run("play_music", {"genre": intent.arg("genre") or ""},
+                         source=source)
+
+    def _do_websearch(self, intent, source):
+        return self._run("web_search", {"query": intent.arg("query")},
+                         source=source)
 
     def _do_cancelled(self, intent, source):
         return self._ok(tr("Хорошо, отменяю."))
@@ -232,20 +377,41 @@ class Executor:
     def _do_silence(self, intent, source):
         return Result.success()
 
-    # ---------- хвост ----------
+    # ---------- the tail ----------
+    def _do_llm_answer(self, intent, source):
+        result = self._tools.call(
+            "ask_model", {"question": intent.text}, source=source)
+        if result.ok:
+            return self._ok(result.message)
+        return Result.failure(error_code=result.error_code)
+
     def _do_fallback_search(self, intent, source):
         from voice import websearch
 
-        engine = self._settings.get("search_engine", websearch.DEFAULT_ENGINE)
-        found = websearch.fallback_search(intent.arg("query"), engine)
-        if found:
-            return self._ok(found)
-        return self._do_fallback_none(intent, source)
+        query = intent.arg("query") or intent.text
+        result = self._tools.call("web_search", {"query": query},
+                                  source=source)
+        if not result.ok:
+            return self._do_fallback_none(intent, source)
+        # The wording of a fallback search differs from an explicit one: the
+        # person did not ask to search, and it is more honest to say so.
+        return self._ok(tr("Не нашла такой команды — поищу «{query}» "
+                           "в интернете.", query=query))
 
     def _do_fallback_none(self, intent, source):
         return self._fail(tr("Извини, я не поняла команду."), "internal")
 
-    # ---------- вспомогательное ----------
+    # ---------- helpers ----------
+    def _run(self, name, args, confirmation_id=None, *, source):
+        """A tool call and the turning of the result into a line."""
+        result = self._tools.call(name, args,
+                                  confirmation_id=confirmation_id,
+                                  source=source)
+        if result.ok:
+            return (self._ok(result.message) if result.message
+                    else Result.success())
+        return self._fail(result.message, result.error_code)
+
     def _ok(self, response):
         self._say(response)
         return Result.success(response)

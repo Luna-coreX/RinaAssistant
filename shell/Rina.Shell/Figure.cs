@@ -1,0 +1,461 @@
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace Rina.Shell;
+
+/// <summary>What Rina is doing, as the figure shows it.</summary>
+/// <remarks>
+/// Four and no more. Every one of them is a state a person can tell apart
+/// without being told, and every one comes from something that actually
+/// happens — not from a timer that makes the picture look busy. A fifth
+/// would have to be invented, and an invented state is a lie told slowly.
+/// </remarks>
+public enum Doing
+{
+    /// <summary>Waiting. Nothing is being asked of her.</summary>
+    Idle,
+
+    /// <summary>A person is speaking into the microphone right now.</summary>
+    Listening,
+
+    /// <summary>An answer is being worked out: `assistant.thinking`.</summary>
+    Thinking,
+
+    /// <summary>She is speaking: her own sound is being played.</summary>
+    Talking,
+}
+
+/// <summary>
+/// The figure on the home screen: an iridescent vortex.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Plan item <c>4.0b-A07</c>, second edition. The first was a flat disc of
+/// the background's own flow — honest about being one substance with the
+/// window, and flat. What was asked for instead was a sphere: a dark core
+/// with thin-film colour swirling over it, the way oil looks on water or a
+/// soap bubble looks against a light.
+/// </para>
+/// <para>
+/// <b>Three things make it a sphere rather than a circle.</b> The surface
+/// normal is worked out per point, so the shading falls off towards the
+/// rim. The colour is driven by the <i>grazing angle</i> — how far from
+/// facing you the surface is — which is exactly what makes a real film
+/// iridescent, and it is why the colour bands hug the edge instead of
+/// lying flat across it. And the flow is sampled through a vortex: the
+/// angle is twisted by an amount that depends on the radius, so the bands
+/// wind in rather than drift past.
+/// </para>
+/// <para>
+/// <b>The spectrum is turned to the accent.</b> A free rainbow belongs to
+/// nobody; this one starts at the colour the rest of the window is using
+/// and travels from there. Change the accent and the vortex changes with
+/// it, the same as the background.
+/// </para>
+/// <para>
+/// <b>It shares the background's clock</b> rather than keeping one of its
+/// own. Every reason the background stops — the window hidden, the system
+/// asked for stillness — is a reason the figure stops, and a second clock
+/// would be a second place to remember that.
+/// </para>
+/// </remarks>
+public sealed class Figure
+{
+    /// <summary>How many points across the sphere is computed.</summary>
+    /// <remarks>
+    /// Larger than the first edition's: this one has an edge that is looked
+    /// at — the rim is where the colour lives — and a rim computed too
+    /// coarsely reads as a jagged circle no amount of smoothing hides.
+    /// </remarks>
+    private const int Side = 200;
+
+    private readonly Image _view;
+    private readonly WriteableBitmap _film;
+    private readonly byte[] _pixels = new byte[Side * Side * 4];
+
+    private double _turn;
+    private double _breath;
+
+    //: What is followed towards its target rather than switched to it.
+    //: `_churned` is the flow's own clock, kept separately because its
+    //: **pace** is what a state changes: multiplying the shared elapsed
+    //: time by a changing rate would jerk the field back and forth as the
+    //: rate moved.
+    private double _spin = 0.35;
+    private double _twist = 0.9;
+    private double _churn = 0.8;
+    private double _burst;
+    private double _churned;
+    private double _hue;
+    private double _loud;
+    private double _shown;
+    private double _gloss = 70;
+    private double _lamp = 0.42;
+
+    public Figure(Image view)
+    {
+        _view = view;
+        _film = new WriteableBitmap(Side, Side, 96, 96, PixelFormats.Bgra32,
+                                    null);
+        _view.Source = _film;
+        RenderOptions.SetBitmapScalingMode(_view, BitmapScalingMode.Fant);
+    }
+
+    /// <summary>What she is doing now.</summary>
+    public Doing State { get; private set; } = Doing.Idle;
+
+    /// <summary>How loud it is — a voice heard, or her own. From 0 to 1.</summary>
+    public double Loud => _loud;
+
+    /// <summary>The cheapest frame the figure has painted, in milliseconds.</summary>
+    /// <remarks>
+    /// The figure is the most expensive thing on the home screen, and
+    /// until now nothing watched it. The cheapest rather than the last:
+    /// a single frame can be interrupted by anything at all, and what is
+    /// being asked is what the work costs, not what the machine was doing
+    /// at the time. The same measure and the same reasoning as the
+    /// background's.
+    /// </remarks>
+    public double BestFrameMs { get; private set; }
+
+    /// <summary>How far the sphere has swelled beyond its resting size.</summary>
+    /// <remarks>
+    /// Public because "the states look different" is otherwise a matter of
+    /// opinion. This is the number the check compares between states: a
+    /// figure whose four states render the same picture has four names and
+    /// one behaviour.
+    /// </remarks>
+    public double Swell { get; private set; }
+
+    /// <summary>Say what is happening, and how loudly.</summary>
+    public void Show(Doing state, double loud = 0)
+    {
+        State = state;
+        _loud = Math.Clamp(loud, 0, 1);
+    }
+
+    /// <summary>Take the hue of the accent that is on.</summary>
+    /// <remarks>
+    /// The hue, not the colour: the spectrum is generated, and what the
+    /// accent decides is where it starts. Read out of the live brush rather
+    /// than out of a table, because the accent is swapped at run time and a
+    /// table would hold the one that was set at build.
+    /// </remarks>
+    public void Build()
+    {
+        if (Application.Current?.TryFindResource("Color.Signal") is Color tone)
+            _hue = Hue(tone);
+    }
+
+    /// <summary>One frame, at the background's own pace.</summary>
+    public void Advance(double elapsed, double step)
+    {
+        // How each state moves, and the differences are what a person
+        // reads without being told which is which.
+        //
+        //   idle      — a slow, even drift and nothing else;
+        //   listening — grows with the voice it hears, and quickens a
+        //               little, because something is arriving;
+        //   thinking  — the vortex winds inward and spins up: the one state
+        //               with nothing coming in and nothing going out, so
+        //               what it has to show is effort;
+        //   talking   — pulses with her own voice, which is the only thing
+        //               here that has a rhythm of its own.
+        //
+        // **And how hard the light sits on it** (`4.0b-E05`). The
+        // highlight is the one thing on a round body that says outright
+        // how hard its surface is, and a state is a hardness as much as a
+        // pace: waiting is soft, effort is tight and glassy, a voice
+        // flickers with what is being said.
+        //
+        // **And where the light sits on it** (`4.0b-E05`). The last
+        // number is how far towards the eye the lamp stands: at nothing
+        // it grazes the body from the side and the highlight lies out by
+        // the rim; nearer one it comes round to the front and the
+        // highlight walks in towards the middle. That walk is what makes
+        // a change of state read as the body turning rather than as the
+        // picture being swapped — waiting looks away, hearing turns
+        // towards you, effort is lit from the side because a long shadow
+        // is what effort looks like.
+        var (spin, swell, twist, churn, burst, gloss, lamp) = State switch
+        {
+            Doing.Listening => (0.5, 0.09 + _loud * 0.20, 1.1, 1.3,
+                                _loud * 0.30, 95.0, 0.74),
+            Doing.Thinking => (2.1, 0.04, 2.6, 2.2, 0.16, 240.0, 0.26),
+            Doing.Talking => (0.9, 0.05 + _loud * 0.16, 1.4, 1.6,
+                              0.10 + _loud * 0.55, 70.0 + _loud * 120.0,
+                              0.48 + _loud * 0.22),
+            _ => (0.35, 0.0, 0.9, 0.8, 0.0, 70.0, 0.42),
+        };
+
+        // **Everything is followed, not assigned.** The first edition eased
+        // only the swell and switched the rest — the spin, the twist, the
+        // pace of the flow — the instant the state changed, and a person
+        // saw the sphere's insides jump while its outside grew smoothly.
+        // Half a transition looks worse than none: the smooth part makes
+        // the jump conspicuous.
+        //
+        // By the flow's time, not by the frame: the paces below are shares
+        // of the way per tick of the timer they were tuned on, and a frame
+        // now carries however many of those ticks it covers. Taken per
+        // frame, they made every transition twice as quick at sixty frames
+        // and quicker still with no limit.
+        var ticks = step / TunedStep;
+        _shown = Follow(_shown, swell, swell > _shown ? 0.16 : 0.05, ticks);
+        _spin = Follow(_spin, spin, 0.06, ticks);
+        _twist = Follow(_twist, twist, 0.06, ticks);
+        _churn = Follow(_churn, churn, 0.06, ticks);
+        _burst = Follow(_burst, burst, burst > _burst ? 0.22 : 0.06, ticks);
+        _gloss = Follow(_gloss, gloss, 0.06, ticks);
+        _lamp = Follow(_lamp, lamp, 0.06, ticks);
+
+        _turn += step * _spin;
+        _breath += step * (State is Doing.Idle ? 0.5 : 1.2);
+        _churned += step * _churn;
+
+        Swell = _shown + Math.Sin(_breath * 2 * Math.PI) * 0.028;
+
+        var began = System.Diagnostics.Stopwatch.GetTimestamp();
+        Paint((float)_churned, (float)_turn, (float)_twist, (float)_burst,
+              (float)_gloss, (float)_lamp);
+        var spent = (System.Diagnostics.Stopwatch.GetTimestamp() - began)
+                    * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        BestFrameMs = BestFrameMs is 0 ? spent : Math.Min(BestFrameMs, spent);
+    }
+
+    /// <summary>One value moving towards another. Nothing here jumps.</summary>
+    /// <remarks>
+    /// <paramref name="pace"/> is the share of the way covered in one
+    /// tuning tick; over several, what is left shrinks by the same share
+    /// each time, which is the power rather than the product.
+    /// </remarks>
+    private static double Follow(double have, double want, double pace,
+                                 double ticks) =>
+        have + (want - have) * (1 - Math.Pow(1 - pace, ticks));
+
+    /// <summary>How far the flow moved in one tick of the timer everything here was tuned on.</summary>
+    /// <remarks>
+    /// A sixtieth of a second of a nine-second period: what the old timer
+    /// asked for and moved the flow by, whichever rate it really ran at.
+    /// Every per-tick pace in the figure and on the home screen was chosen
+    /// by eye against that step, so it is the unit they are kept in.
+    /// Measured in the flow's periods, like <c>step</c> itself: the flow's
+    /// period in real seconds was set to what the old timer really gave, so
+    /// one of these still lasts as long as it did.
+    /// </remarks>
+    public const double TunedStep = 1.0 / 540;
+
+    /// <summary>
+    /// One frame of the sphere (<c>4.0b-E05</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The pattern lives on the ball, not on the disc.</b> This is the
+    /// whole of the second edition. The flow used to be sampled by the
+    /// angle and the distance from the middle — a flat mapping, which
+    /// carries no depth however it is shaded: the bands ran across the rim
+    /// at the same size they had in the centre, and a texture that does not
+    /// foreshorten reads as painted on glass in front of a ball. Now the
+    /// sample point is the surface normal itself, turned about the
+    /// vertical. Near the rim the normal barely moves as the eye travels,
+    /// so the pattern crowds together there by itself — which is what
+    /// makes a sphere look like one.
+    /// </para>
+    /// <para>
+    /// <b>The light is fixed and the surface turns under it.</b> The
+    /// highlight and the shadowed side therefore stay where they are while
+    /// the pattern travels through them, and that is the difference
+    /// between a rotating body and a rotating picture.
+    /// </para>
+    /// <para>
+    /// Three terms of light, and each says something different: the
+    /// diffuse says which way the surface faces, the specular says how
+    /// hard it is, the rim says where it ends. The dark core is left
+    /// almost black — a film is a film because what is under it is not.
+    /// </para>
+    /// </remarks>
+    private void Paint(float z, float turn, float twist, float burst,
+                       float gloss, float lamp)
+    {
+        var pixels = _pixels;
+        var half = Side / 2f;
+        var radius = half * (float)(0.86 + Swell);
+        var hue = (float)_hue;
+
+        // Upper left, and as far towards the eye as the state asks. One
+        // light: a body lit from everywhere is a ring. It does not follow
+        // the surface — that would be a headlamp, and a headlamp shows
+        // nothing about shape — it only comes round from the side to the
+        // front and back as the state changes, and slowly.
+        var depth = Math.Clamp(lamp, 0.05f, 0.95f);
+        var across = MathF.Sqrt(1f - depth * depth);
+        var lightX = -0.68f * across;
+        var lightY = -0.73f * across;
+        var lightZ = depth;
+
+        // The half vector for a viewer straight ahead: the eye is at
+        // (0, 0, 1), so it is the light plus that, over its own length.
+        var halfLen = MathF.Sqrt(lightX * lightX + lightY * lightY
+                                 + (lightZ + 1f) * (lightZ + 1f));
+        var hx = lightX / halfLen;
+        var hy = lightY / halfLen;
+        var hz = (lightZ + 1f) / halfLen;
+
+        Parallel.For(0, Side, y =>
+        {
+            var dy = y - half;
+            var row = y * Side * 4;
+            for (var x = 0; x < Side; x++)
+            {
+                var dx = x - half;
+                var reachOut = MathF.Sqrt(dx * dx + dy * dy);
+                var at = row + x * 4;
+
+                // **The rim is thrown outward unevenly.** Growing and
+                // shrinking is a balloon; what was asked for is the thing
+                // scattering — parts of it flung further than others and
+                // coming back at their own pace. So the radius is not one
+                // number: it is a number per direction, pushed out by the
+                // flow itself at the angle being looked at. Loud enough and
+                // the sphere frays; quiet and it closes back into a circle.
+                var about = MathF.Atan2(dy, dx);
+                var scatter = burst <= 0.001f ? 0f
+                    : Flow.Fbm(MathF.Cos(about) * 1.7f,
+                               MathF.Sin(about) * 1.7f, z * 1.6f) * burst;
+                var far = reachOut / (radius * (1f + scatter));
+
+                if (far >= 1.06f)
+                {
+                    pixels[at + 3] = 0;
+                    continue;
+                }
+
+                // The normal: a ball, not a coin. `face` is the part of it
+                // pointing at the eye — one in the middle, nothing at the
+                // rim — and the two across are what is left.
+                var inside = MathF.Min(far, 1f);
+                var face = MathF.Sqrt(MathF.Max(0f, 1f - inside * inside));
+                var graze = 1f - face;
+                var nx = dx / (radius * (1f + scatter));
+                var ny = dy / (radius * (1f + scatter));
+                if (inside >= 1f)
+                {
+                    var back = 1f / MathF.Max(inside, 0.0001f);
+                    nx *= back;
+                    ny *= back;
+                }
+
+                // The surface point, wound about the axis that points at
+                // you: the nearer the middle, the further it has been
+                // turned, so the bands spiral inward instead of lying in
+                // rings. Sampled in three dimensions, which is what makes
+                // the pattern crowd towards the rim on its own.
+                var wind = turn + twist * face;
+                var cw = MathF.Cos(wind);
+                var sw = MathF.Sin(wind);
+                var sx = nx * cw - ny * sw;
+                var sy = nx * sw + ny * cw;
+
+                const float grain = 2.3f;
+                var qx = Flow.Fbm(sx * grain, sy * grain, face * grain + z);
+                var field = Flow.Fbm(sx * grain + qx, sy * grain,
+                                     face * grain + z);
+
+                // Thin-film colour. The hue runs mostly with the flow and
+                // only a little with the grazing angle — that order matters
+                // and the first attempt had it the other way round, which
+                // gave concentric rings of rainbow: a hue driven by the
+                // radius can only make rings, because the radius is a
+                // circle.
+                var shade = hue + field * 1.05f + graze * 0.46f + z * 0.02f;
+
+                // Three terms of light over a nearly black core.
+                var diffuse = MathF.Max(0f, nx * lightX + ny * lightY
+                                            + face * lightZ);
+                var spec = MathF.Pow(
+                    MathF.Max(0f, nx * hx + ny * hy + face * hz), gloss);
+                var rim = graze * graze * graze;
+
+                // Only the crests of the flow light up, and only where the
+                // light falls on them: bright everywhere is the same as
+                // nowhere, and a film lit on its dark side is a sticker.
+                var wave = field * 0.5f + 0.5f;
+                var crest = Math.Clamp((wave - 0.42f) / 0.34f, 0f, 1f);
+                crest *= crest * (3f - 2f * crest);
+                var band = MathF.Exp(-(inside - 0.72f) * (inside - 0.72f) * 6f);
+
+                var lit = 0.02f
+                          + crest * band * (0.18f + 0.92f * diffuse) * 1.05f
+                          // A faint glow of the body itself where the
+                          // light falls, crest or no crest. Without it
+                          // the shape is legible only where the flow
+                          // happens to be bright, and the ball reads as
+                          // patches rather than as a thing with a near
+                          // side and a far one.
+                          + diffuse * diffuse * 0.13f
+                          + rim * 0.26f
+                          + spec * 0.32f;
+
+                // The highlight washes towards white, the way a highlight
+                // does: colour is a property of the film, and the spot is
+                // the light itself.
+                var sat = Math.Clamp(0.60f + 0.28f * crest - spec * 0.30f,
+                                     0f, 1f);
+
+                var (red, green, blue) = FromHue(shade, sat,
+                                                 Math.Clamp(lit, 0f, 1f));
+
+                // The rim itself fades, and a little of the sphere spills
+                // past the radius — a hard circle would read as a sticker.
+                var alpha = inside < 0.86f ? 1f
+                          : Math.Clamp((1.06f - far) / 0.20f, 0f, 1f);
+
+                pixels[at] = blue;
+                pixels[at + 1] = green;
+                pixels[at + 2] = red;
+                pixels[at + 3] = (byte)(alpha * 255);
+            }
+        });
+
+        _film.WritePixels(new Int32Rect(0, 0, Side, Side), pixels, Side * 4, 0);
+    }
+
+    /// <summary>A colour from a place on the spectrum. Hue wraps at one.</summary>
+    private static (byte R, byte G, byte B) FromHue(float hue, float sat,
+                                                    float value)
+    {
+        hue -= MathF.Floor(hue);
+        var sector = hue * 6f;
+        var step = sector - MathF.Floor(sector);
+        var p = value * (1 - sat);
+        var q = value * (1 - sat * step);
+        var t = value * (1 - sat * (1 - step));
+
+        var (r, g, b) = (int)sector switch
+        {
+            0 => (value, t, p),
+            1 => (q, value, p),
+            2 => (p, value, t),
+            3 => (p, q, value),
+            4 => (t, p, value),
+            _ => (value, p, q),
+        };
+        return ((byte)(r * 255), (byte)(g * 255), (byte)(b * 255));
+    }
+
+    /// <summary>Where on the spectrum a colour sits, from 0 to 1.</summary>
+    private static double Hue(Color tone)
+    {
+        double r = tone.R / 255.0, g = tone.G / 255.0, b = tone.B / 255.0;
+        var high = Math.Max(r, Math.Max(g, b));
+        var low = Math.Min(r, Math.Min(g, b));
+        var span = high - low;
+        if (span <= 0.0001) return 0;
+        var hue = high == r ? (g - b) / span
+                : high == g ? 2 + (b - r) / span
+                            : 4 + (r - g) / span;
+        return (hue / 6.0 + 1.0) % 1.0;
+    }
+}

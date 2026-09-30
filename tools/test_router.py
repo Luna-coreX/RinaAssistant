@@ -1,8 +1,28 @@
 # -*- coding: utf-8 -*-
-"""B02: роутер — чистая функция. Проверяется без приложения."""
+"""B02: the router is a pure function. Checked without the application."""
+import os
 import sys
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
+sys.path.insert(0, os.path.join(
+    r"C:\DevStation\PCDev\DesktopApps\RinaAssistant", "tools"))
+
+# The checks do not touch the machine (`4.0-I04`).
+#
+# Under the interpreter the core actually runs on, `sounddevice` is
+# installed — so every answer here played a real cue through the real
+# speakers, sixty-nine of them across the suite, and two tests brought
+# the process down on the way out. The group "машина" exists precisely
+# so that the ordinary run touches nothing; this check belongs to the
+# ordinary run.
+#
+# Storage is moved as well. These tests bring their own settings, but
+# not their own call journal or logs, and those went into the
+# developer's profile — measured: every check left like this wrote
+# `audit.db` there, the journal Rina answers «почему?» from.
+from sandbox import neutralise
+
+neutralise()
 
 from core.dialog import Question
 from core.router import route, RouterContext
@@ -68,8 +88,8 @@ check("с моделью — намерение модели", answer.name == "l
 check("уверенность ниже единицы", answer.confidence < 1.0,
       f"| {answer.confidence}")
 
-always = RouterContext(apps=APPS, source="always")
-check("в режиме «всегда слушать» поиска нет",
+always = RouterContext(apps=APPS, unbidden=True)
+check("при открытом микрофоне поиска нет",
       route("столица австралии", always).name == "fallback.none")
 
 full = RouterContext(apps=APPS, reminders_active=3)
@@ -84,8 +104,8 @@ check("с активацией — команда",
       route("Рина запусти телеграм", wake).name == "app.launch")
 check("голое слово активации",
       route("Рина", wake).name == "ask.wake")
-wake_always = RouterContext(apps=APPS, require_wake=True, source="always")
-check("голое слово в режиме «всегда» — молчание",
+wake_always = RouterContext(apps=APPS, require_wake=True, unbidden=True)
+check("голое слово при открытом микрофоне — молчание",
       route("Рина", wake_always).name == "silence")
 
 print()
@@ -99,8 +119,8 @@ check("«нет, давай» — отказ (поведение 3.1.0)",
 check("невнятный ответ — не ответ",
       route("какая погода", confirm).name != "system.action")
 
-# Вопрос всегда приходит сериализованным: роутер работает с состоянием,
-# которое можно записать в файл и отправить по протоколу (4.0-B03).
+# The question always arrives serialised: the router works with state that
+# can be written to a file and sent over the protocol (4.0-B03).
 choose = RouterContext(apps=APPS, pending=Question.choose_app(
     APPS[2:4], query="visual studio").to_dict())
 picked = route("второй", choose)
@@ -109,6 +129,471 @@ check("выбор порядковым", picked.name == "app.launch"
 check("выбор именем",
       route("visual studio code", choose).arg("app") == "Visual Studio Code")
 check("отмена выбора", route("отмена", choose).name == "cancelled")
+
+print()
+print("=== то же самое ядро и собирает ===")
+# **Both checks above were green while both rules were dead.** They asked
+# `source="always"`, and that name is passed by the 3.1.0 path where the
+# core opened the microphone itself. Since `4.0-G` the sound comes from
+# the shell and calls itself `voice` in either mode — so "do not search
+# the internet for chance speech" had never once fired in the running
+# program, and an open microphone answered a web search to every noise in
+# the room. A person met that; no check could, because the checks built a
+# context the program does not build.
+#
+# So the context is taken from the core here, not written out by hand.
+# Two objects agreeing on a rule is worth nothing if only one of them is
+# ever asked.
+from core.engine import RinaEngine
+from core.settings_api import MemorySettings
+
+brain = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [], "web_search_fallback": True,
+}))
+brain.ears_outside = True
+
+quiet_ctx = brain._router_context("voice", require_wake=False)
+check("при закрытом микрофоне контекст не «непрошеный»",
+      quiet_ctx.unbidden is False, f"| {quiet_ctx.unbidden}")
+
+brain._always_listen = True
+open_ctx = brain._router_context("voice", require_wake=True)
+check("при открытом — «непрошеный», хотя источник тот же",
+      open_ctx.unbidden is True and open_ctx.source == "voice",
+      f"| unbidden={open_ctx.unbidden}, source={open_ctx.source!r}")
+# With the wake word, or the phrase never reaches the tail: without it
+# the wake stage answers `silence`, and the check would be green about
+# the wrong rule.
+check("и поиска по такому контексту не будет даже при обращении",
+      route("Рина, столица австралии", open_ctx).name == "fallback.none",
+      f"| {route('Рина, столица австралии', open_ctx).name}")
+
+# The half that was missing, and it was missing here too: every check
+# above asks the core with source="voice". The fact was computed from
+# the mode alone, so a line typed while the microphone was open counted
+# as noise in the room.
+typed_ctx = brain._router_context("typed", require_wake=False)
+check("напечатанное непрошеным не бывает",
+      typed_ctx.unbidden is False,
+      f"| unbidden={typed_ctx.unbidden}, source={typed_ctx.source!r}")
+check("и поиск по напечатанному остаётся",
+      route("столица австралии", typed_ctx).name == "fallback.search",
+      f"| {route('столица австралии', typed_ctx).name}")
+
+# The same fact on the other side of the core. The router is given it;
+# the engine asks it again for the fallback after the model failed —
+# and two places computing one rule is how they come apart.
+asked = []
+brain._tools = type("Tools", (), {
+    "call": lambda self, name, args, source=None, **kw: (
+        asked.append((name, source))
+        or type("R", (), {"ok": True, "message": ""})())
+})()
+said = []
+brain.say = lambda text, **kw: said.append(text)
+
+brain._fallback_reply("столица австралии", "typed")
+check("после отказа модели напечатанное всё же ищется",
+      asked == [("web_search", "typed")], f"| {asked}")
+
+asked.clear(); said.clear()
+brain._fallback_reply("столица австралии", "voice")
+check("а услышанное при открытом микрофоне — нет",
+      asked == [] and said and "не поняла" in said[0], f"| {asked} {said}")
+
+print()
+print("=== разговор: слово активации говорится один раз ===")
+# The complaint that started `4.0b-E06`: "the activation word has to be
+# said before every phrase". A person says a name once and then talks;
+# saying it again before each sentence is addressing a machine, not
+# speaking to somebody.
+#
+# The boundary the plan sets against it: an open conversation is an open
+# ear — the same surface as `T-19` — so it must be **finite**, **visible**
+# and **close itself**. All three are asked here; the visible part is
+# asked of the shell in `--check-overlays`.
+import time as _time
+
+talker = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [], "web_search_fallback": True,
+}))
+talker.ears_outside = True
+talker._always_listen = True
+
+said = []
+talker.bus.on("listening.conversation", lambda data: said.append(dict(data)))
+
+check("в покое разговора нет", not talker.talking())
+ctx_shut = talker._router_context("voice", require_wake=True)
+check("и слово активации спрашивается",
+      route("что ты умеешь", ctx_shut).name == "silence",
+      "| без имени и без разговора — молчание")
+
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+check("после обращения разговор открыт", talker.talking())
+check("и об этом сказано наружу",
+      bool(said) and said[0].get("open") is True,
+      f"| {said}")
+
+ctx_open = talker._router_context("voice", require_wake=True)
+check("внутри разговора имя уже не нужно",
+      route("что ты умеешь", ctx_open).name == "builtin.answer",
+      f"| {route('что ты умеешь', ctx_open).name}")
+
+# Finite. The window is a length of time, not a mood: it is asked here by
+# moving the deadline into the past rather than by waiting fifteen
+# seconds, because a check that sleeps for its subject is a check nobody
+# runs.
+talker._talking_until = _time.monotonic() - 0.01
+check("время вышло — разговор закрыт", not talker.talking())
+ctx_shut = talker._router_context("voice", require_wake=True)
+check("и имя спрашивается снова",
+      route("что ты умеешь", ctx_shut).name == "silence")
+
+# Closes itself, out loud. The timer is what does it in life; here it is
+# called directly, because what is being checked is that closing is
+# announced, not that `threading.Timer` works.
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+said.clear()
+talker._talking_until = _time.monotonic() - 0.01
+talker._talk_ran_out()
+check("закрылся сам — и сказал об этом",
+      bool(said) and said[-1].get("open") is False,
+      f"| {said}")
+
+# And it does not grow for ever. Extended turn by turn without a ceiling
+# the word would stay optional for an afternoon — the third part of the
+# boundary, and the easiest of the three to lose.
+talker.handle_command("Рина, что ты умеешь", require_wake=True,
+                      source="voice")
+talker._talking_since = _time.monotonic() - RinaEngine.TALK_LIMIT + 3
+talker.handle_command("что ты умеешь", require_wake=True, source="voice")
+left = talker._talking_until - _time.monotonic()
+check("у долгого разговора есть потолок", left <= 3.5,
+      f"| осталось {left:.1f} с при окне {RinaEngine.TALK_WINDOW:.0f}")
+
+# A typed line opens nothing: it needs no wake word anyway, and opening
+# the ear because somebody typed would be answering a question nobody
+# asked.
+quiet = RinaEngine(settings=MemorySettings({
+    "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+    "history": [],
+}))
+quiet.handle_command("что ты умеешь", source="typed")
+check("напечатанное разговора не открывает", not quiet.talking())
+
+print()
+print("=== музыка: спросить, если не сказали какую ===")
+# «включи музыку» is the plainest thing a person says to an assistant,
+# and this one answered "Не нашла программу «музыку»" — the launcher
+# took it, because nothing else would. The gate matters as much as the
+# stage: "включи блокнот" has the same verb and belongs to the
+# launcher, so music takes only what names itself.
+for text, want in [
+    ("включи музыку", "music.ask"),
+    ("поставь музыку", "music.ask"),
+    ("музыку", "music.ask"),
+    ("включи lo-fi", "music.play"),
+    ("включи джаз", "music.play"),
+    ("поставь эмбиент на фон", "music.play"),
+    # Not music, and the order is what says so: the launcher and the
+    # system stage both run around this one.
+    ("включи блокнот", "app.not_found"),
+    ("включи браузер", "app.launch"),
+    ("включи музыку погромче", "system.action"),
+    ("громче", "system.action"),
+]:
+    got = route(text, RouterContext(apps=APPS)).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+# The genre is what was named, without the words that belong to the
+# asking: "спокойную музыку для работы" is a request for something
+# calm, not for a genre called "музыку".
+for text, genre in [("включи lo-fi", "lo fi"),
+                    ("включи спокойную музыку для работы", "спокойную"),
+                    ("поставь эмбиент на фон", "эмбиент")]:
+    got = route(text, RouterContext(apps=APPS)).arg("genre")
+    check(f"жанр из «{text}»", got == genre,
+          "" if got == genre else f"| {got!r} вместо {genre!r}")
+
+print()
+print("=== обращение — это ещё не команда, но уже разговор ===")
+# Out of six ordinary ways of addressing her, one was answered. The
+# rest went to the end of the parse and got "Извини, я не поняла
+# команду" — and with "always listening" off, a web search for the word
+# "привет". The target model of behaviour ends on «Спасибо, Рина» —
+# «Всегда рада помочь»; an assistant that answers "не поняла" to a
+# greeting does not enter that conversation at all.
+for text, want in [
+    ("привет", "builtin.answer"),
+    ("здравствуй", "builtin.answer"),
+    ("спасибо", "builtin.answer"),
+    ("пока", "builtin.answer"),
+    ("как дела", "builtin.answer"),
+    ("ты кто", "builtin.answer"),
+    ("что ты умеешь", "builtin.answer"),
+    # And it takes nothing that belongs to somebody else: the stages
+    # that carry a real errand run before this one, and have to keep
+    # running first.
+    ("какие дела", "todo.list"),
+    ("напомни через 5 минут сказать привет соседу", "reminder.create"),
+    ("запиши позвонить и сказать спасибо", "todo.add"),
+    ("найди как дела у рынка акций", "websearch"),
+]:
+    got = route(text, RouterContext()).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+print()
+print("=== делить — это делить, а не умножать ===")
+# **Answered confidently and wrongly.** «5 делить на 0» came out as
+# «Получается 0»: the bare verb was missing from the table, so it was
+# dropped as filler, «на» met the rule that makes it multiplication,
+# and the expression became `5 * 0`. A calculator that gives the wrong
+# operation without a word is worse than one that says it did not
+# understand.
+from voice import calculator
+
+sums = [
+    ("сколько будет 5 делить на 0", "calc.zero_division", None),
+    ("сколько будет 10 делить на 2", "calc", "5"),
+    ("сколько будет 12 дели на 4", "calc", "3"),
+    ("сколько будет 100 разделить на 5", "calc", "20"),
+    ("сколько будет 9 подели на 3", "calc", "3"),
+    # And multiplication is still multiplication: the rule that turns
+    # «на» into a product is what this broke against, and it has to
+    # survive the fix.
+    ("сколько будет 7 на 6", "calc", "42"),
+    ("посчитай 8 умножить на 3", "calc", "24"),
+]
+for text, want_name, want_result in sums:
+    got = calculator.classify(text)
+    name = got[0] if got else "—"
+    result = (got[1] or {}).get("result") if got else None
+    check(f"{text}",
+          name == want_name and (want_result is None or result == want_result),
+          f"| {name} {result}")
+
+print()
+print("=== просьба напомнить без времени не идёт в интернет ===")
+# «напомни позвонить маме» — an ordinary thing to say — used to reach
+# the search stage and be sent to a search engine: useless as an answer,
+# and for somebody's own errand worse than useless as an action.
+for text, want in [
+    ("напомни позвонить маме", "reminder.no_time"),
+    ("напомни", "reminder.no_time"),
+    ("поставь будильник", "reminder.no_time"),
+    ("напомни через 0 секунд проверить", "reminder.no_time"),
+    ("напомни через 5 минут позвонить", "reminder.create"),
+    # But a phrase that merely contains the word is a phrase, not a
+    # request: the first cut of this caught it and answered "Не поняла,
+    # когда напомнить" to a question about psychology.
+    ("что такое напоминание в психологии", "fallback.search"),
+    ("расскажи про будильники", "fallback.search"),
+]:
+    got = route(text, RouterContext()).name
+    check(f"{text}", got == want, "" if got == want else f"| {got} вместо {want}")
+
+print()
+print("=== окно разговора не съедается её же ответом ===")
+# **The defect that made the whole feature unusable.** The window opens
+# when the phrase is understood, and then Rina answers: a second or two
+# before the first sound, nine seconds of speech. By the time a person
+# can say the next thing without her name, fifteen seconds are gone.
+# Straight from the journal, three times over — and note the apostrophe
+# left out of this sentence on purpose: a stray one pairs with the next
+# quote mark and hides the Russian below from the language check.
+
+#
+#     `13:11:55  Команда (voice): 'что ты умеешь?'`
+#     `13:12:25  'Хорошо, запустите им.'`
+#     `13:12:26  Расслышано, но не мне (wake)`
+#
+# The window belongs to whoever is listening, so it begins when they
+# can speak — after she stops.
+import time as _clock
+
+from core.engine import RinaEngine
+from core.settings_api import MemorySettings
+
+talker = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+talker._open_talk()
+now = _clock.monotonic()
+check("окно открыто на пятнадцать секунд",
+      talker.talking(now + 14) and not talker.talking(now + 16),
+      f"| {round(talker._talking_until - now, 1)} с")
+
+talker.talk_after_speaking(9.0)
+check("девять секунд её речи окно не тратят",
+      talker.talking(now + 16),
+      "| иначе человек говорит уже в закрытое окно")
+check("а после её молчания — те же пятнадцать",
+      talker.talking(now + 23) and not talker.talking(now + 25),
+      f"| {round(talker._talking_until - now, 1)} с от начала")
+
+# The ceiling still wins: a long conversation ends when it ends, and
+# replies do not buy their way past it.
+long_one = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+long_one._open_talk()
+long_one._talking_since = _clock.monotonic() - long_one.TALK_LIMIT + 5
+long_one.talk_after_speaking(60.0)
+check("потолок разговора не обойти длинной репликой",
+      not long_one.talking(_clock.monotonic() + 10),
+      f"| осталось {round(long_one._talking_until - _clock.monotonic(), 1)} с")
+
+# And nothing is held open when no conversation is on: an answer to a
+# typed line must not make the name optional.
+typed = RinaEngine(settings=MemorySettings({
+    "custom_commands": [], "reminders": [], "history": [], "todo": [],
+}))
+typed.talk_after_speaking(9.0)
+check("без разговора ответ его не открывает", not typed.talking())
+
+print()
+print("=== ответ не зависит от того, что стоит на машине ===")
+# The router used to ask `llm.is_enabled()`, which reads the
+# module-level settings singleton — the machine's own config, not the
+# store this core was handed. The checks below were green for months
+# and went red the first day somebody switched a model on, having
+# measured nothing about the program in between.
+import core.settings_store as _store
+
+_was = _store.settings.get("llm_enabled", False)
+try:
+    _store.settings.set("llm_enabled", True)
+    off = RinaEngine(settings=MemorySettings({
+        "stt_engine": "disabled", "custom_commands": [], "reminders": [],
+        "history": [], "web_search_fallback": True,
+    }))
+    off.ears_outside = True
+    check("модель на машине включена, у ядра — нет, и решает ядро",
+          off._router_context("typed", False).llm_enabled is False,
+          "| роутер спросил машину, а не свой стор")
+finally:
+    _store.settings.set("llm_enabled", _was)
+
+print()
+print("=== светская беседа уходит модели, когда она есть ===")
+# Six canned lines are the same six lines for the life of the program,
+# and a person hears the table on the third day. Handed to the model —
+# but only when there is one, otherwise «привет» would stop working on
+# a machine with nothing configured, and the recorded set would stop
+# measuring what it measures.
+for phrase in ("как дела", "привет", "спасибо", "как тебя зовут"):
+    check(f"«{phrase}» без модели отвечает сама",
+          route(phrase, ctx).name == "builtin.answer",
+          f"| {route(phrase, ctx).name}")
+    check(f"«{phrase}» с моделью уходит ей",
+          route(phrase, llm).name == "llm.answer",
+          f"| {route(phrase, llm).name}")
+
+# What she must not invent. A model asked "what can you do" answers for
+# assistants in general; here the list is exact and is the product's
+# whole claim.
+check("«что ты умеешь» остаётся своим ответом и при модели",
+      route("что ты умеешь", llm).name == "builtin.answer",
+      f"| {route('что ты умеешь', llm).name}")
+
+print()
+print("=== короткое слово не находит себя внутри длинного ===")
+# «пока» lives inside «покажи», and the table matched by substring: the
+# answer to "покажи задачи" was «До встречи». Real answer, wrong phrase,
+# and nothing says so.
+check("«покажи задачи» — это список, а не прощание",
+      route("покажи задачи", ctx).name == "todo.list",
+      f"| {route('покажи задачи', ctx).name}")
+check("а «пока» по-прежнему прощание",
+      route("пока", ctx).name == "builtin.answer",
+      f"| {route('пока', ctx).name}")
+
+print()
+print("=== жанр не прячется внутри чужого слова ===")
+# The same failure as «пока» inside «покажи», a day later and five
+# letters long: «техно» lives inside «технологиями», so «как успехи с
+# технологиями для полного погружения» was taken for a request to put
+# on some techno. The comment over the genre list had predicted it —
+# "a list that starts swallowing other words" — and the list was
+# matched with `in` all the same.
+for phrase in ("как успехи с технологиями для полного погружения",
+               "расскажи про рокировку в шахматах",
+               "нужна электроника для дома"):
+    check(f"«{phrase[:40]}» — не музыка",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).name}")
+
+# And a topic is not a request. `about_music` answers "is this X a
+# genre or a program" for «включи X»; used as the whole gate it sent
+# every sentence that merely mentioned music to the music stage.
+for phrase in ("расскажи про рок-музыку", "что такое поп-культура",
+               "чем джаз отличается от блюза"):
+    check(f"«{phrase[:40]}» — вопрос, а не просьба",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).name}")
+
+# Where a genre is actually consulted — «включи X», is X a genre or a
+# program — a swallowed word is worse still: it plays music instead of
+# starting what was asked for, and the program never opens.
+for phrase in ("включи попкорн", "включи технопарк", "включи хаускипер"):
+    check(f"«{phrase}» — программа, не жанр внутри неё",
+          route(phrase, ctx).stage != "music",
+          f"| {route(phrase, ctx).stage}")
+
+# What must go on working.
+for phrase, want in (("включи техно", "music.play"),
+                     ("поставь лоу-фай", "music.play"),
+                     ("врубай рок", "music.play"),
+                     ("включи музыку", "music.ask")):
+    check(f"«{phrase}» -> {want}", route(phrase, ctx).name == want,
+          f"| {route(phrase, ctx).name}")
+check("«включи блокнот» по-прежнему запуск",
+      route("включи блокнот", ctx).stage != "music",
+      f"| {route('включи блокнот', ctx).stage}")
+
+print()
+print("=== список дел отвечает и на «задачи» ===")
+# The other word for the same thing. It answered to only one of them,
+# and «какие у нас задачи на сегодня» went past the list entirely.
+for phrase in ("какие у нас задачи на сегодня", "какие задачи",
+               "мои задачи", "список задач", "что у меня на сегодня"):
+    check(f"«{phrase}» -> todo.list",
+          route(phrase, ctx).name == "todo.list",
+          f"| {route(phrase, ctx).name}")
+
+print()
+print("=== список программ спрашивается, только когда нужен ===")
+# A fresh shell builds the list by checking the signature of every
+# installed program — ten seconds and more — and the core used to ask for
+# it before every command. «Посчитай 15 умножить на 12» waited for it,
+# and the dialogue check, waiting twenty seconds, failed in the full run.
+asked = []
+
+
+def listing():
+    asked.append(1)
+    return APPS
+
+
+lazy = RouterContext(apps_source=listing)
+summed = route("посчитай 15 умножить на 12", lazy)
+check("сумма не спрашивает список программ", not asked,
+      f"| спрошено {len(asked)} раз, намерение {summed.name}")
+lazy = RouterContext(apps_source=listing)
+started = route("запусти телеграм", lazy)
+check("а запуск спрашивает, и один раз",
+      len(asked) == 1 and started.name == "app.launch",
+      f"| спрошено {len(asked)} раз, намерение {started.name}")
+# And keeps what it got. The core reads the list after routing — a
+# program not found sends it looking on the disk when the list is empty —
+# so a list fetched and not kept is a disk walk after every «not found».
+check("и полученное остаётся в контексте", lazy.apps == APPS,
+      f"| в контексте {len(lazy.apps)} из {len(APPS)}")
 
 print()
 print("=== неизменяемость намерения ===")

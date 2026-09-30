@@ -1,0 +1,10 @@
+{
+  "id": "weather_api_demo",
+  "name": "Weather API Demo",
+  "version": "1.0.0",
+  "author": "Luna",
+  "description": "Minimal API v4 plugin that reads current weather from Open-Meteo",
+  "entry": "WeatherApiDemo",
+  "api_version": 4,
+  "permissions": ["network.external"]
+}

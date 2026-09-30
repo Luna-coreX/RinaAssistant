@@ -1,0 +1,398 @@
+using static Rina.Shell.Strings.Loc;
+
+namespace Rina.Shell.Pages;
+
+/// <summary>What a setting is called and which section it lives in.</summary>
+public sealed record Labelled(string Key, string Title, string Hint = "");
+
+/// <summary>A section of the settings screen: a heading and what is in it.</summary>
+public sealed record Section(string Title, Labelled[] Keys,
+                            Sheet[]? Sheets = null);
+
+/// <summary>
+/// A group of settings that opens in a window of its own.
+/// </summary>
+/// <remarks>
+/// <para>
+/// For what is a **list** rather than a switch: the words Rina answers to,
+/// the programs she has learned, the key combinations, the models. Such
+/// things grow — a person adds a word, teaches an alias, downloads a model
+/// — and a growing list on a shared page drowns everything below it. After
+/// a year of use the page would be aliases with a few settings lost among
+/// them.
+/// </para>
+/// <para>
+/// A button on the page, the list in a window. The editors are the same
+/// ones: what changed is where they are shown, not what they are.
+/// </para>
+/// </remarks>
+public sealed record Sheet(string Title, string Note, string[] Keys,
+                          Labelled[]? Named = null)
+{
+    /// <summary>
+    /// What each key on this sheet is called.
+    /// </summary>
+    /// <remarks>
+    /// A sheet of one key borrows the sheet's own title: the header
+    /// already says «Слова активации», and repeating it on the row
+    /// below said it twice — and said it as `wake_words`, because
+    /// nothing else knew the name. A sheet of several needs one name
+    /// each, and gives them in `Named`.
+    /// </remarks>
+    public Labelled Label(string key) =>
+        Named?.FirstOrDefault(n => n.Key == key)
+        ?? (Keys.Length == 1 ? new Labelled(key, Title, Note)
+                             : new Labelled(key, key));
+}
+
+/// <summary>
+/// The layout of the settings screen — entirely the shell's business.
+/// </summary>
+/// <remarks>
+/// <para>
+/// This is [ADR 0006](../../../docs/adr/0006-settings-ownership.md) in
+/// code. The core hands over <b>meaning</b>: the type, the default, the
+/// allowed values, the dependencies, the warnings. What lies here is
+/// <b>appearance</b>: the labels, the order, the ten sections of
+/// <c>4.0-R04</c>.
+/// </para>
+/// <para>
+/// Labels cannot live in the core, because <c>4.0-F08</c> already decided
+/// it: interface strings belong to the shell, Rina's lines to the core.
+/// "Activation words" is an interface string.
+/// </para>
+/// <para>
+/// <b>An unfamiliar key is shown, not hidden.</b> This is the rule with
+/// teeth from that same decision: the core adds a setting, the shell is
+/// not updated, and a hidden key becomes unreachable with nothing to
+/// notice it by. Shown in the general section it is merely ugly, and what
+/// is ugly gets fixed.
+/// </para>
+/// </remarks>
+public static class SettingsLayout
+{
+    /// <summary>Where to put what the shell does not know.</summary>
+    public static string Other => S("Прочее");
+
+    /// <summary>
+    /// The layout: keys, not translations.
+    /// </summary>
+    /// <remarks>
+    /// <b>`Word` here, not `S`.</b> A static field is evaluated once — on
+    /// the first use of the type — and remembers the language of that
+    /// moment forever. Because of this, settings stayed Russian under an
+    /// English interface: they were translated once and never asked again.
+    /// Whoever draws is who translates: `TitleOf`, `HintOf` and the
+    /// section heading.
+    /// </remarks>
+    public static readonly Section[] Sections =
+    [
+        new(Word("Голос и речь"),
+        [
+            new("personality", Word("Личность"),
+                Word("У Рины пока нет своего голоса — он появится в 4.0.0 Stable")),
+            new("tts_engine", Word("Система синтеза"),
+                Word("Чем Рина говорит. Офлайновые работают без интернета")),
+            new("voice", Word("Голос"),
+                Word("Голоса зависят от выбранной системы синтеза")),
+            new("volume", Word("Громкость"),
+                Word("Насколько громко Рина говорит")),
+            new("speed", Word("Скорость речи"),
+                Word("Быстрее ста — торопится, медленнее — растягивает")),
+            new("stt_engine", Word("Распознавание"),
+                Word("Чем Рина слышит. Без него команды только с клавиатуры")),
+            new("wake_sensitivity", Word("Чувствительность активации"),
+                Word("Ниже — реже слышит имя, выше — чаще ошибается")),
+            new("listen_seconds", Word("Длительность записи"),
+                Word("Сколько секунд слушать после активации")),
+        ],
+        [
+            new(Word("Слова активации"),
+                Word("С этих слов начинается обращение к Рине"),
+                ["wake_words"]),
+            new(Word("Своя личность"),
+                Word("Имя, характер, слова активации и свой голос"),
+                ["own_name", "llm_persona", "own_wake_words", "own_voice_model"],
+                [new("own_name", Word("Имя"),
+                     Word("Как зовут эту личность. Без слов активации её зовут по имени")),
+                 new("llm_persona", Word("Характер"),
+                     Word("Каким характером отвечает эта личность")),
+                 new("own_wake_words", Word("Слова активации"),
+                     Word("Пусто — зовут по имени")),
+                 new("own_voice_model", Word("Свой голос"),
+                     Word("Файл голоса Piper, .onnx. Пусто — голос из общих настроек"))]),
+            new(Word("Модели"),
+                Word("Что скачано и где лежит"),
+                ["whisper_model", "vosk_model", "piper_model"],
+                [new("whisper_model", Word("Whisper"),
+                     Word("Размер модели: чем больше, тем точнее и медленнее")),
+                 new("vosk_model", Word("Vosk"),
+                     Word("Папка с распакованной моделью")),
+                 new("piper_model", Word("Голос Piper"),
+                     Word("Файл голоса .onnx"))]),
+        ]),
+        new(Word("Звук"),
+        [
+            new("input_device", Word("Микрофон"),
+                Word("Устройство, с которого Рина слышит")),
+            new("output_device", Word("Динамик"),
+                Word("Устройство, в которое Рина говорит")),
+            new("sound_effects", Word("Звуковые эффекты"),
+                Word("Короткие сигналы: услышала, ошиблась")),
+        ]),
+        new(Word("Программы"),
+        [
+            new("watch_apps", Word("Замечать, какие программы открыты"),
+                Word("Нужно для напоминаний «когда открою…». Выключено по умолчанию")),
+            // Watching and remembering are two switches, not one
+            // (`4.0b-A02`, `T-22`). The first lets Rina see the change;
+            // the second lets her write it down inside an open session.
+            // One switch for both would mean that turning on context
+            // reminders also started a diary.
+            new("session_apps", Word("Запоминать время по программам в сессии"),
+                Word("Только внутри открытой сессии и только при верхней настройке")),
+            new("session_folders", Word("Запоминать рабочие каталоги в сессии"),
+                Word("Путь говорит, над чем идёт работа. Выключено по умолчанию")),
+        ],
+        [
+            new(Word("Где искать программы"),
+                Word("Папки, кроме тех, что Рина находит сама"),
+                ["program_folders"]),
+            new(Word("Выученные соответствия"),
+                Word("Каким словом Рина зовёт какую программу"),
+                ["app_aliases"]),
+        ]),
+        new(Word("Поведение"),
+        [
+            new("autostart", Word("Запускать при входе в систему"),
+                Word("Рина будет готова сразу после входа")),
+            new("minimize_to_tray", Word("Сворачивать в трей"),
+                Word("Окно уходит в трей, а не на панель задач")),
+            new("start_minimized", Word("Начинать свёрнутой"),
+                Word("Запускаться без окна")),
+            new("floating_command_bar", Word("Плавающая строка команд"),
+                Word("Строка поверх экрана по горячей клавише")),
+            new("notifications", Word("Уведомления"),
+                Word("Показывать всплывающие сообщения")),
+        ],
+        [
+            new(Word("Комбинации клавиш"),
+                Word("Чем вызывать Рину и её действия"),
+                ["hotkey", "action_hotkeys"],
+                [new("hotkey", Word("Позвать Рину"),
+                     Word("Одна комбинация на всё окно")),
+                 new("action_hotkeys", Word("Отдельные действия"),
+                     Word("Каждому своё сочетание"))]),
+        ]),
+        new(Word("ИИ"),
+        [
+            new("llm_enabled", Word("Отвечать моделью"),
+                Word("Отвечать языковой моделью, когда команда не распознана")),
+            new("llm_url", Word("Адрес модели"),
+                Word("Адрес модели. Не локальный означает, что разговоры уйдут наружу")),
+            new("llm_model", Word("Название модели"),
+                Word("Имя модели на этом сервере")),
+            // Under the model's own switch, because it is the model
+            // that searches: with «Отвечать моделью» off there is
+            // nobody to want a search.
+            new("llm_web", Word("Модель может искать в интернете"),
+                Word("Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo")),
+            // Not greyed with the rest of this section: the wizard asks
+            // for it before anybody has decided about the model, and a
+            // name that could not be corrected until an unrelated switch
+            // is on would be a first-run answer locked in place.
+            new("user_name", Word("Как к вам обращаться"),
+                Word("Имя, которым Рина вас называет. Можно оставить пустым")),
+            new("address_form", Word("В каком роде обращаться"),
+                Word("Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы")),
+            new("llm_timeout", Word("Сколько ждать ответа, секунд"),
+                Word("Дольше — терпеливее, но и молчание дольше")),
+        ]),
+        new(Word("Поиск"),
+        [
+            new("search_engine", Word("Поисковая система"),
+                Word("Где искать по просьбе")),
+            new("web_search_fallback", Word("Искать нераспознанное"),
+                Word("Непонятую фразу отправлять в поиск")),
+        ]),
+        new(Word("Внешний вид"),
+        [
+            new("finish", Word("Отделка"),
+                Word("Серебро, чёрный или графит — равноправные")),
+            new("accent", Word("Акцент"),
+                Word("Цвет, которым Рина обращает на себя внимание")),
+            new("frame_rate", Word("Частота кадров фона"),
+                Word("Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка")),
+            new("ui_language", Word("Язык интерфейса"),
+                Word("Язык окна и реплик Рины")),
+        ]),
+        new(Word("Приватность"),
+        [
+            new("save_history", Word("Сохранять историю"),
+                Word("Хранить, о чём был разговор")),
+            new("log_texts", Word("Записывать тексты реплик"),
+                Word("Записывать тексты реплик в журнал. По умолчанию выключено")),
+            new("log_level", Word("Подробность журнала"),
+                Word("Насколько подробен журнал")),
+            // Only in the beta (`4.0b-D05`), gone in Stable (`4.0-S04`).
+            new("telemetry", Word("Телеметрия беты"),
+                Word("Обезличенные счётчики: что срабатывает и где ошибки. Без текста, звука и путей; каждый отчёт виден на странице «Что Рина знает обо мне». В Stable её не будет")),
+        ]),
+        new(Word("Обновления"),
+        [
+            new("check_updates", Word("Проверять обновления"),
+                Word("Раз в сутки спрашивает api.github.com, нет ли новой версии")),
+        ]),
+    ];
+
+    public static readonly HashSet<string> Elsewhere =
+    [
+        "voice_reply",
+        "always_listen",
+    ];
+
+    /// <summary>
+    /// Keys whose list of values is known by the shell, not the core.
+    /// </summary>
+    /// <remarks>
+    /// Input and output devices are a property of the audio subsystem, and
+    /// in 4.0 that belongs to the shell (<c>4.0-F09</c>). The core does not
+    /// see them at all and cannot enumerate them; it only stores the chosen
+    /// name. This is not an exception to
+    /// [ADR 0006](../../../docs/adr/0006-settings-ownership.md) but a
+    /// direct consequence of it: meaning belongs to whoever knows.
+    /// </remarks>
+    public static readonly HashSet<string> ShellKnows =
+    [
+        "input_device",
+        "output_device",
+        // The set of accents depends on the finish, and the finish is the
+        // shell's business: one and the same paint reads differently on
+        // light and on dark.
+        "accent",
+        // And the finish itself. The core stores the name and knows
+        // nothing else about it; what it is called in a person's
+        // language is the design system's business, and the design
+        // system is here. Until this line the dropdown offered
+        // «silver», «black», «graphite» — three English words in a
+        // Russian window, and three lower-case ones in an English one.
+        "finish",
+        // The rate is stored by the core as a bare value; what it costs
+        // is a property of the painting, and the painting is here.
+        "frame_rate",
+    ];
+
+    /// <summary>
+    /// The frame rates: what each is called in the list, and what it costs,
+    /// said once it is chosen.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The cost is in the name as well as in the warning after the choice:
+    /// a list that says only "120" invites picking the biggest number, and
+    /// the price of it is the one thing a number does not say.
+    /// </para>
+    /// <para>
+    /// The multiples are measured, not guessed: three rounds in turn with
+    /// the window in front, the graphics card's 3D share and the
+    /// processor's time for Rina alone. Sixty came out at twice thirty on
+    /// both, and a 75-hertz monitor with no limit at two and a third —
+    /// the cost follows the frames. The processor is named because it
+    /// pays the most: about a core at thirty in a Release build, three to
+    /// four times that in Debug.
+    /// </para>
+    /// </remarks>
+    public static readonly (string Value, string Title, string Cost)[] FrameRates =
+    [
+        ("30", Word("30 кадров"), ""),
+        ("60", Word("60 кадров — нагрузка выше"),
+         Word("60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30.")),
+        ("120", Word("120 кадров — высокая нагрузка"),
+         Word("120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой.")),
+        ("max", Word("Без ограничения — наибольшая нагрузка"),
+         Word("Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать.")),
+    ];
+
+    /// <summary>What a finish is called.</summary>
+    /// <remarks>
+    /// Names rather than the keys the core stores. The keys are
+    /// identifiers and must not change; these are words, and they are
+    /// translated like every other word on the screen.
+    /// </remarks>
+    public static readonly (string Value, string Title)[] Finishes =
+    [
+        ("silver", Word("Серебро")),
+        ("black", Word("Чёрное")),
+        ("graphite", Word("Графит")),
+    ];
+
+    /// <summary>
+    /// What to show in an empty settings field.
+    /// </summary>
+    /// <remarks>
+    /// Not an explanation but an **example**: an explanation says what a
+    /// setting is for, while a hint says in what form to write into it.
+    /// "Model address" and "http://localhost:11434" answer different
+    /// questions, and the second answer is needed at exactly the moment the
+    /// field is empty.
+    /// </remarks>
+    public static string HintInField(string key) => key switch
+    {
+        "llm_url" => S("http://localhost:11434"),
+        "llm_model" => S("например, llama3"),
+        "llm_persona" => S("например, отвечай коротко и по делу"),
+        "own_name" => S("например, Макс"),
+        "own_voice_model" => S("файл .onnx"),
+        "user_name" => S("например, Саша"),
+        "vosk_model" => S("папка с моделью"),
+        "piper_model" => S("файл .onnx"),
+        // There is deliberately no `wake_word` here. The core marks it
+        // obsolete — it is 3.1.0's singular mirror of `wake_words`, kept for
+        // compatibility and never shown — so a hint for it could never
+        // appear. A hint nobody will see reads as a key that exists.
+        _ => "",
+    };
+
+    /// <summary>
+    /// What "erase everything" is called for a particular key.
+    /// </summary>
+    /// <remarks>
+    /// Learned associations are <b>forgotten</b>, assigned hotkeys are
+    /// <b>reset</b>. One word for both cases would be an untruth in one of
+    /// them: what was forgotten Rina will learn again by herself, what was
+    /// reset has to be assigned by hand.
+    /// </remarks>
+    public static string ClearWordOf(string key) => key switch
+    {
+        "app_aliases" => S("Забыть все"),
+        "action_hotkeys" => S("Сбросить все"),
+        _ => S("Очистить"),
+    };
+
+    /// <summary>Every key the shell knows by name.</summary>
+    /// <summary>Every key this layout has a place for — sheets included.</summary>
+    /// <remarks>
+    /// **The sheets were left out, and that was visible.** A key that
+    /// lives on a sheet of its own — `wake_words`, `hotkey` — counted
+    /// as unknown, so its own sheet showed it as "wake_words · ключ
+    /// wake_words оболочке незнаком", under a header that had just
+    /// named it properly. A place on a sheet is a place.
+    /// </remarks>
+    private static IEnumerable<Labelled> Everything =>
+        Sections.SelectMany(s => s.Keys)
+                .Concat(Sections.SelectMany(s => s.Sheets ?? [])
+                                .SelectMany(sheet => sheet.Keys
+                                                          .Select(sheet.Label)));
+
+    public static readonly HashSet<string> Known =
+        Everything.Select(k => k.Key).ToHashSet();
+
+    public static string TitleOf(string key) => S(
+        Everything.FirstOrDefault(k => k.Key == key)?.Title ?? key);
+
+    public static string HintOf(string key)
+    {
+        var hint = Everything.FirstOrDefault(k => k.Key == key)?.Hint ?? "";
+        return hint.Length > 0 ? S(hint) : "";
+    }
+}

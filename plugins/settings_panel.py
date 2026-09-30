@@ -1,9 +1,10 @@
 """
-Автопанель настроек плагина.
+The automatic panel of a plugin's settings.
 
-Принимает схему (список Field из settings_spec) и plugin_id, строит контролы
-нашими стилями и сохраняет значения через менеджер (plugin_settings в конфиге).
-Плагину не нужно знать про Qt — достаточно вернуть settings_schema().
+Takes a schema (a list of Field from settings_spec) and a plugin_id, builds
+the controls in our styles and saves the values through the manager
+(plugin_settings in the config). The plugin need know nothing about Qt — it
+is enough to return settings_schema().
 """
 
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
@@ -19,7 +20,7 @@ from components.controls import (
 
 
 class PluginSettingsPanel(Card):
-    """Карточка с настройками плагина, построенная из схемы."""
+    """A card with a plugin's settings, built from the schema."""
 
     def __init__(self, plugin_id, schema, manager, parent=None):
         super().__init__(parent)

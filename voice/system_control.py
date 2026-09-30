@@ -1,15 +1,16 @@
 """
-Управление системой и медиа: громкость, воспроизведение, блокировка, скриншот.
+Controlling the system and media: volume, playback, locking, screenshots.
 
-Раньше «системные действия» касались только окна самой Рины (свернуть,
-показать, выйти). Здесь — управление компьютером.
+"System actions" used to concern only Rina's own window (minimise, show,
+quit). Here it is the computer that is controlled.
 
-Громкость и медиа делаются через эмуляцию мультимедийных клавиш (VK_VOLUME_*,
-VK_MEDIA_*): их понимает любой плеер, который слушает эти клавиши, и не нужны
-ни внешние библиотеки, ни доступ к конкретному приложению.
+Volume and media are done by emulating the multimedia keys (VK_VOLUME_*,
+VK_MEDIA_*): any player that listens to those keys understands them, and
+neither external libraries nor access to a particular application is needed.
 
-Опасные действия (выключение, перезагрузка, сон) помечены confirm=True —
-их нельзя выполнять по одной распознанной фразе, ассистент обязан переспросить.
+Dangerous actions (shutdown, restart, sleep) are marked confirm=True — they
+must not be performed on one recognised phrase; the assistant is obliged to
+ask again.
 """
 
 import ctypes
@@ -21,7 +22,7 @@ from core.i18n import t as tr
 from core.logging_setup import security_log
 
 
-# --- виртуальные коды мультимедийных клавиш Windows ---
+# --- the virtual codes of Windows's multimedia keys ---
 VK = {
     "volume_mute": 0xAD,
     "volume_down": 0xAE,
@@ -33,7 +34,7 @@ VK = {
 }
 
 KEYEVENTF_KEYUP = 0x0002
-VOLUME_STEP_PRESSES = 4      # одно нажатие меняет громкость примерно на 2%
+VOLUME_STEP_PRESSES = 4      # one press changes the volume by about 2%
 
 
 def _windows():
@@ -42,10 +43,10 @@ def _windows():
 
 def system_exe(name, subdir="System32"):
     """
-    Абсолютный путь к системной программе.
+    The absolute path to a system program.
 
-    По короткому имени Windows ищет программу в том числе в текущей папке,
-    поэтому подложенный туда файл выполнился бы вместо системного.
+    By a short name Windows looks for a program in the current folder as
+    well, so a file slipped in there would run instead of the system one.
     """
     root = os.environ.get("SystemRoot") or r"C:\Windows"
     full = os.path.join(root, subdir, name)
@@ -53,7 +54,7 @@ def system_exe(name, subdir="System32"):
 
 
 def _tap_key(vk_code, times=1):
-    """Эмулирует нажатие клавиши (нажать/отпустить)."""
+    """Emulates a keypress (press/release)."""
     if not _windows():
         return False
     try:
@@ -67,7 +68,7 @@ def _tap_key(vk_code, times=1):
 
 
 # ---------------------------------------------------------------------------
-# Действия
+# The actions
 # ---------------------------------------------------------------------------
 def volume_up():
     return _tap_key(VK["volume_up"], VOLUME_STEP_PRESSES)
@@ -138,8 +139,9 @@ def restart_pc():
 
 def grab_screen():
     """
-    Снимок экрана. ВЫЗЫВАТЬ ТОЛЬКО ИЗ ПОТОКА ИНТЕРФЕЙСА: захват экрана —
-    операция Qt, из фонового потока она даёт пустую картинку или падает.
+    A screenshot. CALL ONLY FROM THE INTERFACE THREAD: capturing the screen
+    is a Qt operation, and from a background thread it gives an empty
+    picture or falls over.
     """
     try:
         from PySide6.QtWidgets import QApplication
@@ -164,9 +166,9 @@ def grab_screen():
 
 
 # ---------------------------------------------------------------------------
-# Разбор команд
+# Parsing commands
 # ---------------------------------------------------------------------------
-# (фразы, идентификатор, требуется ли подтверждение)
+# (the phrases, the identifier, whether confirmation is required)
 ACTIONS = [
     (("сделай скриншот", "скриншот", "снимок экрана", "screenshot"),
      "screenshot", False),
@@ -226,18 +228,20 @@ CONFIRM_QUESTIONS = {
 
 def match_action(text):
     """
-    Возвращает (action_id, needs_confirm) или (None, False).
+    Returns (action_id, needs_confirm) or (None, False).
 
-    Два прохода, и порядок между ними важнее длины фразы.
+    Two passes, and the order between them matters more than a phrase's
+    length.
 
-    Сначала точное вхождение, от длинных фраз к коротким: «выключи звук» не
-    должно срабатывать как «выключи компьютер».
+    First an exact containment, from long phrases to short: "выключи звук"
+    must not fire as "выключи компьютер".
 
-    И только потом — неточное, для оговорок и ошибок распознавания. Раньше
-    проход был один, и «убавь громкость» делало ГРОМЧЕ: неточное сравнение
-    считает её похожей на «прибавь громкость» (0.875 при пороге 0.82), а та
-    длиннее и потому проверялась первой. Точное совпадение обязано побеждать
-    приблизительное, какой бы длины оно ни было.
+    And only then the inexact one, for slips of the tongue and recognition
+    errors. There used to be one pass, and "убавь громкость" made it LOUDER:
+    the inexact comparison finds it similar to "прибавь громкость" (0.875
+    against a threshold of 0.82), and that one is longer and so was checked
+    first. An exact match is obliged to beat an approximate one, whatever
+    its length.
     """
     from voice.textmatch import normalize, contains_phrase
 
@@ -261,21 +265,21 @@ def match_action(text):
     return None, False
 
 
-#: Действия, которые выполняет оболочка, а не ядро.
-#: Снимок экрана — операция интерфейса: из фонового потока она даёт пустую
-#: картинку или падает. Ядро только сообщает о намерении.
+#: Actions performed by the shell rather than by the core.
+#: A screenshot is an interface operation: from a background thread it gives
+#: an empty picture or falls over. The core only reports the intent.
 WINDOW_ACTIONS = frozenset({"screenshot"})
 
 
 def run(action_id):
     """
-    Выполняет действие, возвращает текст ответа.
+    Performs an action, returns the text of the answer.
 
-    Действия из WINDOW_ACTIONS здесь НЕ выполняются: их делает оболочка,
-    а сообщить ей об этом — дело исполнителя, у которого есть своя шина.
-    Раньше отсюда шло событие в модульный синглтон `core.events.bus`, и
-    из-за этого ядро нельзя было поднять дважды: событие уходило мимо
-    обоих (см. 4.0-B05).
+    Actions from WINDOW_ACTIONS are NOT performed here: the shell does them,
+    and telling it so is the executor's business, which has a bus of its
+    own. An event used to go from here to the module singleton
+    `core.events.bus`, and because of that the core could not be raised
+    twice: the event went past both (see 4.0-B05).
     """
     if action_id in WINDOW_ACTIONS:
         return tr("Делаю скриншот.")
@@ -284,7 +288,7 @@ def run(action_id):
     if runner is None:
         return None
     if action_id in CONFIRM_QUESTIONS:
-        # питание и сон — ровно то, ради чего существует подтверждение
+        # power and sleep — precisely what confirmation exists for
         security_log().warning("Выполняется системное действие: %s", action_id)
     if runner():
         return tr(DONE_MESSAGES.get(action_id, "Готово."))

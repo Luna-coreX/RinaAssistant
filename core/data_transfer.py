@@ -1,12 +1,13 @@
 """
-Экспорт и импорт пользовательских данных.
+Exporting and importing the user's data.
 
-Команды переносятся между компьютерами, история выгружается для чтения вне
-приложения. Формат — JSON с версией и типом: без них импорт не отличит файл
-команд от файла истории и не переживёт смену формата.
+Commands are carried between computers, the history is exported for reading
+outside the application. The format is JSON with a version and a kind:
+without them an import will not tell a file of commands from a file of
+history and will not survive a change of format.
 
-Импорт команд по умолчанию ДОБАВЛЯЕТ, а не заменяет: подменить весь набор
-команд одним неверным кликом — слишком дорогая ошибка.
+Importing commands ADDS by default rather than replacing: substituting the
+whole set of commands with one wrong click is too expensive a mistake.
 """
 
 import json
@@ -18,13 +19,39 @@ from version import APP_VERSION
 FORMAT_VERSION = 1
 KIND_COMMANDS = "rina.commands"
 KIND_HISTORY = "rina.history"
+#: Everything kept about a person (`4.0b-B03`). A kind of its own
+#: rather than a bigger commands file: what a file **is** has to be
+#: readable off its first line, and a person who exported everything
+#: and a person who exported their commands are holding different
+#: things — one of them fit to send to somebody, the other not.
+KIND_EVERYTHING = "rina.everything"
 
 
 class TransferError(Exception):
-    """Файл не подошёл: не тот формат, битый JSON, чужие данные."""
+    """
+    The file would not do: the wrong format, broken JSON, somebody else's
+    data.
+
+    Carries a protocol error code alongside the words. The shell branches on
+    the code and shows the words: a person picking a history file where
+    commands were asked for needs a sentence, and the shell needs something
+    it can tell from "the file is unreadable" without matching on prose.
+    """
+
+    def __init__(self, message, code="transfer.unreadable"):
+        super().__init__(message)
+        self.code = code
 
 
-def _envelope(kind, payload):
+def envelope(kind, payload):
+    """
+    What every export here is wrapped in.
+
+    Public because the exports are no longer all assembled in this
+    module: the whole-inventory one lives in `core/privacy.py`
+    (`4.0b-B03`). One envelope for all of them, so a file made by any
+    of them can be recognised the same way.
+    """
     return {
         "kind": kind,
         "format": FORMAT_VERSION,
@@ -35,11 +62,11 @@ def _envelope(kind, payload):
 
 
 # ---------------------------------------------------------------------------
-# Команды
+# Commands
 # ---------------------------------------------------------------------------
 def export_commands(path, commands, stats=None):
-    """Сохраняет команды (и статистику запусков) в файл."""
-    data = _envelope(KIND_COMMANDS, {
+    """Saves the commands (and the launch statistics) to a file."""
+    data = envelope(KIND_COMMANDS, {
         "commands": list(commands or []),
         "stats": dict(stats or {}),
     })
@@ -48,72 +75,128 @@ def export_commands(path, commands, stats=None):
     return len(data["payload"]["commands"])
 
 
+def commands_payload(commands, stats=None):
+    """
+    The content of a commands file — without writing it anywhere.
+
+    Splitting this out of `export_commands` is what lets the protocol hand
+    the file's content over the wire (§6: the shell picks the place and
+    writes; the core hands over the content) and still produce **the same
+    file** as 3.1.0. Two ways of assembling one format would part company,
+    and the divergence would show up as "the export from the new version
+    does not open in the old one".
+    """
+    return envelope(KIND_COMMANDS, {
+        "commands": list(commands or []),
+        "stats": dict(stats or {}),
+    })
+
+
+def history_payload(entries):
+    """The content of a history file. Same reasoning as `commands_payload`."""
+    return envelope(KIND_HISTORY, {"history": list(entries or [])})
+
+
+def commands_from_data(data, source="файл"):
+    """
+    Parsed JSON -> commands fit to be added. Raises TransferError.
+
+    Takes data rather than a path because the file is read by whoever has
+    the file dialogue — in 4.0 that is the shell. What must not move with
+    the file is the **judgement**: which kind this is, whether the format is
+    ours, what may be let through. That is meaning, and meaning lives in the
+    core.
+
+    A command is the launching of a program, and this file could have been
+    written by anyone. So everything that comes through here is brought to a
+    safe shape and arrives switched off.
+    """
+    if isinstance(data, list):
+        # A bare list is easy to get by hand, and refusing it would mean
+        # refusing the obvious for the sake of tidiness.
+        commands = data
+    elif isinstance(data, dict):
+        if "payload" not in data and isinstance(data.get("commands"), list):
+            commands = data["commands"]
+        else:
+            if data.get("kind") != KIND_COMMANDS:
+                raise TransferError("Это не файл команд", "transfer.wrong_kind")
+            try:
+                file_format = int(data.get("format", 0))
+            except (TypeError, ValueError):
+                raise TransferError("Не удалось прочитать версию формата файла",
+                                    "transfer.unreadable")
+            if file_format > FORMAT_VERSION:
+                raise TransferError(
+                    "Файл сделан более новой версией Рины — обновите приложение",
+                    "transfer.too_new")
+            commands = (data.get("payload") or {}).get("commands", [])
+    else:
+        raise TransferError("Файл не похож на экспорт Рины",
+                            "transfer.unreadable")
+
+    if not isinstance(commands, list):
+        raise TransferError("В файле нет списка команд", "transfer.unreadable")
+    if len(commands) > MAX_COMMANDS:
+        raise TransferError(
+            f"Слишком много команд в файле (больше {MAX_COMMANDS})",
+            "transfer.unreadable")
+
+    clean = [sanitize_command(c) for c in commands
+             if isinstance(c, dict) and c.get("triggers")]
+    from core.logging_setup import security_log
+    security_log().info(
+        "Импорт команд из %s: в файле %d, принято %d, отброшено %d, "
+        "все выключены", source, len(commands), len(clean),
+        len(commands) - len(clean))
+    return clean
+
+
 def read_commands(path):
     """
-    Читает файл команд. Возвращает список команд.
-    Бросает TransferError, если файл не тот.
+    Reads a file of commands. Returns a list of commands.
+    Raises TransferError if the file is the wrong one.
     """
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
     except (OSError, ValueError) as e:
-        raise TransferError(f"Не удалось прочитать файл: {e}")
-
-    if not isinstance(data, dict):
-        raise TransferError("Файл не похож на экспорт Рины")
-
-    # допускаем и «голый» список команд — его легко получить руками
-    if "payload" not in data and isinstance(data.get("commands"), list):
-        commands = data["commands"]
-    else:
-        if data.get("kind") != KIND_COMMANDS:
-            raise TransferError("Это не файл команд")
-        try:
-            file_format = int(data.get("format", 0))
-        except (TypeError, ValueError):
-            raise TransferError("Не удалось прочитать версию формата файла")
-        if file_format > FORMAT_VERSION:
-            raise TransferError(
-                "Файл сделан более новой версией Рины — обновите приложение")
-        commands = (data.get("payload") or {}).get("commands", [])
-
-    if not isinstance(commands, list):
-        raise TransferError("В файле нет списка команд")
-    if len(commands) > MAX_COMMANDS:
-        raise TransferError(
-            f"Слишком много команд в файле (больше {MAX_COMMANDS})")
-    clean = [_sanitize_command(c) for c in commands
-             if isinstance(c, dict) and c.get("triggers")]
-    from core.logging_setup import security_log
-    security_log().info(
-        "Импорт команд из %s: в файле %d, принято %d, отброшено %d, "
-        "все выключены", path, len(commands), len(clean),
-        len(commands) - len(clean))
-    return clean
+        raise TransferError(f"Не удалось прочитать файл: {e}",
+                            "transfer.unreadable")
+    return commands_from_data(data, source=path)
 
 
-# Файл команд мог быть написан кем угодно, а команда — это запуск программы.
-# Поэтому импортированное приводится к безопасному виду и приходит выключенным:
-# пользователь включает вручную, увидев, что именно он добавил.
+# A file of commands could have been written by anyone, and a command is the
+# launching of a program. So what is imported is brought to a safe form and
+# arrives switched off: the user switches it on by hand, having seen what
+# exactly they added.
 MAX_COMMANDS = 500
 MAX_TRIGGERS = 20
 MAX_TRIGGER_LEN = 200
 MIN_TRIGGER_LEN = 2
 
 
-def _sanitize_command(raw):
-    """Оставляет только известные поля и приводит их к ожидаемым типам."""
+def sanitize_command(raw):
+    """
+    Keeps only the known fields and brings them to the expected types.
+
+    Public because importing a file is no longer the only way a
+    command card arrives from outside: the editor's "try it" sends
+    one too (`4.0b-A09`). One narrowing for both, so a card that
+    cannot come in through the door cannot come in through the
+    window either.
+    """
     from voice.user_commands import COMMAND_TYPES, SYSTEM_ACTIONS
 
     known_types = {t for t, _label, *_ in COMMAND_TYPES} | {"pause"}
     cmd_type = str(raw.get("type", "app"))
     if cmd_type not in known_types:
-        cmd_type = "speak"          # неизвестный тип ничего не запускает
+        cmd_type = "speak"          # an unknown kind launches nothing
 
     triggers = []
     for trigger in (raw.get("triggers") or [])[:MAX_TRIGGERS]:
         trigger = str(trigger).strip()[:MAX_TRIGGER_LEN]
-        # слишком короткая фраза срабатывала бы почти на любую реплику
+        # too short a phrase would fire on almost any line
         if len(trigger) >= MIN_TRIGGER_LEN:
             triggers.append(trigger)
 
@@ -124,11 +207,36 @@ def _sanitize_command(raw):
             cmd_type, target = "speak", ""
 
     steps = raw.get("steps") or []
-    steps = [_sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
+    steps = [sanitize_command(s) for s in steps[:50] if isinstance(s, dict)]
+    # The "else" branch of a condition (`4.0b-A09`). Narrowed by the same
+    # function and capped the same way: a branch is a list of steps, and a
+    # branch that skipped the narrowing would be the way round it.
+    otherwise = raw.get("otherwise") or []
+    otherwise = [sanitize_command(s) for s in otherwise[:50]
+                 if isinstance(s, dict)]
+
+    # Repetition and choice, brought to their limits. An unreadable count is
+    # one repetition rather than a refusal: the card came from a file, and
+    # doing the thing once is the least surprising reading of "do it a
+    # nonsense number of times".
+    from voice.user_commands import CONDITIONS, MAX_REPEAT
+
+    try:
+        count = int(raw.get("count", 1) or 1)
+    except (TypeError, ValueError):
+        count = 1
+    count = max(0, min(count, MAX_REPEAT))
+
+    condition = str(raw.get("condition", ""))
+    if condition and condition not in {c for c, _ in CONDITIONS}:
+        # An unknown condition would be false at run time anyway; dropping
+        # it here makes the card say what it will do instead of carrying a
+        # word nothing understands.
+        condition = ""
 
     return {
         "id": str(raw.get("id", "")),
-        # импортированное всегда выключено: включение — осознанный шаг
+        # what is imported is always off: switching on is a deliberate step
         "enabled": False,
         "type": cmd_type,
         "triggers": triggers,
@@ -137,16 +245,24 @@ def _sanitize_command(raw):
         "target_kind": "uwp" if raw.get("target_kind") == "uwp" else "file",
         "response": str(raw.get("response", ""))[:500],
         "steps": steps,
+        "otherwise": otherwise,
+        "count": count,
+        "condition": condition,
+        "value": str(raw.get("value", ""))[:1000],
+        # The name of a variable, for "remember" and for the conditions
+        # that ask about one (`4.0b-A09`).
+        "name": str(raw.get("name", ""))[:64],
     }
 
 
 def merge_commands(existing, incoming, new_id):
     """
-    Досыпает импортированные команды к имеющимся.
+    Adds the imported commands to the existing ones.
 
-    Совпадением считаем одинаковый набор фраз активации: id у файла с другого
-    компьютера свой, а фразы — это то, чем команда является для пользователя.
-    Возвращает (итоговый список, добавлено, пропущено дубликатов).
+    A match is taken to be the same set of activation phrases: a file from
+    another computer has ids of its own, while the phrases are what the
+    command is to the user. Returns (the resulting list, added, duplicates
+    skipped).
     """
     from voice.textmatch import normalize
 
@@ -163,7 +279,7 @@ def merge_commands(existing, incoming, new_id):
             skipped += 1
             continue
         copy = dict(cmd)
-        copy["id"] = new_id()          # чужой id мог бы совпасть с местным
+        copy["id"] = new_id()          # a foreign id could clash with a local one
         result.append(copy)
         known.add(cmd_key)
         added += 1
@@ -171,17 +287,17 @@ def merge_commands(existing, incoming, new_id):
 
 
 # ---------------------------------------------------------------------------
-# История
+# History
 # ---------------------------------------------------------------------------
 def export_history_json(path, entries):
     with open(path, "w", encoding="utf-8") as f:
-        json.dump(_envelope(KIND_HISTORY, {"history": list(entries or [])}),
+        json.dump(envelope(KIND_HISTORY, {"history": list(entries or [])}),
                   f, ensure_ascii=False, indent=2)
     return len(entries or [])
 
 
 def export_history_text(path, entries):
-    """Читаемая выгрузка: дата, время, кто, текст."""
+    """A readable export: date, time, who, text."""
     lines = []
     last_day = None
     for entry in entries or []:

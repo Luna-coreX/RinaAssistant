@@ -1,0 +1,209 @@
+using System.Windows;
+
+namespace Rina.Shell;
+
+public partial class App : Application
+{
+    /// <summary>
+    /// Change the accent without touching the rest of the finish.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Raised by the person; `4.0-R08` was refined. The five palettes of
+    /// 3.1.0 gave way to two finishes, and that decision stands: a finish is
+    /// the whole surface, its colours were verified in pairs, and they must
+    /// not be changed one at a time. But <b>an accent is not a palette</b>:
+    /// it is one colour with two duties, to read on the panel and on the
+    /// raised surface. It may be chosen, provided every option was verified
+    /// where the original was — and every one is
+    /// (`tools/check_contrast.py`).
+    /// </para>
+    /// <para>
+    /// Both the brush and the colour are replaced: they are two
+    /// representations of the same thing, and replacing one while forgetting
+    /// the other is a matter of time. An unknown name leaves everything as
+    /// it is: an accent that does not exist is no reason to drain the colour
+    /// out of the program.
+    /// </para>
+    /// </remarks>
+    public static void ApplyAccent(string finish, string accent)
+    {
+        if (Current is null) return;
+        var wanted = string.IsNullOrWhiteSpace(accent)
+            ? DefaultAccent : accent.Trim();
+
+        var signal = Current.TryFindResource($"Accent.{finish}.{wanted}.Signal");
+        var sunk = Current.TryFindResource($"Accent.{finish}.{wanted}.SignalSunk");
+        if (signal is not System.Windows.Media.Color tone
+            || sunk is not System.Windows.Media.Color deep)
+            return;
+
+        Current.Resources["Color.Signal"] = tone;
+        Current.Resources["Color.SignalSunk"] = deep;
+        Current.Resources["C.Signal"] =
+            new System.Windows.Media.SolidColorBrush(tone);
+        Current.Resources["C.SignalSunk"] =
+            new System.Windows.Media.SolidColorBrush(deep);
+        CurrentAccent = wanted;
+        AccentChanged?.Invoke();
+    }
+
+    /// <summary>The accent has changed; the background follows it.</summary>
+    /// <remarks>
+    /// An event and not a call into the window: the accent is applied from
+    /// two places (the settings page and the link's first hello), and
+    /// neither of them should have to know that a background exists.
+    /// </remarks>
+    public static event Action? AccentChanged;
+
+    /// <summary>Which accent is on right now.</summary>
+    /// <remarks>
+    /// Kept as a name rather than read back out of the colours: the living
+    /// background needs the accent to pick its palette, and a palette cannot
+    /// be found by the colour it produced.
+    /// </remarks>
+    public static string CurrentAccent { get; private set; } = "amber";
+
+    /// <summary>The default accent — the one that was there before any choice.</summary>
+    public static string DefaultAccent =>
+        Current?.TryFindResource("Accent.Default") as string ?? "amber";
+
+    /// <summary>Which accents this finish has, with their names.</summary>
+    /// <remarks>
+    /// Each finish has its own set: the same paint reads differently on
+    /// light and on dark, and a shared list would be a list half of which
+    /// fails the check.
+    /// </remarks>
+    public static IEnumerable<(string Value, string Title)> Accents(
+        string finish)
+    {
+        if (Current is null) yield break;
+        foreach (var key in Current.Resources.MergedDictionaries
+                     .SelectMany(d => d.Keys.OfType<string>())
+                     .Where(k => k.StartsWith($"Accent.{finish}.")
+                                 && k.EndsWith(".Signal"))
+                     .OrderBy(k => k, StringComparer.Ordinal))
+        {
+            var name = key.Split('.')[2];
+            yield return (name,
+                Current.TryFindResource($"Accent.Title.{name}") as string
+                ?? name);
+        }
+    }
+
+    /// <summary>
+    /// The finish chosen at startup.
+    /// </summary>
+    /// <remarks>
+    /// The two finishes are equals (<c>4.0-R08</c>): neither is the "main"
+    /// one and neither is an inversion of the other. That is why a whole
+    /// resource dictionary is swapped rather than colours being derived from
+    /// one base.
+    ///
+    /// This block used to sit above <c>ApplyAccent</c>, orphaned by an
+    /// earlier edit, while the method it describes had no documentation at
+    /// all.
+    /// </remarks>
+    /// <summary>The finishes, in the order the button walks them.</summary>
+    /// <remarks>
+    /// One list, so that a fourth finish means one line rather than a hunt
+    /// for the places where a chain of two names was written out.
+    /// </remarks>
+    public static readonly string[] Finishes = ["silver", "black", "graphite"];
+
+    /// <summary>The next finish in the ring.</summary>
+    public static string NextFinish(string current)
+    {
+        var at = Array.IndexOf(Finishes, current);
+        return Finishes[(at < 0 ? 0 : at + 1) % Finishes.Length];
+    }
+
+    /// <summary>
+    /// The remote for whatever is playing (`4.0b-A07`).
+    /// </summary>
+    /// <remarks>
+    /// One for the application. It follows the system's media register, and
+    /// the home page — which is built afresh on every visit — subscribes to
+    /// it rather than owning it.
+    /// </remarks>
+    public static MediaRemote? Remote { get; private set; }
+
+    /// <summary>
+    /// Which build of the window this is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// From the assembly, and from the <b>informational</b> version
+    /// rather than from <c>GetName().Version</c>: the numeric one holds
+    /// four integers and nothing else, so `4.0.0-beta` arrived here as
+    /// «4.0.0» and the beta was invisible everywhere it mattered.
+    /// </para>
+    /// <para>
+    /// The build system adds `+{commit}` to it; that is for a build log,
+    /// not for a person, and it is cut off.
+    /// </para>
+    /// <para>
+    /// One property, because there were two places: «about» read the
+    /// assembly and the foot of the column had `4.0.0` typed into the
+    /// markup. Two sources of one number part company at the first
+    /// release — and this one had already parted company with the core's.
+    /// </para>
+    /// </remarks>
+    public static string ShellVersion
+    {
+        get
+        {
+            var said = typeof(App).Assembly
+                .GetCustomAttributes(
+                    typeof(System.Reflection.AssemblyInformationalVersionAttribute),
+                    false)
+                .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+                .FirstOrDefault()?.InformationalVersion ?? "";
+            var plus = said.IndexOf('+');
+            if (plus > 0) said = said[..plus];
+            return said.Length > 0 ? said
+                : typeof(App).Assembly.GetName().Version is { } v
+                    ? $"{v.Major}.{v.Minor}.{v.Build}" : "4.0.0";
+        }
+    }
+
+    /// <summary>Start following what the machine is playing.</summary>
+    public static async Task StartRemoteAsync()
+    {
+        Remote = new MediaRemote();
+        await Remote.StartAsync();
+    }
+
+    public static void ApplyFinish(string finish)
+    {
+        // The name of the file, from the name of the finish. A switch over
+        // two values turned into a chain the moment a third appeared, and a
+        // chain over what is a list is a way to forget the fourth.
+        var name = finish switch
+        {
+            "black" => "Black",
+            "graphite" => "Graphite",
+            _ => "Silver",
+        };
+        var wanted = new Uri($"Generated/Finish.{name}.g.xaml", UriKind.Relative);
+
+        var dictionaries = Current.Resources.MergedDictionaries;
+        for (var i = 0; i < dictionaries.Count; i++)
+        {
+            if (dictionaries[i].Source?.OriginalString.Contains("Finish.") == true)
+            {
+                dictionaries[i] = new ResourceDictionary { Source = wanted };
+                // The painted things are told, and they have to be: a
+                // finish carries its own palette of the flow, and the
+                // background and the figure hold theirs as numbers
+                // worked out when they were last built. Without this the
+                // window changed colour and the two pictures inside it
+                // did not — which is what happened, and was only noticed
+                // because a check asked one of them what it was standing
+                // on.
+                AccentChanged?.Invoke();
+                return;
+            }
+        }
+    }
+}

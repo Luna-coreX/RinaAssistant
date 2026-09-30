@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-B08: доступность возможностей спрашивается только через интерфейс.
+B08: availability is asked about only through the interface.
 
-Критерий приёмки — «в коде нет ни одной проверки доступности мимо этого
-интерфейса» — проверяется буквально: обходом исходников.
+The acceptance criterion — "there is not one availability check in the code
+that bypasses this interface" — is checked literally: by walking the
+sources.
 """
 import io
 import os
@@ -13,6 +14,12 @@ import sys
 ROOT = r"C:\DevStation\PCDev\DesktopApps\RinaAssistant"
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
+
+# Isolated before anything of the core is imported. A store or a log
+# made first remembers the real profile, and isolating after it moves
+# nothing: measured, this check wrote into the developer's profile.
+from sandbox import isolate_storage
+isolate_storage()
 
 from core.features import (COMMUNITY, FEATURES, CommunityFeatures,
                            FeatureProvider, LimitedFeatures, UnknownFeature,
@@ -45,7 +52,7 @@ check("список совпадает со словарём",
 print()
 print("=== опечатка не выглядит отказом ===")
 try:
-    free.has_feature("agent")           # правильное имя — agents
+    free.has_feature("agent")           # the right name is agents
     check("неизвестное имя отклонено", False)
 except UnknownFeature as e:
     check("неизвестное имя отклонено", True, f"| {e}")
@@ -78,7 +85,7 @@ check("подставленный решает", not custom.features.has_feature
 
 print()
 print("=== критерий приёмки: проверок мимо интерфейса нет ===")
-# Ищем самодельные проверки плана и лицензии по всему коду приложения.
+# We look for home-made checks of the plan and the licence across the application's code.
 SUSPECT = re.compile(
     r"""(plan\s*==|==\s*["']pro["']|is_pro|is_premium|licen[sc]e_ok"""
     r"""|has_licen[sc]e|tier\s*==)""", re.I)

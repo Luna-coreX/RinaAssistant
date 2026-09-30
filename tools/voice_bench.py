@@ -1,31 +1,32 @@
 # -*- coding: utf-8 -*-
 """
-Стенд замеров синтеза речи (задача плана V-02).
+A bench for measuring speech synthesis (plan item V-02).
 
-Единая методика для V-03: все кандидаты проходят один корпус и меряются
-одинаково, иначе сравнение превращается в «мне показалось».
+One method for V-03: every candidate goes through one corpus and is measured
+the same way, or the comparison turns into "it seemed to me".
 
-Что меряется механически:
-  * TTFA — время до первого звука. Главная продуктовая метрика (5.0-A08):
-    разница между «отвечает через 4 секунды» и «начинает говорить через
-    400 мс» — это разница между инструментом и собеседником.
-  * RTF — отношение времени синтеза к длительности результата. Меньше 1 —
-    синтезирует быстрее, чем произносит.
-  * Пиковая память видеокарты, если модель её использует.
-  * Длительность и частота дискретизации результата.
+What is measured mechanically:
+  * TTFA — the time to the first sound. The main product metric (5.0-A08):
+    the difference between "answers in 4 seconds" and "starts speaking in
+    400 ms" is the difference between an instrument and an interlocutor.
+  * RTF — the ratio of the synthesis time to the result's duration. Below 1
+    means it synthesises faster than it says.
+  * The graphics card's peak memory, if the model uses it.
+  * The result's duration and sample rate.
 
-Что мерится ушами и потому только готовится, а не оценивается:
-  * естественность и выразительность,
-  * стабильность тембра между репликами.
-Стенд раскладывает файлы под слепое сравнение: имена обезличены, соответствие
-лежит отдельно (см. --blind).
+What is measured by ear and so is only prepared rather than judged:
+  * naturalness and expressiveness,
+  * the timbre's stability between lines.
+The bench lays the files out for a blind comparison: the names are made
+anonymous and the mapping lies separately (see --blind).
 
-Добавить кандидата — значит написать адаптер: класс с методом
-`synthesize(text, path) -> None` и атрибутом `name`. Адаптеры для движков,
-которые уже есть в приложении, лежат ниже и служат опорными точками: без них
-непонятно, хорош ли новый кандидат или просто не хуже того, что уже стоит.
+Adding a candidate means writing an adapter: a class with a
+`synthesize(text, path) -> None` method and a `name` attribute. The adapters
+for the engines already in the application are below and serve as reference
+points: without them it is unclear whether a new candidate is good or merely
+no worse than what is already installed.
 
-Запуск:
+To run:
     python tools/voice_bench.py --engines edge,pyttsx3
     python tools/voice_bench.py --engines edge --groups short,numbers
     python tools/voice_bench.py --blind out/run-2026-09-01
@@ -47,16 +48,16 @@ OUT_ROOT = os.path.join(ROOT, "out", "voice-bench")
 
 
 # ---------------------------------------------------------------------------
-# Адаптеры
+# The adapters
 # ---------------------------------------------------------------------------
 class Adapter:
-    """Кандидат на стенде."""
+    """A candidate on the bench."""
 
     name = "?"
-    streaming = False        # умеет ли отдавать звук до конца синтеза
+    streaming = False        # can it give out sound before synthesis ends
 
     def prepare(self):
-        """Загрузка модели. Не входит в замер TTFA."""
+        """Loading the model. Not part of the TTFA measurement."""
 
     def synthesize(self, text, path):
         raise NotImplementedError
@@ -66,23 +67,73 @@ class Adapter:
 
 
 class EdgeAdapter(Adapter):
-    """Опорная точка: онлайн-синтез, который приложение уже умеет."""
+    """A reference point: online synthesis, which the application already has.
+
+    **Through the application's own engine, not through `edge-tts`
+    directly.** The other adapters here are candidates the program does
+    not have yet, and for them the library is the only thing to call.
+    Edge is the one the program ships, and the sentence above is its
+    whole reason for being on the bench — so measuring anything other
+    than the path the program actually takes makes the reference point
+    a reference to nothing.
+
+    It mattered. This adapter called `Communicate.save()`, which waits
+    out the whole reply, and went on doing so after `4.0b-E10` taught
+    Edge to stream. The bench reported the main product metric for the
+    one engine people use as 1447 ms when the program was managing
+    1027: a measurement that kept its name after its subject moved.
+    """
 
     name = "edge"
     voice = "ru-RU-SvetlanaNeural"
+    streaming = True
+
+    #: When the first sound was ready, and how much sound came out.
+    #: Both are filled in during `synthesize` and read by `measure`.
+    first_at = None
+    audio_s = None
 
     def synthesize(self, text, path):
-        import asyncio
-        import edge_tts
+        from core.speech import pcm_from_stream
+        from voice import tts
 
-        async def run():
-            await edge_tts.Communicate(text, self.voice).save(path)
+        engine = tts.get_engine("edge")
+        self.first_at = None
+        self.audio_s = None
+        started = time.perf_counter()
+        samples = 0
+        hertz = 0
 
-        asyncio.run(run())
+        with open(path, "wb") as into:
+            def passing():
+                # The chunks go to disk on their way through, so the
+                # blind comparison still gets its file: the point of
+                # streaming is that nothing waits for the file, not
+                # that there is no file.
+                for chunk in engine.stream(text, volume=75, rate=100):
+                    if chunk:
+                        into.write(chunk)
+                        yield chunk
+
+            for pcm, rate in pcm_from_stream(passing(), engine.stream_format):
+                if not pcm:
+                    continue
+                if self.first_at is None:
+                    # Measured at the first **decoded** sample, not at
+                    # the first mp3 chunk. What the program can play is
+                    # the honest "first sound"; the raw chunk is a
+                    # promise of one, and counting it would flatter
+                    # this engine against the others by the decoding.
+                    self.first_at = time.perf_counter() - started
+                samples += len(pcm) // 2
+                hertz = rate or hertz
+
+        if samples and hertz:
+            self.audio_s = round(samples / hertz, 3)
 
 
 class Pyttsx3Adapter(Adapter):
-    """Опорная точка: системный офлайн-синтез, нижняя граница качества."""
+    """A reference point: system offline synthesis, the lower bound of quality."""
 
     name = "pyttsx3"
 
@@ -96,7 +147,7 @@ class Pyttsx3Adapter(Adapter):
 
 
 class PiperAdapter(Adapter):
-    """Опорная точка: офлайн-нейро. Нужна модель в настройках приложения."""
+    """A reference point: offline neural. Needs a model in the application's settings."""
 
     name = "piper"
 
@@ -124,10 +175,10 @@ ADAPTERS = {a.name: a for a in (EdgeAdapter, Pyttsx3Adapter, PiperAdapter)}
 
 
 # ---------------------------------------------------------------------------
-# Измерения
+# The measurements
 # ---------------------------------------------------------------------------
 def gpu_peak_mb():
-    """Пик памяти видеокарты или None, если её не используют."""
+    """The graphics card's peak memory, or None if it is not used."""
     try:
         import torch
 
@@ -149,19 +200,19 @@ def gpu_reset():
 
 
 def audio_facts(path):
-    """Длительность и частота или (None, None), если файл не читается."""
+    """The duration and the rate, or (None, None) if the file cannot be read."""
     try:
         import soundfile as sf
 
         info = sf.info(path)
         return round(info.duration, 3), info.samplerate
     except Exception:
-        # mp3 без поддержки в soundfile — оцениваем только размер
+        # an mp3 unsupported by soundfile — we judge only by size
         return None, None
 
 
 def measure(adapter, item, out_dir):
-    """Один замер: синтез одной фразы."""
+    """One measurement: synthesising one phrase."""
     path = os.path.join(out_dir, f"{adapter.name}__{item['id']}.wav")
     if isinstance(adapter, EdgeAdapter):
         path = path[:-4] + ".mp3"
@@ -176,16 +227,27 @@ def measure(adapter, item, out_dir):
     elapsed = time.perf_counter() - started
 
     duration, rate = audio_facts(path) if error is None else (None, None)
+    # An mp3 `soundfile` cannot read still has a duration if the adapter
+    # decoded it on the way past. Without this Edge had no RTF at all —
+    # a dash in the column that decides whether a voice keeps up with
+    # itself.
+    if duration is None and getattr(adapter, "audio_s", None):
+        duration = adapter.audio_s
     size = os.path.getsize(path) if os.path.isfile(path) else 0
+
+    # Without streaming the first sound is available only once everything
+    # is ready, so TTFA equals the whole time. A streaming adapter says
+    # when its first sound was actually there, and that is the number
+    # this bench exists to compare.
+    ttfa = elapsed
+    if getattr(adapter, "streaming", False):
+        ttfa = getattr(adapter, "first_at", None)
 
     return {
         "id": item["id"],
         "group": item["group"],
         "chars": len(item["text"]),
-        # Без потокового синтеза первый звук доступен только когда готово всё,
-        # поэтому TTFA равен полному времени. У потокового кандидата адаптер
-        # обязан замерить момент первого чанка и переопределить это поле.
-        "ttfa_s": None if error else round(elapsed, 3),
+        "ttfa_s": None if error or ttfa is None else round(ttfa, 3),
         "synthesis_s": round(elapsed, 3),
         "audio_s": duration,
         "rtf": round(elapsed / duration, 3) if duration else None,
@@ -223,14 +285,15 @@ def summarize(rows):
 
 
 # ---------------------------------------------------------------------------
-# Слепое сравнение
+# The blind comparison
 # ---------------------------------------------------------------------------
 def make_blind(run_dir):
     """
-    Раскладывает записи под слепое прослушивание: имена обезличены,
-    соответствие лежит рядом отдельным файлом.
+    Lays the recordings out for blind listening: the names are made
+    anonymous and the mapping lies beside them in a separate file.
 
-    Смысл: услышав имя движка, оценивают имя, а не звук.
+    The point: hearing an engine's name, one judges the name rather than the
+    sound.
     """
     report = json.load(open(os.path.join(run_dir, "report.json"),
                           encoding="utf-8"))
@@ -295,10 +358,10 @@ def run(engine_names, groups, run_dir):
             report["engines"][name] = {"unavailable": str(e), "rows": []}
             continue
 
-        # Прогрев. Первый синтез у каждого движка втрое дороже остальных:
-        # у сетевого это установка соединения, у локального — инициализация.
-        # Без него первая фраза корпуса штрафуется за то, что она первая,
-        # и медиана съезжает.
+        # A warm-up. Every engine's first synthesis costs three times the
+        # rest: for a network one that is establishing a connection, for a
+        # local one initialisation. Without it the corpus's first phrase is
+        # penalised for being first, and the median shifts.
         warmup = {"id": "__warmup__", "group": "warmup",
                   "text": "Проверка связи."}
         warm = measure(adapter, warmup, run_dir)

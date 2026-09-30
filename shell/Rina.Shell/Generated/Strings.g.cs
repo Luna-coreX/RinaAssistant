@@ -1,0 +1,2973 @@
+// Порождено tools/gen_shell_strings.py. Руками не править.
+//
+// Источник: shell/Rina.Shell/Strings/interface.json
+//
+// Ключ — русская строка (4.0-F08, ADR 0007): непереведённое место
+// показывает осмысленный оригинал, а не имя ключа и не пустоту.
+
+namespace Rina.Shell.Strings;
+
+public static partial class Loc
+{
+    /// <summary>Переводы: строка оригинала — язык — перевод.</summary>
+    public static readonly IReadOnlyDictionary<string,
+        IReadOnlyDictionary<string, string>> Table =
+        new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            ["  — пусто"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "  — empty",
+                },
+            [" или "] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = " or ",
+                },
+            [" — необратимо"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = " — irreversible",
+                },
+            [", затем "] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = ", then ",
+                },
+            ["120 кадров — высокая нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "120 frames — high load",
+                },
+            ["120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "120 frames: about four times the load of 30. If the monitor shows fewer frames, the background follows its rate.",
+                },
+            ["19:30"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "19:30",
+                },
+            ["30 кадров"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "30 frames",
+                },
+            ["60 кадров — нагрузка выше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "60 frames — higher load",
+                },
+            ["60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "60 frames: the background and the figure load the graphics card and the processor about twice as much as at 30.",
+                },
+            ["[слишком глубокая вложенность]"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "[nesting too deep]",
+                },
+            ["Enter — отправить, Esc — скрыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Enter — send, Esc — hide",
+                },
+            ["http://localhost:11434"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "http://localhost:11434",
+                },
+            ["Vosk"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Vosk",
+                },
+            ["Whisper"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Whisper",
+                },
+            ["{0} ГБ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} GB",
+                },
+            ["{0} из {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} of {1}",
+                },
+            ["{0} МБ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} MB",
+                },
+            ["{0} мин"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} min",
+                },
+            ["{0} раз"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} times",
+                },
+            ["{0} с"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} s",
+                },
+            ["{0} ч"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} h",
+                },
+            ["{0} ч {1} мин"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} h {1} min",
+                },
+            ["{0} — сейчас недоступно"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} — unavailable right now",
+                },
+            ["{0} → {1}. Ответит: {2}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} → {1}. Answers: {2}.",
+                },
+            ["«{0}» включён."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}” is on.",
+                },
+            ["«{0}» выключен."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}” is off.",
+                },
+            ["«{0}» занято другой программой"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}” is taken by another program",
+                },
+            ["«{0}» не включился: {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}” didn’t start: {1}",
+                },
+            ["«{0}» сохранено."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}” saved.",
+                },
+            ["«{0}»: не понял значение."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“{0}”: didn’t understand the value.",
+                },
+            ["«Готово»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“Done”",
+                },
+            ["«который час» · «запусти браузер» · «посчитай 15 на 12»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“what time is it” · “open the browser” · “calculate 15 times 12”",
+                },
+            ["«напомни через 15 минут выключить духовку»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“remind me in 15 minutes to turn off the oven”",
+                },
+            ["«начни сессию над отчётом»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "“начни сессию над отчётом”",
+                },
+            ["Адрес модели"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model address",
+                },
+            ["Адрес модели. Не локальный означает, что разговоры уйдут наружу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model address. Non-local means conversations leave this machine",
+                },
+            ["Акцент"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Accent",
+                },
+            ["Архив (*.zip)|*.zip"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Archive (*.zip)|*.zip",
+                },
+            ["Архив с плагином"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugin archive",
+                },
+            ["Архивы (*.zip)|*.zip|Все файлы|*.*"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Archives (*.zip)|*.zip|All files|*.*",
+                },
+            ["без имени"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "unnamed",
+                },
+            ["Без ограничения — наибольшая нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No limit — the highest load",
+                },
+            ["Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No limit: the background is redrawn on every frame the monitor shows. On a 144 Hz monitor or faster this is the heaviest setting, and the window may start to stutter.",
+                },
+            ["бета"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "beta",
+                },
+            ["Бета нужна, чтобы узнать, чем пользуются и где что-то не получается. Помочь можно, а можно и нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The beta is there to learn what people use and where things go wrong. You can help, or not.",
+                },
+            ["Бета-возможность: поведение может измениться в следующих версиях."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A beta capability: its behaviour may change in later versions.",
+                },
+            ["Будильник"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Wecker",
+                    ["English"] = "Alarm",
+                    ["Español"] = "Alarma",
+                    ["Українська"] = "Будильник",
+                },
+            ["Быстрее ста — торопится, медленнее — растягивает"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Above 100 she hurries, below she drawls",
+                },
+            ["В каком роде обращаться"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Grammatical gender",
+                },
+            ["В команде есть необратимое действие — Рина спросит подтверждение."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The command contains an irreversible action — Rina will ask to confirm.",
+                },
+            ["в метаданных нет ни одной части"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the metadata lists no parts",
+                },
+            ["в релизе нет manifest.json"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the release has no manifest.json",
+                },
+            ["Вернуть это будет нельзя."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There will be no getting this back.",
+                },
+            ["Вернуть это будет нельзя. Команды, дела и напоминания тоже уйдут."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There will be no getting this back. Commands, things to do and reminders go too.",
+                },
+            ["Версии, ссылки, из чего собрана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Versions, links, what it’s made of",
+                },
+            ["версия {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "version {0}",
+                },
+            ["Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The program and Windows versions, which commands and tools ran and how often, error codes, recognition and first-sound times, a random installation number.",
+                },
+            ["вид"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "look",
+                },
+            ["Включить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Switch on",
+                },
+            ["Включить телеметрию беты?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Switch on beta telemetry?",
+                },
+            ["Внешний вид"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Darstellung",
+                    ["English"] = "Appearance",
+                    ["Español"] = "Apariencia",
+                    ["Українська"] = "Зовнішній вигляд",
+                },
+            ["Во сколько"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "At what time",
+                },
+            ["Время вышло."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Time is up.",
+                },
+            ["Время пишется как 19:30."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Time is written like 19:30.",
+                },
+            ["Все настройки вернутся к значениям по умолчанию: голос, устройства, сочетания клавиш, отделка, приватность."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All settings return to their defaults: voice, devices, shortcuts, finish, privacy.",
+                },
+            ["Всегда доверять"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Always trust",
+                },
+            ["Всегда слушать"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Immer zuhören",
+                    ["English"] = "Always listen",
+                    ["Español"] = "Escuchar siempre",
+                    ["Українська"] = "Завжди слухати",
+                },
+            ["Всегда слушаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Always listening",
+                },
+            ["Всего записей: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Entries in all: {0}",
+                },
+            ["Вставить шаг сюда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Insert a step here",
+                },
+            ["Всё сделано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All done",
+                },
+            ["Всё это лежит на этом компьютере и никуда не отправляется. Здесь видно каждую запись целиком."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All of this is kept on this computer and goes nowhere. Every entry is shown here in full.",
+                },
+            ["Всё это потом можно поменять в настройках."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All of this can be changed later in the settings.",
+                },
+            ["Всё это хранилось на этом компьютере."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "All of this was kept on this computer.",
+                },
+            ["Выберите узел на холсте, чтобы поправить его."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Select a node on the canvas to edit it.",
+                },
+            ["Выберите файл модели"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Choose the model file",
+                },
+            ["выбирать не из чего"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing to choose from",
+                },
+            ["Выбранное скачается в фоне. Пользоваться можно уже сейчас."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What you chose will download in the background. You can start using Rina now.",
+                },
+            ["Выгружено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Exported: {0}",
+                },
+            ["Выгружено: {0} · версия {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Exported: {0} · version {1}",
+                },
+            ["Выгрузить всё"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Export everything",
+                },
+            ["Выйти"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Quit",
+                },
+            ["Выполнить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Ausführen",
+                    ["English"] = "Run",
+                    ["Español"] = "Ejecutar",
+                    ["Українська"] = "Виконати",
+                },
+            ["Выполняю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Working…",
+                },
+            ["Выученные слова"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Learned words",
+                },
+            ["Выученные соответствия"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Learned matches",
+                },
+            ["Выше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Up",
+                },
+            ["Где вы велели искать программы."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where you told Rina to look for programs.",
+                },
+            ["Где искать по просьбе"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to search when asked",
+                },
+            ["Где искать программы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to look for programs",
+                },
+            ["Где лежит модель"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where the model lives",
+                },
+            ["Где посмотреть и выключить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to see it and switch it off",
+                },
+            ["ГДЕ ЧТО ЛЕЖИТ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WHERE THINGS ARE",
+                },
+            ["Главная"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Home",
+                },
+            ["Говорю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Speaking",
+                },
+            ["Говорю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Speaking…",
+                },
+            ["Голос"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Stimme",
+                    ["English"] = "Voice",
+                    ["Español"] = "Voz",
+                    ["Українська"] = "Голос",
+                },
+            ["Голос Piper"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Piper voice",
+                },
+            ["Голос и распознавание — на вашем компьютере."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Speech and recognition happen on your computer.",
+                },
+            ["Голос и речь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Voice and speech",
+                },
+            ["Голоса зависят от выбранной системы синтеза"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Voices depend on the chosen synthesis engine",
+                },
+            ["Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No voice yet: Rina will hear you and answer in text. You can fix that in Settings.",
+                },
+            ["Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A voice assistant living on your computer: it hears, answers, launches programs and reminds.",
+                },
+            ["Готова помочь."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Ready when you are.",
+                },
+            ["Готово"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Done",
+                },
+            ["Готово: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Done: {0}",
+                },
+            ["Графит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Graphite",
+                },
+            ["Громкость"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Lautstärke",
+                    ["English"] = "Volume",
+                    ["Español"] = "Volumen",
+                    ["Українська"] = "Гучність",
+                },
+            ["Дальше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Next",
+                },
+            ["Дальше ничего не выполнится."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing after this will run.",
+                },
+            ["Данные на диске"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Data on disk",
+                },
+            ["Дел пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing here yet",
+                },
+            ["Дела"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To-do",
+                },
+            ["делать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "do",
+                },
+            ["ДИАГНОСТИКА"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "DIAGNOSTICS",
+                },
+            ["Диалог"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Dialogue",
+                },
+            ["Динамик"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Lautsprecher",
+                    ["English"] = "Speaker",
+                    ["Español"] = "Altavoz",
+                    ["Українська"] = "Динамік",
+                },
+            ["Длительность записи"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Aufnahmedauer",
+                    ["English"] = "Recording length",
+                    ["Español"] = "Duración de la grabación",
+                    ["Українська"] = "Тривалість запису",
+                },
+            ["Добавить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Add",
+                },
+            ["Добавить папку…"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Ordner hinzufügen…",
+                    ["English"] = "Add folder…",
+                    ["Español"] = "Añadir carpeta…",
+                    ["Українська"] = "Додати теку…",
+                },
+            ["Добавить фразу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Add a phrase",
+                },
+            ["Добавлено {0}, пропущено как уже известные {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Added {0}, skipped {1} already known.",
+                },
+            ["Дольше — терпеливее, но и молчание дольше"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Longer is more patient, and the silence is longer too",
+                },
+            ["Думаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Thinking",
+                },
+            ["Думаю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Thinking…",
+                },
+            ["Если не ответить, действие не выполнится."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "If you don’t answer, nothing happens.",
+                },
+            ["Есть новая оболочка {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There is a new shell {0}.",
+                },
+            ["Есть новое ядро {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There is a new core {0}.",
+                },
+            ["Есть обновление Рины"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A Rina update is available",
+                },
+            ["Есть обновление: оболочка {0}, ядро {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "An update is available: shell {0}, core {1}.",
+                },
+            ["Жду"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Waiting",
+                },
+            ["Ждёт: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Waiting: {0}",
+                },
+            ["Журналы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Logs",
+                },
+            ["Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Logs, versions and the link's state. The conversation history and your commands are not taken; what went in is written inside.",
+                },
+            ["Забывать было нечего."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "There was nothing to forget.",
+                },
+            ["Забыто записей: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Entries forgotten: {0}",
+                },
+            ["Забыть все"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Alle vergessen",
+                    ["English"] = "Forget all",
+                    ["Español"] = "Olvidar todo",
+                    ["Українська"] = "Забути все",
+                },
+            ["Забыть всю группу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this whole group",
+                },
+            ["Забыть всё в разделе «{0}»? Записей: {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything in “{0}”? Entries: {1}.",
+                },
+            ["Забыть всё за {0}? Записей: {1}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything from {0}? Entries: {1}.",
+                },
+            ["Забыть всё обо мне"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget everything about me",
+                },
+            ["Забыть этот день"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this day",
+                },
+            ["Забыть эту запись"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Forget this entry",
+                },
+            ["Завершить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Finish",
+                },
+            ["завтра в это же время"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "tomorrow at this time",
+                },
+            ["Закрытые никуда не делись: их видно переключателем."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Closed ones are still here: the switch shows them.",
+                },
+            ["Закрыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Close",
+                },
+            ["Заменён: {0}. Он выключен — включите, если доверяете."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Replaced: {0}. It is off — turn it on if you trust it.",
+                },
+            ["заметок {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} notes",
+                },
+            ["Замечать, какие программы открыты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Notice which programs are open",
+                },
+            ["Записать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Add",
+                },
+            ["записей: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "entries: {0}",
+                },
+            ["Записывать тексты реплик"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Nachrichtentexte protokollieren",
+                    ["English"] = "Log message texts",
+                    ["Español"] = "Registrar el texto de los mensajes",
+                    ["Українська"] = "Записувати тексти реплік",
+                },
+            ["Записывать тексты реплик в журнал. По умолчанию выключено"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Write reply texts to the log. Off by default",
+                },
+            ["ЗАПЛАНИРОВАНО"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "SCHEDULED",
+                },
+            ["ЗАПЛАНИРОВАНО · {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "SCHEDULED · {0}",
+                },
+            ["Запоминать время по программам в сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remember time per application in a session",
+                },
+            ["Запоминать рабочие каталоги в сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remember working folders in a session",
+                },
+            ["Запуск без подписи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Launching without a signature",
+                },
+            ["Запускать при входе в систему"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Start when you sign in",
+                },
+            ["Запускаться без окна"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Start with no window",
+                },
+            ["Запустить один раз"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Run once",
+                },
+            ["Звук"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Audio",
+                },
+            ["Звуковые эффекты"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Soundeffekte",
+                    ["English"] = "Sound effects",
+                    ["Español"] = "Efectos de sonido",
+                    ["Українська"] = "Звукові ефекти",
+                },
+            ["Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Everything you ask to be reminded of lands here — from the field above or by voice.",
+                },
+            ["Здравствуйте"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Hello",
+                },
+            ["ЗНАКОМСТВО"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "GETTING STARTED",
+                },
+            ["Знакомство"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Getting started",
+                },
+            ["значение"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "value",
+                },
+            ["И слух, и голос работают по пакету и модели — их размер в установщик не помещается."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Hearing and speaking each need a package and a model — too large to put in the installer.",
+                },
+            ["ИДЁТ СЕЙЧАС"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "RUNNING NOW",
+                },
+            ["Из архива"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "From archive",
+                },
+            ["Из папки"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "From folder",
+                },
+            ["ИЗ ЧЕГО СОБРАНА"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WHAT IT'S MADE OF",
+                },
+            ["Изменённые настройки"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Changed settings",
+                },
+            ["ИИ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "AI",
+                },
+            ["или в"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "or at",
+                },
+            ["Импорт"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Importieren",
+                    ["English"] = "Import",
+                    ["Español"] = "Importar",
+                    ["Українська"] = "Імпорт",
+                },
+            ["Имя"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name",
+                },
+            ["Имя значения"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name of the value",
+                },
+            ["Имя модели на этом сервере"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model name on that server",
+                },
+            ["Имя, которым Рина вас называет. Можно оставить пустым"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The name Rina calls you by. Can be left empty",
+                },
+            ["Имя, характер, слова активации и свой голос"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name, character, wake words and a voice of its own",
+                },
+            ["иначе"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "otherwise",
+                },
+            ["Искать нераспознанное"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Search unrecognized commands",
+                },
+            ["История разговора"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Conversation history",
+                },
+            ["Источник неизвестен"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source unknown",
+                },
+            ["источник обновлений обязан быть https, а это «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the update source must be https, and this is “{0}”",
+                },
+            ["Источник: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source: {0}",
+                },
+            ["Исходники"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Source",
+                },
+            ["Каждому своё сочетание"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "One combination each",
+                },
+            ["Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Every report that was sent is shown in full on the “What Rina knows about me” page. It is switched off in the settings, under “Privacy”. 4.0.0 Stable will have no telemetry.",
+                },
+            ["Как вы называете программы — Рина запомнила это из ваших поправок."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What you call your programs — Rina learned this from your corrections.",
+                },
+            ["Как её позвать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to call her",
+                },
+            ["Как зовут эту личность. Без слов активации её зовут по имени"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What this personality is called. Without wake words, it is called by name",
+                },
+            ["Как к вам обращаться"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to call you",
+                },
+            ["Как часто"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How often",
+                },
+            ["Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How often the background and the figure are redrawn. More often is smoother and costs more",
+                },
+            ["Какая программа"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which program",
+                },
+            ["Какие включены и что они у себя сохранили."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which ones are switched on, and what they have kept.",
+                },
+            ["Каким словом Рина зовёт какую программу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which word Rina uses for which program",
+                },
+            ["Каким характером отвечает эта личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What character this personality answers with",
+                },
+            ["Какое действие"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which action",
+                },
+            ["Какое число"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which day",
+                },
+            ["Какой адрес открыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which address to open",
+                },
+            ["Какую команду вызвать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which command to call",
+                },
+            ["Какую папку открыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which folder to open",
+                },
+            ["Какую программу открыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Which program to open",
+                },
+            ["ключ {0} оболочке незнаком"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "key {0} is unknown to the shell",
+                },
+            ["команд {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} commands",
+                },
+            ["Команда сохранена."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Command saved.",
+                },
+            ["Команды"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Befehle",
+                    ["English"] = "Commands",
+                    ["Español"] = "Comandos",
+                    ["Українська"] = "Команди",
+                },
+            ["Команды живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Commands live in the core, and there’s no connection to it.",
+                },
+            ["Команды Рины (*.json)|*.json"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina commands (*.json)|*.json",
+                },
+            ["Команды, история и плагины останутся на месте."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Commands, history and plugins stay where they are.",
+                },
+            ["Комбинации клавиш"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Key combinations",
+                },
+            ["Короткие сигналы: услышала, ошиблась"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Short signals: heard you, went wrong",
+                },
+            ["Куда сохранить диагностический пакет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to save the diagnostic package",
+                },
+            ["Латунь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Brass",
+                },
+            ["Личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Personality",
+                },
+            ["меньше минуты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "under a minute",
+                },
+            ["метаданные версии {0}, а мы умеем 1"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "metadata version {0}, and we speak 1",
+                },
+            ["Микрофон"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Mikrofon",
+                    ["English"] = "Microphone",
+                    ["Español"] = "Micrófono",
+                    ["Українська"] = "Мікрофон",
+                },
+            ["Микрофон не отозвался: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The microphone didn’t respond: {0}",
+                },
+            ["Модели"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Models",
+                },
+            ["Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*",
+                },
+            ["Модель может искать в интернете"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The model may search the web",
+                },
+            ["Мох"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Moss",
+                },
+            ["на чём они разговаривают"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "what they talk over",
+                },
+            ["нажмите сочетание…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "press a combination…",
+                },
+            ["Назад"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Back",
+                },
+            ["Название модели"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model name",
+                },
+            ["Найти настройку"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Find a setting",
+                },
+            ["Напоминание"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Erinnerung",
+                    ["English"] = "Reminder",
+                    ["Español"] = "Recordatorio",
+                    ["Українська"] = "Нагадування",
+                },
+            ["Напоминания"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Erinnerungen",
+                    ["English"] = "Reminders",
+                    ["Español"] = "Recordatorios",
+                    ["Українська"] = "Нагадування",
+                },
+            ["Напомнить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remind me",
+                },
+            ["Напомню {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "I’ll remind you {0}",
+                },
+            ["например, C:\\Program Files\\App\\app.exe"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, C:\\Program Files\\App\\app.exe",
+                },
+            ["например, chrome"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, chrome",
+                },
+            ["например, D:\\Проекты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, D:\\Projects",
+                },
+            ["например, github.com"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, github.com",
+                },
+            ["например, llama3"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, llama3",
+                },
+            ["например, «открой почту»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, “open mail”",
+                },
+            ["например, Макс"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "e.g. Max",
+                },
+            ["например, отвечай коротко и по делу"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, answer briefly and to the point",
+                },
+            ["например, режим"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "for example, mode",
+                },
+            ["например, Саша"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "e.g. Alex",
+                },
+            ["Например: «Рина, поставь таймер на десять минут»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "For example: “Rina, set a timer for ten minutes”.",
+                },
+            ["Насколько громко Рина говорит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How loudly Rina speaks",
+                },
+            ["Насколько подробен журнал"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How detailed the log is",
+                },
+            ["Настройки"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Einstellungen",
+                    ["English"] = "Settings",
+                    ["Español"] = "Ajustes",
+                    ["Українська"] = "Налаштування",
+                },
+            ["Настройки не пришли: ядро не описало их."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The settings did not arrive: the core described none.",
+                },
+            ["Настройки сброшены."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings have been reset.",
+                },
+            ["Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings live in the core, and there is no link to it right now. The shell is trying to bring it back up.",
+                },
+            ["Настройки, история, команды"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Settings, history, commands",
+                },
+            ["Начать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Start",
+                },
+            ["Начинать свёрнутой"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Start minimised",
+                },
+            ["Не включать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Leave it off",
+                },
+            ["не выбрана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "not chosen",
+                },
+            ["Не вышло открыть ссылку: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Couldn’t open the link: {0}",
+                },
+            ["Не вышло: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Didn't work: {0}",
+                },
+            ["не заполнено"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "not filled in",
+                },
+            ["не назначено"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "not set",
+                },
+            ["Не прочиталось: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Couldn’t read it: {0}",
+                },
+            ["не разобрал сочетание «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "couldn’t parse the shortcut “{0}”",
+                },
+            ["не разобрали ответ: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "could not read the answer: {0}",
+                },
+            ["Не сохранилось: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Not saved: {0}",
+                },
+            ["Не удалось спросить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Could not ask",
+                },
+            ["не удалось спросить источник: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "could not ask the source: {0}",
+                },
+            ["Не уходит никогда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What is never sent",
+                },
+            ["Не чаще раза в сутки. Первый отчёт — через сутки после включения; если Рина в это время выключена, то вскоре после следующего запуска."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No more than once a day. The first report goes a day after switching on; if Rina is closed at that moment, soon after her next start.",
+                },
+            ["Непонятую фразу отправлять в поиск"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Send a phrase that was not understood to a search",
+                },
+            ["нет связи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "no connection",
+                },
+            ["Нечего пробовать: шагов пока нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing to try: there are no steps yet.",
+                },
+            ["Ниже"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Down",
+                },
+            ["Ниже — реже слышит имя, выше — чаще ошибается"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Lower hears the name less often, higher mistakes it more often",
+                },
+            ["Никто не подтвердил, кто её выпустил и что её не подменяли."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nobody has confirmed who released it or that it wasn’t tampered with.",
+                },
+            ["НИЧЕГО НЕ ВЫБРАНО"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "NOTHING SELECTED",
+                },
+            ["Ничего не ждёт"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing waiting",
+                },
+            ["ничего не записано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing recorded",
+                },
+            ["Ничего не нашлось по «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing found for “{0}”",
+                },
+            ["Ничего не уходит в сеть без вашего ведома."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing leaves for the network without your knowing.",
+                },
+            ["ничего — шагов пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "nothing — there are no steps yet",
+                },
+            ["Новая команда"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Neuer Befehl",
+                    ["English"] = "New command",
+                    ["Español"] = "Nuevo comando",
+                    ["Українська"] = "Нова команда",
+                },
+            ["НОВОЕ НАПОМИНАНИЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "NEW REMINDER",
+                },
+            ["новое слово"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "new word",
+                },
+            ["нужен Ctrl, Alt, Shift или Win"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "needs Ctrl, Alt, Shift or Win",
+                },
+            ["Нужен хотя бы один шаг."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "At least one step is needed.",
+                },
+            ["Нужна хотя бы одна фраза."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "At least one phrase is needed.",
+                },
+            ["Нужно для напоминаний «когда открою…». Выключено по умолчанию"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Needed for the «when I open…» reminders. Off by default",
+                },
+            ["О программе"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Über",
+                    ["English"] = "About",
+                    ["Español"] = "Acerca de",
+                    ["Українська"] = "Про програму",
+                },
+            ["о программе"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "about",
+                },
+            ["о чём напомнить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "what to remind about",
+                },
+            ["О чём напомнить?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What should I remind you about?",
+                },
+            ["Обезличенные счётчики: что срабатывает и где ошибки. Без текста, звука и путей; каждый отчёт виден на странице «Что Рина знает обо мне». В Stable её не будет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Anonymous counters: what works and where errors happen. No text, sound or paths; every report is shown on the “What Rina knows about me” page. Stable will not have it",
+                },
+            ["Обзор…"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Durchsuchen…",
+                    ["English"] = "Browse…",
+                    ["Español"] = "Examinar…",
+                    ["Українська"] = "Огляд…",
+                },
+            ["Обновить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Aktualisieren",
+                    ["English"] = "Refresh",
+                    ["Español"] = "Actualizar",
+                    ["Українська"] = "Оновити",
+                },
+            ["Обновление не подходит к тому, что установлено: {0}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This update does not fit what is installed: {0}.",
+                },
+            ["ОБНОВЛЕНИЯ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "UPDATES",
+                },
+            ["Обновления"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Updates",
+                },
+            ["Оболочка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Shell",
+                },
+            ["оболочка говорит [{0}], ядро слышит [{1}]"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the shell speaks [{0}], the core hears [{1}]",
+                },
+            ["оболочка не знает такого элемента страницы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the shell doesn’t know this page element",
+                },
+            ["Оболочка не знает, что это за данные, — поэтому показывает как есть."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The shell does not know what this data is, so it shows it as it stands.",
+                },
+            ["Одна комбинация на всё окно"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "One combination for the whole window",
+                },
+            ["Окно уходит в трей, а не на панель задач"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The window goes to the tray rather than the taskbar",
+                },
+            ["окно, звук, системный слой"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "window, audio, system layer",
+                },
+            ["Орхидея"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Orchid",
+                },
+            ["Остановить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Stop",
+                },
+            ["ответ не объект"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the answer is not an object",
+                },
+            ["Отвечать голосом"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Mit Stimme antworten",
+                    ["English"] = "Reply with voice",
+                    ["Español"] = "Responder con voz",
+                    ["Українська"] = "Відповідати голосом",
+                },
+            ["Отвечать моделью"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Answer with a model",
+                },
+            ["Отвечать языковой моделью, когда команда не распознана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Answer with a language model when a command isn’t recognised",
+                },
+            ["Отделка"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Finish",
+                },
+            ["Отдельные действия"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Separate actions",
+                },
+            ["Открыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Open",
+                },
+            ["Откуда взять команды"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where to take commands from",
+                },
+            ["Отмена"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Abbrechen",
+                    ["English"] = "Cancel",
+                    ["Español"] = "Cancelar",
+                    ["Українська"] = "Скасувати",
+                },
+            ["Отменить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Abbrechen",
+                    ["English"] = "Cancel",
+                    ["Español"] = "Cancelar",
+                    ["Українська"] = "Скасувати",
+                },
+            ["Отправить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Send",
+                },
+            ["Отправлено"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sent",
+                },
+            ["Отправлять обезличенную статистику беты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Send the beta's anonymous statistics",
+                },
+            ["Очистить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Clear",
+                },
+            ["папка с моделью"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "folder with the model",
+                },
+            ["Папка с плагином"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugin folder",
+                },
+            ["Папка с распакованной моделью"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The folder with the unpacked model",
+                },
+            ["Папки поиска программ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Folders searched for programs",
+                },
+            ["Папки, кроме тех, что Рина находит сама"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Folders besides those Rina finds by herself",
+                },
+            ["Пауза"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Pause",
+                },
+            ["Перечитываю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rereading…",
+                },
+            ["Плавающая строка команд"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Schwebende Befehlszeile",
+                    ["English"] = "Floating command bar",
+                    ["Español"] = "Barra de comandos flotante",
+                    ["Українська"] = "Плаваючий рядок команд",
+                },
+            ["Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A plugin gives Rina a new skill: a command, a section, or both. Put the plugin folder next to the program.",
+                },
+            ["плагин не загрузился"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the plugin didn’t load",
+                },
+            ["Плагинов пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No plugins yet",
+                },
+            ["Плагины"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Plug-ins",
+                    ["English"] = "Plugins",
+                    ["Español"] = "Complementos",
+                    ["Українська"] = "Плагіни",
+                },
+            ["Плагины живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Plugins live in the core, and there’s no connection to it.",
+                },
+            ["По этому слову Рина понимает, что обращаются к ней."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This is the word Rina listens for to know she is being spoken to.",
+                },
+            ["Поведение"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Verhalten",
+                    ["English"] = "Behavior",
+                    ["Español"] = "Comportamiento",
+                    ["Українська"] = "Поведінка",
+                },
+            ["Подробность журнала"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Protokolldetails",
+                    ["English"] = "Log detail",
+                    ["Español"] = "Detalle del registro",
+                    ["Українська"] = "Докладність журналу",
+                },
+            ["Подтверждение"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Confirmation",
+                },
+            ["Позвать Рину"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Call Rina",
+                },
+            ["Поиск"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Search",
+                },
+            ["Поисковая система"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Search engine",
+                },
+            ["Пока ни одного напоминания"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No reminders yet",
+                },
+            ["Пока ни одной сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No sessions yet",
+                },
+            ["Пока ничего"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing yet",
+                },
+            ["Показать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Show",
+                },
+            ["Показать все {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Show all {0}",
+                },
+            ["Показывать всплывающие сообщения"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Show pop-up messages",
+                },
+            ["Показывать сделанные"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Show done",
+                },
+            ["Помочь бете"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Help the beta",
+                },
+            ["попытка {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "attempt {0}",
+                },
+            ["Последовательность · шагов {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sequence · {0} steps",
+                },
+            ["Поставлен: {0}. Включите его, чтобы начал работать."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installed: {0}. Turn it on to make it work.",
+                },
+            ["Потяните, чтобы переставить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Drag to move it",
+                },
+            ["Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Drag to move the canvas. Double-click brings it back",
+                },
+            ["Почти тихо: {0}%. Проверьте, тот ли микрофон выбран."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Almost silent: {0}%. Check that the right microphone is selected.",
+                },
+            ["Править"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Edit",
+                },
+            ["Правка команды"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Editing a command",
+                },
+            ["Предыдущий"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Previous",
+                },
+            ["Приватность"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Datenschutz",
+                    ["English"] = "Privacy",
+                    ["Español"] = "Privacidad",
+                    ["Українська"] = "Приватність",
+                },
+            ["применится после перезапуска"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "applies after a restart",
+                },
+            ["Пробую…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Trying…",
+                },
+            ["Проверить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Testen",
+                    ["English"] = "Check",
+                    ["Español"] = "Probar",
+                    ["Українська"] = "Перевірити",
+                },
+            ["Проверить голос"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Test voice",
+                },
+            ["Проверить микрофон"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Test microphone",
+                },
+            ["Проверить не вышло — попробуйте позже."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The check did not go through — try again later.",
+                },
+            ["Проверка не запускалась."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No check has been run yet.",
+                },
+            ["Проверять обновления"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Nach Updates suchen",
+                    ["English"] = "Check for updates",
+                    ["Español"] = "Buscar actualizaciones",
+                    ["Українська"] = "Перевіряти оновлення",
+                },
+            ["программ {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "{0} applications",
+                },
+            ["Программы"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Programme",
+                    ["English"] = "Programs",
+                    ["Español"] = "Programas",
+                    ["Українська"] = "Програми",
+                },
+            ["Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*",
+                },
+            ["Пройти настройку заново"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Run setup again",
+                },
+            ["Протокол"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Protocol",
+                },
+            ["ПРОЧЕЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "OTHER",
+                },
+            ["Прочее"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Other",
+                },
+            ["ПРОШЛЫЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "PAST",
+                },
+            ["ПРОШЛЫЕ · {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "PAST · {0}",
+                },
+            ["пусто"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "empty",
+                },
+            ["Пусто — зовут по имени"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Empty — called by name",
+                },
+            ["Путь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Path",
+                },
+            ["путь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "path",
+                },
+            ["Путь говорит, над чем идёт работа. Выключено по умолчанию"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A path says what the work is about. Off by default",
+                },
+            ["Равно чему"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Equal to what",
+                },
+            ["Раз в сутки Рина будет отправлять разработчику короткий отчёт: чем пользовались и где что-то не сработало."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Once a day Rina will send the developer a short report: what was used and where something did not work.",
+                },
+            ["Раз в сутки спрашивает api.github.com, нет ли новой версии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Once a day, asks api.github.com whether there is a new version",
+                },
+            ["разбор команд, память, речь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "command parsing, memory, speech",
+                },
+            ["Развернуть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Maximise",
+                },
+            ["Разговор"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Talking",
+                },
+            ["Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core runs the conversation, and there’s no connection. The shell is trying to start it again.",
+                },
+            ["Разговор выгружен: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Conversation exported: {0}",
+                },
+            ["Разговор пуст"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The conversation is empty",
+                },
+            ["Раздел появится в 4.0-F04."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This section arrives in 4.0-F04.",
+                },
+            ["Разделы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sections",
+                },
+            ["Размер модели: чем больше, тем точнее и медленнее"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model size: the bigger, the more accurate and the slower",
+                },
+            ["Распаковываю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Unpacking…",
+                },
+            ["Распознавание"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Recognition",
+                },
+            ["Рина"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina",
+                },
+            ["Рина будет готова сразу после входа"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will be ready right after you sign in",
+                },
+            ["Рина будет называть вас этим именем. Можно оставить пустым."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will call you by this name. You can leave it empty.",
+                },
+            ["Рина ещё ничего о вас не запомнила: поговорите с ней, и здесь появятся записи."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina has not remembered anything about you yet: talk to her and entries will appear here.",
+                },
+            ["Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults.",
+                },
+            ["Рина скажет это вместо «Готово»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina will say this instead of “Done”",
+                },
+            ["Рина — голосовой помощник на этом компьютере. Несколько вопросов, и всё."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina is a voice assistant that runs on this computer. A few questions, and that is all.",
+                },
+            ["Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Russian tells «ты прав» from «ты права». Without a gender, Rina avoids such forms",
+                },
+            ["С чего начнём?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Where shall we start?",
+                },
+            ["С этих слов начинается обращение к Рине"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Words that start an address to Rina",
+                },
+            ["Сайт"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Website",
+                },
+            ["Сбросить все"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Reset all",
+                },
+            ["Сбросить настройки"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Reset settings",
+                },
+            ["Свернуть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Minimise",
+                },
+            ["СВОИ И ВСТРОЕННЫЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "YOURS AND BUILT-IN",
+                },
+            ["СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "YOURS AND BUILT-IN · programs found: {0}",
+                },
+            ["Свои команды"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Your own commands",
+                },
+            ["Своих команд пока нет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "No commands of your own yet",
+                },
+            ["Свой голос"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Own voice",
+                },
+            ["Сворачивать в трей"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "In den Infobereich minimieren",
+                    ["English"] = "Minimize to tray",
+                    ["Español"] = "Minimizar a la bandeja",
+                    ["Українська"] = "Згортати в трей",
+                },
+            ["Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row.",
+                },
+            ["Своя личность"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Own personality",
+                },
+            ["связь потеряна, поднимаем"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "connection lost, bringing it back",
+                },
+            ["сейчас"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "now",
+                },
+            ["секунд"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "seconds",
+                },
+            ["Серебро"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Silver",
+                },
+            ["Серебро, чёрное или графит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Silver, black or graphite",
+                },
+            ["Серебро, чёрный или графит — равноправные"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Silver, black or graphite — equals",
+                },
+            ["Сессии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sessions",
+                },
+            ["Сессии живут в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Sessions live in the core, and there is no link to it right now.",
+                },
+            ["Сессия — это отрезок работы с названием. Начните голосом или строкой, и здесь останется, сколько он шёл и что в нём было."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A session is a stretch of work with a name. Start one by voice or by typing, and what is left here is how long it ran and what was in it.",
+                },
+            ["Система синтеза"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Synthesis engine",
+                },
+            ["Скажите «запиши купить хлеб» — или впишите сюда."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say “add buy bread” — or type it here.",
+                },
+            ["Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say it out loud or type below. Everything said lands here and survives a restart.",
+                },
+            ["Скажите или напишите: «запусти браузер»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say or type: “open the browser”",
+                },
+            ["Скажите фразу…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say a phrase…",
+                },
+            ["Скажите — или напишите."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Say it — or type it.",
+                },
+            ["Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Said “{0}” — {1}s. Can’t hear it? Check the speaker.",
+                },
+            ["Сказанное и напечатанное вами, и ответы Рины. Ведётся, пока включено в настройках."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What you said and typed, and Rina's answers. Kept while switched on in the settings.",
+                },
+            ["Скачаем: "] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Will download: ",
+                },
+            ["Скачается само"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Fetches itself",
+                },
+            ["Скачается само при первом обращении."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloads itself the first time it is needed.",
+                },
+            ["Скачано"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloaded",
+                },
+            ["Скачано."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloaded.",
+                },
+            ["Скачать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Download",
+                },
+            ["Скачивание моделей"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Downloading models",
+                },
+            ["Скачивать нечего — распознавание можно включить позже."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Nothing to download — recognition can be switched on later.",
+                },
+            ["Сколько ждать ответа, секунд"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How long to wait for an answer, seconds",
+                },
+            ["Сколько раз"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How many times",
+                },
+            ["Сколько раз какая команда выполнялась и когда в последний раз."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How many times each command has run, and when it last did.",
+                },
+            ["Сколько секунд"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How many seconds",
+                },
+            ["Сколько секунд слушать после активации"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How many seconds to listen after being called",
+                },
+            ["Скорость речи"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Sprechgeschwindigkeit",
+                    ["English"] = "Speech rate",
+                    ["Español"] = "Velocidad del habla",
+                    ["Українська"] = "Швидкість мовлення",
+                },
+            ["Скрыть"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Hide",
+                },
+            ["Следующий"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Next",
+                },
+            ["Слова активации"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Aktivierungswörter",
+                    ["English"] = "Wake words",
+                    ["Español"] = "Palabras de activación",
+                    ["Українська"] = "Слова активації",
+                },
+            ["Слушаю"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening",
+                },
+            ["Слушаю две секунды — скажите что-нибудь…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening for two seconds — say something…",
+                },
+            ["Слушаю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Listening…",
+                },
+            ["Слышно: {0}%. Микрофон работает."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Heard: {0}%. The microphone works.",
+                },
+            ["Собираю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Collecting…",
+                },
+            ["Собрать пакет"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Collect package",
+                },
+            ["Сообщить о неполадке"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Report a problem",
+                },
+            ["Сохранено: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Saved: {0}",
+                },
+            ["Сохранить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Speichern",
+                    ["English"] = "Save",
+                    ["Español"] = "Guardar",
+                    ["Українська"] = "Зберегти",
+                },
+            ["Сохранять историю"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Verlauf speichern",
+                    ["English"] = "Save history",
+                    ["Español"] = "Guardar historial",
+                    ["Українська"] = "Зберігати історію",
+                },
+            ["Список напоминаний живёт в ядре, а связи с ним сейчас нет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The reminder list lives in the core, and there’s no connection to it.",
+                },
+            ["Список обновлён."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "List refreshed.",
+                },
+            ["Список того, что ждёт."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The list of what is waiting.",
+                },
+            ["Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "It asks when its own knowledge falls short. The query goes to DuckDuckGo",
+                },
+            ["Спрашиваю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Asking…",
+                },
+            ["ССЫЛКИ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "LINKS",
+                },
+            ["Ставлю…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installing…",
+                },
+            ["Сталь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Steel",
+                },
+            ["Статистика команд"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Command statistics",
+                },
+            ["Строка поверх экрана по горячей клавише"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A line over the screen, on a hotkey",
+                },
+            ["Таймер"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Timer",
+                    ["English"] = "Timer",
+                    ["Español"] = "Temporizador",
+                    ["Українська"] = "Таймер",
+                },
+            ["такое сочетание не подойдёт"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "that combination won’t work",
+                },
+            ["Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The same questions as on the first run. Nothing is reset: you need not answer them again.",
+                },
+            ["Телеметрия беты"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Beta telemetry",
+                },
+            ["То, о чём вы просили напомнить."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The things you asked to be reminded of.",
+                },
+            ["тогда"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "then",
+                },
+            ["Только внутри открытой сессии и только при верхней настройке"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Only inside an open session, and only with the setting above",
+                },
+            ["Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Only what you changed yourself: an untouched default says nothing about you.",
+                },
+            ["Точно выполнить?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Run it — are you sure?",
+                },
+            ["У Рины пока нет своего голоса — он появится в 4.0.0 Stable"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina has no voice of her own yet — it arrives in 4.0.0 Stable",
+                },
+            ["Убрать"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Entfernen",
+                    ["English"] = "Remove",
+                    ["Español"] = "Quitar",
+                    ["Українська"] = "Прибрати",
+                },
+            ["Убрать «{0}»"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remove “{0}”",
+                },
+            ["Убрать совсем"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Delete",
+                },
+            ["Убрать шаг"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remove this step",
+                },
+            ["Уведомления"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Benachrichtigungen",
+                    ["English"] = "Notifications",
+                    ["Español"] = "Notificaciones",
+                    ["Українська"] = "Сповіщення",
+                },
+            ["Уголь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Ember",
+                },
+            ["Удалить"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Löschen",
+                    ["English"] = "Delete",
+                    ["Español"] = "Eliminar",
+                    ["Українська"] = "Видалити",
+                },
+            ["Уже скачано."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Already downloaded.",
+                },
+            ["Уже установлено."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Already installed.",
+                },
+            ["УМЕЕТ СРАЗУ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "WORKS OUT OF THE BOX",
+                },
+            ["Условие"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Condition",
+                },
+            ["Установить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Install",
+                },
+            ["Установить эту пару нельзя."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This pair cannot be installed.",
+                },
+            ["Установка появится вместе с установщиком."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installing arrives with the installer.",
+                },
+            ["Установлена последняя версия."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The latest version is installed.",
+                },
+            ["УСТАНОВЛЕННЫЕ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "INSTALLED",
+                },
+            ["УСТАНОВЛЕННЫЕ · {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "INSTALLED · {0}",
+                },
+            ["Устройство по умолчанию"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Default device",
+                },
+            ["Устройство, в которое Рина говорит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The device Rina speaks into",
+                },
+            ["Устройство, с которого Рина слышит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The device Rina hears from",
+                },
+            ["Уходит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What is sent",
+                },
+            ["файл .onnx"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the .onnx file",
+                },
+            ["Файл голоса .onnx"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The .onnx voice file",
+                },
+            ["Файл голоса Piper, .onnx. Пусто — голос из общих настроек"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A Piper voice file, .onnx. Empty — the voice from the general settings",
+                },
+            ["Файл не разобрался как JSON."] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Die Datei ließ sich nicht als JSON lesen.",
+                    ["English"] = "The file did not parse as JSON.",
+                    ["Español"] = "El archivo no se pudo analizar como JSON.",
+                    ["Українська"] = "Файл не розібрався як JSON.",
+                },
+            ["фокус"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "focus",
+                },
+            ["формат настроек и истории"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "format of settings and history",
+                },
+            ["Фразы, которые вы завели, и что по ним происходит."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The phrases you set up, and what happens when they fire.",
+                },
+            ["Фразы, по которым сработает"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Phrases that trigger it",
+                },
+            ["Характер"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Persona",
+                },
+            ["Ход скачивания виден в настройках, там же его можно остановить."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Progress is shown in the settings, and can be stopped there too.",
+                },
+            ["Хранить, о чём был разговор"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Keep what the conversation was about",
+                },
+            ["хэш не сошёлся: ждали {0}…, получили {1}…"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the hash did not match: expected {0}…, got {1}…",
+                },
+            ["Цвет, которым Рина обращает на себя внимание"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The colour Rina draws attention with",
+                },
+            ["Частота кадров фона"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Background frame rate",
+                },
+            ["чем всё кончилось — если есть что сказать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "how it ended — if there is anything to say",
+                },
+            ["Чем вызывать Рину и её действия"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What calls Rina and her actions",
+                },
+            ["Чем могу помочь?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How can I help?",
+                },
+            ["Чем Рина говорит. Офлайновые работают без интернета"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How Rina speaks. Offline engines work without the internet",
+                },
+            ["Чем Рина слышит. Без него команды только с клавиатуры"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How Rina hears. Without it, commands are typed only",
+                },
+            ["через 15 минут"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in 15 minutes",
+                },
+            ["через 3 часа"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in 3 hours",
+                },
+            ["через 30 минут"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in 30 minutes",
+                },
+            ["через 5 минут"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in 5 minutes",
+                },
+            ["через {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in {0}",
+                },
+            ["через час"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "in an hour",
+                },
+            ["Читаемый текст (*.txt)|*.txt|Данные (*.json)|*.json"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Readable text (*.txt)|*.txt|Data (*.json)|*.json",
+                },
+            ["Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What you said or typed, sound, paths and file names, the names of your plugins, addresses, passwords and keys.",
+                },
+            ["Что доустановить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What else is needed",
+                },
+            ["Что запомнить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to remember",
+                },
+            ["Что накоплено и ещё не ушло, и каждый отчёт, ушедший на сервер, — в том виде, в каком ушёл. В 4.0.0 Stable телеметрии не будет."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What has been gathered and not yet sent, and every report sent to the server, exactly as it was sent. 4.0.0 Stable will have no telemetry.",
+                },
+            ["Что ответить (необязательно)"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to answer (optional)",
+                },
+            ["Что произнести"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to say out loud",
+                },
+            ["что произнести"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "what to say",
+                },
+            ["Что Рина знает обо мне"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What Rina knows about me",
+                },
+            ["Что сделаем сегодня?"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What shall we do today?",
+                },
+            ["Что скачано и где лежит"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What is downloaded and where it lies",
+                },
+            ["Чтобы говорить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To speak",
+                },
+            ["Чтобы слышать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "To hear",
+                },
+            ["Чувствительность активации"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Aktivierungsempfindlichkeit",
+                    ["English"] = "Wake word sensitivity",
+                    ["Español"] = "Sensibilidad de activación",
+                    ["Українська"] = "Чутливість активації",
+                },
+            ["Чёрное"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Black",
+                },
+            ["Шаг {0} из {1}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Step {0} of {1}",
+                },
+            ["Экспорт"] =
+                new Dictionary<string, string>
+                {
+                    ["Deutsch"] = "Exportieren",
+                    ["English"] = "Export",
+                    ["Español"] = "Exportar",
+                    ["Українська"] = "Експорт",
+                },
+            ["Эта программа не подписана"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This program isn’t signed",
+                },
+            ["Я вас слушаю."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "I am listening.",
+                },
+            ["Ядро"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Core",
+                },
+            ["ядро {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "core {0}",
+                },
+            ["ядро {0} читает данные схемы {1}, а на диске уже {2}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "core {0} reads schema {1}, and the disk already holds {2}",
+                },
+            ["ядро запускается"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the core is starting",
+                },
+            ["ядро на связи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the core is online",
+                },
+            ["ядро не запускалось"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the core hasn’t been started",
+                },
+            ["Ядро не на связи"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Core not connected",
+                },
+            ["Ядро не на связи — скачать пока нечего."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core is not connected — there is nothing to download yet.",
+                },
+            ["Ядро не на связи, поэтому опись показать нечем."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core is not connected, so there is no inventory to show.",
+                },
+            ["Ядро не на связи."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core is not connected.",
+                },
+            ["Ядро не объявило возможность «плагины»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The core didn’t declare the “plugins” capability.",
+                },
+            ["ядро не отвечает"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "the core isn’t responding",
+                },
+            ["Язык интерфейса"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Interface language",
+                },
+            ["Язык окна и реплик Рины"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The language of the window and of Rina's words",
+                },
+            ["Янтарь"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Amber",
+                },
+        };
+}

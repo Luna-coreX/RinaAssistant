@@ -1,0 +1,137 @@
+<UserControl x:Class="Rina.Shell.Pages.AboutPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <ScrollViewer VerticalScrollBarVisibility="Auto" ui:Smooth.Scrolling="True">
+    <StackPanel>
+      <TextBlock Text="{loc:S 'О программе'}"
+                 Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+
+      <!-- Who this is. The name, the version and one line about what she
+           does: without it "Rina 4.0.0" tells a first-time reader nothing. -->
+      <!--
+        The name carries the card, and the version stands under it.
+
+        It was the other way round once: the name in body text and the
+        number under it in the figure face, larger — so the card
+        announced «4.0.0» and mentioned, in passing, what it was the
+        version of. On the one page a person opens to find out what this
+        program is, that is the wrong way round.
+
+        Then it was a line in the top left corner, which is where a
+        heading goes on every other page — and this is not every other
+        page. It is the one place the program says its own name, so the
+        name stands in the middle, in two tiers, at a size nothing else
+        here uses. The flow across it is built in `Flow`.
+      -->
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16"
+              Padding="32,32,32,28">
+        <StackPanel HorizontalAlignment="Center">
+          <TextBlock x:Name="Wordmark" TextAlignment="Center"
+                     HorizontalAlignment="Center"
+                     FontFamily="{StaticResource Type.Title.Family}"
+                     LineHeight="52" LineStackingStrategy="BlockLineHeight">
+            <!-- No weight of their own: `Light` is a face the display
+                 family does not have, and asking for one sent the whole
+                 mark to the next font in the fallback chain — the name
+                 of the program was the one place on the screen not set
+                 in the program's own typeface. -->
+            <Run Text="Rina" FontSize="48" />
+            <LineBreak />
+            <!-- The second tier is set out letter by letter in `Spread`.
+                 The text is not written here because it is not the word
+                 any more: it is the word with spaces in it, and the word
+                 itself must stay in one place. -->
+            <Run x:Name="Spaced" FontSize="24" />
+          </TextBlock>
+          <TextBlock x:Name="Version" Style="{StaticResource Text.Meta}"
+                     HorizontalAlignment="Center" Margin="0,10,0,0" />
+          <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                     TextAlignment="Center" MaxWidth="440" Margin="0,14,0,0"
+                     Text="{loc:S 'Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.'}" />
+        </StackPanel>
+      </Border>
+
+      <!-- Updates are asked about here: "about" is the place people go to
+           find out which version is installed, and the next question is
+           always "is there a newer one". -->
+      <TextBlock Text="{loc:S 'ОБНОВЛЕНИЯ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Card}" Margin="0,0,0,16">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0" VerticalAlignment="Center">
+            <TextBlock x:Name="UpdateState" Style="{StaticResource Text.Body}"
+                       TextWrapping="Wrap"
+                       Text="{loc:S 'Проверка не запускалась.'}" />
+            <TextBlock x:Name="UpdateNote" Style="{StaticResource Text.Meta}"
+                       TextWrapping="Wrap" Margin="0,4,0,0" />
+          </StackPanel>
+          <Button x:Name="CheckNow" Grid.Column="1"
+                  Style="{StaticResource Btn}"
+                  Content="{loc:S 'Проверить'}" Click="OnCheckUpdates"
+                  VerticalAlignment="Center" />
+        </Grid>
+      </Border>
+
+      <TextBlock Text="{loc:S 'ИЗ ЧЕГО СОБРАНА'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Rows}" Margin="0,0,0,16">
+        <StackPanel x:Name="Parts" />
+      </Border>
+
+      <!-- What is asked about first when a fault is being sorted out: where
+           the settings, the logs and the plugins live. Without this a person
+           hunts for them blindly through the file manager, and we ask them
+           to send us what they cannot find. -->
+      <TextBlock Text="{loc:S 'ГДЕ ЧТО ЛЕЖИТ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <Border Style="{StaticResource Rows}" Margin="0,0,0,16">
+        <StackPanel x:Name="Places" />
+      </Border>
+
+      <!-- Collect all of this into one archive with a single press. A
+           person who came here with a fault is not obliged to know which
+           journals we need or where they lie; and we are not obliged to
+           ask them to open ten folders. -->
+      <!-- The wizard again. Without this it was unreachable after the
+           first run: somebody who skipped the downloads had no way back to
+           them but editing the settings file. -->
+      <TextBlock Text="{loc:S 'ЗНАКОМСТВО'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+        <Button x:Name="RunSetup" Style="{StaticResource Btn}"
+                Content="{loc:S 'Пройти настройку заново'}"
+                Click="OnRunSetup" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                 Margin="0,0,0,16"
+                 Text="{loc:S 'Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно.'}" />
+
+      <TextBlock Text="{loc:S 'ДИАГНОСТИКА'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal" Margin="0,0,0,8">
+        <Button x:Name="CollectDiagnostics" Style="{StaticResource Btn}"
+                Content="{loc:S 'Собрать пакет'}"
+                Click="OnCollectDiagnostics" />
+        <TextBlock x:Name="DiagnosticsState" Style="{StaticResource Text.Meta}"
+                   VerticalAlignment="Center" Margin="12,0,0,0"
+                   TextTrimming="CharacterEllipsis" />
+      </StackPanel>
+      <TextBlock Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+                 Margin="0,0,0,16"
+                 Text="{loc:S 'Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло.'}" />
+
+      <TextBlock Text="{loc:S 'ССЫЛКИ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12" />
+      <StackPanel x:Name="Links" Orientation="Horizontal" Margin="0,0,0,16" />
+
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

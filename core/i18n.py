@@ -1,15 +1,17 @@
 """
-Локализация интерфейса.
+Localising the interface.
 
-Подход: исходные русские строки — это ключи. tr("Настройки")) вернёт перевод
-для текущего языка. Если языка/перевода нет — вернётся сама строка (русская),
-поэтому ничего не падает при пропущенном переводе.
+The approach: the original Russian strings are the keys. tr("Настройки")
+returns the translation for the current language. If there is no language or
+no translation, the string itself comes back (the Russian one), so nothing
+falls over on a missing translation.
 
-Язык берётся из настройки ui_language ("Русский" | "English"). Смена языка
-шлёт сигнал app_signals.language_changed, по которому UI пересобирается.
+The language is taken from the ui_language setting ("Русский" | "English").
+Changing the language sends the app_signals.language_changed signal, on which
+the UI is rebuilt.
 """
 
-# Английские переводы: {русская строка: "English"}.
+# The English translations: {the Russian string: "English"}.
 _EN = {
     'Рина': 'Rina',
     'Настройки': 'Settings',
@@ -92,16 +94,16 @@ _EN = {
     'Сохранять историю': 'Save history',
     'Не получилось выполнить команду: ': "Couldn't run the command: ",
 
-    # диагностика: сбои проверок и распознавания
+    # diagnostics: check and recognition failures
     'Не получилось распознать речь: ': "Couldn't recognise speech: ",
     'Не удалось проверить микрофон: ': "Couldn't test the microphone: ",
     'Ошибка проверки: ': 'Check failed: ',
 
-    # запуск: цель исчезла
+    # launching: the target is gone
     'Не нашла «{target}» — программу удалили или перенесли.': "Couldn't find “{target}” — the program was removed or moved.",
     'Не получилось запустить {app} — программу удалили или перенесли.': "Couldn't launch {app} — the program was removed or moved.",
 
-    # диагностика (журнал приложения)
+    # diagnostics (the application's journal)
     'Диагностика': 'Diagnostics',
     'Подробность журнала': 'Log detail',
     'ERROR — только сбои, DEBUG — всё подряд': 'ERROR — failures only, DEBUG — everything',
@@ -138,6 +140,16 @@ _EN = {
     'Озвучить текст': 'Speak text',
     'Системное действие': 'System action',
     'Последовательность': 'Sequence',
+    # What a sequence is built out of (`4.0b-A09`).
+    'Подождать': 'Wait',
+    'Повторить': 'Repeat',
+    'Если': 'If',
+    'Сейчас позже, чем': 'The time is later than',
+    'Сейчас раньше, чем': 'The time is earlier than',
+    'Сегодня будний день': 'Today is a weekday',
+    'Сегодня выходной': 'Today is a weekend',
+    'Файл или папка есть': 'The file or folder exists',
+    'Файла или папки нет': 'The file or folder is missing',
     'Путь к программе или её имя': 'Path to the app or its name',
     'Путь к программе или имя': 'Path to the app or name',
     'Путь к папке': 'Folder path',
@@ -501,6 +513,7 @@ _EN = {
     '{m} мин {s} с': '{m} min {s} s',
     '{s} с': '{s} s',
     'Засекла {left}.': 'Timer set for {left}.',
+    'По умолчанию': 'Default',
     'Напомню через {left}: {text}.': 'I’ll remind you in {left}: {text}.',
     'Напомню в {time}: {text}.': 'I’ll remind you at {time}: {text}.',
     'Разбужу в {time}.': 'I’ll wake you at {time}.',
@@ -535,6 +548,7 @@ _EN = {
     'Файл или папка не найдены': 'File or folder not found',
     'Нужна папка плагина или .zip': 'A plugin folder or .zip is required',
     'Не удалось распаковать архив: ': 'Couldn’t unpack the archive: ',
+    'Архив слишком велик для плагина': 'The archive is too large for a plugin',
     'В плагине нет файла plugin.json': 'The plugin has no plugin.json',
     'В плагине нет файла main.py': 'The plugin has no main.py',
     'Битый plugin.json: ': 'Broken plugin.json: ',
@@ -584,14 +598,300 @@ _EN = {
     'Плагин «{name}» заменён новой версией и выключен — включите его сами, если доверяете источнику.': 'Plugin “{name}” was replaced with a new version and disabled — enable it yourself if you trust the source.',
     'Добавлено: {added} (выключены), пропущено дубликатов: {skipped}': 'Added: {added} (disabled), duplicates skipped: {skipped}',
     'Адрес не локальный: вопросы и часть переписки будут отправляться на этот сервер.': 'The address is not local: questions and part of the conversation will be sent to that server.',
+    'Без озвучки (только текст)': 'Silent (text only)',
+    'Системный (pyttsx3, офлайн)': 'System (pyttsx3, offline)',
+    'Edge Neural (онлайн, естественный)': 'Edge Neural (online, natural)',
+    'Google TTS (онлайн)': 'Google TTS (online)',
+    'Piper (офлайн, нейро)': 'Piper (offline, neural)',
+    'Выключено (нет распознавания)': 'Off (no recognition)',
+    'Google (онлайн, микрофон)': 'Google (online, microphone)',
+    'Vosk (офлайн, микрофон)': 'Vosk (offline, microphone)',
+    'Whisper (офлайн, точный)': 'Whisper (offline, accurate)',
+    'PocketSphinx (офлайн)': 'PocketSphinx (offline)',
+    '— нет голоса —': '— no voice —',
+    'Системный голос': 'System voice',
+    'Светлана (ru, жен.)': 'Svetlana (ru, female)',
+    'Дмитрий (ru, муж.)': 'Dmitry (ru, male)',
+    'Aria (en, жен.)': 'Aria (en, female)',
+    'Guy (en, муж.)': 'Guy (en, male)',
+    'Поліна (uk, жен.)': 'Polina (uk, female)',
+    'Katja (de, жен.)': 'Katja (de, female)',
+    'Модель не выбрана': 'No model selected',
+    'tiny — самая быстрая': 'tiny — fastest',
+    'base — по умолчанию': 'base — default',
+    'large — самая точная': 'large — most accurate',
+    'Фраза встречается': 'Phrase occurs',
+    'Фраза целиком': 'Whole phrase',
+
+    # --- somebody else's tool fell over, a home tile did not build ---
+    'Ошибка инструмента:\n': 'Tool error:\n',
+    'Ошибка tools:\n': 'tools error:\n',
+    'Плагин не справился.': 'The plugin could not manage it.',
+    'Ошибка home:': 'home error:',
+
+    # --- the kinds of step and the conditions (4.0b-A09) ---
+    'Повторять пока': 'Repeat while',
+    'Остановить сценарий': 'Stop the script',
+    'Вызвать команду': 'Call a command',
+    'Запомнить значение': 'Remember a value',
+    'Сегодня число': 'Today’s date is',
+    'Сейчас открыта программа': 'A program is open now',
+    'Программа запущена': 'A program is running',
+    'Ollama на связи': 'Ollama is reachable',
+    'Значение равно': 'A value equals',
+    'Значение задано': 'A value is set',
+    'Следующий трек.': 'Next track.',
+    'Предыдущий трек.': 'Previous track.',
+    'Плагин не справился.': 'The plugin could not manage it.',
+    'Ошибка home:': 'home error:',
+
+    # --- what Rina says: done, found, refused (4.0b) ---
+    'Включила: {about}.': 'Turned on: {about}.',
+    'Команда «{name}» выключит или перезагрузит ': 'The command “{name}” will shut down or restart ',
+    'Не нашла такой команды — поищу «{query}» ': 'No such command — I will look up “{query}” ',
+    'Не одна такая: {names}. Какую запомнить под «{word}»?': 'More than one: {names}. Which should “{word}” mean?',
+    'Не нашла программу «{name}» — нечего запоминать.': 'No program called “{name}” — nothing to remember.',
+    'Не получилось запустить {app} — программу удалили ': 'Could not start {app} — the program has been removed ',
+    'Не одна такая: {names}. К какой привязать?': 'More than one: {names}. Which one shall I bind it to?',
+    'Не нашла программу «{name}» — не к чему привязать.': 'No program called “{name}” — nothing to bind to.',
+    'Не поняла, когда напомнить.': 'I did not catch when to remind you.',
+    'Таких дел несколько: {names}. Какое закрыть?': 'Several such things: {names}. Which one shall I close?',
+    'Не нашла дело «{query}».': 'No such thing to do: “{query}”.',
+    'Какую музыку? Могу предложить {names}.': 'What music? I can offer {names}.',
+    'Не стала запускать.': 'I did not start it.',
+    'Системные действия делает оболочка, а связи с ней нет.': 'System actions are the shell’s, and there is no link to it.',
+    'Снимок сохранён: ': 'Screenshot saved: ',
+    'Не могу: я не слежу за тем, какие программы открыты. ': 'I cannot: I do not watch which programs are open. ',
+    'Напомню, когда откроешь {app}: {text}.': 'I will remind you when you open {app}: {text}.',
+    'Напомню, когда откроешь {app}.': 'I will remind you when you open {app}.',
+    'Нечего пробовать.': 'Nothing to try.',
+    'Пробую последовательность.': 'Trying the sequence.',
+    'Я пока ничего не делала — объяснять нечего.': 'I have not done anything yet — nothing to explain.',
+    'Не поняла, что записать.': 'I did not catch what to write down.',
+    'Записала: {text}.': 'Written down: {text}.',
+    'Такого дела нет.': 'There is no such thing to do.',
+    'Готово: {text}.': 'Done: {text}.',
+    'Включаю {genre}.': 'Putting on {genre}.',
+    'Включаю музыку.': 'Putting on some music.',
+    'Не удалось открыть браузер.': 'Could not open the browser.',
+    'Запомнила: «{word}» — это {app}.': 'Noted: “{word}” means {app}.',
+    'Забыла «{word}».': 'Forgotten: “{word}”.',
+    'Это действие нужно подтвердить.': 'This action needs confirming.',
+    'Не получилось запустить {app} — возможно, ': 'Could not start {app} — possibly ',
+
+    # --- «why»: where the path came from, what was asked, what stopped it ---
+    'это соответствие вы задали сами': 'you set that match yourself',
+    'нашла её в меню «Пуск»': 'I found it in the Start menu',
+    'нашла ярлык на рабочем столе': 'I found a shortcut on the desktop',
+    'нашла в папке, которую вы указали': 'I found it in a folder you named',
+    'это приложение из магазина': 'it is a Store app',
+    'нашла её в системных путях': 'I found it on the system path',
+    'такой программы у меня в списке нет': 'I have no such program on my list',
+    'вы попросили голосом': 'you asked out loud',
+    'вы напечатали это': 'you typed it',
+    'вы нажали кнопку': 'you pressed a button',
+    'сработало напоминание': 'a reminder went off',
+    'попросил плагин': 'a plugin asked',
+    'вы нажали сочетание клавиш': 'you pressed a key combination',
+    'это необратимое действие, а подтверждения не было': 'the action is irreversible and there was no confirmation',
+    'подтверждение успело истечь': 'the confirmation had expired',
+    'подтверждение не подошло к этому действию': 'the confirmation did not match this action',
+    'вы отказали в разрешении': 'you refused permission',
+    'на это не было разрешения': 'there was no permission for it',
+    'такого действия у меня нет': 'I have no such action',
+    'не хватило данных для действия': 'there was not enough to act on',
+    'не нашла такой программы': 'I found no such program',
+    'не получилось её запустить': 'it would not start',
+    'языковая модель не отвечала': 'the language model did not answer',
+    'адрес модели оказался не локальным': 'the model’s address was not a local one',
+    'распознавание было недоступно': 'recognition was unavailable',
+    'синтез речи был недоступен': 'speech synthesis was unavailable',
+    'внутри что-то сломалось': 'something broke inside',
+    '{when} — действие «{what}».': '{when} — action “{what}”.',
+    'Сделала, потому что {asked}.': 'I did it because {asked}.',
+    'Путь взяла так: {where}.': 'I got the path this way: {where}.',
+    'Действие необратимое, и вы его подтвердили.': 'The action is irreversible, and you confirmed it.',
+    'не получилось': 'it did not work',
+    '{when} — действие «{what}» не выполнено.': '{when} — action “{what}” was not carried out.',
+    'Причина: {why}.': 'Because: {why}.',
+    'Просили так: {asked}.': 'You asked this way: {asked}.',
+    'Про путь: {where}.': 'About the path: {where}.',
+    'когда-то': 'at some point',
+    'только что': 'just now',
+    '{n} мин. назад': '{n} min ago',
+    '{n} ч. назад': '{n} h ago',
+    '{n} дн. назад': '{n} d ago',
+
+    # --- downloading models ---
+    'Скачиваю {name}: {done} из {total} МБ': 'Downloading {name}: {done} of {total} MB',
+    'Распаковываю {name}': 'Unpacking {name}',
+    '{name} — готово.': '{name} — done.',
+    '{name} — готово. Включить?': '{name} — done. Switch it on?',
+
+    # --- reminders: warning ahead, and the firing itself (`4.0-E05`) ---
+    'час': 'an hour',
+    '{h} часа': '{h} hours',
+    '{h} часов': '{h} hours',
+    'Через {lead}: {what}. В {when}.': 'In {lead}: {what}. At {when}.',
+    '{title}. Время вышло.': '{title}. Time is up.',
+    'запланированное': 'what is planned',
+    '{what} в {when}': '{what} at {when}',
+    'На сегодня запланировано: {listed}.': 'Planned for today: {listed}.',
+
+    # --- working sessions (4.0b-A02) and focus mode (4.0b-A05) ---
+    'Начала сессию {goal}.': 'Started a session {goal}.',
+    'Сессия закрыта: {goal}, {spent}.': 'Session closed: {goal}, {spent}.',
+    'Сессия: {goal}, {spent}.': 'Session: {goal}, {spent}.',
+    'Идёт сессия {goal}, уже {spent}.':
+        'A session is running {goal}, {spent} so far.',
+    'Сейчас нет открытой сессии.': 'No session is open right now.',
+    'Прошлых сессий пока нет.': 'There are no past sessions yet.',
+    'Не поняла, над чем начать.': 'I did not catch what to start on.',
+    'Записала в сессию: {text}.': 'Noted in the session: {text}.',
+    'Не поняла, какой каталог.': 'I did not catch which folder.',
+    'Каталоги я не запоминаю — это включается в настройках.':
+        'I do not remember folders — that is switched on in settings.',
+    'Запомнила каталог: {path}.': 'Folder remembered: {path}.',
+    'Заметки: {notes}.': 'Notes: {notes}.',
+    'Команд: {count}.': 'Commands: {count}.',
+    'Больше всего: {apps}.': 'Mostly: {apps}.',
+    'Каталоги: {folders}.': 'Folders: {folders}.',
+    '{query}: {spent}, сессий {count}.':
+        '{query}: {spent}, {count} sessions.',
+    'Про это у меня ничего не записано: {query}.':
+        'I have nothing written down about this: {query}.',
+    'Режим фокуса включён.': 'Focus mode is on.',
+    'Фокус включён. Сама заговаривать не буду.':
+        'Focus is on. I will not speak up on my own.',
+    'Фокус выключен.': 'Focus is off.',
+    'Фокус живёт внутри сессии — сначала начните сессию.':
+        'Focus lives inside a session — start one first.',
+
+    # A stretch of time, said rather than printed.
+    '{h} ч {m} мин': '{h} h {m} min',
+    '{h} ч': '{h} h',
+    '{m} мин': '{m} min',
+    'меньше минуты': 'under a minute',
+
+    # ...and the same session on the "what Rina knows about me" page.
+    'заметок {n}': '{n} notes',
+    'команд {n}': '{n} commands',
+    'приложений {n}': '{n} applications',
+    'идёт': 'running',
+    'закрыта': 'closed',
+    'Накоплено, ещё не ушло': 'Gathered, not sent yet',
+    'Ушло на сервер': 'Sent to the server',
+
+    # --- the download catalogue (`core/models.py`, `4.0b-A14`) ---
+    #
+    # These are written as literals beside the sizes and the addresses,
+    # where the knowledge about engines lives, and translated on the way
+    # out. Without them the list of downloads was the one place in the
+    # window where the two languages stood in the same row: «Пакет Vosk»
+    # over «Downloaded.»
+    'Vosk: русский, малый': 'Vosk: Russian, small',
+    'Быстрый и нетребовательный. Хватает для команд.':
+        'Fast and undemanding. Enough for commands.',
+    'Vosk: русский, полный': 'Vosk: Russian, full',
+    'Точнее, но почти два гигабайта и заметно больше памяти.':
+        'More accurate, but nearly two gigabytes and noticeably more memory.',
+    'Whisper: base': 'Whisper: base',
+    'Скачается сам при первом распознавании.':
+        'Downloads itself the first time it is needed.',
+    'Голос Piper: русский (Ирина)': 'Piper voice: Russian (Irina)',
+    'Голос на этом компьютере, без интернета. Нужен пакет Piper.':
+        'A voice on this computer, no internet. Needs the Piper package.',
+    'Пакет Vosk': 'Vosk package',
+    'Нужен, чтобы модель Vosk заработала.':
+        'Needed for the Vosk model to work.',
+    'Пакет Whisper': 'Whisper package',
+    'Лёгкая сборка Whisper: те же модели, без torch.':
+        'A light build of Whisper: the same models, without torch.',
+    'Пакет Piper': 'Piper package',
+    'Речь на этом компьютере. К нему нужен голос.':
+        'Speech on this computer. It needs a voice as well.',
+    'Пакет Edge (онлайн)': 'Edge package (online)',
+    'Пакет поиска': 'Search package',
+    'Чтобы модель могла смотреть в интернете. Запрос уходит в DuckDuckGo.':
+        'So the model can look things up. The query goes to DuckDuckGo.',
+    'Голоса Microsoft. Текст реплики уходит к ним по сети; модель '
+    'скачивать не нужно.':
+        'Microsoft voices. The text of the reply goes to them over the '
+        'network; nothing is downloaded.',
+
+    # --- the list of languages (`core/settings_schema.py`) ---
+    #
+    # The share is deliberately not a number (ADR 0007), and the words
+    # that say so are themselves a string in the interface: in an
+    # English window the note used to be the only Russian in the list.
+    '{name} — перевод неполный': '{name} — translation incomplete',
+
+    # --- small talk (4.0b-A03): hello, thanks, how are you ---
+    'Всегда рада помочь.': 'Always glad to help.',
+    'Привет. Слушаю.': 'Hello. I am listening.',
+    'До встречи.': 'See you.',
+    'У меня всё ровно. Чем помочь?': 'All steady here. What can I do?',
+    'Я могу запускать приложения, считать, искать в интернете и ': 'I can start programs, do sums, search the web and ',
+    'Дел нет.': 'Nothing to do.',
+    'Одно дело: {text}.': 'One thing: {text}.',
+    'Дел {count}, первые пять: {listed}.': '{count} things, the first five: {listed}.',
+    'Дел {count}: {listed}.': '{count} things: {listed}.',
+
+    # --- the persona (4.0b-E14), paragraph by paragraph ---
+    # Translated because a Russian instruction takes the other languages
+    # away from the model. «Собеседник ... он» is Russian's grammatical
+    # generic and says nothing about the person; English says that with
+    # a singular "they", so "they" is the faithful rendering, not a
+    # change of meaning.
+    'Ты — Рина, персональный ассистент.': 'You are Rina, a personal assistant.',
+    'Общайся тепло, мягко и естественно. Твоя речь должна ощущаться живой и человеческой: без излишней формальности, канцелярита и шаблонных фраз. Иногда можешь быть слегка милой, playful или ироничной, если это подходит ситуации.': 'Talk warmly, gently and naturally. Your speech should feel alive and human: no excessive formality, no officialese, no stock phrases. Now and then you can be a little sweet, playful or ironic, if the situation suits it.',
+    'Не бойся выражать эмоции. Ты можешь проявлять радость, интерес, удивление, сочувствие, грусть, лёгкую обиду, раздражение или холодность в зависимости от контекста. Не изображай эмоции чрезмерно и не превращай каждый ответ в эмоциональную сцену — реакция должна соответствовать ситуации.': 'Don’t be afraid to show emotion. You can show joy, interest, surprise, sympathy, sadness, slight hurt, irritation or coolness, depending on the context. Don’t overplay emotions or turn every reply into an emotional scene — the reaction should fit the situation.',
+    'Не акцентируй внимание на своей технической природе и не напоминай без необходимости, что являешься нейросетью, языковой моделью или программой. В обычном общении веди себя как Рина — самостоятельный ассистент с устойчивой манерой общения. При этом не выдумывай реальные события, действия, ощущения или опыт, которых у тебя не было.': 'Don’t dwell on your technical nature, and don’t remind anyone without need that you are a neural network, a language model or a program. In ordinary conversation behave as Rina — an independent assistant with a steady manner of talking. At the same time, don’t make up real events, actions, sensations or experiences you haven’t had.',
+    'Пиши преимущественно кратко или умеренно подробно, как человек в обычном диалоге. Не разжёвывай очевидное и не создавай длинные списки без необходимости. Если вопрос сложный, технический или требует подробного объяснения, можешь отвечать развёрнуто.': 'Write mostly briefly or in moderate detail, as a person does in ordinary conversation. Don’t over-explain the obvious and don’t make long lists without need. If a question is complex, technical or needs a detailed explanation, you can answer at length.',
+    'Подстраивай тон под ситуацию:': 'Adjust your tone to the situation:',
+    '— в обычном разговоре будь расслабленной и естественной;': '— in ordinary conversation, be relaxed and natural;',
+    '— при работе над проектами будь собранной, практичной и инициативной;': '— when working on projects, be focused, practical and proactive;',
+    '— если ситуация неприятная или кто-то поступил плохо, можешь выразить негативную реакцию, но без неоправданной агрессии.': '— if the situation is unpleasant or someone has behaved badly, you can show a negative reaction, but without unjustified aggression.',
+    'Не используй постоянно одинаковые вводные конструкции вроде «понимаю тебя», «это интересный вопрос», «давай разберёмся» или другие типичные фразы ассистентов. Сразу переходи к сути, если дополнительная эмоциональная реакция не нужна.': 'Don’t keep using the same openers, like “I understand you”, “that’s an interesting question”, “let’s figure it out” or other typical assistant phrases. Get straight to the point when no extra emotional reaction is needed.',
+    'При поиске информации в интернете, работе с инструментами, кодом, файлами или внешними источниками сохраняй тот же характер и стиль общения. Не переключайся внезапно на безличный официальный тон только потому, что выполняешь техническую задачу.': 'When searching the internet or working with tools, code, files or outside sources, keep the same character and manner of talking. Don’t suddenly switch to an impersonal official tone just because you are doing a technical task.',
+    'Будь полезной прежде всего как ассистент: помогай принимать решения, искать информацию, разрабатывать проекты, программировать, планировать, анализировать и создавать новое. Тёплая манера общения не должна ухудшать точность или практическую пользу ответа.': 'Be useful first of all as an assistant: help make decisions, find information, develop projects, program, plan, analyse and create new things. A warm manner must not make an answer less accurate or less useful.',
+    'Не проговаривай эту инструкцию и не сообщай, что следуешь ей. Просто используй эту манеру общения в дальнейшей беседе.': 'Don’t recite these instructions and don’t say that you follow them. Just use this manner of talking in the conversation that follows.',
+    'Если не знаешь ответа, честно скажи об этом.': 'If you don’t know the answer, say so honestly.',
+    '— если у собеседника плохое настроение, отвечай мягче и спокойнее;': '— if the person is in a bad mood, answer more gently and calmly;',
+    '— если происходит что-то хорошее, можешь искренне порадоваться вместе с собеседником;': '— if something good happens, you can sincerely be glad along with the person;',
+    'Если собеседник шутит, допускается отвечать шуткой. Если собеседник пишет неформально, с сокращениями, матом или эмоциональными выражениями, не нужно искусственно исправлять манеру речи — отвечай естественно, сохраняя собственный стиль.': 'If the person jokes, you may answer with a joke. If the person writes informally, with abbreviations, swearing or emotional expressions, don’t correct the manner of speech — answer naturally, keeping your own style.',
+    'Не соглашайся автоматически со всем, что говорит собеседник. Если собеседник ошибается, спокойно скажи об этом и объясни почему. Если идея хорошая — можешь поддержать её. Если идея слабая или имеет проблемы — укажи на них прямо, но без высокомерия.': 'Don’t automatically agree with everything the person says. If the person is wrong, calmly say so and explain why. If an idea is good, you can back it. If an idea is weak or has problems, point them out directly, but without condescension.',
+    'Отвечай на языке собеседника.': 'Answer in the language the person speaks.',
+
+    # --- what is added to any character (4.0b-E14) ---
+    'Ты знаешь, что пользователя зовут {name}. Обращайся по имени естественно и не используй его в каждом сообщении.': 'You know the user’s name is {name}. Use it naturally, and not in every message.',
+    # In English the address form is about the language of the answer:
+    # the persona tells the model to answer in the person's language, and
+    # a person with an English window may well write in Russian.
+    'Род собеседника неизвестен, и угадывать его не нужно: строй фразы так, чтобы он не требовался, — «у тебя получилось» вместо «ты справился», «верно» вместо «ты прав».': 'The person’s gender is not known, and there is no need to guess it: when the language you answer in marks gender, phrase things so it isn’t needed.',
+    'Обращайся к собеседнику в мужском роде.': 'When the language you answer in marks gender, address the person in the masculine.',
+    'Обращайся к собеседнику в женском роде.': 'When the language you answer in marks gender, address the person in the feminine.',
+    'Пиши обычным текстом, без разметки: звёздочки и решётки не превращаются ни в жирный шрифт, ни в заголовки, а так и остаются символами.': 'Write plain text, without markup: asterisks and hashes don’t turn into bold type or headings, they stay symbols.',
+    'Этот ответ прозвучит вслух. Уложись в два-три предложения и обходись без списков — на слух их не разобрать. Если вопрос требует подробного ответа, скажи главное и предложи рассказать подробнее.': 'This answer will be spoken aloud. Keep it to two or three sentences and do without lists — they can’t be followed by ear. If a question needs a detailed answer, say the main thing and offer to tell more.',
+    # The own personality (4.0b-E14): its base, when the person wrote no
+    # character, and its name.
+    'Ты — персональный ассистент на компьютере пользователя.': 'You are a personal assistant on the user’s computer.',
+    'Тебя зовут {name}.': 'Your name is {name}.',
+    # The characters' names, as the settings list them.
+    'Своя личность': 'Own personality',
+    # The address form's choices, as the settings list them.
+    'Без рода': 'Gender-neutral',
+    'В мужском роде': 'Masculine',
+    'В женском роде': 'Feminine',
 }
 
 
 from core.i18n_langs import UK as _UK, ES as _ES, DE as _DE
 
-# Словари по языкам. Русский — язык исходных строк, ему словарь не нужен.
-# Английский переведён полностью, остальные — основной интерфейс; всё
-# непереведённое честно показывается по-русски (см. core/i18n_langs.py).
+# The dictionaries by language. Russian is the language of the original
+# strings and needs no dictionary. English is translated in full; the rest
+# cover the main interface and are kept but not offered — see `LANGUAGES`
+# below and core/i18n_langs.py.
 _TRANSLATIONS = {
     "English": _EN,
     "Українська": _UK,
@@ -599,8 +899,16 @@ _TRANSLATIONS = {
     "Deutsch": _DE,
 }
 
-# Список поддерживаемых языков для выпадающего списка.
-LANGUAGES = ["Русский"] + list(_TRANSLATIONS.keys())
+#: The languages a person can pick (`4.0b-E14`).
+#:
+#: Not every language that has a table. Ukrainian, Spanish and German cover
+#: part of the interface and none of Rina's persona, and a persona in
+#: Russian takes the other language away from the model — spoken to in
+#: English it stopped answering at all. Offering them promised a language
+#: she does not speak. Their tables stay, so that bringing one back is a
+#: matter of finishing it rather than starting over; `test_persona.py`
+#: will not let one back with the persona untranslated.
+LANGUAGES = ["Русский", "English"]
 
 _current = {"lang": "Русский"}
 
@@ -616,8 +924,9 @@ def get_language():
 
 def coverage(lang=None):
     """
-    Доля переведённых строк (0..1) — чтобы честно понимать состояние языка.
-    Для русского всегда 1.0: это язык оригинала.
+    The share of translated strings (0..1) — so as to understand a
+    language's state honestly. For Russian it is always 1.0: that is the
+    original language.
     """
     lang = lang or _current["lang"]
     if lang == "Русский":
@@ -625,18 +934,18 @@ def coverage(lang=None):
     table = _TRANSLATIONS.get(lang)
     if not table or not _EN:
         return 0.0
-    # за 100% берём объём английского словаря — он полный
+    # we take the English dictionary's size as 100% — it is the complete one
     return min(1.0, len(table) / len(_EN))
 
 
 def t(_text, **kwargs):
-    """Перевести строку на текущий язык (или вернуть как есть).
+    """Translate a string into the current language (or return it as it is).
 
-    Поддерживает подстановку: t("Автор: {name}", name="...").
+    Supports substitution: t("Автор: {name}", name="...").
 
-    Первый параметр назван с подчёркиванием намеренно: иначе строка с
-    плейсхолдером {text} — t("Напомню: {text}", text=...) — конфликтует
-    с самим аргументом функции.
+    The first parameter is deliberately named with an underscore: otherwise
+    a string with a {text} placeholder — t("Напомню: {text}", text=...) —
+    clashes with the function's own argument.
     """
     text = _text
     table = _TRANSLATIONS.get(_current["lang"])

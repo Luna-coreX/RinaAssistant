@@ -1,13 +1,15 @@
 """
-Speech-to-Text слой с выбором движка и работой с микрофоном.
+The speech-to-text layer with a choice of engine and work with the
+microphone.
 
-Абстракция STTEngine:
-  - SpeechRecognitionEngine — микрофон через SpeechRecognition + Google (онлайн)
-  - VoskEngine              — офлайн распознавание (нужна модель Vosk)
-  - DisabledEngine          — распознавание выключено (ничего не слушает)
+The STTEngine abstraction:
+  - SpeechRecognitionEngine — the microphone through SpeechRecognition +
+                              Google (online)
+  - VoskEngine              — offline recognition (needs a Vosk model)
+  - DisabledEngine          — recognition switched off (listens to nothing)
 
-Каждый бэкенд опционален. Распознавание блокирующее (слушает микрофон),
-поэтому запускается из фонового потока (voice/service.py).
+Every backend is optional. Recognition blocks (it listens to the
+microphone), so it is started from a background thread (voice/service.py).
 """
 
 import os
@@ -15,12 +17,12 @@ import os
 
 def check_vosk_model(path):
     """
-    Проверяет, похожа ли папка на модель Vosk.
+    Checks whether a folder looks like a Vosk model.
 
-    Ошибиться папкой легко (часто указывают на архив или на уровень выше),
-    и без проверки это выясняется только в момент, когда пользователь
-    что-то сказал, — а ответом будет невнятная ошибка распознавания.
-    Возвращает (ok, сообщение).
+    Pointing at the wrong folder is easy (people often point at an archive
+    or one level up), and without a check that comes out only at the moment
+    the user says something — and the answer will be an unintelligible
+    recognition error. Returns (ok, message).
     """
     import os
 
@@ -32,11 +34,11 @@ def check_vosk_model(path):
         return False, tr("Папки не существует")
 
     names = set(os.listdir(path))
-    # у любой модели Vosk есть акустическая часть и конфиг
+    # every Vosk model has an acoustic part and a config
     required = ("am", "conf")
     missing = [n for n in required if n not in names]
     if missing:
-        # частый случай: указали папку на уровень выше настоящей модели
+        # a common case: a folder one level above the real model was named
         nested = [n for n in names
                   if os.path.isdir(os.path.join(path, n))
                   and {"am", "conf"} <= set(os.listdir(os.path.join(path, n)))]
@@ -48,7 +50,7 @@ def check_vosk_model(path):
 
 
 def check_piper_model(path):
-    """Проверяет файл голоса Piper (.onnx + конфиг рядом)."""
+    """Checks a Piper voice file (.onnx plus a config beside it)."""
     import os
 
     from core.i18n import t as tr
@@ -80,16 +82,16 @@ class STTEngine:
         return False
 
     def listen_once(self, language="ru", timeout=6) -> STTResult:
-        """Слушает микрофон один раз и возвращает распознанный текст."""
+        """Listens to the microphone once and returns the recognised text."""
         raise NotImplementedError
 
 
 # ---------------------------------------------------------------------------
 class DisabledEngine(STTEngine):
     """
-    Распознавание выключено. Ничего НЕ слушает и НЕ выдаёт фраз — поэтому
-    ассистент не реагирует «сам по себе». Выбирается по умолчанию, пока
-    пользователь не установит реальный движок (Google/Vosk).
+    Recognition is switched off. Listens to NOTHING and gives out NO
+    phrases — so the assistant does not react "by itself". Chosen by default
+    until the user installs a real engine (Google/Vosk).
     """
     id = "disabled"
     label = "Выключено (нет распознавания)"
@@ -117,12 +119,13 @@ def _sd_available():
 
 def _record_sounddevice(seconds=6, samplerate=16000):
     """
-    Записывает аудио с микрофона через sounddevice (без PyAudio).
-    Возвращает (numpy_float32_mono, samplerate) или (None, sr) при ошибке.
-    Учитывает выбранное устройство ввода из настроек.
+    Records audio from the microphone through sounddevice (without PyAudio).
+    Returns (numpy_float32_mono, samplerate), or (None, sr) on an error.
+    Takes the chosen input device from the settings into account.
 
-    Аудио очищается от NaN/inf: битые сэмплы (устройство недодало данные,
-    неверный формат) иначе вызывают предупреждения и мусор в распознавании.
+    The audio is cleaned of NaN/inf: broken samples (the device gave less
+    data than it should, a wrong format) otherwise cause warnings and
+    rubbish in the recognition.
     """
     try:
         import sounddevice as sd
@@ -141,13 +144,14 @@ def _record_sounddevice(seconds=6, samplerate=16000):
         sd.wait()
         data = rec.flatten()
 
-        # чистим NaN/inf: битые сэмплы (устройство недодало данные, неверный
-        # формат) иначе вызывают предупреждения и мусор в распознавании.
+        # we clean NaN/inf: broken samples (the device gave less data than
+        # it should, a wrong format) otherwise cause warnings and rubbish in
+        # the recognition.
         had_bad = not np.all(np.isfinite(data))
         data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
         data = data.astype(np.float32, copy=False)
 
-        # если ВСЯ запись была битой (сплошь NaN/inf) — это сбой устройства
+        # if the WHOLE recording was broken (nothing but NaN/inf) — that is a device failure
         if had_bad and not np.any(np.abs(data) > 1e-5):
             return None, samplerate
 
@@ -157,10 +161,10 @@ def _record_sounddevice(seconds=6, samplerate=16000):
 
 
 def _to_pcm16(data):
-    """float32 [-1..1] -> int16 little-endian PCM (bytes), безопасно к NaN/inf."""
+    """float32 [-1..1] -> int16 little-endian PCM (bytes), safe against NaN/inf."""
     import numpy as np
     arr = np.asarray(data, dtype=np.float32)
-    # NaN -> 0, +inf -> +1 (рейл), -inf -> -1 (рейл), затем клип в [-1,1]
+    # NaN -> 0, +inf -> +1 (the rail), -inf -> -1 (the rail), then clipped to [-1,1]
     arr = np.nan_to_num(arr, nan=0.0, posinf=1.0, neginf=-1.0)
     arr = np.clip(arr, -1.0, 1.0)
     return (arr * 32767.0).astype("<i2").tobytes()
@@ -168,9 +172,9 @@ def _to_pcm16(data):
 
 class SpeechRecognitionEngine(STTEngine):
     """
-    Онлайн-распознавание Google через SpeechRecognition.
-    Захват — через sounddevice (не требует PyAudio), затем аудио передаётся
-    в recognizer. Работает с той установкой, что у вас есть.
+    Online Google recognition through SpeechRecognition.
+    Capture is through sounddevice (needs no PyAudio), then the audio is
+    handed to the recognizer. Works with whatever installation you have.
     """
     id = "google"
     label = "Google (онлайн, микрофон)"
@@ -200,7 +204,7 @@ class SpeechRecognitionEngine(STTEngine):
             return STTResult(error="Не удалось записать с микрофона")
         try:
             import numpy as np
-            # float32 -> int16 PCM для sr.AudioData
+            # float32 -> int16 PCM for sr.AudioData
             pcm = _to_pcm16(data)
             audio = sr.AudioData(pcm, samplerate, 2)
             recognizer = sr.Recognizer()
@@ -218,9 +222,9 @@ class SpeechRecognitionEngine(STTEngine):
 # ---------------------------------------------------------------------------
 class VoskEngine(STTEngine):
     """
-    Офлайн-распознавание Vosk. Нужна скачанная модель (папка), путь — в
-    настройке vosk_model. Захват через sounddevice.
-    Модели: https://alphacephei.com/vosk/models (напр. vosk-model-small-ru).
+    Offline Vosk recognition. Needs a downloaded model (a folder); the path
+    is in the vosk_model setting. Capture is through sounddevice.
+    Models: https://alphacephei.com/vosk/models (e.g. vosk-model-small-ru).
     """
     id = "vosk"
     label = "Vosk (офлайн, микрофон)"
@@ -247,7 +251,7 @@ class VoskEngine(STTEngine):
         path = settings.get("vosk_model", "")
         if not path or not os.path.isdir(path):
             return None
-        # кэшируем модель между вызовами
+        # we cache the model between calls
         if self._model is None or self._model_path != path:
             try:
                 self._model = vosk.Model(path)
@@ -288,9 +292,10 @@ class VoskEngine(STTEngine):
 # ---------------------------------------------------------------------------
 class WhisperEngine(STTEngine):
     """
-    Офлайн-распознавание OpenAI Whisper (локально). Требует пакет
-    openai-whisper. Точный, но тяжёлый; размер модели — настройка whisper_model
-    (tiny/base/small/medium). Захват через sounddevice.
+    Offline OpenAI Whisper recognition (locally). Requires the
+    openai-whisper package. Accurate but heavy; the model's size is the
+    whisper_model setting (tiny/base/small/medium). Capture is through
+    sounddevice.
     """
     id = "whisper"
     label = "Whisper (офлайн, точный)"
@@ -337,7 +342,7 @@ class WhisperEngine(STTEngine):
             return STTResult(error="Не удалось записать с микрофона")
         try:
             import numpy as np
-            # whisper ждёт float32 16кГц mono — у нас уже так
+            # whisper expects float32 16 kHz mono — which is what we have
             audio = np.nan_to_num(data.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
             result = model.transcribe(audio, language=language, fp16=False)
             text = (result.get("text") or "").strip()
@@ -351,9 +356,9 @@ class WhisperEngine(STTEngine):
 # ---------------------------------------------------------------------------
 class SphinxEngine(STTEngine):
     """
-    Офлайн-распознавание CMU PocketSphinx через SpeechRecognition.
-    Полностью локальное, без скачивания моделей вручную (для английского;
-    для других языков нужны языковые пакеты). Захват через sounddevice.
+    Offline CMU PocketSphinx recognition through SpeechRecognition.
+    Entirely local, without downloading models by hand (for English; other
+    languages need language packs). Capture is through sounddevice.
     """
     id = "sphinx"
     label = "PocketSphinx (офлайн)"
@@ -412,7 +417,7 @@ def get_engine(engine_id):
     for e in all_engines():
         if e.id == engine_id:
             return e
-    return all_engines()[0]  # DisabledEngine как безопасный дефолт
+    return all_engines()[0]  # DisabledEngine as a safe default
 
 
 def engine_choices():

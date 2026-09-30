@@ -1,0 +1,51 @@
+<!--
+  What Rina knows about me (4.0b-B01).
+
+  One page for everything kept on this computer. The groups and the entries
+  come from the core; what a group is called is decided here (ADR 0006), and
+  a group this page does not recognise is shown all the same, under its own
+  identifier — a privacy page that quietly drops a category is worse than no
+  page at all.
+-->
+<UserControl x:Class="Rina.Shell.Pages.PrivacyPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="{loc:S 'Что Рина знает обо мне'}"
+               Style="{StaticResource Text.Title}" Margin="0,0,0,8" />
+
+    <TextBlock Grid.Row="1" Style="{StaticResource Text.Meta}"
+               TextWrapping="Wrap" Margin="0,0,0,16"
+               Text="{loc:S 'Всё это лежит на этом компьютере и никуда не отправляется. Здесь видно каждую запись целиком.'}" />
+
+    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" ui:Smooth.Scrolling="True">
+      <StackPanel x:Name="Groups" />
+    </ScrollViewer>
+
+    <ContentControl Grid.Row="2" x:Name="Empty" Visibility="Collapsed" />
+
+    <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Grid.Row="3" Orientation="Horizontal" Margin="0,16,0,0">
+      <Button Style="{StaticResource Btn}" Content="{loc:S 'Обновить'}"
+              Click="OnRefresh" />
+      <Button Style="{StaticResource Btn}" Margin="8,0,0,0"
+              Content="{loc:S 'Выгрузить всё'}" Click="OnExport" />
+      <!-- The irreversible one: hatched, and set apart by the doubled gap
+           the design system asks for (SYSTEM §4). -->
+      <Button x:Name="ForgetAll" Style="{StaticResource Btn.Danger}"
+              Margin="{StaticResource Pad.DangerLeft}"
+              Content="{loc:S 'Забыть всё обо мне'}" Click="OnForgetAll" />
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 VerticalAlignment="Center" Margin="16,0,0,0"
+                 TextWrapping="Wrap" />
+    </StackPanel>
+  </Grid>
+</UserControl>

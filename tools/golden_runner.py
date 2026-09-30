@@ -1,31 +1,33 @@
 # -*- coding: utf-8 -*-
 """
-Прогонщик набора golden utterances (задача плана 4.0-A03).
+The runner for the golden utterances suite (plan item 4.0-A03).
 
-Гоняет набор фраз против ядра и печатает расхождения в виде
-«фраза / ожидалось / получено». Пригоден для запуска после каждого коммита:
-один вызов, понятный отчёт, код возврата 1 при любом расхождении.
+Drives a set of phrases against the core and prints the divergences as
+"phrase / expected / got". Fit for running after every commit: one call, an
+intelligible report, an exit code of 1 on any divergence.
 
-Почему намерение, а не текст ответа. Набор должен пережить перенос ядра на
-C#. Русский текст ответа для этого не годится: он переводится, переформулируется
-и вообще принадлежит представлению. Ожидание записано как namespace-имя
-намерения из `core/intent.py` с аргументами.
+Why the intent rather than the answer's text. The suite must survive the
+core being ported to C#. Russian answer text will not do for that: it is
+translated, reworded and belongs to the presentation anyway. The expectation
+is written down as the namespace name of an intent from `core/intent.py`,
+with arguments.
 
-Почему драйвер. Сегодня ядро в том же процессе, после 4.0-E02 оно будет
-отдельным процессом за протоколом. Набор и сравнение при этом не меняются —
-меняется только способ задать фразу и получить намерение. Это и есть драйвер.
+Why a driver. Today the core is in the same process; after 4.0-E02 it will
+be a separate process behind the protocol. The suite and the comparison do
+not change for that — only the way a phrase is given and an intent received.
+That is what the driver is.
 
-Почему индекс программ подменяется. Набор обязан давать один результат на
-любой машине. Настоящий индекс зависит от того, что установлено.
+Why the program index is substituted. The suite must give one result on any
+machine. A real index depends on what is installed.
 
-Всё, что имеет побочный эффект, подменено: ни одна программа не запускается,
-компьютер не выключается, браузер не открывается.
+Everything with a side effect is substituted: not one program is launched,
+the computer is not shut down, the browser is not opened.
 
-Запуск:
-    python tools/golden_runner.py                 # весь набор
-    python tools/golden_runner.py --verbose       # с прошедшими случаями
+To run:
+    python tools/golden_runner.py                 # the whole suite
+    python tools/golden_runner.py --verbose       # with the cases that passed
     python tools/golden_runner.py --groups app,reminder
-    python tools/golden_runner.py --json out.json # для сборочной линии
+    python tools/golden_runner.py --json out.json # for the build line
 """
 
 import argparse
@@ -36,6 +38,15 @@ import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+
+# The data directory goes into a temporary folder, and that has to be done
+# before the first store is created. The substitutions below cover what is
+# visible from outside: the sound, launching programs, the browser. They did
+# not cover the store, and the suite wrote the conversation history and the
+# call journal into the user's real files.
+from sandbox import isolate_storage
+isolate_storage()
 
 from core.dialog import Question
 from core.intent import INTENTS, Intent, UnknownIntent, check_intent_name
@@ -45,7 +56,7 @@ DEFAULT_SET = os.path.join(ROOT, "docs", "golden", "utterances.json")
 
 
 # ---------------------------------------------------------------------------
-# Синтетический индекс программ
+# The synthetic program index
 # ---------------------------------------------------------------------------
 FAKE_APPS = [
     ("Telegram Desktop", r"C:\Apps\Telegram\Telegram.exe", "file", "start_menu"),
@@ -63,7 +74,7 @@ FAKE_APPS = [
 
 
 class Observed:
-    """Что случилось при обработке одной фразы."""
+    """What happened while one phrase was handled."""
 
     def __init__(self):
         self.said = []
@@ -83,18 +94,19 @@ class Observed:
 
 
 # ---------------------------------------------------------------------------
-# Драйверы
+# The drivers
 # ---------------------------------------------------------------------------
 class Driver:
-    """Способ задать ядру фразу и получить намерение."""
+    """A way of giving the core a phrase and getting an intent."""
 
     name = "?"
 
     def setup(self):
         pass
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
-        """Возвращает Intent."""
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
+        """Returns an Intent."""
         raise NotImplementedError
 
     def teardown(self):
@@ -103,12 +115,14 @@ class Driver:
 
 class InProcessDriver(Driver):
     """
-    Ядро в том же процессе. Намерение выводится из наблюдаемых последствий.
+    The core in the same process. The intent is derived from the observable
+    consequences.
 
-    Это временная мера, и она честно отмечена: пока конвейер сам не объявляет
-    намерение (4.0-B02 выделяет Router), прогонщик восстанавливает его по
-    тому, что ядро сделало. После B02 драйвер будет брать Intent напрямую,
-    а классификатор ниже исчезнет вместе с этим комментарием.
+    This is a temporary measure, and it is honestly marked as one: until the
+    pipeline declares the intent itself (4.0-B02 separates out the Router),
+    the runner reconstructs it from what the core did. After B02 the driver
+    will take the Intent directly, and the classifier below will disappear
+    along with this comment.
     """
 
     name = "in-process"
@@ -122,6 +136,12 @@ class InProcessDriver(Driver):
         settings.update({
             "first_run": False, "check_updates": False, "llm_enabled": False,
             "web_search_fallback": True, "save_history": True,
+            # The watch is on: the suite checks the parse and the
+            # decision, not the fact that the setting is off by default.
+            # The refusal while it is off is checked separately
+            # (`tools/test_context_reminders.py`) — there it is the
+            # subject of the check.
+            "watch_apps": True,
             "custom_commands": [], "app_aliases": {}, "reminders": [],
             "history": [], "ui_language": "Русский", "search_engine": "google",
             "wake_words": ["Рина", "Rina"],
@@ -152,36 +172,74 @@ class InProcessDriver(Driver):
 
         real_add = reminders.ReminderStore.add
 
-        def spy_add(store, kind, fire_at, text=""):
-            obs.reminders.append({"kind": kind, "fire_at": fire_at,
-                                  "text": text})
-            return real_add(store, kind, fire_at, text)
+        def spy_add(store, *args, **kwargs):
+            # What is recorded is what was stored, not what was passed:
+            # see tools/sandbox.py.
+            item = real_add(store, *args, **kwargs)
+            obs.reminders.append(dict(item))
+            return item
 
         reminders.ReminderStore.add = spy_add
 
         engine = RinaEngine(event_bus=EventBus())
         engine._speak_blocking = lambda text: None
+
+        # The shell, which is not here. Since 4.0-G01 the core asks it to
+        # perform a system action and to launch a program (ADR 0009), and it
+        # is precisely that which has to be substituted — the core no longer
+        # calls the `system_control.RUNNERS` functions at all. We record the
+        # request and answer "it worked": the suite checks that the core
+        # **decided** correctly, not that Windows can turn the volume up.
+        def as_shell_do(action):
+            obs.actions.append(action)
+            return True, ""
+
+        def as_shell_launch(launch, kind="file"):
+            entry = next((e for e in app_index.cached_index()
+                          if e.launch == launch), None)
+            obs.launched.append(entry.name if entry else launch)
+            return True, ""
+
+        engine.system_out = as_shell_do
+        engine.launch_out = as_shell_launch
         real_say = engine.say
         engine.say = lambda text, sound="response": (
             obs.said.append(text), real_say(text, sound=sound))[0]
         self.engine = engine
 
-        # Одна шина — своего ядра. До 4.0-B05 приходилось слушать ещё и
-        # модульный синглтон: system_control слал события мимо ядра.
-        # Подписчик принимает полезную нагрузку одним словарём — см. EventBus.
+        # One bus — our own core's. Before 4.0-B05 the module singleton had
+        # to be listened to as well: system_control sent events past the
+        # core. A subscriber takes the payload as one dict — see EventBus.
         for name in (Events.APP_NOT_FOUND, Events.WINDOW_ACTION):
             engine.bus.on(name, (lambda n: (lambda data: obs.events.append(
                 (n, data))))(name))
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
+        # Whether the microphone is open on her own initiative. Set on the
+        # engine, not passed alongside: that is where the rules read it
+        # from, and a suite that handed it in separately would be checking
+        # a path the program does not take. The suite used to say
+        # `source="always"` — a name the running program never passes —
+        # and every case about that mode was green while the rules behind
+        # them were dead.
+        self.engine._always_listen = bool(unbidden)
         if not keep_state:
             self.engine._dialog.dropped()
             self.settings.set("reminders", [])
             self.settings.set("app_aliases", {})
+            # **The open conversation is state too, and it was the one
+            # piece not being cleared.** Being spoken to opens a window
+            # in which the wake word need not be said again; a case that
+            # arrived by ear left that window open for the next one, so
+            # «просто разговор в комнате» and «выключи компьютер» were
+            # obeyed without ever being addressed. Invisible while every
+            # case was delivered as typed, because typing never opens it.
+            self.engine._close_talk()
         self.obs.clear()
         self.engine.handle_command(text, require_wake=require_wake,
                                    source=source)
-        # Заданный вопрос теперь живёт в core/dialog.py и сериализуем.
+        # The question asked now lives in core/dialog.py and is serialisable.
         question = self.engine._dialog.current()
         self.obs.pending = question.to_dict() if question else None
         return classify(self.obs, text)
@@ -189,13 +247,14 @@ class InProcessDriver(Driver):
 
 class RouterDriver(Driver):
     """
-    Роутер напрямую. Ни ядра, ни настроек, ни Qt, ни единого хранилища.
+    The router directly. No core, no settings, no Qt, not a single store.
 
-    Это критерий приёмки 4.0-B02: набор проверяет разбор, а не последствия.
-    Всё, что роутер знает о мире, собрано здесь руками — поэтому результат
-    одинаков на любой машине и не зависит от установленного софта.
+    This is 4.0-B02's acceptance criterion: the suite checks the parse, not
+    the consequences. Everything the router knows about the world is
+    assembled here by hand — so the result is the same on any machine and
+    does not depend on the software installed.
 
-    Состояние между случаями драйвер ведёт сам: у роутера его нет.
+    The driver keeps the state between cases itself: the router has none.
     """
 
     name = "router"
@@ -206,27 +265,55 @@ class RouterDriver(Driver):
 
         self.apps = [app_index.AppEntry(*a) for a in FAKE_APPS]
         self.aliases = {}
+        self.last_launch_query = ""
         self.reminders_active = 0
         self.pending = None
         self.ctx = RouterContext(apps=self.apps)
 
-    def send(self, text, source="typed", require_wake=False, keep_state=False):
+    def send(self, text, source="typed", require_wake=False,
+             keep_state=False, unbidden=False):
         from core.router import route
+        from voice.textmatch import normalize
 
         if not keep_state:
             self.pending = None
             self.reminders_active = 0
+            # What was learned and the memory of the last launch are
+            # cleared along with the rest: otherwise a rule from one case
+            # would go on teaching the next, and the suite would depend on
+            # its own order.
+            self.aliases = {}
+            self.last_launch_query = ""
 
+        self.ctx.aliases = self.aliases
+        self.ctx.last_launch_query = self.last_launch_query
         self.ctx.pending = self.pending
         self.ctx.source = source
+        self.ctx.unbidden = bool(unbidden)
         self.ctx.require_wake = require_wake
         self.ctx.reminders_active = self.reminders_active
 
         intent = route(text, self.ctx)
 
-        # Последствия, которые меняют состояние следующего шага. Их
-        # применяет исполнитель; здесь воспроизводится ровно столько,
-        # сколько нужно многошаговым случаям набора.
+        # The consequences that change the next step's state. The executor
+        # applies them; reproduced here is exactly as much as the suite's
+        # multi-step cases need.
+        # The consequences that change the next step's state. The
+        # executor applies them; reproduced here is exactly as much as the
+        # suite's multi-step cases need.
+        if intent.name == "alias.teach":
+            entry = next((e for e in self.apps
+                          if e.name == intent.arg("app")), None)
+            if entry is not None:
+                self.aliases[normalize(intent.arg("word"))] = {
+                    "path": entry.launch, "kind": entry.kind,
+                    "name": entry.name}
+        # One turn, as in the core: without clearing it a correction
+        # would attach to a launch from somebody else's case, and the
+        # suite would depend on its own order.
+        self.last_launch_query = (intent.arg("query") or ""
+                                  if intent.name == "app.launch" else "")
+
         if intent.name == "reminder.create":
             self.reminders_active += 1
         elif intent.name == "reminder.cancel":
@@ -246,11 +333,12 @@ class RouterDriver(Driver):
 
 class ProtocolDriver(Driver):
     """
-    Ядро отдельным процессом за именованным каналом.
+    The core as a separate process behind a named pipe.
 
-    Появится вместе с 4.0-E02. Тогда `send` отправит `command.handle` и
-    дождётся намерения ответом, а всё остальное в этом файле — набор,
-    сравнение и отчёт — останется как есть. Ради этого и введён драйвер.
+    It will appear along with 4.0-E02. Then `send` will send
+    `command.handle` and wait for the intent as the answer, and everything
+    else in this file — the suite, the comparison and the report — will stay
+    as it is. That is what the driver was introduced for.
     """
 
     name = "protocol"
@@ -265,10 +353,10 @@ DRIVERS = {d.name: d for d in (InProcessDriver, RouterDriver,
 
 
 # ---------------------------------------------------------------------------
-# Восстановление намерения по последствиям (до 4.0-B02)
+# Reconstructing the intent from the consequences (until 4.0-B02)
 # ---------------------------------------------------------------------------
 def classify(obs, text=""):
-    """Наблюдаемое поведение -> Intent."""
+    """Observable behaviour -> an Intent."""
 
     def intent(name, **args):
         return Intent(name=name, args=args, stage="observed", text=text)
@@ -280,6 +368,12 @@ def classify(obs, text=""):
         args = {"kind": item["kind"]}
         if item["text"]:
             args["text"] = item["text"]
+        # The occasion is visible in the entry itself rather than in
+        # Rina's answer (`4.0b-A03`): the answer is words, and the suite
+        # describes the decision. The program's name, not its path: paths
+        # in the suite would depend on the machine.
+        if item.get("on"):
+            args["on"] = item["on"].get("app")
         return intent("reminder.create", **args)
     if obs.actions:
         return intent("system.action", action=obs.actions[-1])
@@ -309,8 +403,8 @@ def classify(obs, text=""):
     if response is None:
         return intent("silence")
 
-    # Опорные строки — это ключи словаря переводов, а не переведённый текст:
-    # они не меняются при смене языка интерфейса.
+    # The reference strings are keys of the translation dictionary rather
+    # than translated text: they do not change with the interface language.
     table = [
         ("Да? Слушаю.", lambda r: intent("ask.wake")),
         ("Хорошо, отменяю.", lambda r: intent("cancelled")),
@@ -320,7 +414,15 @@ def classify(obs, text=""):
          lambda r: intent("reminder.list", empty=True)),
         ("Нечего отменять.",
          lambda r: intent("reminder.cancel", empty=True)),
+        # Both wordings. 3.1 said "Всегда пожалуйста!" and 4.0-beta says
+        # "Всегда рада помочь." — the answer changed on purpose, and this
+        # table exists to recognise the topic, not to freeze the phrase.
+        # Keeping the old one is what makes the set still about 3.1: a
+        # recording that quietly follows every rewording stops being a
+        # recording.
         ("Всегда пожалуйста!",
+         lambda r: intent("builtin.answer", topic="thanks")),
+        ("Всегда рада помочь.",
          lambda r: intent("builtin.answer", topic="thanks")),
     ]
     for exact, make in table:
@@ -336,8 +438,25 @@ def classify(obs, text=""):
             "fallback.search", query=r.split("«", 1)[1].split("»")[0])),
         ("Запланировано:", lambda r: intent("reminder.list", empty=False)),
         ("Отменила:", lambda r: intent("reminder.cancel", empty=False)),
-        ("Не нашла программу", lambda r: intent("app.not_found")),
+        # "Nothing to remember" comes first: both phrases begin the same
+        # way, and the order here is load-bearing. What tells a refusal to
+        # learn from a program that was not found is the tail, not the
+        # start.
+        ("Не нашла программу", lambda r: intent(
+            "alias.unknown" if "нечего запоминать" in r
+            else "reminder.unknown_app" if "не к чему привязать" in r
+            else "app.not_found",
+            query=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
         ("Не получилось запустить", lambda r: intent("app.launch_failed")),
+        ("Запомнила: «", lambda r: intent(
+            "alias.teach",
+            word=r.split("«", 1)[1].split("»")[0],
+            app=r.split("— это ", 1)[1].rstrip(".") if "— это " in r else None)),
+        ("Не одна такая: ", lambda r: intent(
+            "reminder.ambiguous" if "привязать" in r else "alias.ambiguous",
+            options=[n.strip() for n in
+                     r[len("Не одна такая: "):].split(".", 1)[0].split(",")],
+            word=r.split("«", 1)[1].split("»")[0] if "«" in r else None)),
         ("Меня зовут", lambda r: intent("builtin.answer", topic="name")),
         ("Я могу запускать",
          lambda r: intent("builtin.answer", topic="capabilities")),
@@ -350,14 +469,30 @@ def classify(obs, text=""):
 
 
 def matches(expected, got):
-    """Совпало ли ожидание. Проверяются только заявленные аргументы."""
+    """Did the expectation match. Only the arguments stated are checked."""
     if expected.get("intent") != got.name:
         return False
     for key, want in expected.items():
         if key in ("intent", "note"):
             continue
         value = got.arg(key)
+        # The router returns the occasion as a dict — that is the state
+        # of an entry, obliged to survive the store and the trip over the
+        # protocol — while the observable behaviour shows the program's
+        # name. The suite describes the name: a path would depend on the
+        # machine it is run on.
+        if isinstance(value, dict) and isinstance(want, str):
+            value = value.get("app")
         if isinstance(want, list):
+            if isinstance(value, (list, tuple)):
+                # The options arrive differently: the router returns
+                # dicts — the state of a question, obliged to survive
+                # being written to a file and travelling over the protocol
+                # (4.0-B03) — while the observable behaviour shows only
+                # names. The suite describes names: it is about the
+                # decision, not about which driver obtained it.
+                value = [v.get("name") if isinstance(v, dict) else v
+                         for v in value]
             if not isinstance(value, list) or set(want) - set(value):
                 return False
         elif str(value) != str(want):
@@ -367,7 +502,7 @@ def matches(expected, got):
 
 # ---------------------------------------------------------------------------
 def load_set(path):
-    """Набор с проверкой имён намерений по каталогу ядра."""
+    """The suite, with the intents' names checked against the core's catalogue."""
     data = json.load(open(path, encoding="utf-8"))
     bad = []
     for case in data["cases"]:
@@ -395,9 +530,24 @@ def run(path, groups=None, verbose=False, driver_name="in-process"):
     started = time.perf_counter()
     passed, failures = 0, []
     for case in cases:
-        got = driver.send(case["say"], source=case.get("source", "typed"),
+        # **«Непрошеный» is a state of the microphone, so the phrase
+        # arrives by ear.** The three cases about that mode set the flag
+        # and said nothing about the source, so the suite delivered them
+        # as typed — a combination the running program cannot produce,
+        # and the same mistake one floor down from the one the driver
+        # already carries a comment about. It stayed invisible while
+        # «непрошеный» was computed from the mode alone; the moment the
+        # core started asking where the phrase came from, all three went
+        # red and were right to.
+        #
+        # A case may still say `source` outright and is obeyed.
+        unbidden = case.get("unbidden", False)
+        got = driver.send(case["say"],
+                          source=case.get("source",
+                                          "voice" if unbidden else "typed"),
                           require_wake=case.get("wake", False),
-                          keep_state=case.get("keep_state", False))
+                          keep_state=case.get("keep_state", False),
+                          unbidden=unbidden)
         if matches(case["expect"], got):
             passed += 1
             if verbose:

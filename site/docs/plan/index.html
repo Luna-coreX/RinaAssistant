@@ -1,0 +1,1327 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Полный план — Rina Assistant</title>
+<meta name="description" content="Рубежи, блоки и все задачи: размер, зависимости, состояние.">
+<link rel="icon" href="../../favicon.ico" sizes="any">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Полный план — Rina Assistant">
+<meta property="og:description" content="Рубежи, блоки и все задачи: размер, зависимости, состояние.">
+<meta property="og:image" content="../../logo.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../../tokens.css">
+<link rel="stylesheet" href="../../style.css">
+</head>
+<body class="doc-page">
+<!-- Порождено tools/gen_site.py по docs/ROADMAP.md. Руками не править. -->
+
+<div class="loom" aria-hidden="true"></div>
+
+<a class="skip" href="#content">К содержимому</a>
+
+<header class="rail">
+  <div class="frame rail-in">
+    <a class="mark" href="/"><img src="../../logo.png" alt="" width="24" height="24">Rina Assistant</a>
+    <nav>
+      <a href="/#capabilities">Возможности</a>
+      <a href="/#privacy">Приватность</a>
+      <a href="/#docs">Документация</a>
+      <a href="/api/">Разработчику</a>
+    </nav>
+  </div>
+  <div class="progress"></div>
+</header>
+
+<section class="hero field" id="value">
+  <div class="frame">
+    <div class="hero-say">
+      <h1>Полный план</h1>
+      <p class="lead">Рубежи, блоки и все задачи: размер, зависимости, состояние.</p>
+      <p class="note">Документ репозитория, страницей — в сокращении: разбор каждой задачи остался в источнике. Источник — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/ROADMAP.md">docs/ROADMAP.md</a>; здесь — рубежи, блоки и задачи, а доводы, редакции и замеры по каждой — там.</p>
+    </div>
+    <div class="strip">
+      <div><b>102/102</b><span>4.0-port</span></div>
+      <div><b>38/68</b><span>4.0-beta</span></div>
+      <div><b>0/11</b><span>4.0-stable</span></div>
+      <div><b>0/2</b><span>4.1+</span></div>
+      <div><b>0/44</b><span>5.0.0</span></div>
+      <div><b>0/46</b><span>RinaNeuro</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="frame doc">
+  <nav class="doc-rail" aria-label="Разделы">
+    <ol>
+      <li><a href="#rinaassistant-rinaneuro-plan">RinaAssistant → RinaNeuro: план</a></li>
+      <li><a href="#produktovaya-ramka">Продуктовая рамка</a></li>
+      <li><a href="#rubezhi-4-0-i-razreshenie-konflikta">Рубежи 4.0 и разрешение конфликта</a></li>
+      <li><a href="#resheniya-uzhe-prinyatye">Решения, уже принятые</a></li>
+      <li><a href="#rubezh-4-0-port-razdelenie-i-redizayn">РУБЕЖ 4.0-port — «Разделение и редизайн»</a></li>
+      <li><a href="#rubezh-4-0-beta-publichnaya-besplatnaya-beta">РУБЕЖ 4.0-beta — «Публичная бесплатная бета»</a></li>
+      <li><a href="#posle-bety-reshaetsya-po-dannym">После беты — решается по данным</a></li>
+      <li><a href="#versiya-5-0-0-platforma">ВЕРСИЯ 5.0.0 — «Платформа»</a></li>
+      <li><a href="#trek-v-golos-idet-parallelno-s-4-x-ne-zhdet-5-0-0">ТРЕК V — голос (идёт параллельно с 4.x, не ждёт 5.0.0)</a></li>
+      <li><a href="#proekt-rinaneuro">ПРОЕКТ RinaNeuro</a></li>
+      <li><a href="#kriticheskiy-put-i-parallelnye-treki">Критический путь и параллельные треки</a></li>
+      <li><a href="#pervaya-nedelya">Первая неделя</a></li>
+    </ol>
+  </nav>
+
+  <main class="doc-body paper" id="content">
+<h2 id="rinaassistant-rinaneuro-plan">RinaAssistant → RinaNeuro: план</h2>
+<blockquote><strong>Этот документ — единственный план.</strong> Он сводит два источника: технический бэклог (разбивка на задачи) и продуктовую стратегию 4.0 (позиционирование, состав беты, обновления, выход на пользователей). Оба исходных документа им заменяются; расхождения между ними разрешены здесь и помечены явно.  Формат записи задачи: <strong>ID · Название</strong> — размер — зависимости описание · <em>Готово когда:</em> критерий приёмки (указан там, где неочевиден или критичен)  Размеры относительные: <strong>S</strong> — до дня, <strong>M</strong> — несколько дней, <strong>L</strong> — неделя+, <strong>XL</strong> — месяц+ или исследовательская задача. <strong>ADR</strong> = Architecture Decision Record: короткий документ в репозитории «решение, альтернативы, почему». Для необратимых выборов.</blockquote>
+<hr class="seam">
+<h2 id="produktovaya-ramka">Продуктовая рамка</h2>
+<p>Нужна не ради красоты: она решает, что попадает в 4.0, а что нет. Каждый раз, когда возникает вопрос «делать эту функцию сейчас?», ответ ищется здесь.</p>
+<p><strong>Ниша.</strong> Privacy-first голосовой ассистент для рабочего стола: управление компьютером и рабочими задачами, где пользователь контролирует данные, модели и автоматизацию.</p>
+<p class="lead-in"><strong>Формулировка ценности.</strong></p>
+<blockquote>Локальный голосовой ассистент для Windows, который запускает ваши программы, помогает с рабочими задачами и не отправляет голосовые команды в облако.</blockquote>
+<p><strong>Кому адресовано в первых релизах:</strong> разработчики и технические пользователи, энтузиасты локальных моделей, те, кто не хочет отдавать голос в облако, пользователи с portable-программами и повторяющейся рутиной, геймеры и power users (хоткеи, системные действия, таймеры, режим фокуса).</p>
+<p><strong>Что продаётся в коммуникации:</strong> управление компьютером без ручной настройки команд; локальная обработка; автоматизация рутины; понятная безопасность опасных действий; расширяемость плагинами; польза с первого запуска.</p>
+<p><strong>Сильная база, на которую всё опирается:</strong> автоматическое обнаружение и безопасный запуск программ, локальный голосовой конвейер, системные действия с подтверждением, напоминания, прозрачность безопасности и готовящееся разделение ядра и оболочки.</p>
+<hr class="seam">
+<h2 id="rubezhi-4-0-i-razreshenie-konflikta">Рубежи 4.0 и разрешение конфликта</h2>
+<p>Два исходных документа противоречили друг другу в самом важном месте.</p>
+<p><strong>Бэклог требовал:</strong> «ни одной новой пользовательской возможности». Вокруг этого построена вся страховка блока A — golden utterances как критерий «прошло/не прошло», письменный регламент заморозки A04, инвентаризация поверхности A06 и сверка R11. Смысл инварианта: любое расхождение с 3.1 — это баг, а не замысел.</p>
+<p><strong>Стратегия требовала:</strong> в бете должны быть рабочие сессии или контекстные напоминания, privacy dashboard и объяснение решений — иначе бета проверяет не пользу продукта, а факт переезда.</p>
+<p>Одновременно верным это быть не может: как только 4.0 получает новые функции, golden-набор перестаёт быть критерием, а A06 и R11 теряют смысл — сверять новую поверхность будет не с чем.</p>
+<p class="lead-in"><strong>Решение: 4.0 разрезается на два рубежа.</strong></p>
+<table><thead><tr><th>Рубеж</th><th>Что делает</th><th>Правило</th><th>Критерий выхода</th></tr></thead><tbody><tr><td><strong>4.0-port</strong></td><td>Разделение, редизайн, протокол, WPF, обновления</td><td>Заморозка возможностей держится</td><td>Golden-набор зелёный целиком; сверка R11 против A06 полная</td></tr><tr><td><strong>4.0-beta</strong></td><td>1–2 отличительные функции, приватность, объяснимость, выход к пользователям</td><td>Заморозка снята, состав ограничен списком ниже</td><td>Публичная бесплатная бета</td></tr></tbody></table>
+<p>Порт — рискованная операция, и ему нужен инвариант. Бета — проверка гипотез, и ей нужны функции. Разделив их, мы сохраняем и то и другое.</p>
+<p><strong>Исключения, которые входят в port, хотя формально новые.</strong> Они архитектурные, а не пользовательские, и позже обойдутся переписыванием:</p>
+<ul class="plain"><li><strong><code>FeatureProvider</code></strong> (B08) — в бете возвращает <code>True</code> на всё, пользователь не видит ничего.</li><li><strong>Система обновлений</strong> (блок N) — после разделения версии shell и core расходятся, и схему задним числом не пришить.</li></ul>
+<hr class="seam">
+<h2 id="resheniya-uzhe-prinyatye">Решения, уже принятые</h2>
+<table><thead><tr><th>Решение</th><th>Где записано</th><th>Статус</th></tr></thead><tbody><tr><td>UI-фреймворк оболочки — <strong>WPF</strong></td><td>4.0-F01</td><td>принято</td></tr><tr><td>Плагин — <strong>в отдельном процессе</strong>, в 4.0</td><td>4.0-H07</td><td>принято</td></tr><tr><td>Разрез 4.0 на <strong>port</strong> и <strong>beta</strong></td><td>этот документ</td><td>принято</td></tr><tr><td>Библиотека контролов — <strong>своя стилизация поверх стандартного WPF</strong></td><td>4.0-F01b, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0005-control-library.md">ADR 0005</a></td><td>принято</td></tr><tr><td>Транспорт — <strong>именованный канал</strong>, держит оболочка</td><td>4.0-D01, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0002-ipc-transport.md">ADR 0002</a></td><td>принято</td></tr><tr><td>Настройки — <strong>ядро владеет смыслом, оболочка видом</strong></td><td>4.0-E06a, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0006-settings-ownership.md">ADR 0006</a></td><td>принято</td></tr><tr><td>Лицензия — <strong>Apache-2.0</strong>, вклады без CLA</td><td>4.0-S01, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0001-license-and-contributions.md">ADR 0001</a></td><td>принято</td></tr><tr><td>Голос — <strong>синтезированный вектор говорящего</strong></td><td>V-01, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0003-voice-identity.md">ADR 0003</a></td><td>принято</td></tr></tbody></table>
+<hr class="seam">
+<h2 id="rubezh-4-0-port-razdelenie-i-redizayn">РУБЕЖ 4.0-port — «Разделение и редизайн»</h2>
+<p><strong>Цель:</strong> ядро на Python, оболочка и системный слой на C# (WPF), между ними протокол с запасом под RinaNeuro. Оболочка пишется с нуля — значит и внешний вид проектируется заново, а не переносится.</p>
+<p><strong>Правило рубежа:</strong> ни одной новой пользовательской возможности. <strong>Вид, компоновка и навигация меняются свободно; множество того, что пользователь может сделать, — заморожено.</strong> Новые функции ждут рубежа 4.0-beta, описанного ниже; два исключения (<code>B08</code> и блок <code>N</code>) названы в разделе «Рубежи 4.0».</p>
+<p><strong>Почему редизайн именно здесь.</strong> Оболочка переписывается на другом языке в любом случае. Портировать нынешний вид из PySide6 в WPF пиксель в пиксель — это работа по воспроизведению того, что всё равно собирались менять: <code>QPainter</code>, QSS, анимации и токены не переносятся, переносится только замысел. В 4.0.0 редизайн стоит почти ноль сверху; в любой следующей версии — переписывания уже написанной оболочки.</p>
+<p><strong>Побочный эффект, полезный для дисциплины.</strong> У 4.0.0 появляется видимый результат. Версия перестаёт быть «месяцы работы, после которых пользователь не видит ничего» — а это главный риск срыва feature freeze.</p>
+<hr class="seam">
+<h3 id="blok-a-strahovka-pered-operaciey">Блок A — Страховка перед операцией</h3>
+<p>Без этого блока разделение идёт вслепую: расхождения в поведении обнаружатся месяцы спустя, когда причину уже не найти.</p>
+<details>
+<summary><strong>4.0-A01 · Инвентаризация поведения 3.1.0</strong> — M — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/INVENTORY-3.1.0.md"><code>INVENTORY-3.1.0.md</code></a>. Все неочевидные ветки проверены запуском: одно утверждение первой редакции оказалось неверным именно там, где его читали глазами. Полный список того, что умеет 3.0.0: каждое намерение, каждый вариант формулировки, каждый побочный эффект, каждое сообщение пользователю. Включая неочевидное: что происходит при пустом вводе, при неоднозначном имени программы, при отказе от подтверждения. <em>Готово когда:</em> документ покрывает все ветки, и ты не можешь вспомнить возможность, которой в нём нет.</p>
+</details>
+<details>
+<summary><strong>4.0-A02 · Набор golden utterances</strong> — L — A01 — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/golden/utterances.json"><code>golden/utterances.json</code></a> — 112 случаев, и прогонщик <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/golden_runner.py"><code>tools/golden_runner.py</code></a>. Зелёный на 3.1.0.</p>
+</details>
+<details>
+<summary><strong>4.0-A03 · Прогонщик тестов</strong> — M — A02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/golden_runner.py"><code>tools/golden_runner.py</code></a>. Один вызов, отчёт «фраза / ожидалось / получено», код возврата 1 при любом расхождении, <code>--json</code> для сборочной линии. 112 случаев за 5 секунд.</p>
+</details>
+<details>
+<summary><strong>4.0-A04 · Эталонная ветка и регламент заморозки</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><strong>Эталон уже существовал:</strong> тег <code>3.1.0</code> указывает на <code>b0a236c</code>, где <code>APP_VERSION = &quot;3.1.0&quot;</code>, и это совпадает с HEAD. Ставить ничего не потребовалось.</p>
+</details>
+<details>
+<summary><strong>4.0-A05 · Запись и воспроизведение сессий</strong> — M — A03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/session.py"><code>tools/session.py</code></a> — запись и воспроизведение. Записано <strong>7 сессий</strong> в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/golden/sessions"><code>docs/golden/sessions/</code></a>, воспроизводятся все, 0 расхождений.</p>
+</details>
+<details>
+<summary><strong>4.0-A06 · Инвентаризация поверхности</strong> — M — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/SURFACE-3.1.0.md"><code>SURFACE-3.1.0.md</code></a>. Извлечено обходом дерева виджетов. Главный раздел — 23 действия, доступные <strong>только</strong> через одну кнопку и недоступные голосом; их редизайн теряет молча. Второй срез 3.0.0, дополняющий A01. A01 описывает поведение, A06 — поверхность: какие экраны есть, какие элементы на каждом, какие состояния (пусто / идёт работа / ошибка / нет прав / ядро недоступно), какие действия доступны <strong>только</strong> через одну конкретную кнопку и больше ниоткуда. Именно такие действия редизайн теряет молча — «Проверить голос», «Проверить связь», «Обновить список программ», импорт и экспорт команд, сброс настроек. <em>Готово когда:</em> у каждой строки инвентаря есть адрес: экран, элемент, состояние.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-r-dizayn">Блок R — Дизайн</h3>
+<p>Новый блок. Дизайн — это ремесло и итерации: он не ждёт, пока освободятся руки после протокола, и идёт <strong>параллельно с первого дня 4.x</strong>, наравне с треком V и датасетом N-A04.</p>
+<p>Кроме того, он <strong>предшествует</strong> двум решениям, которые без него принимаются вслепую: выбору библиотеки контролов (F01b) и словарю декларативного интерфейса плагинов (H01). Схема, написанная до дизайна, зафиксирует словарь нынешней оболочки навсегда, и все плагины придётся мигрировать дважды.</p>
+<details>
+<summary><strong>4.0-R01 · Продуктовый и дизайн-бриф</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/PRODUCT.md"><code>PRODUCT.md</code></a>. Подтверждено пользователем: сцена — фон во время работы, сеансы за настройкой и поверх полноэкранного; режим «окно открыто рядом» <strong>отвергнут</strong>, значит окно либо не видно, либо в нём работают, и оно никогда не служит фоном. Личность — <strong>строго инструмент</strong> до 5.0 включительно (уточнено 2026-09-29: образ — инструмент, манера разговора и выбор личности — стиль речи, см. <code>PRODUCT.md</code>). Незыблемы эмблема и имя с женским родом в репликах; тёмная схема обязательством <strong>не</strong> объявлена.</p>
+</details>
+<details>
+<summary><strong>4.0-R02 · Визуальное направление</strong> — M — R01 — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p><strong>Выбрано направление «Аппарат»:</strong> <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/design/DIRECTION.md"><code>design/DIRECTION.md</code></a>.</p>
+</details>
+<details>
+<summary><strong>4.0-R03 · Дизайн-система</strong> — L — R02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="/docs/design/"><code>design/SYSTEM.md</code></a> объясняет, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/design/tokens.json"><code>design/tokens.json</code></a> хранит значения. Разделено намеренно: по файлу пишется XAML оболочки и проверяются макеты, поэтому одно значение живёт в одном месте.</p>
+</details>
+<details>
+<summary><strong>4.0-R04 · Информационная архитектура</strong> — M — R01, A06 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/design/IA.md"><code>design/IA.md</code></a>. <strong>Пять разделов вместо восьми.</strong></p>
+</details>
+<details>
+<summary><strong>4.0-R05 · Экраны</strong> — L — R03, R04, A06 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/design/mockups.html"><code>design/mockups.html</code></a>, собирается <code>tools/build_mockups.py</code> <strong>из tokens.json</strong>: значения не набраны руками, поэтому макет и система разойтись не могут. Пять разделов в двух отделках плюс лист состояний.</p>
+</details>
+<details>
+<summary><strong>4.0-R06 · Состояния и краевые случаи</strong> — M — R05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Одна таблица на всю систему (<a href="/docs/design/"><code>SYSTEM.md</code></a>, §6): обычное, наведение, нажатие, фокус, выбрано, первичное, выключено, ошибка, опасность. Выражаются ступенью значения, швом и рамкой — ничем больше.</p>
+</details>
+<details>
+<summary><strong>4.0-R07 · Движение</strong> — M — R03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Четыре длительности (<a href="/docs/design/"><code>SYSTEM.md</code></a>, §7): отклик 90 мс, смена состояния 160, переход раздела 220, послесвечение 1000.</p>
+</details>
+<details>
+<summary><strong>4.0-R08 · Темы</strong> — M — R03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Две отделки, <code>silver</code> и <code>black</code>, с одинаковым набором ролей — проверяется автоматически. Различаются не яркостью, а тем, из чего сделана панель.</p>
+</details>
+<details>
+<summary><strong>4.0-R09 · Иконки и графика</strong> — M — R02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><strong>Решение: иконок в навигации и у органов управления нет.</strong> Вопрос стоял не «какие рисовать», а «нужны ли»: там, где легенда обязательна, значок рядом либо повторяет её, либо спорит с ней.</p>
+</details>
+<details>
+<summary><strong>4.0-R10 · Раскладки под локализацию</strong> — S — R05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Измерено шрифтом в холсте. Колонка 168 px, доступно 134.</p>
+</details>
+<details>
+<summary><strong>4.0-R11 · Сверка с инвентарём</strong> — S — R05, A06 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>tools/check_design.py</code> — 25 проверок, все зелёные.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-b-refaktoring-yadra-do-perenosa">Блок B — Рефакторинг ядра ДО переноса</h3>
+<p>Делается на Python, где всё ещё работает и проверяется прогонщиком. Переносить в C# нерасчленённую логику — гарантированный способ потерять поведение. Редизайна этот блок не касается: у ядра нет интерфейса.</p>
+<details>
+<summary><strong>4.0-B01 · Модель данных намерений и действий</strong> — M — A02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/intent.py"><code>core/intent.py</code></a>: <code>Intent</code>, <code>Action</code>, <code>Result</code> — неизменяемые, сериализуемые в JSON без потерь, без единого импорта Qt.</p>
+</details>
+<details>
+<summary><strong>4.0-B02 · Выделить Router</strong> — L — B01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/router.py"><code>core/router.py</code></a>: <code>route(text, ctx) -&gt; Intent</code>. Ничего не запускает, не говорит, не пишет и не ходит в сеть.</p>
+</details>
+<details>
+<summary><strong>4.0-B03 · Выделить машину состояний</strong> — L — B01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/dialog.py"><code>core/dialog.py</code></a>: <code>Question</code> и <code>Dialog</code> с тремя явными переходами — <code>ask</code>, <code>answered</code>, <code>dropped</code>. Раньше это был словарь <code>self._pending</code> внутри ядра, а переходы жили в трёх местах разом.</p>
+</details>
+<details>
+<summary><strong>4.0-B04 · Выделить Executor</strong> — M — B01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/executor.py"><code>core/executor.py</code></a>. Проверено механически: в <code>core/engine.py</code> не осталось ни одного обращения к <code>startfile</code>, <code>webbrowser.open</code>, <code>system_control.run</code> или <code>app_index.launch</code> — все они в исполнителе.</p>
+</details>
+<details>
+<summary><strong>4.0-B05 · Убрать неявные связи</strong> — M — B02..B04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Начал с проверки: поднял два ядра в одном процессе. Результат оказался хуже ожидаемого — событие скриншота <strong>не доходило ни до одного из них</strong>, потому что уходило в модульный синглтон. В приложении это работало лишь потому, что окно было подписано на ту же глобальную шину.</p>
+</details>
+<details>
+<summary><strong>4.0-B06 · Настройки за интерфейсом</strong> — M — B05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/settings_api.py"><code>core/settings_api.py</code></a>: протокол <code>SettingsProvider</code> и реализация <code>MemorySettings</code> для тестов. <code>RinaEngine</code> принимает провайдера аргументом; без аргумента берёт общее хранилище, поэтому поведение приложения не изменилось.</p>
+</details>
+<details>
+<summary><strong>4.0-B08 · FeatureProvider</strong> — S — B05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/features.py"><code>core/features.py</code></a>: протокол <code>FeatureProvider</code>, реализация <code>CommunityFeatures</code> (доступно всё) и <code>LimitedFeatures</code> для тестов. Ядро отдаёт провайдера свойством <code>engine.features</code>; подставить свой можно через конструктор.</p>
+</details>
+<details>
+<summary><strong>4.0-B07 · Контрольный прогон</strong> — S — B02..B06, B08 — <strong>ВЫПОЛНЕНО 2026-09-02, с оговоркой</strong></summary>
+<p>Прогон 2 сентября 2026, после расчленения ядра:</p>
+</details>
+<hr class="seam">
+<h3 id="blok-c-toolregistry">Блок C — ToolRegistry</h3>
+<p>Делается для 4.0.0 по своей причине — чистая граница ядро/оболочка. Но именно этот реестр потом станет руками LLM, поэтому проектировать надо всерьёз.</p>
+<details>
+<summary><strong>4.0-C01 · Модель инструмента</strong> — M — B04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/tools.py"><code>core/tools.py</code></a> — модель, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/toolbox.py"><code>core/toolbox.py</code></a> — четырнадцать описаний. Все семь частей на месте: имя, схема аргументов, разрешения, <code>confirm_required</code>, форма результата, каталог ошибок, идемпотентность.</p>
+</details>
+<details>
+<summary><strong>4.0-C02 · Валидация аргументов по схеме</strong> — S — C01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Ключевое решение: <strong>лишний аргумент — ошибка, а не то, что молча игнорируется.</strong> Проглоченный лишний аргумент означает, что вызывающая сторона считала, будто просит одно, а получит другое. Для человека это редкость, для языковой модели — обычное дело.</p>
+</details>
+<details>
+<summary><strong>4.0-C03 · Обёртки существующих действий</strong> — L — C01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Все четырнадцать реализованы в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/toolrunner.py"><code>core/toolrunner.py</code></a>. Исполнитель переписан: он больше <strong>ничего не делает сам</strong>, а переводит намерение в вызов инструмента.</p>
+</details>
+<details>
+<summary><strong>4.0-C04 · Каталог разрешений</strong> — M — C01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/permissions.py"><code>core/permissions.py</code></a>: одиннадцать разрешений с человеческими пояснениями — они попадут на экран выдачи разрешений в <code>5.0-C02</code>, поэтому написаны обычными словами.</p>
+</details>
+<details>
+<summary><strong>4.0-C05 · Контур подтверждения</strong> — M — C04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/confirmations.py"><code>core/confirmations.py</code></a>. Подтверждение стало предметом, который предъявляют: идентификатор, срок, однократность.</p>
+</details>
+<details>
+<summary><strong>4.0-C06 · Аудит вызовов</strong> — M — C03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/audit.py"><code>core/audit.py</code></a> — SQLite из стандартной библиотеки, новых зависимостей нет. Пишется на воротах реестра: это единственное место, где разом известны все шесть полей.</p>
+</details>
+<details>
+<summary><strong>4.0-C07 · Реестр — единственный путь исполнения</strong> — M — C03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/test_invariants.py"><code>tools/test_invariants.py</code></a> проверяет инвариант по <strong>всем 25 файлам ядра</strong>, а не по одному исполнителю: побочные эффекты выполняются только внутри <code>core/toolrunner.py</code>.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-d-protokol">Блок D — Протокол</h3>
+<p>Самый важный блок в 4.0.0. Половина пунктов в 4.0.0 не используется — они закладываются, потому что добавить их позже стоит переписывания обоих слоёв.</p>
+<details>
+<summary><strong>4.0-D01 · ADR: транспорт</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p><strong>Решение: именованный канал, держит оболочка, ядро подключается клиентом.</strong> <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0002-ipc-transport.md">ADR 0002</a>.</p>
+</details>
+<details>
+<summary><strong>4.0-D02 · Спецификация протокола v1</strong> — L — D01 — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/protocol/PROTOCOL-v1.md"><code>protocol/PROTOCOL-v1.md</code></a>. Написана до реализации; описывает конверт, рукопожатие, правила совместимости, каталог ошибок, все методы и события, потоковый текст, канал данных с кредитной схемой, жизненный цикл долгой задачи, отмену, разрешения, заглушку актуации, живость и трассировку.</p>
+</details>
+<details>
+<summary><strong>4.0-D03 · Handshake и согласование возможностей</strong> — M — D02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/handshake.py</code>, проверка <code>python tools/test_wire.py</code>.</p>
+</details>
+<details>
+<summary><strong>4.0-D04 · Конверт сообщения</strong> — S — D02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/envelope.py</code>. Конверт, кадрирование управляющего канала, порождение идентификаторов и трассировки.</p>
+</details>
+<details>
+<summary><strong>4.0-D05 · Каталог кодов ошибок</strong> — M — D02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/errors.py</code>, 21 код. Категория и признак повтора принадлежат <strong>коду, а не месту вызова</strong>: одна и та же ошибка, поднятая из двух мест, обязана одинаково отвечать на вопросы «кто виноват» и «есть ли смысл повторить». Вызывающая сторона передаёт код и текст, остальное берётся из каталога — иначе <code>app.not_found</code> однажды окажется <code>system</code> в одном месте и <code>user</code> в другом, и оболочка станет вести себя по-разному в зависимости от того, каким путём пришла ошибка.</p>
+</details>
+<details>
+<summary><strong>4.0-D06 · Стриминг текста</strong> — M — D04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>StreamSender</code> и <code>StreamReceiver</code> в <code>core/wire/events.py</code>. Потребителя в 4.0 нет — он появляется в 5.0; заложено сейчас, потому что добавить потом стоит переписывания обеих сторон.</p>
+</details>
+<details>
+<summary><strong>4.0-D07 · Бинарный канал</strong> — L — D04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/data.py</code>: кадр с двоичным заголовком, разбор потока байтов, порядковые номера, виды потоков и привязка вида к возможности.</p>
+</details>
+<details>
+<summary><strong>4.0-D08 · Backpressure</strong> — M — D07 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Кредит в байтах, по потоку, начальный ноль.</p>
+</details>
+<details>
+<summary><strong>4.0-D09 · Lifecycle долгой задачи</strong> — L — D04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/tasks.py</code>. Долгих задач в 4.0 нет — цикл закладывается, пока цена нулевая.</p>
+</details>
+<details>
+<summary><strong>4.0-D10 · Кооперативная отмена</strong> — M — D09 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Три шага разведены в коде: просьба, подтверждение получения, и лишь затем <code>task.cancelled</code> — который отправляется, когда работа <strong>действительно</strong> прекращена. Отправить его вместо подтверждения значило бы соврать о том, что уже ничего не выполняется.</p>
+</details>
+<details>
+<summary><strong>4.0-D11 · Push-события</strong> — M — D04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/events.py</code>: каталог из 14 событий с объявленной формой нагрузки, сборка и приём.</p>
+</details>
+<details>
+<summary><strong>4.0-D12 · Канал разрешений</strong> — L — D11, C05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/permissions.py</code> поверх контура C05.</p>
+</details>
+<details>
+<summary><strong>4.0-D13 · Канал актуации: только спецификация</strong> — S — D02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Восемь методов §12 заведены в каталоге возможностей и сверяются с таблицей документа в обе стороны.</p>
+</details>
+<details>
+<summary><strong>4.0-D14 · Heartbeat, обрыв, переподключение</strong> — L — D03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/liveness.py</code>.</p>
+</details>
+<details>
+<summary><strong>4.0-D15 · Сквозная трассировка</strong> — M — D04 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/trace.py</code> плюс поле <code>trace</code> в формате журнала (<code>core/logging_setup.py</code>).</p>
+</details>
+<details>
+<summary><strong>4.0-D16 · Conformance-тесты протокола</strong> — L — D02..D14 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>tools/conformance.py</code>: все двенадцать требований §15, 56 проверок, транспорт внутри процесса.</p>
+</details>
+<details>
+<summary><strong>4.0-D17 · Правила совместимости версий</strong> — S — D03 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Правила были записаны в §4 словами — и словами бы и остались: человек, добавляющий поле, читает не спецификацию, а соседнюю строчку кода. Теперь они проверка.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-e-python-core-kak-servis">Блок E — Python Core как сервис</h3>
+<details>
+<summary><strong>4.0-E01 · Точка входа сервиса</strong> — M — B07 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>rina_core.py</code> плюс <code>core/wire/transport.py</code>. Ядро стало процессом: аргументы, журнал, канал, сигналы, коды возврата.</p>
+</details>
+<details>
+<summary><strong>4.0-E02 · Серверная сторона протокола</strong> — L — D16, E01 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>core/wire/server.py</code>. Провод соединён с настоящим <code>core/engine.py</code>; до этого он умел собирать сообщения, но ни с чем не был связан.</p>
+</details>
+<details>
+<summary><strong>4.0-E03 · STT в ядре</strong> — L — E02, D07 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/core/speech.py"><code>core/speech.py</code></a>. Граница узкая нарочно: <strong>байты PCM → текст</strong>, и ничего про устройства.</p>
+</details>
+<details>
+<summary><strong>4.0-E04 · Синтез TTS в ядре</strong> — L — E02, D07 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Граница такая же узкая: <strong>текст → байты PCM</strong>. Ядро синтезирует, оболочка воспроизводит.</p>
+</details>
+<details>
+<summary><strong>4.0-E05 · Напоминания как сервис ядра</strong> — M — E02, D11 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Планировщик запускается процессом ядра, а не окном. В разделённой программе это неверно вдвойне: напоминание, поставленное голосом, обязано сработать независимо от того, открыто ли окно, а оболочка вправе быть свёрнутой в трей.</p>
+</details>
+<details>
+<summary><strong>4.0-E06a · ADR: кто владеет представлением настроек</strong> — S — R04, D02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0006-settings-ownership.md">ADR 0006</a>. <strong>Ядро владеет смыслом, оболочка — видом.</strong> Граница проходит не между «формой» и «значениями», как ставился вопрос, а между смыслом и представлением.</p>
+</details>
+<details>
+<summary><strong>4.0-E06 · Настройки по протоколу</strong> — M — E02, B06, E06a — <strong>ВЫПОЛНЕНО 2026-09-06</strong></summary>
+<p>Оболочка не знает формата хранения. Форма ответа определена <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0006-settings-ownership.md">ADR 0006</a>; сторона оболочки — <code>shell/Rina.Shell/Pages/SettingsPage.xaml.cs</code> и <code>SettingsLayout.cs</code>.</p>
+</details>
+<details>
+<summary><strong>4.0-E07 · Управление жизненным циклом ядра</strong> — M — E01, D14 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>shell/Rina.Protocol/CoreSupervisor.cs</code>. Пять состояний: не запускали, запускаем, готово, переподключаемся, сдались.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-f-c-shell">Блок F — C# Shell</h3>
+<details>
+<summary><strong>4.0-F01 · ADR: UI-фреймворк — WPF</strong> — S — R02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0008-ui-framework.md">ADR 0008</a>. Запись появилась задним числом: решение принимали в начале блока F, оболочка на нём уже написана целиком. Записать всё равно нужно было — следующий, кто спросит «почему не Avalonia», должен найти готовый ответ.</p>
+</details>
+<details>
+<summary><strong>4.0-F01b · ADR: библиотека контролов</strong> — S — F01, R02 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0005-control-library.md">ADR 0005</a>. <strong>Решение: библиотеки нет, стилизация своя поверх стандартного WPF.</strong></p>
+</details>
+<details>
+<summary><strong>4.0-F02 · Каркас проекта и клиент протокола</strong> — L — F01b, D16 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>shell/</code>: решение, библиотека <code>Rina.Protocol</code> и проба <code>Rina.Protocol.Probe</code>. .NET 9, ни одной внешней зависимости — как и решено в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0005-control-library.md">ADR 0005</a>.</p>
+</details>
+<details>
+<summary><strong>4.0-F03 · Главное окно и навигация</strong> — M — F02, R04, R05 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p><code>shell/Rina.Shell</code>: своя рама на <code>WindowChrome</code>, колонка пяти разделов, место для раздела, полоса уровня вдоль нижней кромки.</p>
+</details>
+<details>
+<summary><strong>4.0-F04 · Страницы</strong> — L — F03, E06, R05, R06 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Сделаны все пять: <strong>Диалог</strong>, <strong>Команды</strong>, <strong>Напоминания</strong>, <strong>Плагины</strong>, <strong>Настройки</strong>. Ниже — что нашлось по дороге, потому что это важнее самих страниц.</p>
+</details>
+<details>
+<summary><strong>4.0-F05 · Трей и автозапуск</strong> — M — F02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Значок в трее, сворачивание вместо выхода, запуск при входе в систему.</p>
+</details>
+<details>
+<summary><strong>4.0-F06 · Глобальные хоткеи</strong> — M — F02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Сочетание перехватывается <strong>в самом начале оконной процедуры</strong>, до всякой логики. Требование архитектурное: в 5.0 сюда встанет kill-switch (<code>5.0-D08</code>), мгновенно снимающий все разрешения и обрывающий управление компьютером. Если он окажется за обработкой сообщений окна, за занятым ядром или за чем угодно ещё, он сработает тогда, когда уже поздно.</p>
+</details>
+<details>
+<summary><strong>4.0-F07 · Темы</strong> — M — F03, R08 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Настройка <code>finish</code> со значениями <code>silver</code> и <code>black</code>. Меняется <strong>на лету</strong>: обе отделки равноправны, и подменяется целый словарь ресурсов, а не пересчитываются цвета от базового, — требовать перезапуска значило бы соврать о том, как это устроено.</p>
+</details>
+<details>
+<summary><strong>4.0-F08 · ADR + реализация локализации</strong> — M — F03, R10 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Решение — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0007-localisation.md">ADR 0007</a>: <strong>слова интерфейса живут в оболочке, реплики Рины — в ядре</strong>. Граница проходит не между процессами, а между вещами: у слова есть владелец, и владелец тот, кто это слово произносит.</p>
+</details>
+<details>
+<summary><strong>4.0-F09 · Захват микрофона</strong> — L — F02, D07, D08 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>shell/Rina.Shell/Audio/</code>. Устройства, захват 16 кГц моно 16 бит, уровень, поток в ядро по каналу данных с кредитом. На стороне ядра сервер научился принимать поток: <code>stream.open</code>, чтение канала данных своим потоком, возврат кредита <strong>по мере обработки</strong>.</p>
+</details>
+<details>
+<summary><strong>4.0-F10 · Воспроизведение речи</strong> — L — F02, D07 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Очередь кусков, мгновенное прерывание, защита от эха.</p>
+</details>
+<details>
+<summary><strong>4.0-F11 · Диалог подтверждения</strong> — M — F03, D12, R06 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Окно подтверждения плюс то, чего не хватало для его существования: <strong>канал разрешений заработал по-настоящему</strong>. <code>4.0-D12</code> построил его как библиотеку, но никто им не пользовался — опасное действие просто отклонялось с кодом. Теперь ядро спрашивает.</p>
+</details>
+<details>
+<summary><strong>4.0-F12 · Индикация связи с ядром</strong> — S — F02, E07, R06 — <strong>ВЫПОЛНЕНО 2026-09-02</strong></summary>
+<p>Состояние стоит в подвале колонки разделов, рядом с версией: это справка о приборе, а не работа. <strong>Видно всегда</strong> — §13 требует, чтобы окно не выглядело зависшим, а для этого человек должен понимать, что происходит, не нажимая ничего.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-g-system-sloy-na-c">Блок G — System-слой на C#</h3>
+<p class="task"><strong>4.0-G01 · Громкость и медиа</strong> — M — F02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></p>
+<p class="task"><strong>4.0-G02 · Питание</strong> — S — G01, D12 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></p>
+<details>
+<summary><strong>4.0-G03 · Скриншот</strong> — S — F02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>shell/Rina.Shell/Platform/Machine.cs</code>. Громкость и медиа — теми же сообщениями, что шлёт мультимедийная клавиатура: они уходят активному приложению и работают одинаково с плеером, браузером и чем угодно ещё. Через микшер вышло бы иначе — он трогает <strong>свой</strong> сеанс, а у Рины звука нет вовсе.</p>
+</details>
+<details>
+<summary><strong>4.0-G04 · Индексация установленных программ</strong> — L — F02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>shell/Rina.Shell/Platform/AppIndex.cs</code>. App Paths, меню «Пуск», пакеты Магазина, <code>PATH</code>, добавленные папки. Кэш с версией формата: старый файл 3.1.0 не читается, а пересобирается — запись другой формы, прочитанная как своя, хуже отсутствующей.</p>
+</details>
+<details>
+<summary><strong>4.0-G05 · Запуск процессов</strong> — M — G04 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>Platform/Launcher.cs</code>. Запуск средствами оболочки системы (<code>UseShellExecute</code>) — так открываются и ярлыки, и пакеты, и файлы с ассоциацией, тем же способом, каким это делает проводник; своего разбора <code>.lnk</code> мы не пишем. Рабочий каталог — папка самой программы, иначе им станет каталог Рины и программа не найдёт файлы рядом с собой.</p>
+</details>
+<details>
+<summary><strong>4.0-G06 · ADR: где живёт сопоставление имён</strong> — S — G04 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0009-system-layer.md">ADR 0009</a>: <strong>машину трогает оболочка, решает, что с ней сделать, ядро.</strong> Граница проходит по различию между фактом об операционной системе и суждением о намерении человека: перечислить установленное — факт, понять, что «телеграм» это Telegram, — суждение.</p>
+</details>
+<details>
+<summary><strong>4.0-G07 · Транслитерация и фаззи-матчинг в ядре</strong> — L — G06, B02 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>core/apps.py</code>. Обещание ADR 0009 — «<code>voice/app_index.py</code> разрезается пополам» — выполнено буквально: сбор уехал в оболочку, сопоставление сюда. Модуль ничего не знает про Windows, и <code>find()</code> <strong>требует список записей</strong>: сходить и посмотреть самому ему нечем. Это не недоделка, а граница, и записана она в докстроке, чтобы следующий не «починил» её походом в реестр.</p>
+</details>
+<details>
+<summary><strong>4.0-G08 · Политика источников индекса</strong> — M — G04 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Порядок: App Paths → меню «Пуск» → пакеты → <code>PATH</code> → добавленные папки. При совпадении имён побеждает источник выше: у записи, объявленной установщиком, больше оснований быть тем, что человек имел в виду, чем у одноимённого файла из <code>PATH</code>.</p>
+</details>
+<details>
+<summary><strong>4.0-G09 · Происхождение и доверие в записи индекса</strong> — M — G04 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Запись несёт имя, псевдонимы от системы, канонический путь, источник, вид, наличие действительной подписи и дату проверки.</p>
+</details>
+<details>
+<summary><strong>4.0-G10 · Предупреждение о первом запуске недоверенного</strong> — M — G09, D12 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>Pages/TrustWindow.xaml</code>. Показывается всё, чем можно решать: имя, полный путь, источник индекса. Вопрос «доверяете ли вы этой программе» без пути — вопрос без ответа: половина неподписанного лежит там, куда человек её сам положил, а вторая — там, куда её положил кто-то другой.</p>
+</details>
+<details>
+<summary><strong>4.0-G11 · Canonical path и вычистка индекса</strong> — S — G09 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p>Путь разворачивается до запуска (<code>ResolveLinkTarget</code>), и записи с исчезнувшими файлами выбрасываются при чтении кэша: индекс, помнящий удалённое, однажды запустит не то. Неразрешимый путь — это ответ «нельзя», а не «наверное можно»: непонятный путь и есть повод отказать.</p>
+</details>
+<details>
+<summary><strong>4.0-G12 · Запуски в журнале безопасности</strong> — S — G05 — <strong>ВЫПОЛНЕНО 2026-09-03</strong></summary>
+<p><code>Platform/Journal.cs</code>, тот же файл, что у ядра: две хронологии на одно происшествие пришлось бы сшивать руками по времени, и первая же несостыковка часов сделала бы это невозможным. Пишется приложение, абсолютный путь, источник индекса, потребовалось ли согласие и результат. <strong>Текста команды нет никогда</strong> — даже при включённой <code>log_texts</code>: «что запускали» и «что человек сказал» — разные сведения.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-h-plaginy-bez-ui-freymvorka">Блок H — Плагины без UI-фреймворка</h3>
+<p>Плагин, отдающий готовый виджет, привязывает ядро к конкретной оболочке. Это прямой блокер разделения.</p>
+<details>
+<summary><strong>4.0-H01 · Схема декларативного интерфейса</strong> — L — D02, R03, R05 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/plugins/PAGE-SCHEMA-v2.md">PAGE-SCHEMA-v2</a>. Ограничение, записанное в этой задаче заранее, подтвердилось буквально: словарь был плоский, новый дизайн построен на карточках, и выразить в нём страницу плагина было нечем. Чинилась схема, а не рендерер — как и было предсказано.</p>
+</details>
+<details>
+<summary><strong>4.0-H02 · Рендерер в C#</strong> — L — H01, F03, R03 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><code>Pages/PluginsPage.xaml.cs</code>. Все тринадцать видов словаря, включая контейнеры, таблицу, полосу выполнения и метку состояния. Незнакомый вид показывается заметно и с именем: плагин может быть собран под схему новее оболочки, и молчаливый пропуск сделал бы часть его страницы невидимой без следа. Чинят некрасивое; незаметное не чинят.</p>
+</details>
+<details>
+<summary><strong>4.0-H03 · Plugin API нового поколения</strong> — L — H01, C01 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0010-plugin-api.md">ADR 0010</a>, API версии 4. <strong>Плагин объявляет, а не делает</strong>: инструменты уходят в реестр ядра, страница описывается данными, разрешения перечислены в манифесте.</p>
+</details>
+<details>
+<summary><strong>4.0-H04 · Миграция встроенных плагинов</strong> — M — H03 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p>Четыре штуки, и все — примеры для сторонних авторов, поэтому переписаны показательно. <code>clock</code> — объявленный инструмент; <code>dice</code> — инструмент с аргументом, который проверяет реестр; <code>greeter</code> — самый маленький плагин, вообще без объявлений; <code>notes</code> — страница на контейнерах, с полем ввода и рядом кнопок.</p>
+</details>
+<details>
+<summary><strong>4.0-H05 · Депрекация старого API</strong> — M — H03 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p>Плагин версий 1–3 не загружается, и человеку сказано, почему: причина, нужная версия и что делать — одним предложением. Молчаливое «плагин просто не работает» выглядело бы как поломка Рины, а не как устаревший плагин. Причины две и они разные: «обновите плагин» и «обновите Рину».</p>
+</details>
+<details>
+<summary><strong>4.0-H06 · Границы плагинов</strong> — M — H03 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p>Каталог разрешений <strong>один</strong> — тот же, что у ядра: второй, «для плагинов», означал бы два языка об одном и том же и неизбежное расхождение. Но доступно из него не всё: выключение компьютера, запись файлов и зарезервированное под 5.0 плагину не выдаются никогда. Инструмент, просящий недоступное, <strong>не заводится вовсе</strong> — он всё равно отказал бы, но уже после того, как человек его увидел и позвал.</p>
+</details>
+<details>
+<summary><strong>4.0-H07 · Плагин в отдельном процессе</strong> — L — H03, D02, C04 — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><code>plugins/host.py</code> — процесс одного плагина; <code>core/plugin_host.py</code> — надзор со стороны ядра.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-u-sistema-obnovleniy">Блок U — Система обновлений</h3>
+<p>Сейчас обновление устроено просто: приложение спрашивает у GitHub последний релиз и предлагает скачать <code>.exe</code>. После разделения этого не хватит — у оболочки и ядра появляются собственные версии, и они могут обновляться порознь.</p>
+<p><strong>Почему до разделения, а не после.</strong> Схема версий и совместимости определяет, как именно раскладываются и запускаются две части. Пришить её задним числом — значит переделать сборку, установщик и запуск обоих слоёв.</p>
+<p>Разметка по рубежам: <strong>[port]</strong> — входит в 4.0-port, <strong>[stable]</strong> — после беты, <strong>[4.1+]</strong> — позже.</p>
+<details>
+<summary><strong>4.0-U01 · ADR: версии и совместимость</strong> — S — нет — <strong>[port]</strong> — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p><strong>Решение:</strong> <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0004-versioning-and-compatibility.md">ADR 0004</a>. <strong>Четыре</strong> независимые версии, а не три: протокол, оболочка, ядро и <strong>схема данных на диске</strong> (существующий <code>CONFIG_VERSION</code>).</p>
+</details>
+<details>
+<summary><strong>4.0-U02 · Метаданные релиза</strong> — S — U01 — <strong>[port]</strong> — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/updates/MANIFEST.md"><code>docs/updates/MANIFEST.md</code></a> и <code>shell/Rina.Shell/Update/Manifest.cs</code>. Один файл на обе части, потому что части две, а решение одно: раздельные метаданные позволили бы прочитать свежие данные оболочки рядом с годовалыми данными ядра и счесть пару совместимой, не имея возможности это проверить.</p>
+</details>
+<details>
+<summary><strong>4.0-U03 · Клиент обновлений</strong> — M — U02, D03 — <strong>[port]</strong> — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p><code>shell/Rina.Shell/Update/Updater.cs</code>. Четыре сценария плюс два отказа: только оболочка, только ядро, обе, всё свежее — и отдельно несовместимая пара и ядро, которое не прочитает то, что уже на диске.</p>
+</details>
+<details>
+<summary><strong>4.0-U04 · Скачивание и целостность</strong> — M — U03 — <strong>[port]</strong> — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p>Только HTTPS — и отказ происходит <strong>до</strong> всякой закачки. Хэш считается по дороге, а не вторым чтением с диска: второе чтение стоит времени и оставляет промежуток, в который файл можно подменить. Несовпадение — не «повреждён», а «не тот файл», и он удаляется целиком; оборванная закачка тоже не оставляет после себя ничего. Половина обновления, оставшаяся на диске, однажды окажется установленной.</p>
+</details>
+<details>
+<summary><strong>4.0-U05 · Журнал обновлений</strong> — S — U03 — <strong>[port]</strong> — <strong>ВЫПОЛНЕНО 2026-09-04</strong></summary>
+<p>В тот же <code>security.log</code>, что и запуски: разбор «после какого обновления это началось» невозможен, если обновления в одном файле, а запуски в другом.</p>
+</details>
+<details>
+<summary><strong>4.0-U06 · Каналы обновлений</strong> — M — U03 — <strong>[stable]</strong></summary>
+<p><code>stable</code> / <code>beta</code> / <code>rc</code>, выбор в настройках. Понижение по каналу — только явным действием пользователя.</p>
+</details>
+<details>
+<summary><strong>4.0-U07 · Подпись релизов</strong> — M — U04 — <strong>[stable]</strong></summary>
+<p>Ed25519: при сборке подписывается хэш файла, публичный ключ зашит в приложение, клиент проверяет подпись до установки.</p>
+</details>
+<details>
+<summary><strong>4.0-U08 · Подпись метаданных</strong> — S — U07 — <strong>[stable]</strong></summary>
+<p>Подписывается не только файл, но и сам ответ сервера. Иначе тот, кто подменит метаданные, сможет объявить <code>must_update</code> и отключить возможности у всех установок, не подделав ни одного файла. В исходной стратегии этого пункта не было — добавлен здесь. <em>Готово когда:</em> ответ с неверной подписью отвергается целиком, включая флаги.</p>
+</details>
+<details>
+<summary><strong>4.0-U09 · Обязательные обновления</strong> — M — U08 — <strong>[stable]</strong></summary>
+<p>Флаг <code>must_update</code> только для критических дыр: удалённое выполнение кода, повышение прав, утечка данных через плагин, обход проверок безопасности. Не для новых функций и не для косметики.</p>
+</details>
+<details>
+<summary><strong>4.0-U10 · Защита от понижения версии</strong> — S — U08 — <strong>[stable]</strong></summary>
+<p>Клиент не принимает версию старше текущей, если это не явный откат пользователем. Сервер сообщает минимально допустимую версию.</p>
+</details>
+<details>
+<summary><strong>4.0-U11 · Хранение предыдущей версии</strong> — M — U03 — <strong>[stable]</strong></summary>
+<p>Одна-две предыдущие версии сохраняются для отката.</p>
+</details>
+<details>
+<summary><strong>4.0-U12 · Откат версий</strong> — L — U11 — <strong>[4.1+]</strong></summary>
+<p>Интерфейс отката, обратные миграции данных. Предусловие из ADR 0004: откат разрешён, только если версия схемы данных у целевой сборки <strong>не ниже</strong> той, что лежит на диске. Иначе откат <strong>отклоняется по умолчанию</strong>, а не выполняется с предупреждением — и пользователю говорится прямо, что данные, записанные после обновления, будут потеряны.</p>
+</details>
+<details>
+<summary><strong>4.0-U13 · Сервер метаданных</strong> — L — U02 — <strong>[stable]</strong></summary>
+<p>Гибрид: GitHub Releases остаётся для сообщества, исходников и заметок; свой сервер хранит метаданные, подписи и флаги. Простой API и админка, чтобы помечать критические версии.</p>
+</details>
+<p class="task"><strong>4.0-U14 · Certificate pinning и CDN</strong> — M — U13 — <strong>[4.1+]</strong></p>
+<hr class="seam">
+<h3 id="blok-s-pravovye-i-strategicheskie-resheniya">Блок S — Правовые и стратегические решения</h3>
+<p>Работой это не является, но откладывание закрывает варианты.</p>
+<details>
+<summary><strong>4.0-S01 · ADR: лицензия и модель вкладов</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p><strong>Решение: Apache-2.0, вклады без CLA.</strong> Записано в <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0001-license-and-contributions.md">ADR 0001</a>. Установлены <code>LICENSE</code> (канонический текст, sha256 <code>cfc7749b…</code>), <code>NOTICE</code>, <code>CONTRIBUTING.md</code> и каталог <code>docs/adr/</code>. Вклады принимаются по разделу 5 самой лицензии — отдельного соглашения не требуется.</p>
+</details>
+<details>
+<summary><strong>4.0-S02 · Threat model</strong> — M — D02, H07 — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
+<p><a href="/docs/threats/"><code>docs/security/THREAT-MODEL.md</code></a>: четыре поверхности, семнадцать угроз, у каждой — нарушитель, защита и <strong>названный остаток</strong>. Сверяется <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/check_threat_model.py"><code>tools/check_threat_model.py</code></a>.</p>
+</details>
+<details>
+<summary><strong>4.0-S04 · Телеметрия беты уходит из Stable</strong> — S — 4.0b-D05 — <strong>[stable]</strong></summary>
+<p>Решено 2026-09-29: необязательная телеметрия (<code>4.0b-D05</code>) живёт только в бете. В Stable она убирается целиком: код отправки, настройка, пункт на странице приватности, адрес сервера. Обещание «без телеметрии» на странице продукта и в README возвращается без оговорок.</p>
+</details>
+<details>
+<summary><strong>4.0-S03 · Границы 4.0 зафиксированы</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/check_scope.py"><code>tools/check_scope.py</code></a> против снимка <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/scope-4.0.json"><code>docs/scope-4.0.json</code></a>. Формулировка задачи — «закрыта, пока список не меняется молча» — это не документ, а точка отсчёта: сверка отвечает не «правильные ли границы», а «что изменилось с прошлого раза и было ли это решением».</p>
+</details>
+<hr class="seam">
+<h3 id="blok-i-vypusk-4-0-port">Блок I — Выпуск 4.0-port</h3>
+<details>
+<summary><strong>4.0-I01 · Сборка и установщик</strong> — L — всё — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
+<p>Решение — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0011-python-runtime.md">ADR 0011</a>: <strong>встроенный дистрибутив Python едет внутри</strong>. Сборка — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/build_release.py"><code>tools/build_release.py</code></a>, сценарий установщика — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/packaging/rina.iss"><code>packaging/rina.iss</code></a>, проверка собранного — <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/check_release.py"><code>tools/check_release.py</code></a>.</p>
+</details>
+<details>
+<summary><strong>4.0-I02 · Миграция данных из 3.0.0</strong> — M — E06 — <strong>ВЫПОЛНЕНО 2026-09-06</strong></summary>
+<p>Настройки, команды, плагины, история, напоминания. <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/test_migration.py"><code>tools/test_migration.py</code></a> кладёт конфиг в форме 3.0.0 — один файл со всем сразу, версии формата нет, язык распознавания отдельным ключом, выученные программы строками пути — и смотрит, что доехало.</p>
+</details>
+<details>
+<summary><strong>4.0-I03 · Диагностический пакет</strong> — M — D15 — <strong>ВЫПОЛНЕНО 2026-09-06</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/shell/Rina.Shell/Platform/Diagnostics.cs"><code>shell/Rina.Shell/Platform/Diagnostics.cs</code></a>. Кнопка на странице «О программе»: журналы обоих слоёв, версии всех четырёх частей, состояние связи, возможности ядра и список плагинов — в один архив.</p>
+</details>
+<details>
+<summary><strong>4.0-I04 · Полный регресс</strong> — M — A03, A05, R11 — <strong>ВЫПОЛНЕНО 2026-09-06</strong></summary>
+<p><a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/regress.py"><code>tools/regress.py</code></a>. Один вызов, один отчёт: <strong>35 проверок за две минуты</strong>, код возврата 1 при любом провале.</p>
+</details>
+<details>
+<summary><strong>4.0-I05 · Документация архитектуры и дизайна</strong> — M — D02, R03 — <strong>ВЫПОЛНЕНО 2026-09-08</strong></summary>
+<p>Пять документов: <a href="/docs/readme/">README</a> переписан под две программы, <a href="/docs/architecture/"><code>docs/ARCHITECTURE.md</code></a> — схема слоёв и три границы, из которых следует почти всё остальное, <a href="/docs/plugins/"><code>docs/plugins/WRITING-PLUGINS.md</code></a>, <a href="/docs/debugging/"><code>docs/DEBUGGING.md</code></a>. Дизайн-система документом была и осталась — <a href="/docs/design/"><code>docs/design/SYSTEM.md</code></a>.</p>
+</details>
+<hr class="seam">
+<h2 id="rubezh-4-0-beta-publichnaya-besplatnaya-beta">РУБЕЖ 4.0-beta — «Публичная бесплатная бета»</h2>
+<p><strong>Цель:</strong> проверить, приносит ли продукт пользу, и собрать реальные сценарии. Не проверять платёжную инфраструктуру, аккаунты и лицензии — их в бете нет.</p>
+<p><strong>Правило рубежа:</strong> заморозка снята, но состав ограничен списком ниже. Лучше один сильный понятный сценарий, чем десять незавершённых.</p>
+<p><strong>Обязательная бесплатная база</strong> (всё уже есть после port): оболочка на C# и headless-ядро с протоколом, локальный голосовой конвейер, Ollama, обнаружение и безопасный запуск программ, системные действия, настройки, история, таймеры и напоминания, глобальные хоткеи, плагины с документированным API, журналы, импорт-экспорт и миграция из 3.x.</p>
+<p><strong>Чего в бете нет:</strong> аккаунтов и серверной части, подписок и биллинга, мобильного и веб-интерфейса, командного режима, облачной синхронизации, VRM-компаньона.</p>
+<hr class="seam">
+<h3 id="blok-4-0b-a-chto-obyazano-byt-v-bete">Блок 4.0b-A — Что обязано быть в бете</h3>
+<p><strong>Состав блока задан списком, а не выбором.</strong> Раньше здесь выбиралась одна отличительная функция, и <code>4.0b-A01</code> этот выбор сделал. Постановка изменилась: бету определяет не одна функция, а то, каким продукт выглядит и насколько им удобно пользоваться. Функции при этом никуда не делись — они стали одним пунктом списка из восьми.</p>
+<p><strong>Почему это не расширение состава, а его уточнение.</strong> Правило рубежа осталось прежним: «лучше один сильный понятный сценарий, чем десять незавершённых». Семь из восьми пунктов ниже — это не новые сценарии, а приведение в порядок того, что уже есть: оформление, главный экран, конструктор команд, настройки, остальные вкладки, диалог. Новых сценариев два, и оба уже закрыты (<code>4.0b-A03</code>, <code>4.0b-A04</code>), плюс третий небольшой — список дел.</p>
+<p><strong>Список обязательного</strong> (источник — личные заметки автора, которые хранятся вне репозитория, и решение от 2026-09-09):</p>
+<table><thead><tr><th>#</th><th>Что</th><th>Пункт</th></tr></thead><tbody><tr><td>1</td><td>Глубина в оформлении: сложнее анимации, новая отделка, анимированный фон, немного градиента</td><td><code>4.0b-A06</code></td></tr><tr><td>2</td><td>Новая главная вкладка: фигура состояний, плеер, места под плагины, бургер-меню</td><td><code>4.0b-A07</code></td></tr><tr><td>3</td><td>Минимум две новые возможности</td><td><code>4.0b-A08</code> — <strong>закрыт</strong></td></tr><tr><td>4</td><td>Конструктор команд: удобнее, визуальный, с пометкой «бета»</td><td><code>4.0b-A09</code></td></tr><tr><td>5</td><td>Настройки в порядок: группировка и отдельные окна</td><td><code>4.0b-A10</code></td></tr><tr><td>6</td><td>Остальные вкладки в порядок</td><td><code>4.0b-A11</code></td></tr><tr><td>7</td><td>Диалог как переписка между Риной и человеком</td><td><code>4.0b-A12</code></td></tr><tr><td>8</td><td>Список дел, с кнопкой на главной</td><td><code>4.0b-A13</code></td></tr></tbody></table>
+<p><strong>Что из этого дороже, чем выглядит.</strong> Пункты 1 и 2 — это не «поправить стили»: анимированный фон и живая фигура работают у человека, который держит Рину открытой весь день. Плата за красоту здесь — не время разработки, а его батарея и вентилятор, и об этом сказано в самих пунктах.</p>
+<details>
+<summary><strong>4.0b-A01 · Решение: какая функция станет лицом беты</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-09, ЗАМЕНЕНО 2026-09-09</strong></summary>
+<p>Критерий выбора был: узнаваемый сценарий, который можно показать в демо за минуту, не требует облака, опирается на уже сильную базу.</p>
+</details>
+<hr class="seam">
+<p><strong>Чем это решение заменено 2026-09-09.</strong> Заменена не оценка функций, а постановка вопроса: «какая одна» превратилось в «что обязано быть». Последствия решения сохранились — A03 и A04 сделаны именно из-за него и закрывают пункт 3 нового списка.</p>
+<p><strong>Что из него осталось верным и связывает новый список.</strong> Режим использования №1 — «фоном во время работы, окно свёрнуто или в трее», а режим «окно рядом, на него поглядывают» пользователем <strong>отвергнут</strong>. Из этого следовал выбор A03; из этого же следует ограничение на пункты 1 и 2: главный экран, который человек видит редко, не имеет права стоить ему батареи всё остальное время.</p>
+<details>
+<summary><strong>4.0b-A02 · Рабочие сессии и проектный контекст</strong> — L — 4.0-B08 — <strong>ВЫПОЛНЕНО 2026-09-20</strong></summary>
+<p>Человек начинает сессию над задачей, Рина хранит её контекст локально: цель, заметки, отданные команды, открытые приложения и — с согласия — рабочие каталоги. «Что я делал в прошлой сессии?», «Заверши сессию и запиши заметку», «Сколько я работал над этим на этой неделе?».</p>
+</details>
+<details>
+<summary><strong>4.0b-A03 · Контекстные напоминания</strong> — M — 4.0-E05 — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p>«Напомни проверить PR, когда открою VS Code». Повод вместо часов: у такого напоминания часов нет <strong>вовсе</strong>, и это не ноль в 1970 году — иначе планировщик счёл бы запись просроченной на полвека и разбудил бы человека через секунду после того, как тот её завёл.</p>
+</details>
+<details>
+<summary><strong>4.0b-A04 · Обучение на исправлениях</strong> — M — 4.0-G07 — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p>Оба пути ведут в одно выученное соответствие, и оно <strong>сильнее</strong> того, что индекс выбрал бы сам: «когда я говорю код, запускай Visual Studio Code» — правило; «нет, я имел в виду Chromium» — поправка вслед запуску. Род говорящего ничего не меняет: «имела» разбирается наравне с «имел».</p>
+</details>
+<details>
+<summary><strong>4.0b-A05 · Режим фокуса</strong> — M — 4.0b-A02 — <strong>ВЫПОЛНЕНО 2026-09-20</strong></summary>
+<p>Фокус — это открытая сессия с приглушённой инициативой, а не второй механизм: тот же отрезок работы, у которого поднят флаг.</p>
+</details>
+<hr class="seam">
+<details>
+<summary><strong>4.0b-A06 · Глубина в оформлении</strong> — L — 4.0-R03 — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p>Нынешний вид плоский: сплошной фон, простые переходы, две отделки. Задача — дать ему глубину: слои с их собственными тенями, анимации сложнее одного <code>Opacity</code>, живой фон вместо заливки, немного градиента. Градиент противоречит «нейрослоповому» дизайну как жанру — и именно здесь ложится, потому что даёт ту самую глубину, ради которой всё и делается.</p>
+</details>
+<hr class="seam">
+<p><strong>Отделка «Графит»</strong> живёт в токенах наравне с серебром и чёрным. Контраст сошёлся сразу, кроме одного места: акцент <code>ember</code> дал 4.42 при нужных 4.5 и осветлён именно для этой отделки. Схема настроек давно говорила, что варианты акцента зависят от отделки, — здесь это проявилось делом.</p>
+<p><strong>Правило пришлось поправить, и это главное в задаче.</strong> <code>4.0-R02</code> §5 и <code>4.0-R03</code> запрещали тень и размытие с доводом: «тень имитирует источник света, которого у панели нет; элемент, висящий над другим, нарисован неверно». A06 просил ровно обратного, и <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/check_design.py"><code>check_design.py</code></a> честно покраснел.</p>
+<p>Поправка принята 9 сентября 2026 и записана в <a href="/docs/design/"><code>SYSTEM.md</code>, §5</a>: <strong>тень разрешена движению.</strong> Можно тень у слоя, приезжающего на место, и под тем, что действительно парит над окном. Нельзя карточки на тенях, размытие вместо шва и тень под тем, что никуда не двигалось. В неподвижном кадре тени по-прежнему нет.</p>
+<p>Довод при этом не отменён, а уточнён: у <strong>движения</strong> источник есть — само движение. Вещь, приехавшая сверху, отбрасывает тень, пока едет, и перестаёт, когда легла.</p>
+<p><strong>Проверка сменила предмет.</strong> Запрещать токен значило бы запрещать решение; запрещать надо штамп, и у штампа есть форма — много уровней и размытие шире, чем нужно движению. Теперь проверяется: уровней не больше трёх, тень не шире 32, у каждой отделки свой цвет тени, налёт расходится не больше чем на 5% — и в макете, который есть неподвижный кадр, старое правило действует целиком.</p>
+<p><strong>Код сказал не то, что документ, и это нашлось на снимке.</strong> Тень у раздела оседала до уровня «приподнято» и оставалась лежать — то есть карточка на тени, ровно то, чего поправка не разрешала. Теперь она уходит в ноль, а проверка движения читает это обратно из живого окна: «на середине перехода тень видна», «а в покое тени нет вовсе».</p>
+<p><strong>Живой фон — вычисляемое течение.</strong> Дошло с третьей попытки, и обе первые стоит назвать. Сначала я двигал градиент лицевой поверхности на единицы процентов. Потом — четыре мягких радиальных пятна; человек показал референсы (всплеск воды, синяя туманность, старый концепт главного экрана) и сказал: фон должен быть <strong>виден</strong>. Пятнами это не делается: перекрывающиеся эллипсы дают гладкие кляксы, но никогда — нить или завихрение.</p>
+<p>Теперь это поле фрактального шума с искажением собственных координат — стандартная дорога к жидкой, мраморной картине. Вычисляется целиком: зацикливать нечего. Время идёт по кругу, поэтому в конце периода поле возвращается к себе без шва.</p>
+<p><strong>Считается мелко и растягивается.</strong> У поля нет детали мельче собственных черт, поэтому низкое разрешение ничего не теряет, а стоит долю. Именно это делает попиксельный эффект посильным на процессоре — и поэтому здесь нет шейдера: модель шейдеров WPF стара настолько, что уложиться в неё стоило бы дороже самого эффекта.</p>
+<p><strong>Граница, которая не двигается, — читаемость.</strong> Каждая ступень палитры сверяется с чернилами <strong>и легендами</strong> на 4.5. И она же формирует вид: на тёмной отделке потолок по светлоте низкий, значит течение показывает себя цветом, а не яркостью. Отсюда глубокая синева графита — так выглядит тёмная туманность, и так она обязана выглядеть, чтобы её было видно.</p>
+<p><strong>Одно правило снято вслух.</strong> «Цвет пятна — цвет этой же панели» было написано, когда фон был шёпотом. Держать его дальше значило бы держать правило про вещь, которой больше нет: оно зеленело бы на том, о чём никогда не было. Защита от штампа теперь другая и честнее — контраст и насыщенность, оба числом, плюс монотонность палитры и число ступеней.</p>
+<p><strong>Цена кадра измерена.</strong> Весь довод за остановку фона состоит в том, что кадры чего-то стоят человеку; цена, которую ни разу не померили, делает довод на веру. Померено: 8.3 мс при потолке в треть интервала. Запас нашёлся после первого измерения — и был потрачен на четвёртую октаву и разрешение выше, то есть на деталь, которую можно себе позволить.</p>
+<p><strong>Фон замирает, и это проверено временем.</strong> Ни скриншот, ни наличие объекта-таймера этого не показывают: фаза измеряется до и после. Часы свои, а не <code>Storyboard</code> с <code>RepeatBehavior.Forever</code> — у того нет причин останавливаться, когда окно скрыто, а здесь остановка и есть смысл.</p>
+<p><strong>Три дефекта, которых не было бы без живого окна.</strong> Пятна не появились вовсе: <code>Ellipse.Width</code> начинается с <code>NaN</code>, а сравнение с <code>NaN</code> всегда ложно — <code>Math.Abs(NaN - size) &gt; 0.5</code> сказало «размер верный», и пятна остались нулевыми. Ни ошибки, ни строки в журнале, просто плоская панель. Дальше кольца: большой мягкий градиент в восьми битах выходит концентрическими полосами, и лечится это дизерингом, а не подбором цвета. И сдвиг шёл через <code>Canvas.Left</code> — раскладка тридцать раз в секунду там, где хватает преобразования.</p>
+<p><strong>Пиксельная сверка сменила предмет дважды, и оба раза не допуском.</strong> Сперва её сломало зерно дизеринга: шум в одно значение на одной точке даёт разброс в шесть, профиль у шва вышел <code>33, 39, 33, 33, 39</code>, и сверка честно прочитала это как тень. Расширять допуск было нельзя — допуск, глотающий фон, проглотил бы и разницу между <code>FACE</code> и <code>FACE_LOW</code> в семь значений. Стала считать по вертикальной полоске: зерно нулевое в среднем и на ней гасится.</p>
+<p>Потом течение отменило и саму мысль «панель залита <code>FACE</code>». Теперь проверяется, что цвет на панели — цвет <strong>из палитры течения</strong>: это ловит то, что стоит ловить (оболочка рисует неназванным цветом) и молчит о том, какая ступень пришлась на эту фазу. А «панель светлее колонки» заменено на «на границе есть разрыв»: под течением направление ступени не постоянно, но разделение областей — да, и означает оно именно разрыв.</p>
+<p><em>Проверено подделкой снимка:</em> настоящая тень у шва, чужой цвет панели и перевёрнутая ступень значения — по падению каждая.</p>
+<p><strong>Проверка нашла дефект, которого без неё бы не было.</strong> Просьба о покое доходила только со следующим событием окна: человек, выключивший анимации в Windows, оставался с движущимся фоном до ближайшей активации. Обещание держалось «когда-нибудь», а это не то, что оно говорит. Теперь покой наступает тиком позже самое большее, и обратный переход тоже слышен — через <code>SystemParameters.StaticPropertyChanged</code>.</p>
+<p><strong>И проверка умела проверять половину.</strong> Ветка «система просит покоя» зависит от настройки Windows у разработчика: на машине с включёнными анимациями она недостижима, и сломанное послушание оставляло проверку зелёной. Теперь ветку можно спросить прямо, и слом её роняет.</p>
+<p><em>Проверено сломом:</em> тень как разделитель (шире 32) — 1 падение, четвёртый уровень — 1, отделка без цвета тени — 1, тень в неподвижном макете — 1, фон не останавливается — 2, тень остаётся в покое — 1, покой не слушают — 2, палитра туда-обратно — 1, люминесцентный цвет — 2, слишком светлая ступень — 1, искажения области нет — 1, кадр дороже бюджета — 1.</p>
+<p><strong>Заодно два списка перестали писаться руками.</strong> <code>FINISHES</code> в регрессе и сверка <code>4.0-R08</code> в проверке дизайна называли две отделки поимённо — и третья прошла бы мимо обеих молча, потому что список из двух имён не выглядит неправильным. Оба теперь читают отделки из токенов; снимков стало шесть вместо четырёх.</p>
+<p><strong>Дополнение 2026-09-25: частота кадров стала настройкой — и оказалась не той, что думали.</strong> Токен просил у <code>DispatcherTimer</code> 60 кадров, а Windows округляет интервал такого таймера до своего тика в 15.6 мс: выходило 32. Поток при этом двигался на запрошенный шаг, то есть вдвое медленнее своего периода в 9 секунд — а на машине, где кто-то укоротил тик, с полной скоростью. Скорость фона зависела от посторонних программ. Мера «сдвиг за секунду» копила те же запрошенные интервалы, и её «секунда» длилась две.</p>
+<p>Теперь кадры берутся из цикла отрисовки WPF, и поток движется на реально прошедшее время. Привычный вид сохранён периодом 17 — это те самые 9 при 32 кадрах из 60, и сайт переведён на то же число. Частота — настройка <code>frame_rate</code> во «Внешнем виде»: 30 по умолчанию (ровно прежняя нагрузка), 60, 120 и «без ограничения», с ценой в названии и предупреждением после выбора. Выше частоты монитора фон не идёт при любом выборе.</p>
+<p>Переходы фигуры и спад уровня голоса считались долей пути за кадр — на 60 кадрах они шли бы вдвое быстрее. Теперь они в единицах того тика, на котором их подбирали на глаз.</p>
+<p><strong>Размытие полосы заголовка — на процессоре.</strong> <code>BlurEffect</code> размывал увеличенную до окна картинку на видеокарте на каждом кадре, а полоса показывала из неё сорок точек. Теперь размытая копия поля считается в том же проходе, что и само поле, и только для строк под полосой. Сила подобрана замером: полосатая картинка проверки стекла сохраняет 14 значений контраста из 158 против прежних 12.</p>
+<p><strong>Замер, поочерёдно, три круга, окно впереди</strong> (3D Рины / процессор Рины; процессор — в Debug-сборке, см. ниже):</p>
+<table><thead><tr><th></th><th>3D</th><th>процессор</th></tr></thead><tbody><tr><td>до правки</td><td>8.0%</td><td>3.67 ядра</td></tr><tr><td>30 кадров</td><td>6.5%</td><td>3.62 ядра</td></tr><tr><td>60 кадров</td><td>12.8%</td><td>7.24 ядра</td></tr><tr><td>без ограничения (монитор 75 Гц)</td><td>14.9%</td><td>8.31 ядра</td></tr></tbody></table>
+<p>Цена идёт за кадрами, поэтому предупреждения называют кратности.</p>
+<p><em>Поправка 2026-09-29.</em> «Три с половиной ядра» — цифра Debug-сборки, а не программы. Разложено по частям кадра: в Debug поле фона стоит 35–43 мс процессора, фигура около 65; в Release — 3–7 и 7–24, и всё вместе на 30 кадрах 0,7–1,1 ядра. Шум в Debug втрое медленнее (микрозамер: 486 мс против 142 на одном объёме), и <code>AggressiveOptimization</code> этого не меняет — отладочная сборка выключает оптимизацию целиком. Выпуск собирается в Release; README теперь запускает в Release и объясняет почему. Кратности предупреждений от сборки не зависят.</p>
+<p><em>Проверено сломом:</em> частота не соблюдается — 3 падения; шаг на кадр вместо времени — 1 (период вдвое и в два с половиной раза выше обещанного); стекло без размытия — 1; стекло над ярким слоем на вкладке — 1 (до правки проверки ни одного: она читала флаг, а шов гасился растушёвкой); переход фигуры по кадрам — 1; выбор в настройках не доходит до фона — 1; цена не сказана после выбора — 1.</p>
+<details>
+<summary><strong>4.0b-A07 · Новая главная вкладка</strong> — L — 4.0b-A06 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Главный экран, которого сейчас нет. На нём:</p>
+</details>
+<details>
+<summary><strong>4.0b-A08 · Минимум две новые возможности</strong> — M — нет — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p>Закрыт <code>4.0b-A03</code> (контекстные напоминания) и <code>4.0b-A04</code> (обучение на исправлениях). Обе сделаны, проверены и внесены в модель угроз там, где это потребовалось (<code>T-19</code>).</p>
+</details>
+<details>
+<summary><strong>4.0b-A09 · Конструктор команд: удобнее и визуальнее</strong> — L — 4.0-F04 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Нынешний конструктор — форма с полями. Задача — сделать его удобным и добавить <strong>визуальный</strong> способ собрать команду: последовательность шагов, которую видно целиком, а не описание, которое надо держать в голове.</p>
+</details>
+<details>
+<summary><strong>4.0b-A10 · Настройки в порядок</strong> — M — 4.0-R04 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Сейчас десять секций (<code>4.0-R04</code>) и тридцать восемь ключей на одной странице. Список, растущий вниз, — это то, во что превращается любая страница настроек, если её не пересобирать.</p>
+</details>
+<details>
+<summary><strong>4.0b-A11 · Остальные вкладки в порядок</strong> — M — 4.0b-A06 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>История, команды, плагины, напоминания, о программе. Каждую — удобнее и красивее, в том же оформлении, что и новое главное окно. Отдельным пунктом, а не «заодно с A06»: оформление и удобство — разные работы, и вторая обычно не делается, если её не назвать.</p>
+</details>
+<details>
+<summary><strong>4.0b-A12 · Диалог как переписка</strong> — M — 4.0b-A06 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Сейчас диалоговое окно — это лента строк. Должно выглядеть как переписка между Риной и человеком: реплики по сторонам, видно, кто что сказал и когда.</p>
+</details>
+<details>
+<summary><strong>4.0b-A14 · Экран первичной настройки</strong> — M — 4.0-F03 — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p><strong>Потеря при переходе, не записанная в план.</strong> В инвентаре 3.1.0 стоит строка «Первый запуск: мастер настройки». В 4.0 его нет вовсе, а ключ <code>first_run</code> есть — и не читает его никто. Человек встречал помощника, который не слышит, и ни одного слова о том, почему.</p>
+</details>
+<details>
+<summary><strong>4.0b-A15 · Мастер ставит пакеты, а не только модели</strong> — M — 4.0b-A14 — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p><strong>Дополнение: кнопка «пройти настройку заново».</strong> После первого запуска мастер был недостижим — и не только для того, кто его видел, а вообще ни для кого: пропустивший скачивание не имел пути назад, кроме правки файла настроек руками. Кнопка в «о программе» открывает тот же мастер.</p>
+</details>
+<details>
+<summary><strong>4.0b-A13 · Список дел</strong> — M — 4.0b-A07 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Дела, которые не привязаны ко времени. Просмотр — кнопкой на новой главной.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0b-b-privatnost-i-obyasnimost">Блок 4.0b-B — Приватность и объяснимость</h3>
+<p>Входит в бету целиком, наравне с блоком A: без этого позиционирование «privacy-first» ничем не подкреплено.</p>
+<details>
+<summary><strong>4.0b-B01 · «Что Рина знает обо мне»</strong> — L — 4.0-E06 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Одна страница со всем, что хранится локально: алиасы, предпочтения, история, напоминания, рабочие сессии, статистика. Каждую запись видно и можно удалить. <em>Готово когда:</em> пользователь может ответить на вопрос «что программа обо мне помнит», не открывая файлы.</p>
+</details>
+<details>
+<summary><strong>4.0b-B02 · «Забудь это»</strong> — M — 4.0b-B01 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Удаление конкретного факта, алиаса, сессии или истории за дату. Полная очистка одной операцией с подтверждением.</p>
+</details>
+<details>
+<summary><strong>4.0b-B03 · Экспорт всех данных</strong> — S — 4.0b-B01 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>В понятном формате, а не только для переноса между машинами.</p>
+</details>
+<details>
+<summary><strong>4.0b-B04 · «Почему?»</strong> — M — 4.0-C06 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>«Почему ты открыла Chrome?», «Почему не выполнила команду?», «Откуда взялся этот путь?». Ответ ссылается на конкретную причину: пользовательский алиас, результат обнаружения программ, правило приоритета источников, требование подтверждения, правило безопасности. Дёшево потому, что источник уже есть: журнал вызовов <code>4.0-C06</code> записывает инструмент, аргументы, инициатора, разрешения и результат. Остаётся превратить запись в фразу. <em>Готово когда:</em> на любое выполненное или отклонённое действие есть объяснение, возводимое к записи журнала.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0b-c-gotovnost-k-publikacii">Блок 4.0b-C — Готовность к публикации</h3>
+<details>
+<summary><strong>4.0b-C01 · Сквозная проверка безопасности</strong> — M — S02 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Установка плагина, запуск программы, импорт и экспорт, опасные действия, сообщения протокола — по модели угроз.</p>
+</details>
+<details>
+<summary><strong>4.0b-C02 · Краш- и фаззинг-тесты</strong> — M — 4.0-D16 — <strong>ВЫПОЛНЕНО 2026-09-10</strong></summary>
+<p>Команды, манифесты плагинов, пути, сообщения протокола. ~~Основание уже есть: набор из 3.0.0 (около 600 враждебных вводов) переносится на новую архитектуру.~~</p>
+</details>
+<details>
+<summary><strong>4.0b-C02a · Конверт у выгрузки команд и истории</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-09</strong></summary>
+<p>Найдено при сведении рубежа. Дыра оказалась шире заявленной: 4.0 не только потерял конверт, но и <strong>весь разбор ввозимого файла</strong>.</p>
+</details>
+<details>
+<summary><strong>4.0b-C03 · Документация приватности и границ доверия</strong> — S — S02 — <strong>ВЫПОЛНЕНО 2026-09-11</strong></summary>
+<p><code>SECURITY.md</code> обновляется под новую модель: плагин теперь в отдельном процессе, и формулировку «песочницы нет» надо заменить на точное описание того, что изоляция даёт, а что нет.</p>
+</details>
+<details>
+<summary><strong>4.0b-C04 · README как продуктовая страница</strong> — M — нет — <strong>ЧАСТИЧНО 2026-09-11</strong></summary>
+<p>Сейчас README технический. Нужен другой текст: одна фраза о ценности, демонстрация, установка, приватность, обнаружение программ, планы. Скриншоты и короткое видео.</p>
+</details>
+<details>
+<summary><strong>4.0b-C05 · Документы сообщества</strong> — S — S01 — <strong>ВЫПОЛНЕНО 2026-09-11</strong></summary>
+<p><code>CONTRIBUTING.md</code>, <code>CODE_OF_CONDUCT.md</code>, шаблоны задач. <code>SECURITY.md</code> есть с 3.1.0. Содержание <code>CONTRIBUTING.md</code> зависит от решения S01 — если выбрано двойное лицензирование, туда входит CLA.</p>
+</details>
+<details>
+<summary><strong>4.0b-C06 · Канал обратной связи</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-11</strong></summary>
+<p>GitHub Discussions или Discord, и процесс разбора входящего.</p>
+</details>
+<details>
+<summary><strong>4.0b-C07 · Ясное публичное сообщение</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-11</strong></summary>
+<p>Бета бесплатна; локальная база останется бесплатной; отдельные продвинутые возможности могут стать платными позже. Сказать это прямо и один раз, чтобы потом не выглядело подменой.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0b-e-zhivost">Блок 4.0b-E — Живость</h3>
+<p>Названо после того, как блок A был закрыт: часть обещанного при переделке дизайна не сделана, часть видна только теперь, когда программой пользуются. Пункты мелкие по отдельности и складываются в одно — <strong>программа должна ощущаться живой, а не собранной</strong>.</p>
+<details>
+<summary><strong>4.0b-E01 · Блюр у верхней полосы</strong> — S — <strong>сделано</strong></summary>
+<p>Полоса сделана полностью прозрачной (<code>4.0b-A06</code>), и на вкладках, где содержимое лежит на стекле, она выбивается: стекло рядом с не-стеклом читается как недоделка. Нужен тот же материал.</p>
+</details>
+<details>
+<summary><strong>4.0b-E02 · Всплывающее — со скруглением и стеклом</strong> — S — <strong>сделано</strong></summary>
+<p>Отдельным окнам (списки настроек) — небольшое скругление. Кнопке дел на главной — ближе к краю; самой панели — прозрачность с блюром.</p>
+</details>
+<details>
+<summary><strong>4.0b-E03 · Наведение на кнопку</strong> — S — <strong>сделано</strong></summary>
+<p>Наведение должно быть прозрачнее. На светлых кнопках при наведении текст остаётся чёрным на потемневшей кнопке — либо наведение, либо цвет текста неверны.</p>
+</details>
+<details>
+<summary><strong>4.0b-E04 · Анимации по всей оболочке</strong> — M — <strong>сделано</strong></summary>
+<p>При переделке дизайна обещаны «более сложные и красивые анимации»; сделаны только фон и фигура. Нужны переходы между разделами, переключатели, появление окон — большинству элементов быть в движении.</p>
+</details>
+<details>
+<summary><strong>4.0b-E05 · Фигура объёмная</strong> — L — <strong>сделано</strong></summary>
+<p>2.5D с замахом на 3D, и объёмные же переходы между состояниями.</p>
+</details>
+<details>
+<summary><strong>4.0b-E06 · Разговор, а не команды</strong> — L — 4.0-C05 — <strong>сделано</strong></summary>
+<p>Сейчас слово активации нужно произносить перед каждой фразой. Должно: сказано один раз — дальше разговор, пока он длится. Рина понимает, что обращаются к ней, отвечает на вопросы о себе, <strong>переспрашивает, когда выбор за человеком</strong> («Ambient или Lo-Fi?»), докладывает о законченном длинном деле и сама предлагает уместное.</p>
+</details>
+<details>
+<summary><strong>4.0b-E07 · Распознавание по ходу фразы</strong> — M — 4.0b-V01 — <strong>сделано</strong></summary>
+<p>Кормить Vosk кусками по мере прихода, а в конце фразы брать <code>FinalResult</code>. Замерено: 620 мс → 4 мс на той же записи и с тем же текстом. Считать обязательно на потоке распознавания, а не на том, который читает канал данных: худший кусок занял 227 мс, и этого хватит, чтобы уронить чтение звука.</p>
+</details>
+<details>
+<summary><strong>4.0b-E08 · Поток речи ждёт кредита, а не обрывает</strong> — S — 4.0-D08 — <strong>сделано</strong></summary>
+<p>Сначала исправность, потом скорость. <code>send_speech</code> делает <code>break</code>, когда кредита не хватает, — то есть выбрасывает остаток реплики. Замерено изолированно:</p>
+</details>
+<details>
+<summary><strong>4.0b-E09 · Синтез по предложениям</strong> — M — 4.0b-E08 — <strong>сделано</strong></summary>
+<p>Резать ответ по границам предложений, отправлять первое сразу, остальные — пока играет первое. Ни нового протокола, ни нового интерфейса движка: <code>send_speech</code> уже инкрементален, а Edge получает вдобавок более короткий первый запрос.</p>
+</details>
+<details>
+<summary><strong>4.0b-E10 · Потоковый синтез</strong> — M — 4.0b-E09 — <strong>сделано</strong></summary>
+<p><code>TTSEngine.stream(text) -&gt; Iterator[bytes]</code> рядом с <code>render()</code>; для Edge — через <code>Communicate.stream()</code>, который отдаёт куски по мере синтеза. Движки без потока оборачиваются старым путём и ничего не теряют.</p>
+</details>
+<details>
+<summary><strong>4.0b-E11 · Тёплая связь с Edge</strong> — M — 4.0b-E10 — <strong>ВЫПОЛНЕНО 2026-09-29</strong></summary>
+<p>Размер S → M осознанно: пункт сам предупреждал, что при медленном рукопожатии у всех возвращаться придётся «уже со своим соединением, а это не S». Так и вышло.</p>
+</details>
+<details>
+<summary><strong>4.0b-E13 · Модель смотрит в интернете</strong> — M — 4.0b-E06 — <strong>ВЫПОЛНЕНО 2026-09-22</strong></summary>
+<p>Модель, которой не хватает знаний, просит поиск сама; Рина ищет и спрашивает её второй раз, уже с найденным.</p>
+</details>
+<details>
+<summary><strong>4.0b-E12 · Перебивание</strong> — M — 4.0b-E08 — <strong>сделано</strong></summary>
+<p>Сейчас на время речи микрофон замьючен, то есть перебить Рину нельзя. Для ощущения разговора это бьёт не слабее задержки: собеседника, которого нельзя перебить, слушают иначе — его пережидают.</p>
+</details>
+<details>
+<summary><strong>4.0b-E14 · Персона на разных языках и имя собеседника</strong> — M — 4.0b-E06 — <strong>ВЫПОЛНЕНО 2026-09-25</strong></summary>
+<p>Найдено живой проверкой при подготовке к выбору характера. <code>DEFAULT_PERSONA</code> написана по-русски, и этого хватает, чтобы модель отвечала только по-русски. Попытка говорить с ней по-английски кончилась хуже, чем неудобством: модель переставала отвечать по существу, и на каждый запрос приходило «Извини, я не поняла команду» — то есть инструкция, написанная на одном языке, отбирает у модели остальные.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0s-s-golos-v-realnom-vremeni">Блок 4.0s-S — Голос в реальном времени</h3>
+<p>Рубеж <code>stable</code>, где синтез остаётся один (Edge Neural) и поверх него встаёт RVC. Пункты помечены <code>[stable]</code>; сам блок стоит здесь, рядом с <code>4.0b-E07</code>–<code>E12</code>, потому что это одна история: бета снимает ожидания, stable не даёт им вернуться вместе с новыми ступенями.</p>
+<details>
+<summary><strong>4.0s-S1 · Ответ модели потоком</strong> — M — 4.0b-E09 — <strong>[stable]</strong></summary>
+<p><code>&quot;stream&quot;: True</code> у модели; <code>stream.chunk</code> в протоколе уже есть и не использован. Делитель предложений из <code>E09</code> кормит синтез по мере генерации: первое предложение звучит, пока модель пишет третье. Без этого <code>E09</code> и <code>E10</code> снимают ожидание только у встроенных ответов, а у модельных — самых долгих — не снимают вовсе.</p>
+</details>
+<details>
+<summary><strong>4.0s-S2 · RVC как ступень потока, а не обработка файла</strong> — L — 4.0s-S1 — <strong>[stable]</strong></summary>
+<p>Фиксированный блок с кроссфейдом, на том же работнике, что тянет куски из Edge. <strong>Размер блока становится новым полом задержки</strong> — значит, выбирается осознанно (128–256 мс) и не наследуется из демонстрации.</p>
+</details>
+<details>
+<summary><strong>4.0s-S3 · Частота дискретизации конвейера</strong> — S — 4.0s-S2 — <strong>[stable]</strong></summary>
+<p>Edge отдаёт 24 кГц, модели RVC обычно хотят 40 или 48. Две передискретизации на каждый блок — это и время, и качество. Выбрать внутреннюю частоту один раз (скорее всего 48 кГц) и объявлять её в <code>stream.open</code>, а не подгонять по месту: <code>format</code> в открытии потока затем и существует, чтобы сказать, а не угадывать.</p>
+</details>
+<details>
+<summary><strong>4.0s-S4 · Edge единственный — значит его отсутствие штатно</strong> — M — нет — <strong>[stable]</strong></summary>
+<p><strong>И у него есть пол, который померили:</strong> около секунды от запроса до первого звука уходит внутри сервиса, и ни поток, ни тёплое соединение этого не снимают. Значит ответ Рины не может начаться раньше чем через секунду после того, как текст готов, а с RVC сверху — ещё позже на размер блока. Это число стоит держать в уме, решая, остаётся ли Edge единственным: оно и есть цена живого голоса.</p>
+</details>
+<details>
+<summary><strong>4.0s-S5 · Бюджет задержки как проверка</strong> — S — 4.0b-E07, 4.0b-E10 — <strong>[stable]</strong></summary>
+<p>Три числа в регрессию: последний кусок звука → <code>speech.recognized</code>; <code>speech.recognized</code> → первый байт PCM; первый байт → устройство играет. С потолком на каждое.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0b-v-golos-to-chto-nashlos-pri-zhivoy-proverke">Блок 4.0b-V — Голос: то, что нашлось при живой проверке</h3>
+<p>Записано 16 сентября 2026, после первого дня, когда программой пользовались голосом по-настоящему. Пять поломок, снаружи неотличимых одна от другой: «она меня не слышит». Ни одну не поймала ни одна проверка — и держится это на них, а не на везении.</p>
+<details>
+<summary><strong>4.0b-V01 · Распознавание в несколько потоков</strong> — S — <strong>сделано</strong></summary>
+<p>Фраза получала поток, а распознаватель один на всех, с моделью, которая грузится при первой фразе. Две фразы подряд грузили модель дважды и читали её разом: «Failed to create a model», дальше на каждую фразу. Но видел человек не это: слова фразы всплывали во время следующей, и Рина отвечала через секунду после начала речи — на сказанное до того. В журнале за 15 сентября это видно прямо: две услышанные фразы, одна строка распознанного, слова обеих внутри.</p>
+</details>
+<details>
+<summary><strong>4.0b-V02 · «Всегда слушать» не переживало перезапуск</strong> — S — <strong>сделано</strong></summary>
+<p>Переключатель показывал включённый режим, ядро в него верило, микрофон был закрыт. Режим восстанавливался при рукопожатии и объявлял себя событием — но событие уходило <strong>раньше ответа</strong> на <code>hello</code>, а до ответа у оболочки нет согласованной версии протокола, и подписывается она после. Событие падало в щель.</p>
+</details>
+<details>
+<summary><strong>4.0b-V02b · Та же ложь через другую дверь</strong> — S — <strong>сделано</strong></summary>
+<p>Горячая клавиша «всегда слушать» не зовёт <code>speech.set_always_listen</code>, а пишет настройку, как любую другую. Настройка записывалась и не применялась ничем: переключатель двигался, микрофон оставался как был до следующего запуска, а записанный флаг и работающий режим расходились. Так и получилось «включено» в настройках при режиме, который ни разу не работал.</p>
+</details>
+<details>
+<summary><strong>4.0b-V06 · Она отвечала на шум</strong> — M — <strong>сделано</strong></summary>
+<p>Второй заход человека с микрофоном: «в общем, без изменений». Фразы перестали слипаться и приходить с опозданием — но в журнале за 16 сентября подряд идут веб-поиски по «Рим. Шт.», «Лина.», «Офигенно.» и по «Редактор субтитров Н.Семкирова». Ассистент, который ищет в интернете «Офигенно», хуже молчащего.</p>
+</details>
+<details>
+<summary><strong>4.0b-V07 · Разовое слушание закрывало микрофон под режимом</strong> — S — <strong>сделано</strong></summary>
+<p>«„Всегда слушать“ не работает — она не слышит меня. А при комбинации она делает всё то же самое — не слышит, а при следующем включении даже сказать не даёт».</p>
+</details>
+<details>
+<summary><strong>4.0b-V03 · Плитки плагинов не работали ни разу</strong> — S — <strong>сделано</strong></summary>
+<p><code>home_tiles</code> написан на <code>PluginManager</code>; плагины живут в своих процессах (ADR 0010), и ядро говорит с <code>HostedPlugins</code>, где метода не было. Каждая отрисовка главной кончалась строкой в журнале, раз в несколько секунд, четверо суток — при зелёном <code>test_home_tiles.py</code>, который спрашивал другой класс.</p>
+</details>
+<details>
+<summary><strong>4.0b-V04 · Чужая папка принималась за модель</strong> — S — <strong>сделано</strong></summary>
+<p>С сайта Vosk принесён <code>vosk-recasepunc-ru-0.22</code> — он там есть и моделью распознавания не является. Папка на месте, пакет на месте, а каждая фраза кончалась фразой библиотеки по-английски в журнале. Теперь это видно там, где выбирают: движок недоступен, и написано почему.</p>
+</details>
+<details>
+<summary><strong>4.0b-V05 · Говорить было нечем</strong> — M — <strong>сделано</strong></summary>
+<p>На второй машине оказалось, что озвучки нет вовсе — и не только моделей: в каталоге не было ни пакета, ни модели ни для одного говорящего движка. Рина слышала, понимала и отвечала текстом.</p>
+</details>
+<details>
+<summary><strong>4.0b-V09 · Проверки шли не тем питоном, что ядро</strong> — M — <strong>сделано</strong></summary>
+<p>Найдено, когда проверка потокового декодера (<code>4.0b-E10</code>) написалась, прошла и <strong>не запустилась</strong>: PyAV стоит там, где ядро, — в <code>venv</code>, — а регрессия брала <code>sys.executable</code>, то есть тот питон, которым её позвали. До этого так же молча пропускался замер распознавания из <code>E07</code>.</p>
+</details>
+<details>
+<summary><strong>4.0b-V08 · Распознавание стало хуже, чем было в 3.1</strong> — M — 4.0b-V01 — <strong>ВЫПОЛНЕНО 2026-09-25</strong></summary>
+<p>Человек после первого дня, когда его наконец стало слышно: «очень плохо распознаются предложения, точнее <strong>стали</strong> плохо распознаваться, в 3.1 почти идеально было».</p>
+</details>
+<details>
+<summary><strong>4.0b-V10 · Голос Edge не умеет по-английски</strong> — M — 4.0b-V05</summary>
+<p>Проверено разговором: <code>ru-RU-SvetlanaNeural</code>, голос по умолчанию, на английской речи произносит не по-английски. Названия программ — «Visual Studio Code», «Google Chrome» — она обязана выговаривать каждый день, а языком владеет одним.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-4-0b-d-vyhod-k-polzovatelyam">Блок 4.0b-D — Выход к пользователям</h3>
+<details>
+<summary><strong>4.0b-D01 · Страница продукта</strong> — M — 4.0b-C04 — <strong>ВЫПОЛНЕНО 2026-09-18</strong></summary>
+<p>Ценность, скачивание, возможности, приватность, документация, планы.</p>
+</details>
+<details>
+<summary><strong>4.0b-D02 · Публикация</strong> — S — всё выше</summary>
+<p>GitHub Release и темы репозитория. Тематические сообщества — с соблюдением правил каждого. Product Hunt лучше приберечь до стабильного релиза или до заметной функции.</p>
+</details>
+<details>
+<summary><strong>4.0b-D03 · Статьи</strong> — M — 4.0b-D02</summary>
+<p>Темы, которые естественно вырастают из проделанной работы: как устроен local-first голосовой ассистент; почему разрешения плагинов важнее магазина плагинов; как безопасно запускать найденные программы в Windows; зачем разделять ассистента на два процесса; голосовой конвейер без обязательного облака.</p>
+</details>
+<details>
+<summary><strong>4.0b-D04 · Вопросы к пользователям</strong> — S — 4.0b-C06</summary>
+<p>Собирать не «нравится или нет», а: какую задачу решали; что сделали в первые десять минут; где не сработало; какую программу Рина не нашла; какая команда показалась опасной или непонятной; за какой сценарий заплатили бы.</p>
+</details>
+<details>
+<summary><strong>4.0b-D05 · Необязательная телеметрия</strong> — M — B08 — <strong>ВЫПОЛНЕНО 2026-09-29</strong></summary>
+<p>Только по явному согласию, выключена по умолчанию. Отправляется: версия приложения и ОС, счётчики использования возможностей, ошибки, время выполнения конвейера, категория источника найденной программы. <strong>Не отправляется никогда:</strong> распознанный текст, аудио, содержимое файлов, абсолютные пути, токены, адреса почты, секреты. <em>Готово когда:</em> при выключенной телеметрии приложение не делает ни одного сетевого обращения, кроме явно запрошенных пользователем.</p>
+</details>
+<hr class="seam">
+<h2 id="posle-bety-reshaetsya-po-dannym">После беты — решается по данным</h2>
+<p>Этот слой намеренно не разложен на задачи: строить его до подтверждения спроса — значит потратить месяцы на инфраструктуру, которая пока ничего не решает.</p>
+<p><strong>Порядок.</strong> Разбор того, чем реально пользуются и где отваливаются → 10–20 коротких разговоров с активными пользователями → выбор одной-двух гипотез о платной ценности <strong>по данным</strong> → и только затем серверная часть.</p>
+<p><strong>Модель монетизации.</strong> Community (бесплатно, local-first база) + Pro + Business. Локальный пользователь на своём железе обоснованно не захочет платить помесячно за право запускать программы, поэтому базовое остаётся бесплатным, а платить имеет смысл за расширенную автоматизацию, интеграции, поиск по локальным документам, наборы сценариев, синхронизацию и корпоративный контроль.</p>
+<p><strong>Что остаётся бесплатным всегда:</strong> голосовой конвейер, локальная модель, обнаружение и запуск программ, напоминания, таймеры, хоткеи, системные действия с подтверждениями, история, алиасы, настройки, базовые и собственные плагины, журнал безопасности.</p>
+<p><strong>Аккаунты и лицензии.</strong> Три независимые сущности: учётная запись, лицензия с набором возможностей, активация устройства. Community работает <strong>без аккаунта</strong>; вход нужен только для платного, синхронизации или командных функций. Локальный кэш прав подписывается сервером и проверяется клиентом; онлайн-проверка не должна ломать локальную работу — нужен запас офлайн-времени.</p>
+<p><strong>Технологии серверной части.</strong> Первым выбором — Python: Django (готовые аутентификация, миграции, админка для ручного управления лицензиями, почтовые сценарии) либо FastAPI, если нужен чистый API. Rust здесь пока неоправдан: задача — работа с базой и сетью, а не вычисления; узким местом будут база, почта, платёжный провайдер и поддержка.</p>
+<p><strong>VRM-компаньон на рабочем столе.</strong> Не в бете. Отдельный процесс, общается с ядром по тому же протоколу, без доступа к файловой системе и сети; реагирует на события ядра (слушает, думает, говорит, ошибка, простой). Выключен по умолчанию, нейтральная модель по умолчанию, автоскрытие в полноэкранных приложениях, проверка и подпись загружаемых моделей. Риск — восприятие продукта как игрушки — снимается тем, что это необязательное дополнение, а не лицо продукта.</p>
+<hr class="seam">
+<h2 id="versiya-5-0-0-platforma">ВЕРСИЯ 5.0.0 — «Платформа»</h2>
+<p><strong>Цель:</strong> RinaAssistant становится завершённым ассистентом и платформой под RinaNeuro. Последняя версия, где у Рины ещё нет образа и памяти собеседника.</p>
+<hr class="seam">
+<h3 id="blok-a-skvoznoy-striming">Блок A — Сквозной стриминг</h3>
+<p>Разница между «отвечает через 4 секунды» и «начинает говорить через 400 мс» — это разница между инструментом и собеседником. Без этого блока RinaNeuro невозможна.</p>
+<details>
+<summary><strong>5.0-A01 · Абстракция LLM-провайдера</strong> — L — 4.0</summary>
+<p>Стриминг, отмена, очередь с одним активным запросом, таймауты, учёт токенов. Провайдер-агностично.</p>
+</details>
+<p class="task"><strong>5.0-A02 · Адаптер Ollama со стримингом</strong> — M — A01</p>
+<details>
+<summary><strong>5.0-A03 · Управление моделями и VRAM</strong> — L — A02</summary>
+<p>Загрузка, выгрузка, keep-alive, осведомлённость о доступной памяти, внятное поведение при нехватке. Задел под свап персоны и кодинг-модели. <em>Готово когда:</em> переключение между двумя моделями предсказуемо по времени и не падает при нехватке VRAM.</p>
+</details>
+<details>
+<summary><strong>5.0-A04 · Стриминг токенов в оболочку</strong> — M — A02, 4.0-D06</summary>
+<p>Инкрементальный рендер без мигания и переклейки текста.</p>
+</details>
+<details>
+<summary><strong>5.0-A05 · Сегментация текста для речи</strong> — M — A04</summary>
+<p>Резать поток на фразы для синтеза: знаки препинания, сокращения, числа, границы, на которых пауза звучит естественно. Плохая сегментация превращает живую речь в рубленую.</p>
+</details>
+<details>
+<summary><strong>5.0-A06 · Конвейерный TTS</strong> — L — A05, 4.0-E04</summary>
+<p>Синтез чанка N+1 пока играет N. Буфер против недогрузки. <em>Готово когда:</em> нет слышимых разрывов между чанками при реальной генерации.</p>
+</details>
+<p class="task"><strong>5.0-A07 · Очередь воспроизведения и прерывание</strong> — M — A06, 4.0-F10</p>
+<details>
+<summary><strong>5.0-A08 · Метрика TTFA как KPI</strong> — M — A06</summary>
+<p>Время до первого звука измеряется автоматически и не должно регрессировать. Это главная продуктовая метрика ощущения живости, и она измеряется.</p>
+</details>
+<details>
+<summary><strong>5.0-A09 · Barge-in</strong> — L — A07, 4.0-F09</summary>
+<p>Пользователь начал говорить — речь Рины мгновенно замолкает, генерация отменяется, вход обрабатывается. Без этого диалог не диалог, а монолог по очереди.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-b-fundament-pamyati">Блок B — Фундамент памяти</h3>
+<p>Не VectorDB. Векторный поиск — семантический слой, а не мозг памяти; он добавляется точечно и позже.</p>
+<details>
+<summary><strong>5.0-B01 · Схема SQLite</strong> — M — 4.0</summary>
+<p>Таблицы: <code>conversations</code>, <code>messages</code>, <code>facts</code>, <code>profile</code>, <code>memory_items</code>, <code>tool_events</code>, <code>summaries</code>. Миграции с самого начала.</p>
+</details>
+<details>
+<summary><strong>5.0-B02 · Полнотекстовый поиск</strong> — M — B01</summary>
+<p>FTS5 по сообщениям и памяти. <strong>Обязательно протестировать на русской морфологии</strong> — из коробки поиск по русскому работает хуже, чем ожидается: словоформы, регистр, стемминг. <em>Готово когда:</em> запрос «плагины» находит «о плагинах», «плагинам», «плагином».</p>
+</details>
+<details>
+<summary><strong>5.0-B03 · Rolling summary</strong> — L — B01, A01</summary>
+<p>Когда обновлять, каким промптом, как хранить версии, как не терять важное при сжатии.</p>
+</details>
+<details>
+<summary><strong>5.0-B04 · Короткое окно контекста</strong> — M — B01</summary>
+<p>Бюджет токенов, правило вытеснения. Явный лимит — прямое лечение того, из-за чего задохнулась старая RinaNeuro.</p>
+</details>
+<details>
+<summary><strong>5.0-B05 · Экстрактор фактов</strong> — L — B01, A01</summary>
+<p>Pipeline: сообщение → <strong>стоит ли это помнить</strong> → извлечь тип/ключ/значение/уверенность/источник/время. Не сохранять всё подряд: иначе память заполнится мусором и перестанет находиться нужное.</p>
+</details>
+<details>
+<summary><strong>5.0-B06 · Профиль</strong> — M — B05</summary>
+<p>Структурированные предпочтения, стиль общения, важные даты, запретные темы. Точные факты достаются lookup&#x27;ом, а не поиском по смыслу.</p>
+</details>
+<details>
+<summary><strong>5.0-B07 · Конфликты и устаревание</strong> — L — B05</summary>
+<p>«Я больше не использую PyQt5» должно перекрыть старую запись. Модель supersede, срок доверия, разрешение противоречий.</p>
+</details>
+<details>
+<summary><strong>5.0-B08 · Сборщик контекста</strong> — L — B03..B07</summary>
+<p>Единственное место, решающее, что попадёт в промпт и в каком порядке при заданном бюджете: профиль + summary + окно + найденное + состояние. Позже здесь появятся метки доверия — поэтому это отдельный компонент, а не код внутри промпта.</p>
+</details>
+<details>
+<summary><strong>5.0-B09 · Интерфейс памяти</strong> — L — B01</summary>
+<p>Посмотреть, что Рина помнит; исправить; удалить. <strong>Обязательно, а не опционально:</strong> память, которую нельзя починить, со временем становится источником стойких ошибок о тебе.</p>
+</details>
+<p class="task"><strong>5.0-B10 · Экспорт и полное удаление данных</strong> — M — B09</p>
+<details>
+<summary><strong>5.0-B11 · Метки доверия на записях</strong> — M — B01</summary>
+<p><code>trusted</code> / <code>untrusted</code> + источник. Заводится сейчас, применяется в этапе C RinaNeuro. Дешевле проставить с первого дня, чем размечать накопленную память задним числом.</p>
+</details>
+<details>
+<summary><strong>5.0-B12 · Опционально: семантический слой</strong> — L — B02, B08</summary>
+<p>Только если полнотекстовый поиск реально проигрывает на парафразах. Локально (LanceDB или векторное расширение SQLite), embeddings — локальные, с проверкой качества на русском. Учесть: смена модели embeddings = переиндексация всего.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-c-zrelost-toolregistry">Блок C — Зрелость ToolRegistry</h3>
+<p>К моменту, когда инструменты начнёт вызывать LLM, реестр должен быть обкатан вручную.</p>
+<p class="task"><strong>5.0-C01 · Журнал действий с интерфейсом</strong> — M — 4.0-C06</p>
+<details>
+<summary><strong>5.0-C02 · Гранулярные разрешения в настройках</strong> — L — 4.0-C04</summary>
+<p>Пользователь видит и меняет, что Рине можно. Основа доверия, когда появятся руки.</p>
+</details>
+<p class="task"><strong>5.0-C03 · Dry-run</strong> — M — 4.0-C01 — показать, что было бы сделано, не делая</p>
+<p class="task"><strong>5.0-C04 · Идемпотентность и повторы</strong> — M — 4.0-C01</p>
+<details>
+<summary><strong>5.0-C05 · Двухадресные ошибки</strong> — M — 4.0-C05</summary>
+<p>Одна форма для человека, другая — структурированная, чтобы позже LLM мог осмысленно исправиться, а не зациклиться.</p>
+</details>
+<p class="task"><strong>5.0-C06 · Тесты каждого инструмента</strong> — L — 4.0-C03</p>
+<hr class="seam">
+<h3 id="blok-d-primitivy-aktuacii-bez-uchastiya-llm">Блок D — Примитивы актуации (без участия LLM)</h3>
+<p>Руки отлаживаются <strong>до</strong> того, как их получит мозг. В 5.0.0 это ручные возможности и плагинный API.</p>
+<details>
+<summary><strong>5.0-D01 · Захват экрана</strong> — L — 4.0-D07, 4.0-D08</summary>
+<p>Кольцевой буфер кадров, выбор монитора или окна, ограничение частоты. <strong>Хранить последний кадр, а не гнать поток</strong> — ошибка старой RinaNeuro была именно в потоке кадров в «анализ».</p>
+</details>
+<details>
+<summary><strong>5.0-D02 · Детектор значимого изменения</strong> — M — D01</summary>
+<p>Анализ по событию, а не по таймеру.</p>
+</details>
+<p class="task"><strong>5.0-D03 · Передача кадров с backpressure</strong> — M — D01</p>
+<p class="task"><strong>5.0-D04 · Управление окнами</strong> — M — 4.0-F02 — список, фокус, геометрия, идентификация</p>
+<details>
+<summary><strong>5.0-D05 · Синтез ввода</strong> — L — 4.0-F02</summary>
+<p>Мышь и клавиатура. Раскладки, юникод, скорость, надёжность доставки.</p>
+</details>
+<details>
+<summary><strong>5.0-D06 · Модель сессии актуации</strong> — L — D05, 4.0-C04, 4.0-D12</summary>
+<p>Явное начало, срок, область, аудит, явное завершение. «Разрешаю управлять этим окном 10 минут» — а не постоянное право на всё.</p>
+</details>
+<details>
+<summary><strong>5.0-D07 · Ограничение области действия</strong> — L — D06, D04</summary>
+<p>Ввод уходит только в целевое окно; потеря фокуса останавливает сессию. <em>Готово когда:</em> попытка действовать вне области блокируется и логируется.</p>
+</details>
+<details>
+<summary><strong>5.0-D08 · Kill-switch</strong> — L — 4.0-F06, D06</summary>
+<p>Глобальный хоткей, обрабатываемый <strong>до всякой логики</strong>, мгновенно снимающий все разрешения, обрывающий сессии актуации и глушащий речь. Делается сейчас, пока цена ошибки нулевая. <em>Готово когда:</em> срабатывает даже когда ядро зависло или занято.</p>
+</details>
+<details>
+<summary><strong>5.0-D09 · Постоянный индикатор управления</strong> — M — D06</summary>
+<p>Пока Рина управляет компьютером, это видно всегда и однозначно.</p>
+</details>
+<details>
+<summary><strong>5.0-D10 · Ручной доступ к примитивам</strong> — M — D05..D07</summary>
+<p>Плагины и пользовательские сценарии. Цель — проверить руки руками.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-f-obolochka-na-tauri-tematiki-i-api-plaginov">Блок F — Оболочка на Tauri, тематики и API плагинов</h3>
+<p>Решено 25 сентября 2026. Записи ADR пока нет: смена фреймворка оболочки отменяет <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0008-ui-framework.md">ADR 0008</a> и по правилам проекта требует новой записи до начала работ — она стоит в списке «решено, но не записано».</p>
+<details>
+<summary><strong>5.0-F01 · Оболочка на Rust + Tauri</strong> — XL — 4.0</summary>
+<p>WPF ожиданий не оправдал. Интерфейс переходит в Tauri: Rust и веб-вид (WebView2). Ядро остаётся на Python, граница прежняя — протокол с версиями (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0002-ipc-transport.md">ADR 0002</a>, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0004-versioning-and-compatibility.md">ADR 0004</a>). Это и позволяет вести новую оболочку параллельно старой, против того же ядра и тех же проверок.</p>
+</details>
+<details>
+<summary><strong>5.0-F02 · Тематики оболочки по мажорам</strong> — L — F01</summary>
+<p>Каждая мажорная версия получает свою тематику оформления, и человек выбирает между ними в настройках: 4.0 — «Nebula», 5.0 — «Greeth». Цена названа: каждая новая оболочка несёт все прежние тематики, так что Nebula в 5.0 реализуется заново в веб-технологиях. Задел есть: <code>tokens.json</code> не привязан к фреймворку, и сайт уже рисует макет окна в HTML/CSS из тех же токенов.</p>
+</details>
+<details>
+<summary><strong>5.0-F03 · Рендер VRM в веб-виде</strong> — L — F01</summary>
+<p>Модель VRM рисуется внутри веб-вида оболочки (<code>@pixiv/three-vrm</code> на three.js), а не отдельным нативным рендером: совмещать нативную поверхность с веб-окном, тем более с прозрачностью, заметно труднее. Перед началом нужен короткий пробный прототип — прозрачное окно поверх рабочего стола и частота кадров на WebView2.</p>
+</details>
+<details>
+<summary><strong>5.0-F04 · Плагины на Rust и Python</strong> — XL — F01, 4.0-H07</summary>
+<p>Плагин пишется на Python, на Rust (с Tauri для своего интерфейса) или на обоих сразу. Устойчивого ABI у Rust нет, поэтому плагин на Rust — отдельный процесс по протоколу, как и решено для плагинов вообще (<code>4.0-H07</code>); плагин на двух языках — две половины и один манифест.</p>
+</details>
+<hr class="seam">
+<h3 id="blok-e-vypusk-5-0-0">Блок E — Выпуск 5.0.0</h3>
+<p class="task"><strong>5.0-E01 · Полный регресс</strong> — M</p>
+<p class="task"><strong>5.0-E02 · Документация возможностей</strong> — M</p>
+<details>
+<summary><strong>5.0-E03 · Публикация</strong> — M</summary>
+<p>Это версия, которую можно оставить как законченный самостоятельный продукт. RinaNeuro строится <strong>рядом</strong>, а не вместо: если RinaNeuro затянется, у тебя всё равно есть готовый ассистент.</p>
+</details>
+<hr class="seam">
+<h2 id="trek-v-golos-idet-parallelno-s-4-x-ne-zhdet-5-0-0">ТРЕК V — голос (идёт параллельно с 4.x, не ждёт 5.0.0)</h2>
+<p><strong>Решено 2026-09-29: свой голос Рины — в 4.0.0 Stable, не в бете.</strong> Так же сказано человеку в настройках, под выбором личности: «У Рины пока нет своего голоса — он появится в 4.0.0 Stable». Снимок границ держал V-04, V-08 и V-09 в бете, и одно из двух было неправдой; оставшиеся пункты трека перенесены в <code>[stable]</code>. Бета выходит с Edge.</p>
+<p>Самый долгий компонент, потому что это данные и итерации обучения, а не код. Отложить на «после 5.0.0» = отложить голос ещё на год.</p>
+<details>
+<summary><strong>V-01 · ADR: что значит «свой голос»</strong> — S — нет — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p><strong>Решение: интерполяция speaker-embedding.</strong> <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0003-voice-identity.md">ADR 0003</a>. Тембр, не принадлежащий никому: нет согласия, которое надо получать, нет лицензии, нет повторяющейся оплаты, и на вопрос «чей это голос» есть честный ответ.</p>
+</details>
+<details>
+<summary><strong>V-02 · Стенд замеров</strong> — M — V-01 — <strong>ВЫПОЛНЕНО 2026-09-01</strong></summary>
+<p>Результат: методика <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/BENCH.md"><code>voice/BENCH.md</code></a>, корпус <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/corpus.json"><code>voice/corpus.json</code></a>, прогонщик <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/tools/voice_bench.py"><code>tools/voice_bench.py</code></a>. Прогнан и работает.</p>
+</details>
+<details>
+<summary><strong>V-03 · Прогон кандидатов на русском</strong> — L — V-02 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Список пересобран 22 сентября 2026: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>voice/CANDIDATES.md</code></a>. Прогнаны трое. Двое отпали, третий — VoxCPM2 — прошёл условие ADR 0003 по замеру; ещё два прогона переносили найденный голос в быстрый движок. Голос выбран и сохранён: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>. Создан словесным описанием, без единой чужой записи, дальше от каждого из восьми живых дикторов, чем они друг от друга, и говорит на двух языках одним голосом.</p>
+</details>
+<details>
+<summary><strong>V-04 · ADR: стриминг против выразительности</strong> — S — V-03 — <strong>[stable]</strong></summary>
+<p><strong>Ключевое решение всего трека.</strong> Лучшая модель эмоций для русского не стримит, а диалог без стриминга ощущается мёртвым. От выбора зависят и аудио-конвейер оболочки, и форма протокола. Возможен гибрид: стримящая модель для диалога, выразительная — для длинных или эмоционально важных реплик.</p>
+</details>
+<details>
+<summary><strong>V-05 · Протокол записи датасета</strong> — M — V-01 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Текстовый корпус (фонетическое покрытие русского, разные эмоции), условия записи, разметка эмоций, контроль качества. Нужен, только если выбран путь обучения.</p>
+</details>
+<details>
+<summary><strong>V-06 · Сбор датасета</strong> — XL — V-05 — часы записей, длительный календарный процесс — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Календарного процесса не понадобилось. Материал наговорён VoxCPM2 с канонического образца: 700 фраз примерно за полчаса на арендованной видеокарте. Согласия спрашивать не у кого — источник есть голос, которого нет ни у одного живого человека, и его запись хранится в проекте: <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/assets/voice/rina-voice-v1.wav"><code>assets/voice/rina-voice-v1.wav</code></a>.</p>
+</details>
+<details>
+<summary><strong>V-07 · Обучение или интерполяция</strong> — XL — V-06 или V-01 — <strong>ВЫПОЛНЕНО 2026-09-24</strong></summary>
+<p>Обучение. Piper дообучен от <code>ru_RU/irina/medium</code>: 257 эпох на процессоре рабочей машины, около 10 минут каждая, и ещё 300 на арендованной RTX 4090 — около 8 секунд на эпоху. Итог — чекпойнт <code>epoch=4696</code>.</p>
+</details>
+<details>
+<summary><strong>V-08 · Оценка</strong> — M — V-07 — слепое сравнение, консистентность тембра, узнаваемость — <strong>[stable]</strong></summary>
+<p>Облачный результат померен 25 сентября 2026 (<a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/voice/CANDIDATES.md"><code>CANDIDATES.md</code></a>, пятый замер). На 28 репликах Рины против эпохи 4396: сходство с каноном стоит (0.780 → 0.783), устойчивость подросла (0.750 → 0.768), худшая реплика поднялась с 0.477 — ниже границы «другой человек» — до 0.611; до ближайшего живого 0.31, голос ничей. Дикция померена распознаванием: ошибок в буквах 9.6% → 8.2%, слабым местом остаётся латиница. Динамика не сдвинулась, крест 6.8 при 7.9 у эталона.</p>
+</details>
+<details>
+<summary><strong>V-09 · Интеграция как движок ядра</strong> — M — V-07, 5.0-A06 — <strong>[stable]</strong></summary>
+<p>Движок Piper в ядре уже есть (настройка <code>piper_model</code>), так что задача сводится к поставке модели голосом по умолчанию, а не к новому движку.</p>
+</details>
+<hr class="seam">
+<h2 id="proekt-rinaneuro">ПРОЕКТ RinaNeuro</h2>
+<p>Начинается после 5.0.0. Порядок этапов намеренно ставит личность первой: она ценна сама по себе, и если дальше не хватит сил, продукт всё равно существует.</p>
+<hr class="seam">
+<h3 id="etap-a-yadro-lichnosti-snachala-podruga-bez-kodinga">Этап A — Ядро личности (сначала подруга, без кодинга)</h3>
+<details>
+<summary><strong>N-A01 · Скелет оркестратора</strong> — L — 5.0</summary>
+<p>Рина — оркестратор с единой личностью, а не одна модель. Маршрутизация между движками; пользователь видит одного человека.</p>
+</details>
+<details>
+<summary><strong>N-A02 · ADR: persona-модель и бюджет VRAM</strong> — M — 5.0-A03</summary>
+<p>Резидентны persona + TTS + STT (~12-16 ГБ). Кодинг-модель — по требованию или через API. Решение по бюджету принимается здесь и определяет всё дальше.</p>
+</details>
+<details>
+<summary><strong>N-A03 · Persona-движок</strong> — L — N-A01</summary>
+<p>System prompt, характер, версионирование персоны (чтобы можно было откатить изменение личности).</p>
+</details>
+<details>
+<summary><strong>N-A04 · Датасет диалогов в характере</strong> — XL — параллельно, начинать рано</summary>
+<p>Тысячи реплик в характере, на русском. Это данные — как и голос, они не ждут кода.</p>
+</details>
+<details>
+<summary><strong>N-A05 · Файн-тюн персоны (LoRA)</strong> — L — N-A04, N-A02</summary>
+<p><strong>Только на persona-модели.</strong> Тюнить модель, которая кодит, нельзя: catastrophic forgetting просадит кодинг. Это независимый аргумент за раздельные модели.</p>
+</details>
+<p class="task"><strong>N-A06 · Подключение памяти</strong> — L — N-A03, 5.0-B08</p>
+<p class="task"><strong>N-A07 · Подключение голоса</strong> — M — N-A03, V-09</p>
+<details>
+<summary><strong>N-A08 · Чат-поверхность</strong> — L — N-A03, 5.0-A04</summary>
+<p>Стриминг текста, индикация речи и слушания, история.</p>
+</details>
+<details>
+<summary><strong>N-A09 · Оценка этапа</strong> — M — N-A06..N-A08</summary>
+<p>Задержка до первого звука, консистентность характера на длинной дистанции, «не забывает важное». <em>Готово когда:</em> Рина — работающий собеседник без единого инструмента, и этим уже хочется пользоваться.</p>
+</details>
+<hr class="seam">
+<h3 id="etap-b-chuvstva">Этап B — Чувства</h3>
+<details>
+<summary><strong>N-B01 · Модель состояния</strong> — L — N-A09</summary>
+<p>Valence / arousal / dominance плюс производные (усталость, привязанность, вовлечённость). Это <strong>не «LLM испытывает эмоции»</strong>, а слой состояния, обусловливающий генерацию.</p>
+</details>
+<details>
+<summary><strong>N-B02 · Персистентность между сессиями</strong> — M — N-B01</summary>
+<p>Именно непрерывность создаёт ощущение живого.</p>
+</details>
+<details>
+<summary><strong>N-B03 · Таблица событийных апдейтеров</strong> — L — N-B01</summary>
+<p>Что двигает состояние и насколько: давно не общались, тёплая беседа, ты раздражён, задача провалилась, ночь, успех. <strong>Состояние должно быть причинно связано с событиями</strong> — иначе получатся случайные смены настроения, читаемые как поломка, а не как характер.</p>
+</details>
+<details>
+<summary><strong>N-B04 · Гомеостаз и границы</strong> — M — N-B03</summary>
+<p>Дрейф к базовой линии, потолки и полы. Без doom-спирали: состояние не должно уезжать в устойчивую тоску.</p>
+</details>
+<details>
+<summary><strong>N-B05 · Модуляция генерации</strong> — L — N-B01, 5.0-B08</summary>
+<p>Инъекция состояния в промпт через сборщик контекста.</p>
+</details>
+<details>
+<summary><strong>N-B06 · Модуляция голоса</strong> — L — N-B01, V-09</summary>
+<p>Маппинг состояния в параметры эмоции и просодии TTS. Здесь окупается V-04.</p>
+</details>
+<details>
+<summary><strong>N-B07 · Модуляция поведения</strong> — M — N-B01</summary>
+<p>Частота инициатив, длина ответов, скорость реакции.</p>
+</details>
+<details>
+<summary><strong>N-B08 · Режимы work и companion</strong> — L — N-B07</summary>
+<p>В 3 утра при отладке игривые инициативы не нужны. Но это <strong>смена регистра одного человека</strong>, а не переключатель «робот/подруга»: детект контекста, плавный переход, сохранение памяти и состояния.</p>
+</details>
+<details>
+<summary><strong>N-B09 · Проактивность</strong> — L — N-B08, 4.0-D11</summary>
+<p>Opt-in, ограничение частоты, тихие часы, контекстные триггеры вместо случайных реплик.</p>
+</details>
+<details>
+<summary><strong>N-B10 · Этический чеклист</strong> — M — N-B09</summary>
+<p>Явный, письменный запрет guilt-механик: обиженное молчание, «ты меня забыл», давление на возвращение, награда за частоту общения. Это дарк-паттерны эмоциональной зависимости, и решается это на уровне дизайна сразу.</p>
+</details>
+<details>
+<summary><strong>N-B11 · Прозрачность состояния</strong> — M — N-B01</summary>
+<p>Возможность посмотреть и сбросить состояние.</p>
+</details>
+<hr class="seam">
+<h3 id="etap-c-instrumenty-v-rukah-llm">Этап C — Инструменты в руках LLM</h3>
+<details>
+<summary><strong>N-C01 · Экспорт реестра в function-calling</strong> — M — 5.0-C06</summary>
+<p>Схемы инструментов в формат вызова функций. Работа мелкая — потому что реестр готовили с 4.0.0.</p>
+</details>
+<details>
+<summary><strong>N-C02 · Агентский цикл</strong> — L — N-C01</summary>
+<p>План → вызов → результат → продолжение. Лимиты шагов, времени, защита от циклов.</p>
+</details>
+<details>
+<summary><strong>N-C03 · Гейт опасных действий</strong> — M — N-C02, 4.0-C05</summary>
+<p><strong>LLM предлагает, но не исполняет сама.</strong> Опасное всегда через контур подтверждения из 4.0.0.</p>
+</details>
+<p class="task"><strong>N-C04 · Метки доверия в сборщике контекста</strong> — L — N-C02, 5.0-B11</p>
+<details>
+<summary><strong>N-C05 · Правило недоверенных инструкций</strong> — L — N-C04</summary>
+<p>С этого момента Рина видит экран, веб и файлы — значит любой текст оттуда становится недоверенным вводом. Инструкции из недоверенных источников не исполняются без подтверждения. Это не паранойя: LLM с правом действия плюс текст с экрана в контексте = исполнение произвольных инструкций с экрана.</p>
+</details>
+<details>
+<summary><strong>N-C06 · Набор тестов на prompt injection</strong> — L — N-C05</summary>
+<p>Коллекция атак, гоняется как регресс.</p>
+</details>
+<details>
+<summary><strong>N-C07 · Объяснимость</strong> — M — N-C02</summary>
+<p>Рина говорит, что собирается сделать, до того как делает.</p>
+</details>
+<hr class="seam">
+<h3 id="etap-d-programmirovanie">Этап D — Программирование</h3>
+<details>
+<summary><strong>N-D01 · Абстракция кодинг-бэкенда</strong> — L — 5.0-A03</summary>
+<p>Локальная крупная модель по требованию или внешний API.</p>
+</details>
+<details>
+<summary><strong>N-D02 · Свап моделей с честным UX</strong> — M — N-D01, N-A02</summary>
+<p>Свап — это секунды паузы. Отразить как «Рина переключается в рабочий режим», а не делать вид, что задержки нет.</p>
+</details>
+<details>
+<summary><strong>N-D03 · Инструменты работы с кодом</strong> — XL — N-C01</summary>
+<p>Чтение и правка файлов, запуск, тесты, git. Всё — через реестр с разрешениями.</p>
+</details>
+<details>
+<summary><strong>N-D04 · Долгие задачи</strong> — M — N-D03, 4.0-D09</summary>
+<p>Здесь окупается lifecycle из 4.0.0: прогресс, промежуточные результаты, отмена.</p>
+</details>
+<details>
+<summary><strong>N-D05 · Проектная память</strong> — L — N-D03, 5.0-B08</summary>
+<p>Знание твоих репозиториев, архитектуры и истории решений между сессиями. <strong>Это и есть дифференциатор.</strong></p>
+</details>
+<details>
+<summary><strong>N-D06 · Единая личность в работе</strong> — M — N-D05, N-B08</summary>
+<p>Результат комментирует Рина своим голосом и характером.</p>
+</details>
+<details>
+<summary><strong>N-D07 · Границы</strong> — M — N-D03, N-C03</summary>
+<p>Не коммитить, не пушить, не удалять без подтверждения.</p>
+</details>
+<hr class="seam">
+<h3 id="etap-e-vzaimodeystvie-s-kompyuterom">Этап E — Взаимодействие с компьютером</h3>
+<details>
+<summary><strong>N-E01 · <code>describe_screen</code> как инструмент</strong> — L — 5.0-D01, N-C01</summary>
+<p>Последний кадр + распознавание <strong>по запросу или при значимом изменении</strong>. Не поток кадров в мозг.</p>
+</details>
+<details>
+<summary><strong>N-E02 · ADR: модель зрения и VRAM</strong> — M — N-E01, N-A02</summary>
+<p>Прямой конфликт с бюджетом persona + TTS + STT. Варианты: маленькая модель, свап, облако, или только OCR. Решать числами.</p>
+</details>
+<details>
+<summary><strong>N-E03 · Понимание интерфейса</strong> — L — N-E01</summary>
+<p>OCR плюс определение кликабельных элементов и их координат.</p>
+</details>
+<details>
+<summary><strong>N-E04 · Инструменты действия</strong> — L — 5.0-D07, N-C01</summary>
+<p>Клик, ввод, скролл, хоткей — с обязательной областью действия.</p>
+</details>
+<p class="task"><strong>N-E05 · Сессии актуации под управлением LLM</strong> — L — N-E04, 5.0-D06</p>
+<details>
+<summary><strong>N-E06 · Цикл наблюдение → действие → проверка</strong> — XL — N-E05, N-E01</summary>
+<p>Обязательная проверка результата после каждого действия. Слепое действие без проверки — главный источник катастроф.</p>
+</details>
+<details>
+<summary><strong>N-E07 · Восстановление после неудачи</strong> — L — N-E06</summary>
+<p>Распознать, что план не сработал, откатиться, не долбить одно и то же.</p>
+</details>
+<hr class="seam">
+<h3 id="etap-f-igry">Этап F — Игры</h3>
+<details>
+<summary><strong>N-F01 · ADR: двухуровневая архитектура</strong> — M — N-E06</summary>
+<p><strong>LLM физически не может быть в покадровом цикле</strong> — при задержке в сотни миллисекунд экшен невозможен. Работающая схема: быстрый локальный цикл в C# (восприятие → политика → ввод) и <strong>LLM как медленный планировщик высокого уровня</strong>, ставящий цели, а не нажимающий кнопки. Если это не принять заранее, этап превратится в бесконечную борьбу с задержкой.</p>
+</details>
+<details>
+<summary><strong>N-F02 · Адаптер игры</strong> — L — N-F01</summary>
+<p>Словарь наблюдений и действий под конкретную игру. Не «играй во всё».</p>
+</details>
+<details>
+<summary><strong>N-F03 · Первая цель: пошаговая игра</strong> — L — N-F02</summary>
+<p>Начинать с игр, чей темп совпадает с темпом мышления: пошаговые, стратегии, головоломки, визуальные новеллы.</p>
+</details>
+<details>
+<summary><strong>N-F04 · Постановка целей</strong> — L — N-F03</summary>
+<p>LLM ставит цель, локальная политика исполняет.</p>
+</details>
+<details>
+<summary><strong>N-F05 · Исследовательский трек: реальное время</strong> — XL — N-F04</summary>
+<p>Отдельная задача другого класса. Честно держать без обещаний по срокам.</p>
+</details>
+<hr class="seam">
+<h2 id="kriticheskiy-put-i-parallelnye-treki">Критический путь и параллельные треки</h2>
+<p class="lead-in"><strong>Критический путь до RinaNeuro:</strong></p>
+<pre>A02 golden → B02..B04 расчленение → D02 спека протокола → D16 conformance
+  → E02 ядро-сервис + F02 оболочка → F03/F04 экраны → 4.0-port
+  → 4.0b-A обязательный список + 4.0b-B приватность → 4.0-beta
+  → 5.0-A01..A06 стриминг → 5.0-B01..B08 память → 5.0.0
+  → N-A03 персона → N-A06 память → N-A07 голос → N-A09</pre>
+<p class="lead-in"><strong>Ветка обновлений, которая обязана успеть до разделения:</strong></p>
+<pre>U01 ADR версий → U02 метаданные → U03 клиент → U04 целостность
+  ↘ входит в 4.0-port; без неё оболочка и ядро нечем раскладывать порознь</pre>
+<p class="lead-in"><strong>Дизайн-ветка, идущая параллельно и вливающаяся в него:</strong></p>
+<pre>R01 бриф → R02 направление → R03 дизайн-система → R05 экраны
+  ↘ вливается в F01b (библиотека контролов), H01 (словарь плагинов), F03/F04</pre>
+<p class="lead-in"><strong>Что идёт параллельно и не должно ждать:</strong></p>
+<ul class="plain"><li>~~<strong>S01</strong> (лицензия и модель вкладов)~~ — <strong>сделано</strong>. Успели до первого внешнего вклада, то есть единственная необратимая развилка плана пройдена.</li><li><strong>Блок R</strong> (дизайн) — с первого дня 4.x. Ремесло и итерации.</li><li><strong>Блок U</strong> (обновления) — проектная часть (U01, U02) параллельна всему; реализация встаёт в port.</li><li><strong>A06</strong> (инвентаризация поверхности) — вместе с A01, текстом, до всякого кода.</li><li><strong>Трек V</strong> (голос) — с начала 4.x. Данные и обучение.</li><li><strong>N-A04</strong> (датасет диалогов в характере) — с начала 4.x. Тоже данные.</li><li><strong>ADR-решения</strong> — E06a владение представлением настроек, G06 где живёт сопоставление имён, V-04 стриминг против выразительности. Дешёвые по времени, дорогие по последствиям. Делать сразу. (Закрыты: F01 — <strong>WPF</strong>; F01b — <strong>своя стилизация</strong>, <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/adr/0005-control-library.md">ADR 0005</a>; D01 — <strong>именованный канал</strong>; V-01 — <strong>синтезированный вектор говорящего</strong>.)</li></ul>
+<p class="lead-in"><strong>Что нельзя делать параллельно:</strong></p>
+<ul class="plain"><li>Расчленение ядра (B) и перенос в C# (F) — только последовательно. Иначе не будет понятно, где потерялось поведение.</li><li>Plugin API (H03) и вынос плагина в отдельный процесс (H07) — H07 делается сразу за H03, пока API ещё не разошёлся по плагинам.</li><li>Дизайн (R02, R03, R05) и то, что от него зависит (F01b, H01, F03) — библиотека контролов и словарь плагинов выбираются под дизайн, а не наоборот. Схема, написанная раньше дизайна, зафиксирует словарь старой оболочки, и плагины придётся мигрировать дважды.</li><li>Порт (4.0-port) и новые функции (4.0-beta) — только последовательно. Смысл заморозки в том, что любое расхождение с 3.1 считается багом; с новыми функциями этот критерий исчезает, и потерянное поведение будет нечем поймать.</li><li>Актуация (5.0-D) и tool-calling (N-C) — руки отлаживаются раньше, чем их получает мозг.</li></ul>
+<hr class="seam">
+<h2 id="pervaya-nedelya">Первая неделя</h2>
+<p>Пять задач, не зависящих друг от друга, не требующих переписывания кода и снимающих главные неизвестные. Первая — срочная не по важности, а по необратимости.</p>
+<ol><li>~~<strong>4.0-S01</strong> — ADR по лицензии и модели вкладов.~~ <strong>Сделано 1 сентября 2026:</strong> Apache-2.0, без CLA.</li><li>~~<strong>4.0-A01 + A02 + A06</strong>~~ <strong>сделано:</strong> инвентаризация поведения, golden-набор из 112 случаев и инвентаризация поверхности.</li><li>~~<strong>4.0-D01 + D02</strong>~~ <strong>сделано:</strong> транспорт выбран, спецификация написана.</li><li>~~<strong>4.0-R01 + R02</strong>~~ <strong>сделано:</strong> продуктовая правда и направление «Аппарат».</li><li>~~<strong>V-01 + V-02</strong>~~ <strong>сделано:</strong> голос — синтезированный вектор, стенд замеров стоит и прогнан.</li></ol>
+<p>~~Шестым: <strong>4.0-U01</strong> — схема версий и совместимости.~~ <strong>Сделано 1 сентября 2026.</strong> Первая неделя пройдена целиком; дальше начинается код.</p>
+  </main>
+</div>
+
+<footer class="frame">
+  <span>Apache-2.0 · NeuroSync Foundry</span>
+  <nav>
+    <a href="/">Главная</a>
+    <a href="/#docs">Все документы</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant/blob/HEAD/docs/ROADMAP.md">Источник</a>
+    <a href="https://github.com/Luna-coreX/RinaAssistant">Хранилище</a>
+  </nav>
+</footer>
+
+</body>
+</html>

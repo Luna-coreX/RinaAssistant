@@ -1,0 +1,1829 @@
+{
+  "  — пусто": {
+    "English": "  — empty"
+  },
+  " или ": {
+    "English": " or "
+  },
+  " — необратимо": {
+    "English": " — irreversible"
+  },
+  ", затем ": {
+    "English": ", then "
+  },
+  "120 кадров — высокая нагрузка": {
+    "English": "120 frames — high load"
+  },
+  "120 кадров: нагрузка примерно вчетверо выше, чем на 30. Если монитор показывает меньше кадров, фон пойдёт с его частотой.": {
+    "English": "120 frames: about four times the load of 30. If the monitor shows fewer frames, the background follows its rate."
+  },
+  "19:30": {
+    "English": "19:30"
+  },
+  "30 кадров": {
+    "English": "30 frames"
+  },
+  "60 кадров — нагрузка выше": {
+    "English": "60 frames — higher load"
+  },
+  "60 кадров: фон и фигура нагружают видеокарту и процессор примерно вдвое сильнее, чем на 30.": {
+    "English": "60 frames: the background and the figure load the graphics card and the processor about twice as much as at 30."
+  },
+  "Enter — отправить, Esc — скрыть": {
+    "English": "Enter — send, Esc — hide"
+  },
+  "Vosk": {
+    "English": "Vosk"
+  },
+  "Whisper": {
+    "English": "Whisper"
+  },
+  "[слишком глубокая вложенность]": {
+    "English": "[nesting too deep]"
+  },
+  "http://localhost:11434": {
+    "English": "http://localhost:11434"
+  },
+  "{0} ГБ": {
+    "English": "{0} GB"
+  },
+  "{0} МБ": {
+    "English": "{0} MB"
+  },
+  "{0} из {1}": {
+    "English": "{0} of {1}"
+  },
+  "{0} мин": {
+    "English": "{0} min"
+  },
+  "{0} раз": {
+    "English": "{0} times"
+  },
+  "{0} с": {
+    "English": "{0} s"
+  },
+  "{0} ч": {
+    "English": "{0} h"
+  },
+  "{0} ч {1} мин": {
+    "English": "{0} h {1} min"
+  },
+  "{0} — сейчас недоступно": {
+    "English": "{0} — unavailable right now"
+  },
+  "{0} → {1}. Ответит: {2}.": {
+    "English": "{0} → {1}. Answers: {2}."
+  },
+  "«{0}» включён.": {
+    "English": "“{0}” is on."
+  },
+  "«{0}» выключен.": {
+    "English": "“{0}” is off."
+  },
+  "«{0}» занято другой программой": {
+    "English": "“{0}” is taken by another program"
+  },
+  "«{0}» не включился: {1}": {
+    "English": "“{0}” didn’t start: {1}"
+  },
+  "«{0}» сохранено.": {
+    "English": "“{0}” saved."
+  },
+  "«{0}»: не понял значение.": {
+    "English": "“{0}”: didn’t understand the value."
+  },
+  "«Готово»": {
+    "English": "“Done”"
+  },
+  "«который час» · «запусти браузер» · «посчитай 15 на 12»": {
+    "English": "“what time is it” · “open the browser” · “calculate 15 times 12”"
+  },
+  "«напомни через 15 минут выключить духовку»": {
+    "English": "“remind me in 15 minutes to turn off the oven”"
+  },
+  "«начни сессию над отчётом»": {
+    "English": "“начни сессию над отчётом”"
+  },
+  "Адрес модели": {
+    "English": "Model address"
+  },
+  "Адрес модели. Не локальный означает, что разговоры уйдут наружу": {
+    "English": "Model address. Non-local means conversations leave this machine"
+  },
+  "Акцент": {
+    "English": "Accent"
+  },
+  "Архив (*.zip)|*.zip": {
+    "English": "Archive (*.zip)|*.zip"
+  },
+  "Архив с плагином": {
+    "English": "Plugin archive"
+  },
+  "Архивы (*.zip)|*.zip|Все файлы|*.*": {
+    "English": "Archives (*.zip)|*.zip|All files|*.*"
+  },
+  "Без ограничения — наибольшая нагрузка": {
+    "English": "No limit — the highest load"
+  },
+  "Без ограничения: фон перерисовывается на каждом кадре монитора. На мониторе 144 Гц и выше это самая тяжёлая настройка, и окно может начать подтормаживать.": {
+    "English": "No limit: the background is redrawn on every frame the monitor shows. On a 144 Hz monitor or faster this is the heaviest setting, and the window may start to stutter."
+  },
+  "Бета нужна, чтобы узнать, чем пользуются и где что-то не получается. Помочь можно, а можно и нет.": {
+    "English": "The beta is there to learn what people use and where things go wrong. You can help, or not."
+  },
+  "Бета-возможность: поведение может измениться в следующих версиях.": {
+    "English": "A beta capability: its behaviour may change in later versions."
+  },
+  "Будильник": {
+    "Deutsch": "Wecker",
+    "English": "Alarm",
+    "Español": "Alarma",
+    "Українська": "Будильник"
+  },
+  "Быстрее ста — торопится, медленнее — растягивает": {
+    "English": "Above 100 she hurries, below she drawls"
+  },
+  "В каком роде обращаться": {
+    "English": "Grammatical gender"
+  },
+  "В команде есть необратимое действие — Рина спросит подтверждение.": {
+    "English": "The command contains an irreversible action — Rina will ask to confirm."
+  },
+  "Вернуть это будет нельзя.": {
+    "English": "There will be no getting this back."
+  },
+  "Вернуть это будет нельзя. Команды, дела и напоминания тоже уйдут.": {
+    "English": "There will be no getting this back. Commands, things to do and reminders go too."
+  },
+  "Версии, ссылки, из чего собрана": {
+    "English": "Versions, links, what it’s made of"
+  },
+  "Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки.": {
+    "English": "The program and Windows versions, which commands and tools ran and how often, error codes, recognition and first-sound times, a random installation number."
+  },
+  "Включить": {
+    "English": "Switch on"
+  },
+  "Включить телеметрию беты?": {
+    "English": "Switch on beta telemetry?"
+  },
+  "Внешний вид": {
+    "Deutsch": "Darstellung",
+    "English": "Appearance",
+    "Español": "Apariencia",
+    "Українська": "Зовнішній вигляд"
+  },
+  "Во сколько": {
+    "English": "At what time"
+  },
+  "Время вышло.": {
+    "English": "Time is up."
+  },
+  "Время пишется как 19:30.": {
+    "English": "Time is written like 19:30."
+  },
+  "Все настройки вернутся к значениям по умолчанию: голос, устройства, сочетания клавиш, отделка, приватность.": {
+    "English": "All settings return to their defaults: voice, devices, shortcuts, finish, privacy."
+  },
+  "Всегда доверять": {
+    "English": "Always trust"
+  },
+  "Всегда слушать": {
+    "Deutsch": "Immer zuhören",
+    "English": "Always listen",
+    "Español": "Escuchar siempre",
+    "Українська": "Завжди слухати"
+  },
+  "Всегда слушаю": {
+    "English": "Always listening"
+  },
+  "Всего записей: {0}": {
+    "English": "Entries in all: {0}"
+  },
+  "Вставить шаг сюда": {
+    "English": "Insert a step here"
+  },
+  "Всё сделано": {
+    "English": "All done"
+  },
+  "Всё это лежит на этом компьютере и никуда не отправляется. Здесь видно каждую запись целиком.": {
+    "English": "All of this is kept on this computer and goes nowhere. Every entry is shown here in full."
+  },
+  "Всё это потом можно поменять в настройках.": {
+    "English": "All of this can be changed later in the settings."
+  },
+  "Всё это хранилось на этом компьютере.": {
+    "English": "All of this was kept on this computer."
+  },
+  "Выберите узел на холсте, чтобы поправить его.": {
+    "English": "Select a node on the canvas to edit it."
+  },
+  "Выберите файл модели": {
+    "English": "Choose the model file"
+  },
+  "Выбранное скачается в фоне. Пользоваться можно уже сейчас.": {
+    "English": "What you chose will download in the background. You can start using Rina now."
+  },
+  "Выгружено: {0}": {
+    "English": "Exported: {0}"
+  },
+  "Выгружено: {0} · версия {1}": {
+    "English": "Exported: {0} · version {1}"
+  },
+  "Выгрузить всё": {
+    "English": "Export everything"
+  },
+  "Выйти": {
+    "English": "Quit"
+  },
+  "Выполнить": {
+    "Deutsch": "Ausführen",
+    "English": "Run",
+    "Español": "Ejecutar",
+    "Українська": "Виконати"
+  },
+  "Выполняю…": {
+    "English": "Working…"
+  },
+  "Выученные слова": {
+    "English": "Learned words"
+  },
+  "Выученные соответствия": {
+    "English": "Learned matches"
+  },
+  "Выше": {
+    "English": "Up"
+  },
+  "ГДЕ ЧТО ЛЕЖИТ": {
+    "English": "WHERE THINGS ARE"
+  },
+  "Где вы велели искать программы.": {
+    "English": "Where you told Rina to look for programs."
+  },
+  "Где искать по просьбе": {
+    "English": "Where to search when asked"
+  },
+  "Где искать программы": {
+    "English": "Where to look for programs"
+  },
+  "Где лежит модель": {
+    "English": "Where the model lives"
+  },
+  "Где посмотреть и выключить": {
+    "English": "Where to see it and switch it off"
+  },
+  "Главная": {
+    "English": "Home"
+  },
+  "Говорю": {
+    "English": "Speaking"
+  },
+  "Говорю…": {
+    "English": "Speaking…"
+  },
+  "Голос": {
+    "Deutsch": "Stimme",
+    "English": "Voice",
+    "Español": "Voz",
+    "Українська": "Голос"
+  },
+  "Голос Piper": {
+    "English": "Piper voice"
+  },
+  "Голос и распознавание — на вашем компьютере.": {
+    "English": "Speech and recognition happen on your computer."
+  },
+  "Голос и речь": {
+    "English": "Voice and speech"
+  },
+  "Голоса зависят от выбранной системы синтеза": {
+    "English": "Voices depend on the chosen synthesis engine"
+  },
+  "Голоса пока нет: Рина будет слышать и отвечать текстом. Это поправимо в «Настройках».": {
+    "English": "No voice yet: Rina will hear you and answer in text. You can fix that in Settings."
+  },
+  "Голосовой помощник, который живёт на вашем компьютере: слышит, отвечает, запускает программы и напоминает.": {
+    "English": "A voice assistant living on your computer: it hears, answers, launches programs and reminds."
+  },
+  "Готова помочь.": {
+    "English": "Ready when you are."
+  },
+  "Готово": {
+    "English": "Done"
+  },
+  "Готово: {0}": {
+    "English": "Done: {0}"
+  },
+  "Графит": {
+    "English": "Graphite"
+  },
+  "Громкость": {
+    "Deutsch": "Lautstärke",
+    "English": "Volume",
+    "Español": "Volumen",
+    "Українська": "Гучність"
+  },
+  "ДИАГНОСТИКА": {
+    "English": "DIAGNOSTICS"
+  },
+  "Дальше": {
+    "English": "Next"
+  },
+  "Дальше ничего не выполнится.": {
+    "English": "Nothing after this will run."
+  },
+  "Данные на диске": {
+    "English": "Data on disk"
+  },
+  "Дел пока нет": {
+    "English": "Nothing here yet"
+  },
+  "Дела": {
+    "English": "To-do"
+  },
+  "Диалог": {
+    "English": "Dialogue"
+  },
+  "Динамик": {
+    "Deutsch": "Lautsprecher",
+    "English": "Speaker",
+    "Español": "Altavoz",
+    "Українська": "Динамік"
+  },
+  "Длительность записи": {
+    "Deutsch": "Aufnahmedauer",
+    "English": "Recording length",
+    "Español": "Duración de la grabación",
+    "Українська": "Тривалість запису"
+  },
+  "Добавить": {
+    "English": "Add"
+  },
+  "Добавить папку…": {
+    "Deutsch": "Ordner hinzufügen…",
+    "English": "Add folder…",
+    "Español": "Añadir carpeta…",
+    "Українська": "Додати теку…"
+  },
+  "Добавить фразу": {
+    "English": "Add a phrase"
+  },
+  "Добавлено {0}, пропущено как уже известные {1}.": {
+    "English": "Added {0}, skipped {1} already known."
+  },
+  "Дольше — терпеливее, но и молчание дольше": {
+    "English": "Longer is more patient, and the silence is longer too"
+  },
+  "Думаю": {
+    "English": "Thinking"
+  },
+  "Думаю…": {
+    "English": "Thinking…"
+  },
+  "Если не ответить, действие не выполнится.": {
+    "English": "If you don’t answer, nothing happens."
+  },
+  "Есть новая оболочка {0}.": {
+    "English": "There is a new shell {0}."
+  },
+  "Есть новое ядро {0}.": {
+    "English": "There is a new core {0}."
+  },
+  "Есть обновление Рины": {
+    "English": "A Rina update is available"
+  },
+  "Есть обновление: оболочка {0}, ядро {1}.": {
+    "English": "An update is available: shell {0}, core {1}."
+  },
+  "Жду": {
+    "English": "Waiting"
+  },
+  "Ждёт: {0}": {
+    "English": "Waiting: {0}"
+  },
+  "Журналы": {
+    "English": "Logs"
+  },
+  "Журналы, версии и состояние связи. Историю разговора и команды не берём; внутри написано, что именно вошло.": {
+    "English": "Logs, versions and the link's state. The conversation history and your commands are not taken; what went in is written inside."
+  },
+  "ЗАПЛАНИРОВАНО": {
+    "English": "SCHEDULED"
+  },
+  "ЗАПЛАНИРОВАНО · {0}": {
+    "English": "SCHEDULED · {0}"
+  },
+  "ЗНАКОМСТВО": {
+    "English": "GETTING STARTED"
+  },
+  "Забывать было нечего.": {
+    "English": "There was nothing to forget."
+  },
+  "Забыто записей: {0}": {
+    "English": "Entries forgotten: {0}"
+  },
+  "Забыть все": {
+    "Deutsch": "Alle vergessen",
+    "English": "Forget all",
+    "Español": "Olvidar todo",
+    "Українська": "Забути все"
+  },
+  "Забыть всю группу": {
+    "English": "Forget this whole group"
+  },
+  "Забыть всё в разделе «{0}»? Записей: {1}.": {
+    "English": "Forget everything in “{0}”? Entries: {1}."
+  },
+  "Забыть всё за {0}? Записей: {1}.": {
+    "English": "Forget everything from {0}? Entries: {1}."
+  },
+  "Забыть всё обо мне": {
+    "English": "Forget everything about me"
+  },
+  "Забыть этот день": {
+    "English": "Forget this day"
+  },
+  "Забыть эту запись": {
+    "English": "Forget this entry"
+  },
+  "Завершить": {
+    "English": "Finish"
+  },
+  "Закрытые никуда не делись: их видно переключателем.": {
+    "English": "Closed ones are still here: the switch shows them."
+  },
+  "Закрыть": {
+    "English": "Close"
+  },
+  "Заменён: {0}. Он выключен — включите, если доверяете.": {
+    "English": "Replaced: {0}. It is off — turn it on if you trust it."
+  },
+  "Замечать, какие программы открыты": {
+    "English": "Notice which programs are open"
+  },
+  "Записать": {
+    "English": "Add"
+  },
+  "Записывать тексты реплик": {
+    "Deutsch": "Nachrichtentexte protokollieren",
+    "English": "Log message texts",
+    "Español": "Registrar el texto de los mensajes",
+    "Українська": "Записувати тексти реплік"
+  },
+  "Записывать тексты реплик в журнал. По умолчанию выключено": {
+    "English": "Write reply texts to the log. Off by default"
+  },
+  "Запоминать время по программам в сессии": {
+    "English": "Remember time per application in a session"
+  },
+  "Запоминать рабочие каталоги в сессии": {
+    "English": "Remember working folders in a session"
+  },
+  "Запуск без подписи": {
+    "English": "Launching without a signature"
+  },
+  "Запускать при входе в систему": {
+    "English": "Start when you sign in"
+  },
+  "Запускаться без окна": {
+    "English": "Start with no window"
+  },
+  "Запустить один раз": {
+    "English": "Run once"
+  },
+  "Звук": {
+    "English": "Audio"
+  },
+  "Звуковые эффекты": {
+    "Deutsch": "Soundeffekte",
+    "English": "Sound effects",
+    "Español": "Efectos de sonido",
+    "Українська": "Звукові ефекти"
+  },
+  "Здесь окажется всё, о чём вы попросите напомнить — полем выше или голосом.": {
+    "English": "Everything you ask to be reminded of lands here — from the field above or by voice."
+  },
+  "Здравствуйте": {
+    "English": "Hello"
+  },
+  "Знакомство": {
+    "English": "Getting started"
+  },
+  "И слух, и голос работают по пакету и модели — их размер в установщик не помещается.": {
+    "English": "Hearing and speaking each need a package and a model — too large to put in the installer."
+  },
+  "ИДЁТ СЕЙЧАС": {
+    "English": "RUNNING NOW"
+  },
+  "ИЗ ЧЕГО СОБРАНА": {
+    "English": "WHAT IT'S MADE OF"
+  },
+  "ИИ": {
+    "English": "AI"
+  },
+  "Из архива": {
+    "English": "From archive"
+  },
+  "Из папки": {
+    "English": "From folder"
+  },
+  "Изменённые настройки": {
+    "English": "Changed settings"
+  },
+  "Импорт": {
+    "Deutsch": "Importieren",
+    "English": "Import",
+    "Español": "Importar",
+    "Українська": "Імпорт"
+  },
+  "Имя": {
+    "English": "Name"
+  },
+  "Имя значения": {
+    "English": "Name of the value"
+  },
+  "Имя модели на этом сервере": {
+    "English": "Model name on that server"
+  },
+  "Имя, которым Рина вас называет. Можно оставить пустым": {
+    "English": "The name Rina calls you by. Can be left empty"
+  },
+  "Имя, характер, слова активации и свой голос": {
+    "English": "Name, character, wake words and a voice of its own"
+  },
+  "Искать нераспознанное": {
+    "English": "Search unrecognized commands"
+  },
+  "История разговора": {
+    "English": "Conversation history"
+  },
+  "Источник неизвестен": {
+    "English": "Source unknown"
+  },
+  "Источник: {0}": {
+    "English": "Source: {0}"
+  },
+  "Исходники": {
+    "English": "Source"
+  },
+  "Каждому своё сочетание": {
+    "English": "One combination each"
+  },
+  "Каждый ушедший отчёт виден целиком на странице «Что Рина знает обо мне». Выключается в настройках, в разделе «Приватность». В 4.0.0 Stable телеметрии не будет.": {
+    "English": "Every report that was sent is shown in full on the “What Rina knows about me” page. It is switched off in the settings, under “Privacy”. 4.0.0 Stable will have no telemetry."
+  },
+  "Как вы называете программы — Рина запомнила это из ваших поправок.": {
+    "English": "What you call your programs — Rina learned this from your corrections."
+  },
+  "Как её позвать": {
+    "English": "What to call her"
+  },
+  "Как зовут эту личность. Без слов активации её зовут по имени": {
+    "English": "What this personality is called. Without wake words, it is called by name"
+  },
+  "Как к вам обращаться": {
+    "English": "What to call you"
+  },
+  "Как часто": {
+    "English": "How often"
+  },
+  "Как часто перерисовываются фон и фигура. Чем чаще, тем плавнее и тем сильнее нагрузка": {
+    "English": "How often the background and the figure are redrawn. More often is smoother and costs more"
+  },
+  "Какая программа": {
+    "English": "Which program"
+  },
+  "Какие включены и что они у себя сохранили.": {
+    "English": "Which ones are switched on, and what they have kept."
+  },
+  "Каким словом Рина зовёт какую программу": {
+    "English": "Which word Rina uses for which program"
+  },
+  "Каким характером отвечает эта личность": {
+    "English": "What character this personality answers with"
+  },
+  "Какое действие": {
+    "English": "Which action"
+  },
+  "Какое число": {
+    "English": "Which day"
+  },
+  "Какой адрес открыть": {
+    "English": "Which address to open"
+  },
+  "Какую команду вызвать": {
+    "English": "Which command to call"
+  },
+  "Какую папку открыть": {
+    "English": "Which folder to open"
+  },
+  "Какую программу открыть": {
+    "English": "Which program to open"
+  },
+  "Команда сохранена.": {
+    "English": "Command saved."
+  },
+  "Команды": {
+    "Deutsch": "Befehle",
+    "English": "Commands",
+    "Español": "Comandos",
+    "Українська": "Команди"
+  },
+  "Команды Рины (*.json)|*.json": {
+    "English": "Rina commands (*.json)|*.json"
+  },
+  "Команды живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Commands live in the core, and there’s no connection to it."
+  },
+  "Команды, история и плагины останутся на месте.": {
+    "English": "Commands, history and plugins stay where they are."
+  },
+  "Комбинации клавиш": {
+    "English": "Key combinations"
+  },
+  "Короткие сигналы: услышала, ошиблась": {
+    "English": "Short signals: heard you, went wrong"
+  },
+  "Куда сохранить диагностический пакет": {
+    "English": "Where to save the diagnostic package"
+  },
+  "Латунь": {
+    "English": "Brass"
+  },
+  "Личность": {
+    "English": "Personality"
+  },
+  "Микрофон": {
+    "Deutsch": "Mikrofon",
+    "English": "Microphone",
+    "Español": "Micrófono",
+    "Українська": "Мікрофон"
+  },
+  "Микрофон не отозвался: {0}": {
+    "English": "The microphone didn’t respond: {0}"
+  },
+  "Модели": {
+    "English": "Models"
+  },
+  "Модели (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|Все файлы|*.*": {
+    "English": "Models (*.onnx;*.bin;*.pt)|*.onnx;*.bin;*.pt|All files|*.*"
+  },
+  "Модель может искать в интернете": {
+    "English": "The model may search the web"
+  },
+  "Мох": {
+    "English": "Moss"
+  },
+  "НИЧЕГО НЕ ВЫБРАНО": {
+    "English": "NOTHING SELECTED"
+  },
+  "НОВОЕ НАПОМИНАНИЕ": {
+    "English": "NEW REMINDER"
+  },
+  "Назад": {
+    "English": "Back"
+  },
+  "Название модели": {
+    "English": "Model name"
+  },
+  "Найти настройку": {
+    "English": "Find a setting"
+  },
+  "Напоминание": {
+    "Deutsch": "Erinnerung",
+    "English": "Reminder",
+    "Español": "Recordatorio",
+    "Українська": "Нагадування"
+  },
+  "Напоминания": {
+    "Deutsch": "Erinnerungen",
+    "English": "Reminders",
+    "Español": "Recordatorios",
+    "Українська": "Нагадування"
+  },
+  "Напомнить": {
+    "English": "Remind me"
+  },
+  "Напомню {0}": {
+    "English": "I’ll remind you {0}"
+  },
+  "Например: «Рина, поставь таймер на десять минут».": {
+    "English": "For example: “Rina, set a timer for ten minutes”."
+  },
+  "Насколько громко Рина говорит": {
+    "English": "How loudly Rina speaks"
+  },
+  "Насколько подробен журнал": {
+    "English": "How detailed the log is"
+  },
+  "Настройки": {
+    "Deutsch": "Einstellungen",
+    "English": "Settings",
+    "Español": "Ajustes",
+    "Українська": "Налаштування"
+  },
+  "Настройки не пришли: ядро не описало их.": {
+    "English": "The settings did not arrive: the core described none."
+  },
+  "Настройки сброшены.": {
+    "English": "Settings have been reset."
+  },
+  "Настройки хранит ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново.": {
+    "English": "Settings live in the core, and there is no link to it right now. The shell is trying to bring it back up."
+  },
+  "Настройки, история, команды": {
+    "English": "Settings, history, commands"
+  },
+  "Начать": {
+    "English": "Start"
+  },
+  "Начинать свёрнутой": {
+    "English": "Start minimised"
+  },
+  "Не включать": {
+    "English": "Leave it off"
+  },
+  "Не вышло открыть ссылку: {0}": {
+    "English": "Couldn’t open the link: {0}"
+  },
+  "Не вышло: {0}": {
+    "English": "Didn't work: {0}"
+  },
+  "Не прочиталось: {0}": {
+    "English": "Couldn’t read it: {0}"
+  },
+  "Не сохранилось: {0}": {
+    "English": "Not saved: {0}"
+  },
+  "Не удалось спросить": {
+    "English": "Could not ask"
+  },
+  "Не уходит никогда": {
+    "English": "What is never sent"
+  },
+  "Не чаще раза в сутки. Первый отчёт — через сутки после включения; если Рина в это время выключена, то вскоре после следующего запуска.": {
+    "English": "No more than once a day. The first report goes a day after switching on; if Rina is closed at that moment, soon after her next start."
+  },
+  "Непонятую фразу отправлять в поиск": {
+    "English": "Send a phrase that was not understood to a search"
+  },
+  "Нечего пробовать: шагов пока нет.": {
+    "English": "Nothing to try: there are no steps yet."
+  },
+  "Ниже": {
+    "English": "Down"
+  },
+  "Ниже — реже слышит имя, выше — чаще ошибается": {
+    "English": "Lower hears the name less often, higher mistakes it more often"
+  },
+  "Никто не подтвердил, кто её выпустил и что её не подменяли.": {
+    "English": "Nobody has confirmed who released it or that it wasn’t tampered with."
+  },
+  "Ничего не ждёт": {
+    "English": "Nothing waiting"
+  },
+  "Ничего не нашлось по «{0}»": {
+    "English": "Nothing found for “{0}”"
+  },
+  "Ничего не уходит в сеть без вашего ведома.": {
+    "English": "Nothing leaves for the network without your knowing."
+  },
+  "Новая команда": {
+    "Deutsch": "Neuer Befehl",
+    "English": "New command",
+    "Español": "Nuevo comando",
+    "Українська": "Нова команда"
+  },
+  "Нужен хотя бы один шаг.": {
+    "English": "At least one step is needed."
+  },
+  "Нужна хотя бы одна фраза.": {
+    "English": "At least one phrase is needed."
+  },
+  "Нужно для напоминаний «когда открою…». Выключено по умолчанию": {
+    "English": "Needed for the «when I open…» reminders. Off by default"
+  },
+  "О программе": {
+    "Deutsch": "Über",
+    "English": "About",
+    "Español": "Acerca de",
+    "Українська": "Про програму"
+  },
+  "О чём напомнить?": {
+    "English": "What should I remind you about?"
+  },
+  "ОБНОВЛЕНИЯ": {
+    "English": "UPDATES"
+  },
+  "Обезличенные счётчики: что срабатывает и где ошибки. Без текста, звука и путей; каждый отчёт виден на странице «Что Рина знает обо мне». В Stable её не будет": {
+    "English": "Anonymous counters: what works and where errors happen. No text, sound or paths; every report is shown on the “What Rina knows about me” page. Stable will not have it"
+  },
+  "Обзор…": {
+    "Deutsch": "Durchsuchen…",
+    "English": "Browse…",
+    "Español": "Examinar…",
+    "Українська": "Огляд…"
+  },
+  "Обновить": {
+    "Deutsch": "Aktualisieren",
+    "English": "Refresh",
+    "Español": "Actualizar",
+    "Українська": "Оновити"
+  },
+  "Обновление не подходит к тому, что установлено: {0}.": {
+    "English": "This update does not fit what is installed: {0}."
+  },
+  "Обновления": {
+    "English": "Updates"
+  },
+  "Оболочка": {
+    "English": "Shell"
+  },
+  "Оболочка не знает, что это за данные, — поэтому показывает как есть.": {
+    "English": "The shell does not know what this data is, so it shows it as it stands."
+  },
+  "Одна комбинация на всё окно": {
+    "English": "One combination for the whole window"
+  },
+  "Окно уходит в трей, а не на панель задач": {
+    "English": "The window goes to the tray rather than the taskbar"
+  },
+  "Орхидея": {
+    "English": "Orchid"
+  },
+  "Остановить": {
+    "English": "Stop"
+  },
+  "Отвечать голосом": {
+    "Deutsch": "Mit Stimme antworten",
+    "English": "Reply with voice",
+    "Español": "Responder con voz",
+    "Українська": "Відповідати голосом"
+  },
+  "Отвечать моделью": {
+    "English": "Answer with a model"
+  },
+  "Отвечать языковой моделью, когда команда не распознана": {
+    "English": "Answer with a language model when a command isn’t recognised"
+  },
+  "Отделка": {
+    "English": "Finish"
+  },
+  "Отдельные действия": {
+    "English": "Separate actions"
+  },
+  "Открыть": {
+    "English": "Open"
+  },
+  "Откуда взять команды": {
+    "English": "Where to take commands from"
+  },
+  "Отмена": {
+    "Deutsch": "Abbrechen",
+    "English": "Cancel",
+    "Español": "Cancelar",
+    "Українська": "Скасувати"
+  },
+  "Отменить": {
+    "Deutsch": "Abbrechen",
+    "English": "Cancel",
+    "Español": "Cancelar",
+    "Українська": "Скасувати"
+  },
+  "Отправить": {
+    "English": "Send"
+  },
+  "Отправлено": {
+    "English": "Sent"
+  },
+  "Отправлять обезличенную статистику беты": {
+    "English": "Send the beta's anonymous statistics"
+  },
+  "Очистить": {
+    "English": "Clear"
+  },
+  "ПРОЧЕЕ": {
+    "English": "OTHER"
+  },
+  "ПРОШЛЫЕ": {
+    "English": "PAST"
+  },
+  "ПРОШЛЫЕ · {0}": {
+    "English": "PAST · {0}"
+  },
+  "Папка с плагином": {
+    "English": "Plugin folder"
+  },
+  "Папка с распакованной моделью": {
+    "English": "The folder with the unpacked model"
+  },
+  "Папки поиска программ": {
+    "English": "Folders searched for programs"
+  },
+  "Папки, кроме тех, что Рина находит сама": {
+    "English": "Folders besides those Rina finds by herself"
+  },
+  "Пауза": {
+    "English": "Pause"
+  },
+  "Перечитываю…": {
+    "English": "Rereading…"
+  },
+  "Плавающая строка команд": {
+    "Deutsch": "Schwebende Befehlszeile",
+    "English": "Floating command bar",
+    "Español": "Barra de comandos flotante",
+    "Українська": "Плаваючий рядок команд"
+  },
+  "Плагин добавляет Рине умение: свою команду, свой раздел или и то и другое. Папку с плагином кладут рядом с программой.": {
+    "English": "A plugin gives Rina a new skill: a command, a section, or both. Put the plugin folder next to the program."
+  },
+  "Плагинов пока нет": {
+    "English": "No plugins yet"
+  },
+  "Плагины": {
+    "Deutsch": "Plug-ins",
+    "English": "Plugins",
+    "Español": "Complementos",
+    "Українська": "Плагіни"
+  },
+  "Плагины живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Plugins live in the core, and there’s no connection to it."
+  },
+  "По этому слову Рина понимает, что обращаются к ней.": {
+    "English": "This is the word Rina listens for to know she is being spoken to."
+  },
+  "Поведение": {
+    "Deutsch": "Verhalten",
+    "English": "Behavior",
+    "Español": "Comportamiento",
+    "Українська": "Поведінка"
+  },
+  "Подробность журнала": {
+    "Deutsch": "Protokolldetails",
+    "English": "Log detail",
+    "Español": "Detalle del registro",
+    "Українська": "Докладність журналу"
+  },
+  "Подтверждение": {
+    "English": "Confirmation"
+  },
+  "Позвать Рину": {
+    "English": "Call Rina"
+  },
+  "Поиск": {
+    "English": "Search"
+  },
+  "Поисковая система": {
+    "English": "Search engine"
+  },
+  "Пока ни одного напоминания": {
+    "English": "No reminders yet"
+  },
+  "Пока ни одной сессии": {
+    "English": "No sessions yet"
+  },
+  "Пока ничего": {
+    "English": "Nothing yet"
+  },
+  "Показать": {
+    "English": "Show"
+  },
+  "Показать все {0}": {
+    "English": "Show all {0}"
+  },
+  "Показывать всплывающие сообщения": {
+    "English": "Show pop-up messages"
+  },
+  "Показывать сделанные": {
+    "English": "Show done"
+  },
+  "Помочь бете": {
+    "English": "Help the beta"
+  },
+  "Последовательность · шагов {0}": {
+    "English": "Sequence · {0} steps"
+  },
+  "Поставлен: {0}. Включите его, чтобы начал работать.": {
+    "English": "Installed: {0}. Turn it on to make it work."
+  },
+  "Потяните, чтобы переставить": {
+    "English": "Drag to move it"
+  },
+  "Потяните, чтобы подвинуть холст. Двойной щелчок — вернуть на место": {
+    "English": "Drag to move the canvas. Double-click brings it back"
+  },
+  "Почти тихо: {0}%. Проверьте, тот ли микрофон выбран.": {
+    "English": "Almost silent: {0}%. Check that the right microphone is selected."
+  },
+  "Править": {
+    "English": "Edit"
+  },
+  "Правка команды": {
+    "English": "Editing a command"
+  },
+  "Предыдущий": {
+    "English": "Previous"
+  },
+  "Приватность": {
+    "Deutsch": "Datenschutz",
+    "English": "Privacy",
+    "Español": "Privacidad",
+    "Українська": "Приватність"
+  },
+  "Пробую…": {
+    "English": "Trying…"
+  },
+  "Проверить": {
+    "Deutsch": "Testen",
+    "English": "Check",
+    "Español": "Probar",
+    "Українська": "Перевірити"
+  },
+  "Проверить голос": {
+    "English": "Test voice"
+  },
+  "Проверить микрофон": {
+    "English": "Test microphone"
+  },
+  "Проверить не вышло — попробуйте позже.": {
+    "English": "The check did not go through — try again later."
+  },
+  "Проверка не запускалась.": {
+    "English": "No check has been run yet."
+  },
+  "Проверять обновления": {
+    "Deutsch": "Nach Updates suchen",
+    "English": "Check for updates",
+    "Español": "Buscar actualizaciones",
+    "Українська": "Перевіряти оновлення"
+  },
+  "Программы": {
+    "Deutsch": "Programme",
+    "English": "Programs",
+    "Español": "Programas",
+    "Українська": "Програми"
+  },
+  "Программы (*.exe;*.lnk)|*.exe;*.lnk|Все файлы|*.*": {
+    "English": "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*"
+  },
+  "Пройти настройку заново": {
+    "English": "Run setup again"
+  },
+  "Протокол": {
+    "English": "Protocol"
+  },
+  "Прочее": {
+    "English": "Other"
+  },
+  "Пусто — зовут по имени": {
+    "English": "Empty — called by name"
+  },
+  "Путь": {
+    "English": "Path"
+  },
+  "Путь говорит, над чем идёт работа. Выключено по умолчанию": {
+    "English": "A path says what the work is about. Off by default"
+  },
+  "Равно чему": {
+    "English": "Equal to what"
+  },
+  "Раз в сутки Рина будет отправлять разработчику короткий отчёт: чем пользовались и где что-то не сработало.": {
+    "English": "Once a day Rina will send the developer a short report: what was used and where something did not work."
+  },
+  "Раз в сутки спрашивает api.github.com, нет ли новой версии": {
+    "English": "Once a day, asks api.github.com whether there is a new version"
+  },
+  "Развернуть": {
+    "English": "Maximise"
+  },
+  "Разговор": {
+    "English": "Talking"
+  },
+  "Разговор ведёт ядро, а связи с ним сейчас нет. Оболочка пробует поднять его заново.": {
+    "English": "The core runs the conversation, and there’s no connection. The shell is trying to start it again."
+  },
+  "Разговор выгружен: {0}": {
+    "English": "Conversation exported: {0}"
+  },
+  "Разговор пуст": {
+    "English": "The conversation is empty"
+  },
+  "Раздел появится в 4.0-F04.": {
+    "English": "This section arrives in 4.0-F04."
+  },
+  "Разделы": {
+    "English": "Sections"
+  },
+  "Размер модели: чем больше, тем точнее и медленнее": {
+    "English": "Model size: the bigger, the more accurate and the slower"
+  },
+  "Распаковываю…": {
+    "English": "Unpacking…"
+  },
+  "Распознавание": {
+    "English": "Recognition"
+  },
+  "Рина": {
+    "English": "Rina"
+  },
+  "Рина будет готова сразу после входа": {
+    "English": "Rina will be ready right after you sign in"
+  },
+  "Рина будет называть вас этим именем. Можно оставить пустым.": {
+    "English": "Rina will call you by this name. You can leave it empty."
+  },
+  "Рина ещё ничего о вас не запомнила: поговорите с ней, и здесь появятся записи.": {
+    "English": "Rina has not remembered anything about you yet: talk to her and entries will appear here."
+  },
+  "Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию.": {
+    "English": "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults."
+  },
+  "Рина скажет это вместо «Готово»": {
+    "English": "Rina will say this instead of “Done”"
+  },
+  "Рина — голосовой помощник на этом компьютере. Несколько вопросов, и всё.": {
+    "English": "Rina is a voice assistant that runs on this computer. A few questions, and that is all."
+  },
+  "Русский различает «ты прав» и «ты права». Без рода Рина обходит такие формы": {
+    "English": "Russian tells «ты прав» from «ты права». Without a gender, Rina avoids such forms"
+  },
+  "С чего начнём?": {
+    "English": "Where shall we start?"
+  },
+  "С этих слов начинается обращение к Рине": {
+    "English": "Words that start an address to Rina"
+  },
+  "СВОИ И ВСТРОЕННЫЕ": {
+    "English": "YOURS AND BUILT-IN"
+  },
+  "СВОИ И ВСТРОЕННЫЕ · программ найдено: {0}": {
+    "English": "YOURS AND BUILT-IN · programs found: {0}"
+  },
+  "ССЫЛКИ": {
+    "English": "LINKS"
+  },
+  "Сайт": {
+    "English": "Website"
+  },
+  "Сбросить все": {
+    "English": "Reset all"
+  },
+  "Сбросить настройки": {
+    "English": "Reset settings"
+  },
+  "Свернуть": {
+    "English": "Minimise"
+  },
+  "Свои команды": {
+    "English": "Your own commands"
+  },
+  "Своих команд пока нет": {
+    "English": "No commands of your own yet"
+  },
+  "Свой голос": {
+    "English": "Own voice"
+  },
+  "Сворачивать в трей": {
+    "Deutsch": "In den Infobereich minimieren",
+    "English": "Minimize to tray",
+    "Español": "Minimizar a la bandeja",
+    "Українська": "Згортати в трей"
+  },
+  "Своя команда — это фраза и то, что по ней происходит: открыть программу, сказать текст, сделать несколько дел подряд.": {
+    "English": "Your own command is a phrase and what happens on it: open a program, say a text, do several things in a row."
+  },
+  "Своя личность": {
+    "English": "Own personality"
+  },
+  "Серебро": {
+    "English": "Silver"
+  },
+  "Серебро, чёрное или графит": {
+    "English": "Silver, black or graphite"
+  },
+  "Серебро, чёрный или графит — равноправные": {
+    "English": "Silver, black or graphite — equals"
+  },
+  "Сессии": {
+    "English": "Sessions"
+  },
+  "Сессии живут в ядре, а связи с ним сейчас нет.": {
+    "English": "Sessions live in the core, and there is no link to it right now."
+  },
+  "Сессия — это отрезок работы с названием. Начните голосом или строкой, и здесь останется, сколько он шёл и что в нём было.": {
+    "English": "A session is a stretch of work with a name. Start one by voice or by typing, and what is left here is how long it ran and what was in it."
+  },
+  "Система синтеза": {
+    "English": "Synthesis engine"
+  },
+  "Скажите «запиши купить хлеб» — или впишите сюда.": {
+    "English": "Say “add buy bread” — or type it here."
+  },
+  "Скажите вслух или напишите ниже. Всё сказанное окажется здесь и переживёт перезапуск.": {
+    "English": "Say it out loud or type below. Everything said lands here and survives a restart."
+  },
+  "Скажите или напишите: «запусти браузер»": {
+    "English": "Say or type: “open the browser”"
+  },
+  "Скажите фразу…": {
+    "English": "Say a phrase…"
+  },
+  "Скажите — или напишите.": {
+    "English": "Say it — or type it."
+  },
+  "Сказала: «{0}» — {1} с. Не слышно? Проверьте динамик.": {
+    "English": "Said “{0}” — {1}s. Can’t hear it? Check the speaker."
+  },
+  "Сказанное и напечатанное вами, и ответы Рины. Ведётся, пока включено в настройках.": {
+    "English": "What you said and typed, and Rina's answers. Kept while switched on in the settings."
+  },
+  "Скачаем: ": {
+    "English": "Will download: "
+  },
+  "Скачается само": {
+    "English": "Fetches itself"
+  },
+  "Скачается само при первом обращении.": {
+    "English": "Downloads itself the first time it is needed."
+  },
+  "Скачано": {
+    "English": "Downloaded"
+  },
+  "Скачано.": {
+    "English": "Downloaded."
+  },
+  "Скачать": {
+    "English": "Download"
+  },
+  "Скачивание моделей": {
+    "English": "Downloading models"
+  },
+  "Скачивать нечего — распознавание можно включить позже.": {
+    "English": "Nothing to download — recognition can be switched on later."
+  },
+  "Сколько ждать ответа, секунд": {
+    "English": "How long to wait for an answer, seconds"
+  },
+  "Сколько раз": {
+    "English": "How many times"
+  },
+  "Сколько раз какая команда выполнялась и когда в последний раз.": {
+    "English": "How many times each command has run, and when it last did."
+  },
+  "Сколько секунд": {
+    "English": "How many seconds"
+  },
+  "Сколько секунд слушать после активации": {
+    "English": "How many seconds to listen after being called"
+  },
+  "Скорость речи": {
+    "Deutsch": "Sprechgeschwindigkeit",
+    "English": "Speech rate",
+    "Español": "Velocidad del habla",
+    "Українська": "Швидкість мовлення"
+  },
+  "Скрыть": {
+    "English": "Hide"
+  },
+  "Следующий": {
+    "English": "Next"
+  },
+  "Слова активации": {
+    "Deutsch": "Aktivierungswörter",
+    "English": "Wake words",
+    "Español": "Palabras de activación",
+    "Українська": "Слова активації"
+  },
+  "Слушаю": {
+    "English": "Listening"
+  },
+  "Слушаю две секунды — скажите что-нибудь…": {
+    "English": "Listening for two seconds — say something…"
+  },
+  "Слушаю…": {
+    "English": "Listening…"
+  },
+  "Слышно: {0}%. Микрофон работает.": {
+    "English": "Heard: {0}%. The microphone works."
+  },
+  "Собираю…": {
+    "English": "Collecting…"
+  },
+  "Собрать пакет": {
+    "English": "Collect package"
+  },
+  "Сообщить о неполадке": {
+    "English": "Report a problem"
+  },
+  "Сохранено: {0}": {
+    "English": "Saved: {0}"
+  },
+  "Сохранить": {
+    "Deutsch": "Speichern",
+    "English": "Save",
+    "Español": "Guardar",
+    "Українська": "Зберегти"
+  },
+  "Сохранять историю": {
+    "Deutsch": "Verlauf speichern",
+    "English": "Save history",
+    "Español": "Guardar historial",
+    "Українська": "Зберігати історію"
+  },
+  "Список напоминаний живёт в ядре, а связи с ним сейчас нет.": {
+    "English": "The reminder list lives in the core, and there’s no connection to it."
+  },
+  "Список обновлён.": {
+    "English": "List refreshed."
+  },
+  "Список того, что ждёт.": {
+    "English": "The list of what is waiting."
+  },
+  "Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo": {
+    "English": "It asks when its own knowledge falls short. The query goes to DuckDuckGo"
+  },
+  "Спрашиваю…": {
+    "English": "Asking…"
+  },
+  "Ставлю…": {
+    "English": "Installing…"
+  },
+  "Сталь": {
+    "English": "Steel"
+  },
+  "Статистика команд": {
+    "English": "Command statistics"
+  },
+  "Строка поверх экрана по горячей клавише": {
+    "English": "A line over the screen, on a hotkey"
+  },
+  "Таймер": {
+    "Deutsch": "Timer",
+    "English": "Timer",
+    "Español": "Temporizador",
+    "Українська": "Таймер"
+  },
+  "Те же вопросы, что при первом запуске. Ничего не сбрасывает: отвечать заново не обязательно.": {
+    "English": "The same questions as on the first run. Nothing is reset: you need not answer them again."
+  },
+  "Телеметрия беты": {
+    "English": "Beta telemetry"
+  },
+  "То, о чём вы просили напомнить.": {
+    "English": "The things you asked to be reminded of."
+  },
+  "Только внутри открытой сессии и только при верхней настройке": {
+    "English": "Only inside an open session, and only with the setting above"
+  },
+  "Только то, что вы меняли сами: нетронутое по умолчанию ничего о вас не говорит.": {
+    "English": "Only what you changed yourself: an untouched default says nothing about you."
+  },
+  "Точно выполнить?": {
+    "English": "Run it — are you sure?"
+  },
+  "У Рины пока нет своего голоса — он появится в 4.0.0 Stable": {
+    "English": "Rina has no voice of her own yet — it arrives in 4.0.0 Stable"
+  },
+  "УМЕЕТ СРАЗУ": {
+    "English": "WORKS OUT OF THE BOX"
+  },
+  "УСТАНОВЛЕННЫЕ": {
+    "English": "INSTALLED"
+  },
+  "УСТАНОВЛЕННЫЕ · {0}": {
+    "English": "INSTALLED · {0}"
+  },
+  "Убрать": {
+    "Deutsch": "Entfernen",
+    "English": "Remove",
+    "Español": "Quitar",
+    "Українська": "Прибрати"
+  },
+  "Убрать «{0}»": {
+    "English": "Remove “{0}”"
+  },
+  "Убрать совсем": {
+    "English": "Delete"
+  },
+  "Убрать шаг": {
+    "English": "Remove this step"
+  },
+  "Уведомления": {
+    "Deutsch": "Benachrichtigungen",
+    "English": "Notifications",
+    "Español": "Notificaciones",
+    "Українська": "Сповіщення"
+  },
+  "Уголь": {
+    "English": "Ember"
+  },
+  "Удалить": {
+    "Deutsch": "Löschen",
+    "English": "Delete",
+    "Español": "Eliminar",
+    "Українська": "Видалити"
+  },
+  "Уже скачано.": {
+    "English": "Already downloaded."
+  },
+  "Уже установлено.": {
+    "English": "Already installed."
+  },
+  "Условие": {
+    "English": "Condition"
+  },
+  "Установить": {
+    "English": "Install"
+  },
+  "Установить эту пару нельзя.": {
+    "English": "This pair cannot be installed."
+  },
+  "Установка появится вместе с установщиком.": {
+    "English": "Installing arrives with the installer."
+  },
+  "Установлена последняя версия.": {
+    "English": "The latest version is installed."
+  },
+  "Устройство по умолчанию": {
+    "English": "Default device"
+  },
+  "Устройство, в которое Рина говорит": {
+    "English": "The device Rina speaks into"
+  },
+  "Устройство, с которого Рина слышит": {
+    "English": "The device Rina hears from"
+  },
+  "Уходит": {
+    "English": "What is sent"
+  },
+  "Файл голоса .onnx": {
+    "English": "The .onnx voice file"
+  },
+  "Файл голоса Piper, .onnx. Пусто — голос из общих настроек": {
+    "English": "A Piper voice file, .onnx. Empty — the voice from the general settings"
+  },
+  "Файл не разобрался как JSON.": {
+    "Deutsch": "Die Datei ließ sich nicht als JSON lesen.",
+    "English": "The file did not parse as JSON.",
+    "Español": "El archivo no se pudo analizar como JSON.",
+    "Українська": "Файл не розібрався як JSON."
+  },
+  "Фразы, которые вы завели, и что по ним происходит.": {
+    "English": "The phrases you set up, and what happens when they fire."
+  },
+  "Фразы, по которым сработает": {
+    "English": "Phrases that trigger it"
+  },
+  "Характер": {
+    "English": "Persona"
+  },
+  "Ход скачивания виден в настройках, там же его можно остановить.": {
+    "English": "Progress is shown in the settings, and can be stopped there too."
+  },
+  "Хранить, о чём был разговор": {
+    "English": "Keep what the conversation was about"
+  },
+  "Цвет, которым Рина обращает на себя внимание": {
+    "English": "The colour Rina draws attention with"
+  },
+  "Частота кадров фона": {
+    "English": "Background frame rate"
+  },
+  "Чем Рина говорит. Офлайновые работают без интернета": {
+    "English": "How Rina speaks. Offline engines work without the internet"
+  },
+  "Чем Рина слышит. Без него команды только с клавиатуры": {
+    "English": "How Rina hears. Without it, commands are typed only"
+  },
+  "Чем вызывать Рину и её действия": {
+    "English": "What calls Rina and her actions"
+  },
+  "Чем могу помочь?": {
+    "English": "How can I help?"
+  },
+  "Читаемый текст (*.txt)|*.txt|Данные (*.json)|*.json": {
+    "English": "Readable text (*.txt)|*.txt|Data (*.json)|*.json"
+  },
+  "Что Рина знает обо мне": {
+    "English": "What Rina knows about me"
+  },
+  "Что вы сказали или напечатали, звук, пути и имена файлов, названия ваших плагинов, адреса, пароли и ключи.": {
+    "English": "What you said or typed, sound, paths and file names, the names of your plugins, addresses, passwords and keys."
+  },
+  "Что доустановить": {
+    "English": "What else is needed"
+  },
+  "Что запомнить": {
+    "English": "What to remember"
+  },
+  "Что накоплено и ещё не ушло, и каждый отчёт, ушедший на сервер, — в том виде, в каком ушёл. В 4.0.0 Stable телеметрии не будет.": {
+    "English": "What has been gathered and not yet sent, and every report sent to the server, exactly as it was sent. 4.0.0 Stable will have no telemetry."
+  },
+  "Что ответить (необязательно)": {
+    "English": "What to answer (optional)"
+  },
+  "Что произнести": {
+    "English": "What to say out loud"
+  },
+  "Что сделаем сегодня?": {
+    "English": "What shall we do today?"
+  },
+  "Что скачано и где лежит": {
+    "English": "What is downloaded and where it lies"
+  },
+  "Чтобы говорить": {
+    "English": "To speak"
+  },
+  "Чтобы слышать": {
+    "English": "To hear"
+  },
+  "Чувствительность активации": {
+    "Deutsch": "Aktivierungsempfindlichkeit",
+    "English": "Wake word sensitivity",
+    "Español": "Sensibilidad de activación",
+    "Українська": "Чутливість активації"
+  },
+  "Чёрное": {
+    "English": "Black"
+  },
+  "Шаг {0} из {1}": {
+    "English": "Step {0} of {1}"
+  },
+  "Экспорт": {
+    "Deutsch": "Exportieren",
+    "English": "Export",
+    "Español": "Exportar",
+    "Українська": "Експорт"
+  },
+  "Эта программа не подписана": {
+    "English": "This program isn’t signed"
+  },
+  "Я вас слушаю.": {
+    "English": "I am listening."
+  },
+  "Ядро": {
+    "English": "Core"
+  },
+  "Ядро не на связи": {
+    "English": "Core not connected"
+  },
+  "Ядро не на связи — скачать пока нечего.": {
+    "English": "The core is not connected — there is nothing to download yet."
+  },
+  "Ядро не на связи, поэтому опись показать нечем.": {
+    "English": "The core is not connected, so there is no inventory to show."
+  },
+  "Ядро не на связи.": {
+    "English": "The core is not connected."
+  },
+  "Ядро не объявило возможность «плагины».": {
+    "English": "The core didn’t declare the “plugins” capability."
+  },
+  "Язык интерфейса": {
+    "English": "Interface language"
+  },
+  "Язык окна и реплик Рины": {
+    "English": "The language of the window and of Rina's words"
+  },
+  "Янтарь": {
+    "English": "Amber"
+  },
+  "без имени": {
+    "English": "unnamed"
+  },
+  "бета": {
+    "English": "beta"
+  },
+  "в метаданных нет ни одной части": {
+    "English": "the metadata lists no parts"
+  },
+  "в релизе нет manifest.json": {
+    "English": "the release has no manifest.json"
+  },
+  "версия {0}": {
+    "English": "version {0}"
+  },
+  "вид": {
+    "English": "look"
+  },
+  "выбирать не из чего": {
+    "English": "nothing to choose from"
+  },
+  "делать": {
+    "English": "do"
+  },
+  "завтра в это же время": {
+    "English": "tomorrow at this time"
+  },
+  "заметок {0}": {
+    "English": "{0} notes"
+  },
+  "записей: {0}": {
+    "English": "entries: {0}"
+  },
+  "значение": {
+    "English": "value"
+  },
+  "или в": {
+    "English": "or at"
+  },
+  "иначе": {
+    "English": "otherwise"
+  },
+  "источник обновлений обязан быть https, а это «{0}»": {
+    "English": "the update source must be https, and this is “{0}”"
+  },
+  "ключ {0} оболочке незнаком": {
+    "English": "key {0} is unknown to the shell"
+  },
+  "команд {0}": {
+    "English": "{0} commands"
+  },
+  "меньше минуты": {
+    "English": "under a minute"
+  },
+  "метаданные версии {0}, а мы умеем 1": {
+    "English": "metadata version {0}, and we speak 1"
+  },
+  "на чём они разговаривают": {
+    "English": "what they talk over"
+  },
+  "нажмите сочетание…": {
+    "English": "press a combination…"
+  },
+  "например, C:\\Program Files\\App\\app.exe": {
+    "English": "for example, C:\\Program Files\\App\\app.exe"
+  },
+  "например, D:\\Проекты": {
+    "English": "for example, D:\\Projects"
+  },
+  "например, chrome": {
+    "English": "for example, chrome"
+  },
+  "например, github.com": {
+    "English": "for example, github.com"
+  },
+  "например, llama3": {
+    "English": "for example, llama3"
+  },
+  "например, «открой почту»": {
+    "English": "for example, “open mail”"
+  },
+  "например, Макс": {
+    "English": "e.g. Max"
+  },
+  "например, Саша": {
+    "English": "e.g. Alex"
+  },
+  "например, отвечай коротко и по делу": {
+    "English": "for example, answer briefly and to the point"
+  },
+  "например, режим": {
+    "English": "for example, mode"
+  },
+  "не выбрана": {
+    "English": "not chosen"
+  },
+  "не заполнено": {
+    "English": "not filled in"
+  },
+  "не назначено": {
+    "English": "not set"
+  },
+  "не разобрал сочетание «{0}»": {
+    "English": "couldn’t parse the shortcut “{0}”"
+  },
+  "не разобрали ответ: {0}": {
+    "English": "could not read the answer: {0}"
+  },
+  "не удалось спросить источник: {0}": {
+    "English": "could not ask the source: {0}"
+  },
+  "нет связи": {
+    "English": "no connection"
+  },
+  "ничего не записано": {
+    "English": "nothing recorded"
+  },
+  "ничего — шагов пока нет": {
+    "English": "nothing — there are no steps yet"
+  },
+  "новое слово": {
+    "English": "new word"
+  },
+  "нужен Ctrl, Alt, Shift или Win": {
+    "English": "needs Ctrl, Alt, Shift or Win"
+  },
+  "о программе": {
+    "English": "about"
+  },
+  "о чём напомнить": {
+    "English": "what to remind about"
+  },
+  "оболочка говорит [{0}], ядро слышит [{1}]": {
+    "English": "the shell speaks [{0}], the core hears [{1}]"
+  },
+  "оболочка не знает такого элемента страницы": {
+    "English": "the shell doesn’t know this page element"
+  },
+  "окно, звук, системный слой": {
+    "English": "window, audio, system layer"
+  },
+  "ответ не объект": {
+    "English": "the answer is not an object"
+  },
+  "папка с моделью": {
+    "English": "folder with the model"
+  },
+  "плагин не загрузился": {
+    "English": "the plugin didn’t load"
+  },
+  "попытка {0}": {
+    "English": "attempt {0}"
+  },
+  "применится после перезапуска": {
+    "English": "applies after a restart"
+  },
+  "программ {0}": {
+    "English": "{0} applications"
+  },
+  "пусто": {
+    "English": "empty"
+  },
+  "путь": {
+    "English": "path"
+  },
+  "разбор команд, память, речь": {
+    "English": "command parsing, memory, speech"
+  },
+  "связь потеряна, поднимаем": {
+    "English": "connection lost, bringing it back"
+  },
+  "сейчас": {
+    "English": "now"
+  },
+  "секунд": {
+    "English": "seconds"
+  },
+  "такое сочетание не подойдёт": {
+    "English": "that combination won’t work"
+  },
+  "тогда": {
+    "English": "then"
+  },
+  "файл .onnx": {
+    "English": "the .onnx file"
+  },
+  "фокус": {
+    "English": "focus"
+  },
+  "формат настроек и истории": {
+    "English": "format of settings and history"
+  },
+  "хэш не сошёлся: ждали {0}…, получили {1}…": {
+    "English": "the hash did not match: expected {0}…, got {1}…"
+  },
+  "чем всё кончилось — если есть что сказать": {
+    "English": "how it ended — if there is anything to say"
+  },
+  "через 15 минут": {
+    "English": "in 15 minutes"
+  },
+  "через 3 часа": {
+    "English": "in 3 hours"
+  },
+  "через 30 минут": {
+    "English": "in 30 minutes"
+  },
+  "через 5 минут": {
+    "English": "in 5 minutes"
+  },
+  "через {0}": {
+    "English": "in {0}"
+  },
+  "через час": {
+    "English": "in an hour"
+  },
+  "что произнести": {
+    "English": "what to say"
+  },
+  "ядро {0}": {
+    "English": "core {0}"
+  },
+  "ядро {0} читает данные схемы {1}, а на диске уже {2}": {
+    "English": "core {0} reads schema {1}, and the disk already holds {2}"
+  },
+  "ядро запускается": {
+    "English": "the core is starting"
+  },
+  "ядро на связи": {
+    "English": "the core is online"
+  },
+  "ядро не запускалось": {
+    "English": "the core hasn’t been started"
+  },
+  "ядро не отвечает": {
+    "English": "the core isn’t responding"
+  }
+}

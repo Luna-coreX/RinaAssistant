@@ -1,0 +1,114 @@
+/* Порождено tools/gen_site.py по docs/design/tokens.json.
+ * Руками не править: правка переживёт ровно до следующего запуска,
+ * а расхождение с программой переживёт дольше.
+ *
+ * Мир страницы — коммутационное поле; цвета — отделки «Графит».
+ * Своё у страницы одно значение: земля, на которой всё стоит. */
+
+@font-face {
+  font-family: 'Unbounded';
+  src: url('fonts/Unbounded-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Unbounded';
+  src: url('fonts/Unbounded-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Onest';
+  src: url('fonts/Onest-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Onest';
+  src: url('fonts/Onest-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geologica';
+  src: url('fonts/Geologica-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Geologica';
+  src: url('fonts/Geologica-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: dark;
+
+  /* Гарнитуры: наборная, текстовая, показаний. */
+  --font-display: 'Unbounded', system-ui, sans-serif;
+  --font-ui: 'Onest', system-ui, sans-serif;
+  --font-figure: 'Geologica', system-ui, sans-serif;
+
+  /* Кегли ролей прибора. Страница читает их с поправкой: --scale в style.css. */
+  --type-title: 22px;
+  --type-section: 11px;
+  --type-nav: 13px;
+  --type-legend: 12px;
+  --type-body: 13px;
+  --type-value: 14px;
+  --type-figure: 13px;
+  --type-speech: 15px;
+  --type-meta: 11px;
+
+  /* Лестница просветов. */
+  --space-hair: 1px;
+  --space-tight: 6px;
+  --space-inner: 12px;
+  --space-within: 16px;
+  --space-between: 32px;
+  --space-danger: 64px;
+
+  /* Радиусы: у прибора углы тугие. */
+  --radius-none: 0px;
+  --radius-tight: 2px;
+  --radius-max: 3px;
+
+  /* Длительности и смягчение. */
+  --motion-instant: 0ms;
+  --motion-stagger: 24ms;
+  --motion-press: 90ms;
+  --motion-state: 160ms;
+  --motion-panel: 220ms;
+  --motion-afterglow: 1000ms;
+  --ease-default: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decay: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Штриховка необратимого: единственный его признак. */
+  --hatch-angle: 45deg;
+  --hatch-line: 2px;
+  --hatch-gap: 7px;
+  --hatch-opacity: 0.2;
+
+  /* Коммутационное поле. */
+  --ground: #060708;  /* комната коммутаторной: единственное значение страницы */
+  --plate: #1d2022;  /* плита, в которой просверлено поле */
+  --plate-low: #16181a;  /* плита под нажатием */
+  --hole: #070809;  /* нутро гнезда */
+  --rim: #5e605f;  /* фаска гнезда — единственное, что его выдаёт */
+  --hair: #383d41;  /* волосяная линия */
+  --ink: #dcdbd5;  /* чернила */
+  --ink-soft: #a09f98;  /* легенды */
+  --ink-faint: #7b7a72;  /* выключенное */
+  --cord: #f2731c;  /* шнур и единственный акцент */
+  --cord-sunk: #cf5c12;  /* шнур под нажатием */
+  --lamp: #6cba74;  /* лампа занятой линии */
+  --strip: #dcdbd5;  /* наборная этикетка: плашка */
+  --strip-ink: #1d2022;  /* наборная этикетка: буквы */
+}

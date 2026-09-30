@@ -1,0 +1,58 @@
+<UserControl x:Class="Rina.Shell.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings">
+  <!--
+    One long panel that scrolls, not nested tabs (4.0-R04): an instrument is
+    a front panel with sections, not a cabinet with drawers. In the "a
+    session at the settings" scenario, seeing the neighbouring sections is
+    more use than hiding them.
+  -->
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <!-- The title, and a way through forty settings. On the same line
+         because a search box on a line of its own would cost a row of
+         the panel for something used once a visit. -->
+    <Grid Grid.Row="0" Margin="0,0,0,16">
+      <TextBlock Text="{loc:S 'Настройки'}"
+                 Style="{StaticResource Text.Title}"
+                 VerticalAlignment="Center" />
+      <TextBox x:Name="Find" Style="{StaticResource Field}" Width="280"
+               HorizontalAlignment="Right" VerticalAlignment="Center"
+               TextChanged="OnFind"
+               ui:Ui.Hint="{loc:S 'Найти настройку'}" />
+    </Grid>
+
+    <ContentControl x:Name="Empty" Grid.Row="1" Visibility="Collapsed" />
+
+    <!-- The search found nothing. Said out loud, because an empty panel
+         is what a broken one looks like. -->
+    <TextBlock x:Name="NoMatch" Grid.Row="1" Visibility="Collapsed"
+               Style="{StaticResource Text.Meta}" TextWrapping="Wrap"
+               HorizontalAlignment="Center" Margin="0,40,0,0" />
+
+    <ScrollViewer x:Name="Scroll" Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                  Padding="0,0,12,0" ui:Smooth.Scrolling="True">
+      <StackPanel x:Name="Body" />
+    </ScrollViewer>
+
+    <!-- A gap twice the usual: what is dangerous is set apart by emptiness
+         rather than by colour (DIRECTION §3). At twelve points the reset
+         button read as a continuation of the list of settings. -->
+    <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" x:Name="Bottom" Grid.Row="2" Orientation="Horizontal">
+      <!-- The reset is set apart by emptiness, not by colour: between the
+           irreversible and its neighbours the gap is twice the usual
+           (DIRECTION §3). -->
+      <Button Style="{StaticResource Btn.Danger}" Margin="0,0,64,0"
+              Content="{loc:S 'Сбросить настройки'}" Click="OnReset" />
+      <TextBlock x:Name="Note" Style="{StaticResource Text.Meta}"
+                 VerticalAlignment="Center" TextWrapping="Wrap" />
+    </StackPanel>
+  </Grid>
+</UserControl>

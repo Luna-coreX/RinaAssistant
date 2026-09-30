@@ -1,0 +1,1126 @@
+<!--
+  The controls. Written, not taken from a library — ADR 0005.
+
+  A secondary button is not drawn as a box: it is flush with the panel and
+  shows itself on hover. Prominence comes from the single primary button,
+  filled with ink — a hierarchy without a second accent. There is one accent
+  in the system, and it means "attention here", not "this is an important
+  button".
+
+  Elevation used to be a step in value and a hairline seam, and there were no
+  shadows at all: an instrument panel has no light source, and a shadow would
+  have imitated something that does not exist.
+
+  That held while the background was flat. Since `4.0b-A06` a computed flow
+  runs beneath everything, and a step in value stopped separating anything —
+  the background itself changes lightness under the element, so "lighter than
+  its surroundings" no longer means a thing. A shadow does: it is not a
+  colour but darker than whatever lies under it, so it reads over every
+  colour the flow can reach. The panel gained a light source, and the code
+  says so.
+
+  What did not change: three levels and no more, and never wider than 32
+  points. When the values in `4.0b-A06` did not fit that rule, the values
+  were the ones that moved.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:ui="clr-namespace:Rina.Shell.Styles"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!--
+    The highlight brushes. Each place that needs one has its own.
+
+    `x:Shared="False"` is mandatory: a value from a dictionary is otherwise
+    one for everybody, and it is frozen — it cannot be animated, and if it
+    could, the whole table would light up at once.
+
+    Declared **at the start of the dictionary**: `StaticResource` looks for
+    what is declared above, and a reference to a resource from the bottom
+    half of the file fails at run time while passing the build.
+
+    There are two brushes, because a highlight is obliged to differ from
+    **what it lies on**, and they lie on different things. A list row lies
+    on the raised surface (`FACE_HIGH`) and darkens to `FACE_LOW`. An opened
+    list is raised too, so its option darkens to `FACE`: a step down, but a
+    different one, because what is underneath is different too.
+
+    The first edition took `FACE_HIGH` for the option — the colour of the
+    surface itself. Opacity honestly travelled to one, the animation ran,
+    the check went green, and nothing was visible: the highlight coincided
+    with the background. Hence the check "the highlight differs from what is
+    underneath" — it compares colours, not the fact of movement.
+  -->
+  <SolidColorBrush x:Key="Row.Warm" x:Shared="False" Opacity="0"
+                   Color="{DynamicResource Color.FaceLow}" />
+  <SolidColorBrush x:Key="Choice.Warm" x:Shared="False" Opacity="0"
+                   Color="{DynamicResource Color.Face}" />
+
+
+  <Style x:Key="Btn" TargetType="Button">
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Control}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <!--
+      What the state washes over the face (4.0b-E03). Named here rather
+      than in the template so a button whose face is not the panel's can
+      say so: see Btn.Primary, whose face is ink.
+    -->
+    <Setter Property="ui:Ui.Warm" Value="{DynamicResource C.FaceHigh}" />
+    <Setter Property="ui:Ui.Sunk" Value="{DynamicResource C.FaceLow}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="FontWeight" Value="Medium" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Padding" Value="16,0" />
+    <Setter Property="Cursor" Value="Arrow" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <!--
+              The highlight layer over the face. What is animated is its
+              opacity, not the brush's colour: brushes from the dictionary
+              are shared and frozen, and animating the colour would drop the
+              application on the first hover.
+            -->
+            <Border x:Name="Face" Background="{TemplateBinding Background}"
+                    CornerRadius="{StaticResource Radius.Max}">
+              <!--
+                What a person presses stands above the flow, and is seen to
+                (4.0b-A06). The shadow is not decoration: on a living
+                background a step of value stops separating anything,
+                because the background itself changes lightness underneath.
+                A shadow is not a colour — it is darker than whatever is
+                under it — so it reads over any of the flow's colours.
+              -->
+              <Border.Effect>
+                <DropShadowEffect BlurRadius="{StaticResource Lift.Raised.Blur}"
+                                  ShadowDepth="{StaticResource Lift.Raised.Y}"
+                                  Opacity="{StaticResource Lift.Raised.Opacity}"
+                                  Direction="270" Color="Black" />
+              </Border.Effect>
+            </Border>
+            <Border x:Name="Warm" Opacity="0"
+                    Background="{Binding Path=(ui:Ui.Warm),
+                                RelativeSource={RelativeSource TemplatedParent}}"
+                    CornerRadius="{StaticResource Radius.Max}" />
+            <Border x:Name="Sunk" Opacity="0"
+                    Background="{Binding Path=(ui:Ui.Sunk),
+                                RelativeSource={RelativeSource TemplatedParent}}"
+                    CornerRadius="{StaticResource Radius.Max}" />
+            <!--
+              And a single line of light along the top edge, saying where
+              the light comes from. A pixel high: enough to read as an edge
+              catching the light, not enough to read as a border.
+            -->
+            <Border x:Name="Edge" Height="1" VerticalAlignment="Top"
+                    Margin="6,0" Background="{DynamicResource C.Edge}" />
+            <Border x:Name="Ring" BorderThickness="0"
+                    CornerRadius="{StaticResource Radius.Max}"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center"
+                                VerticalAlignment="Center" />
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <!-- Hover is a change of state: 160 ms (SYSTEM §7). -->
+            <Trigger Property="IsMouseOver" Value="True">
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="{StaticResource State.Hover.Wash}"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+            <!-- A press is a response: 90 ms. Faster than hover on purpose:
+                 the finger has already pressed, and there is nothing to wait
+                 for from the instrument. -->
+            <Trigger Property="IsPressed" Value="True">
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Sunk"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="{StaticResource State.Press.Wash}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Sunk"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+            <!-- Focus by a border, not by a background highlight: a keyboard
+                 user has to see where they are without guessing whether this
+                 is selected or hovered.
+                 And only while the keyboard is what is being used: clicking
+                 a button focuses it too, so the ring appeared after a mouse
+                 click and meant nothing there. See `Styles.Navigation`. -->
+            <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding IsKeyboardFocused,
+                           RelativeSource={RelativeSource Self}}" Value="True" />
+                <Condition Binding="{Binding ByKeyboard,
+                           Source={x:Static ui:Navigation.Current}}"
+                           Value="True" />
+              </MultiDataTrigger.Conditions>
+              <Setter TargetName="Ring" Property="BorderBrush"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Ring" Property="BorderThickness" Value="2" />
+            </MultiDataTrigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    The hatching of the irreversible. The only sign of danger in the system,
+    and it occurs in exactly one place — which is why it always means one and
+    the same thing.
+
+    Danger is not marked by colour: colour wears out through repetition, and
+    where every unpleasantness is painted red, red stops meaning "careful".
+    There is no red in the palette at all.
+
+    The angle, the thickness, the pitch and the opacity come from
+    tokens.json.
+  -->
+  <DrawingBrush x:Key="Hatch" TileMode="Tile" Stretch="None"
+                Viewport="0,0,7,7" ViewportUnits="Absolute"
+                Opacity="0.2">
+    <DrawingBrush.Drawing>
+      <GeometryDrawing>
+        <GeometryDrawing.Pen>
+          <Pen Brush="{DynamicResource C.Hatch}" Thickness="2" />
+        </GeometryDrawing.Pen>
+        <GeometryDrawing.Geometry>
+          <LineGeometry StartPoint="0,7" EndPoint="7,0" />
+        </GeometryDrawing.Geometry>
+      </GeometryDrawing>
+    </DrawingBrush.Drawing>
+  </DrawingBrush>
+
+  <!--
+    The button of an irreversible action. It is neither filled with the
+    accent nor red: it is hatched. The second device is the gap around it,
+    twice the usual one; that works for someone who cannot make out the
+    pattern too.
+  -->
+  <Style x:Key="Btn.Danger" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="{StaticResource Hatch}" />
+    <Setter Property="Padding" Value="20,0" />
+  </Style>
+
+  <!--
+    Primary: one per screen. Filled with ink, not with the accent.
+
+    Its states are its own (4.0b-E03). The general highlight is the panel's
+    raised face, and laying that over ink left the button's text — the
+    panel's own colour — standing on the panel's own colour: a contrast of
+    1.1 where reading needs 4.5. On a dark finish, where the ink is light,
+    it read as black text on a button that went dark under the pointer,
+    which is how a person found it. Washed with the soft ink instead: the
+    face darkens or lightens with the finish and the text keeps 5.3 at the
+    worst of the three.
+  -->
+  <Style x:Key="Btn.Primary" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Face}" />
+    <Setter Property="ui:Ui.Warm" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="ui:Ui.Sunk" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
+  <!-- Window controls: marks, not words. That is the system's convention. -->
+  <!--
+    The window's own controls are part of the frame and do not float above
+    it. That is the rule that keeps "everything a person presses is raised"
+    from becoming "everything is raised", which is the same as nothing
+    being raised.
+  -->
+  <Style x:Key="Btn.Window" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="44" />
+    <Setter Property="Height" Value="{StaticResource Size.Row}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="12" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="WindowChrome.IsHitTestVisibleInChrome" Value="True" />
+  </Style>
+
+  <!--
+    A transport button: back, hold, on (4.0b-A07).
+
+    Quiet on purpose. Three of them stand together in a row, and three
+    ordinary buttons side by side read as a toolbar demanding a choice.
+    These answer a glance, not a decision.
+  -->
+  <Style x:Key="Btn.Quiet" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="34" />
+    <Setter Property="Height" Value="34" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+  </Style>
+
+  <!--
+    The cross inside a tag or a card.
+
+    Not a button with a word in it: the word «Убрать» repeated on six
+    tags is six copies of one word and none of the words a person came
+    to read. A cross is smaller than the thing it removes, which is the
+    right proportion for the destructive half of a label.
+
+    It is still a button and it still says what it does — the name and
+    the tooltip carry «Убрать „Рина“». A mark that works only for those
+    who already know the convention is decoration.
+  -->
+  <Style x:Key="Btn.Cross" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="22" />
+    <Setter Property="Height" Value="22" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="10" />
+    <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!--
+    A button in the corner: transparent until you come near it.
+
+    It carries an icon and no word. Nothing about it should draw the eye —
+    the home screen is the figure, and this is a thing one reaches for
+    occasionally and does not look for the rest of the time. The hover is
+    the whole of its presence.
+  -->
+  <Style x:Key="Btn.Corner" TargetType="Button" BasedOn="{StaticResource Btn}">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Width" Value="40" />
+    <Setter Property="Height" Value="40" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="FontSize" Value="16" />
+    <Setter Property="FontFamily" Value="Segoe MDL2 Assets" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="Opacity" Value="0.55" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="Opacity" Value="1" />
+        <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- A section in the column. The active mark is the only accent. -->
+  <Style x:Key="Nav.Item" TargetType="RadioButton">
+    <Setter Property="Height" Value="{StaticResource Size.Row}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="FontFamily" Value="{StaticResource Type.Nav.Family}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Nav.Size}" />
+    <Setter Property="FontWeight" Value="{StaticResource Type.Nav.Weight}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="RadioButton">
+          <Grid x:Name="Row" Background="Transparent">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="2" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <!-- The hover highlight as a separate layer: a shared brush's
+                 colour cannot be animated, it is frozen. -->
+            <Border x:Name="Warm" Grid.ColumnSpan="2" Opacity="0"
+                    Background="{DynamicResource C.FaceHigh}" />
+            <!--
+              The accent stroke, and it grows rather than appears
+              (`4.0b-E04`). It is the system's only mark of where one is
+              standing, and it used to be switched on by a setter: the one
+              thing on the screen that answers "where am I" arrived
+              without saying that anything had changed.
+
+              Held out of sight by the scale rather than by the colour: a
+              brush in a setter goes back instantly when the section
+              changes, and the stroke would vanish from the old row before
+              it had finished growing on the new one — a blink where there
+              should be a hand-off.
+            -->
+            <Rectangle x:Name="Mark" Grid.Column="0"
+                       Fill="{DynamicResource C.Signal}"
+                       RenderTransformOrigin="0.5,0.5">
+              <Rectangle.RenderTransform>
+                <ScaleTransform x:Name="MarkGrow" ScaleY="0" />
+              </Rectangle.RenderTransform>
+            </Rectangle>
+            <ContentPresenter Grid.Column="1" VerticalAlignment="Center"
+                              Margin="14,0,0,0" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="{StaticResource State.Hover.Wash}"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Warm"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+            <Trigger Property="IsChecked" Value="True">
+              <!--
+                No fill at all, and this is the second correction here.
+                First the open row was a solid plate, which with a fully
+                transparent column (4.0b-A06) was the only opaque thing left
+                in it. Then it was glass — and glass turned out not to work:
+                in `black` the flow's brighter stops are lighter than
+                `FACE_HIGH`, so the same fill came out lighter than the row
+                beneath it in one place and darker in another. No density
+                fixes that; it is which colour is on top of which, and the
+                flow decides that afresh every second.
+                A mark that works in two finishes out of three is not a
+                mark. What marks the open section is the accent stroke —
+                which the system has always said is its only marker — and
+                the ink going from soft to full. Both hold over any colour
+                the flow can reach.
+              -->
+              <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="MarkGrow"
+                                     Storyboard.TargetProperty="ScaleY"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="MarkGrow"
+                                     Storyboard.TargetProperty="ScaleY"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <ui:CaretGutter x:Key="CaretGutter" />
+
+  <!-- A field: sunk, without a border. The boundary is drawn by a step in value. -->
+  <Style x:Key="Field" TargetType="TextBox">
+    <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource C.Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <!-- The padding is not put on the border. A `TextBox`
+               applies its own `Padding` to the text inside the content
+               host, so passing it to the border as well applied it
+               twice: the hint stood at twelve and the first character
+               at twenty-six. Measured, not guessed: the check named
+               `check-fields` asks the geometry and says both numbers.
+               So the border holds only its own thickness, the text is
+               placed by the box's padding as it always was, and the
+               hint is given the same padding as a margin. One number,
+               two things that must agree. -->
+          <Border x:Name="Well" Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource Radius.Max}">
+            <Grid>
+              <!-- The hint sits under the content: it goes out as soon as
+                   text appears in the field, and never becomes a value. -->
+              <TextBlock x:Name="Hint" VerticalAlignment="Center"
+                         Margin="{Binding Padding,
+                                  RelativeSource={RelativeSource TemplatedParent},
+                                  Converter={StaticResource CaretGutter}}"
+                         IsHitTestVisible="False"
+                         Foreground="{DynamicResource C.InkFaint}"
+                         FontFamily="{StaticResource Font.Ui}"
+                         FontSize="{StaticResource Type.Value.Size}"
+                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding Path=(ui:Ui.Hint),
+                                RelativeSource={RelativeSource TemplatedParent}}"
+                         Visibility="Collapsed" />
+              <ScrollViewer x:Name="PART_ContentHost"
+                            VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <MultiDataTrigger>
+              <MultiDataTrigger.Conditions>
+                <Condition Binding="{Binding Text.Length,
+                           RelativeSource={RelativeSource Self}}" Value="0" />
+              </MultiDataTrigger.Conditions>
+              <Setter TargetName="Hint" Property="Visibility"
+                      Value="Visible" />
+            </MultiDataTrigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Well" Property="BorderBrush"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Well" Property="BorderThickness" Value="2" />
+              <!-- On the box, not on the border: the padding now moves
+                   the text and the hint together, and two pixels of
+                   border are paid for by two of padding so that
+                   nothing shifts when a person clicks in. -->
+              <Setter Property="Padding" Value="10,0" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    The dropdown.
+
+    It had no style of its own, and WPF drew its own: a white field with a
+    blue border in the middle of a black finish. This is exactly the case
+    ADR 0005 turned down somebody else's library for, in favour of our own
+    styles over the standard controls — and a reminder that "a standard
+    control" means "looks standard" until it is dressed.
+
+    An unavailable option goes dim but stays: a person has to see that such
+    an engine exists — otherwise they will go looking for it where we hid
+    it.
+  -->
+  <Style TargetType="ComboBoxItem">
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Padding" Value="12,8" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBoxItem">
+          <Border x:Name="Row" Background="{StaticResource Choice.Warm}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter />
+          </Border>
+          <ControlTemplate.Triggers>
+            <!--
+              The option under the cursor is highlighted by the same motion
+              as a list row: 160 ms. What used to stand here was an instant
+              colour change — the one place where a state was switched
+              rather than changed.
+
+              Each option has a brush of its own (`Row.Warm`,
+              `x:Shared="False"`): the shared one is frozen and cannot be
+              animated.
+            -->
+            <Trigger Property="IsHighlighted" Value="True">
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Row"
+                                     Storyboard.TargetProperty="Background.Opacity"
+                                     To="1"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetName="Row"
+                                     Storyboard.TargetProperty="Background.Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.State}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Foreground"
+                      Value="{DynamicResource C.InkFaint}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    The slider.
+
+    It is created where the core named **both** bounds: "volume from zero to
+    a hundred" is an invitation to drag rather than to type. The rule is
+    general rather than a list of keys: a setting that gains bounds will get
+    a slider by itself, and nobody will forget to write it in here.
+
+    The value is always shown alongside. A slider without a number answers
+    the question "roughly how much" and does not answer "exactly how much" —
+    and a person who needs to set eighty is doomed to push a mouse around.
+  -->
+  <Style x:Key="Slide" TargetType="Slider">
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="IsMoveToPointEnabled" Value="True" />
+    <!-- The accent fill below is drawn by `Slider` itself, and only when
+         it has been told there is a range to draw. Without these three
+         the template had a `PART_SelectionRange` of no width, and the
+         part already covered looked exactly like the part still to come
+         — which the template's own note says it must not. -->
+    <Setter Property="IsSelectionRangeEnabled" Value="True" />
+    <Setter Property="SelectionStart"
+            Value="{Binding Minimum, RelativeSource={RelativeSource Self}}" />
+    <Setter Property="SelectionEnd"
+            Value="{Binding Value, RelativeSource={RelativeSource Self}}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Slider">
+          <Grid VerticalAlignment="Center">
+            <!-- The track is sunk and what has been covered is in the accent:
+                 "how much already" and "how much in all" must differ without
+                 a caption. -->
+            <Border Height="4" CornerRadius="2" VerticalAlignment="Center"
+                    Background="{DynamicResource C.FaceSunk}" />
+            <Border x:Name="PART_SelectionRange" Height="4" CornerRadius="2"
+                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                    Background="{DynamicResource C.Signal}" />
+            <Track x:Name="PART_Track">
+              <Track.DecreaseRepeatButton>
+                <RepeatButton Command="Slider.DecreaseLarge"
+                              Opacity="0" Focusable="False" />
+              </Track.DecreaseRepeatButton>
+              <Track.IncreaseRepeatButton>
+                <RepeatButton Command="Slider.IncreaseLarge"
+                              Opacity="0" Focusable="False" />
+              </Track.IncreaseRepeatButton>
+              <Track.Thumb>
+                <Thumb Width="16" Height="16">
+                  <Thumb.Template>
+                    <ControlTemplate TargetType="Thumb">
+                      <Ellipse x:Name="Grip"
+                               Fill="{DynamicResource C.Ink}" />
+                      <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                          <Setter TargetName="Grip" Property="Fill"
+                                  Value="{DynamicResource C.Signal}" />
+                        </Trigger>
+                        <Trigger Property="IsDragging" Value="True">
+                          <Setter TargetName="Grip" Property="Fill"
+                                  Value="{DynamicResource C.Signal}" />
+                        </Trigger>
+                      </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                  </Thumb.Template>
+                </Thumb>
+              </Track.Thumb>
+            </Track>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="Choice" TargetType="ComboBox">
+    <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ComboBox">
+          <Grid>
+            <ToggleButton x:Name="Face" Focusable="False" ClickMode="Press"
+                          IsChecked="{Binding IsDropDownOpen, Mode=TwoWay,
+                                      RelativeSource={RelativeSource TemplatedParent}}">
+              <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                  <Border x:Name="Well"
+                          Background="{DynamicResource C.FaceSunk}"
+                          CornerRadius="{StaticResource Radius.Max}">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <ContentPresenter Grid.Column="0" Margin="12,0,0,0"
+                                        VerticalAlignment="Center" />
+                      <!-- The arrow is drawn, not typed as a character: a
+                           font may not contain it, and then the list would
+                           look broken on somebody else's machine. -->
+                      <Path Grid.Column="1" Margin="8,0,14,0"
+                            VerticalAlignment="Center"
+                            Data="M0,0 L8,0 L4,5 Z"
+                            Fill="{DynamicResource C.InkSoft}" />
+                    </Grid>
+                  </Border>
+                  <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter TargetName="Well" Property="Background"
+                              Value="{DynamicResource C.FaceLow}" />
+                    </Trigger>
+                  </ControlTemplate.Triggers>
+                </ControlTemplate>
+              </ToggleButton.Template>
+            </ToggleButton>
+
+            <ContentPresenter x:Name="Shown" IsHitTestVisible="False"
+                              Margin="12,0,34,0" VerticalAlignment="Center"
+                              Content="{TemplateBinding SelectionBoxItem}"
+                              ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                              TextElement.Foreground="{TemplateBinding Foreground}" />
+
+            <Popup x:Name="PART_Popup" AllowsTransparency="True"
+                   Placement="Bottom" Focusable="False"
+                   IsOpen="{TemplateBinding IsDropDownOpen}"
+                   PopupAnimation="Fade">
+              <!-- A raised surface, not a sunk one: the list lies over the
+                   panel. It is also the only surface on which a dimmed
+                   option is readable in both finishes (2.90 against the 3.0
+                   needed on a sunk one in "silver"). -->
+              <Border Background="{DynamicResource C.Glass.Popup}"
+                      BorderBrush="{DynamicResource C.Seam}"
+                      BorderThickness="1"
+                      CornerRadius="{StaticResource Radius.Tight}"
+                      MinWidth="{TemplateBinding ActualWidth}"
+                      MaxHeight="320" Margin="0,4,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                  <ItemsPresenter />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter TargetName="Shown" Property="Opacity" Value="0.5" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    The toggle. The on position is a mark in the accent: this is the
+    "selected" state from the table in §6, not a second meaning of the
+    accent.
+  -->
+  <Style x:Key="Toggle" TargetType="CheckBox">
+    <Setter Property="Cursor" Value="Hand" />
+    <!-- A label by a control is mandatory (direction), and its colour is
+         given by the system rather than by WPF's default: otherwise it ends
+         up the grey nobody chose. -->
+    <Setter Property="Foreground" Value="{DynamicResource C.InkSoft}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Body.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="CheckBox">
+          <StackPanel Orientation="Horizontal">
+            <!-- A toggle switch, not a pill. A radius of 11 made a phone
+                 button of it; instruments have tight corners, and the radius
+                 limit is 3 (DIRECTION §2). It is also more honest this way:
+                 this is a switch on a panel, not a soft icon in a list. -->
+            <Grid Width="40" Height="22" VerticalAlignment="Center">
+              <Border x:Name="Track"
+                      CornerRadius="{StaticResource Radius.Max}"
+                      Background="{DynamicResource C.FaceSunk}" />
+              <!-- The on position as a separate layer over the top: a shared
+                   brush's colour cannot be animated, it is frozen. -->
+              <Border x:Name="On" Opacity="0"
+                      CornerRadius="{StaticResource Radius.Max}"
+                      Background="{DynamicResource C.Signal}" />
+              <!--
+                The knob travels by a shift, not by a change of alignment:
+                alignment switches instantly, whereas a state in the system
+                changes over 160 ms (SYSTEM §7). A toggle whose knob
+                teleports reads as a picture rather than as a control.
+              -->
+              <Border x:Name="Knob" Width="14" Height="14"
+                      CornerRadius="{StaticResource Radius.Tight}"
+                      HorizontalAlignment="Left" Margin="4,0,0,0"
+                      Background="{DynamicResource C.InkFaint}">
+                <Border.RenderTransform>
+                  <TranslateTransform x:Name="Shift" X="0" />
+                </Border.RenderTransform>
+                <!-- The bright face of the knob, as a layer of its own and
+                     for the same reason as the track's: a shared brush is
+                     frozen and its colour cannot be animated. It used to
+                     be a setter, which meant the knob changed colour in
+                     the same instant it started moving — the two halves
+                     of one action happening at once, which reads as
+                     neither. -->
+                <Border x:Name="KnobOn" Opacity="0"
+                        CornerRadius="{StaticResource Radius.Tight}"
+                        Background="{DynamicResource C.FaceHigh}" />
+              </Border>
+            </Grid>
+            <ContentPresenter Margin="10,0,0,0" VerticalAlignment="Center" />
+          </StackPanel>
+          <ControlTemplate.Triggers>
+            <!--
+              **Two stages inside one state change** (`4.0b-E04`). The
+              knob sets off, and the circuit closes behind it: the track
+              lights and the knob's face brightens a fraction later, over
+              a shorter span, so both finish together at the system's 160
+              ms. Before this all three ran on the same clock with the
+              same curve, which is one flat change wearing three
+              costumes — the switch said "now it is on" and nothing about
+              the act of switching.
+
+              Two presses, one after the other, rather than a new
+              duration: the throw is `press`, and the circuit closes over
+              another `press` once the knob has landed. A switch whose
+              contact is made before the lever arrives is a switch drawn
+              by somebody who has not held one.
+            -->
+            <Trigger Property="IsChecked" Value="True">
+              <Trigger.EnterActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <!-- 40 track width − 14 knob − 4 gap on the left
+                         − 4 on the right = 18 points of travel. -->
+                    <DoubleAnimation Storyboard.TargetName="Shift"
+                                     Storyboard.TargetProperty="X"
+                                     To="18"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                    <DoubleAnimation Storyboard.TargetName="On"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                    <DoubleAnimation Storyboard.TargetName="KnobOn"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="1"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.In}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.EnterActions>
+              <Trigger.ExitActions>
+                <BeginStoryboard>
+                  <Storyboard>
+                    <!-- Going back, the circuit opens first and the knob
+                         follows: an order reversed, not repeated. A
+                         switch that turns off the same way it turned on
+                         is a picture of a switch. -->
+                    <DoubleAnimation Storyboard.TargetName="On"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <DoubleAnimation Storyboard.TargetName="KnobOn"
+                                     Storyboard.TargetProperty="Opacity"
+                                     To="0"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                    <DoubleAnimation Storyboard.TargetName="Shift"
+                                     Storyboard.TargetProperty="X"
+                                     To="0"
+                                     BeginTime="{StaticResource Beat.Press}"
+                                     Duration="{StaticResource Motion.Press}"
+                                     EasingFunction="{StaticResource Ease.Out}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </Trigger.ExitActions>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    The glass field: the instrument's only glowing surface.
+
+    Nearly opaque, and the "nearly" is a measured number rather than a
+    taste. The flow shows through it faintly — it was the one place in the
+    window where the background stopped dead — but text lies on this field,
+    and what that text is read against is glass **composited over the
+    flow**, not the glass alone. `check_contrast.py` works that composite
+    out for every stop of every palette; at nine tenths the dim text on
+    silver falls to 4.20, so the ninety-five hundredths here is where
+    readability runs out, not where the effect stopped pleasing.
+  -->
+  <Style x:Key="Glass" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Field}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="16" />
+  </Style>
+
+  <!--
+    The scrollbar. Our own, because the stock one brings Windows' palette
+    onto a panel that has its own — and in the black finish a light grey bar
+    is seen first, before the contents.
+
+    Without arrows: they belong to another era and take up room while adding
+    nothing. The thumb is a step in value, like all elevation in the system.
+  -->
+  <Style x:Key="ScrollThumb" TargetType="Thumb">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Thumb">
+          <Border x:Name="Bar" Background="{DynamicResource C.InkFaint}"
+                  CornerRadius="{StaticResource Radius.Max}" Opacity="0.5" />
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Bar" Property="Opacity" Value="0.8" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="ScrollBar">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ScrollBar">
+          <Track x:Name="PART_Track" IsDirectionReversed="True">
+            <Track.Thumb>
+              <Thumb Style="{StaticResource ScrollThumb}" />
+            </Track.Thumb>
+            <!-- The page buttons are obliged to exist, but there is no need
+                 for them to be visible: the bar is the control. -->
+            <Track.IncreaseRepeatButton>
+              <RepeatButton Command="ScrollBar.PageDownCommand"
+                            Opacity="0" Focusable="False" />
+            </Track.IncreaseRepeatButton>
+            <Track.DecreaseRepeatButton>
+              <RepeatButton Command="ScrollBar.PageUpCommand"
+                            Opacity="0" Focusable="False" />
+            </Track.DecreaseRepeatButton>
+          </Track>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    A list block: one raised step for the whole list.
+
+    Not a stack of cards: "a window is a front panel, not a set of cards on a
+    background" (DIRECTION §3). The rows of a list are parts of one object,
+    and a gap between them would turn them into five objects.
+  -->
+  <Style x:Key="Rows" TargetType="Border">
+    <!--
+      Glass, like everything else raised over the flow (4.0b-A06). A list
+      was the last opaque plate left in the window: rows of plugins and
+      commands sat on a solid rectangle while the frame around them had
+      already become one system with the background.
+    -->
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Raised}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="0" />
+    <Setter Property="Effect">
+      <Setter.Value>
+        <DropShadowEffect BlurRadius="{StaticResource Lift.Raised.Blur}"
+                          ShadowDepth="{StaticResource Lift.Raised.Y}"
+                          Opacity="{StaticResource Lift.Raised.Opacity}"
+                          Direction="270" Color="Black" />
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
+    A row inside a block. Separated from its neighbour by a hairline seam —
+    the same device as the areas of the panel, and never by a shadow.
+  -->
+  <Style x:Key="Rows.Item" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Row.Warm}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />
+    <Setter Property="BorderThickness" Value="0,0,0,1" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="MinHeight" Value="{StaticResource Size.Row}" />
+    <Style.Triggers>
+      <!--
+        Hovering over a row is the same change of state as a button's: 160
+        ms. A list row is not a control, but it **responds**, and the
+        response shows what the buttons on the right belong to. Without a
+        response a person aims at a button without understanding which row it
+        belongs to.
+      -->
+      <Trigger Property="IsMouseOver" Value="True">
+        <Trigger.EnterActions>
+          <BeginStoryboard>
+            <Storyboard>
+              <DoubleAnimation Storyboard.TargetProperty="Background.Opacity"
+                               To="1"
+                               Duration="{StaticResource Motion.State}"
+                               EasingFunction="{StaticResource Ease.In}" />
+            </Storyboard>
+          </BeginStoryboard>
+        </Trigger.EnterActions>
+        <Trigger.ExitActions>
+          <BeginStoryboard>
+            <Storyboard>
+              <DoubleAnimation Storyboard.TargetProperty="Background.Opacity"
+                               To="0"
+                               Duration="{StaticResource Motion.State}"
+                               EasingFunction="{StaticResource Ease.Out}" />
+            </Storyboard>
+          </BeginStoryboard>
+        </Trigger.ExitActions>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- A card: raised by a step in value, without a border and without a shadow. -->
+  <!--
+    A beta mark: a capability that may still change under a person.
+
+    Beside the control itself, not in a release note. The promise is not
+    the disclaimer but the warning — this may behave differently in a
+    month, so do not build your work on it yet — and a person reads that
+    where they press, or not at all.
+
+    It is deliberately quiet: hatching is spoken for (it means irreversible
+    and nothing else, DIRECTION §5), and a loud mark on a capability that
+    works perfectly well would read as a fault. An outline, small type, and
+    the word.
+  -->
+  <Style x:Key="Chip.Beta" TargetType="Border">
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="BorderBrush" Value="{DynamicResource C.InkFaint}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="6,1" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+  </Style>
+
+  <!--
+    The menu that picks a kind of node (4.0b-A09).
+
+    Without a style of its own it came out in the system's colours: a white
+    panel with blue highlights in the middle of a dark window. It is the
+    only menu in the program, which is exactly why it had been missed — one
+    of a thing gets looked at once and then never again.
+
+    Dressed as the dropdown of a choice, because that is what it is: a list
+    one picks from. The same glass, the same seam, the same warmth under the
+    item the cursor is on.
+  -->
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Popup}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource C.Seam}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="4" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="13" />
+    <Setter Property="HasDropShadow" Value="False" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ContextMenu">
+          <Border Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}"
+                  BorderThickness="{TemplateBinding BorderThickness}"
+                  CornerRadius="{StaticResource Radius.Max}"
+                  Padding="{TemplateBinding Padding}">
+            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle" />
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style TargetType="MenuItem">
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="Padding" Value="10,6" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="MenuItem">
+          <Border x:Name="Well" Background="Transparent"
+                  CornerRadius="{StaticResource Radius.Tight}"
+                  Padding="{TemplateBinding Padding}">
+            <ContentPresenter ContentSource="Header"
+                              VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Well" Property="Background"
+                      Value="{DynamicResource C.Glass.Raised}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+              <Setter Property="Opacity" Value="0.45" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <Style x:Key="Card" TargetType="Border">
+    <Setter Property="Background" Value="{DynamicResource C.Glass.Raised}" />
+    <Setter Property="CornerRadius" Value="{StaticResource Radius.Max}" />
+    <Setter Property="Padding" Value="16,12" />
+    <Setter Property="MinHeight" Value="56" />
+  </Style>
+</ResourceDictionary>

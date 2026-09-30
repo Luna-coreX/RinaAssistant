@@ -1,23 +1,23 @@
 """
-Пользовательские команды.
+The user's commands.
 
-Пользователь создаёт команды через конструктор на вкладке «Команды».
-Каждая команда — словарь:
+A user creates commands through the editor on the "Commands" tab. Every
+command is a dict:
 
     {
         "id": "cmd_ab12",
         "enabled": True,
         "type": "app" | "folder" | "website" | "speak" | "system" | "sequence",
-        "triggers": ["запусти дискорд", "открой discord"],  # фразы активации
-        "match": "contains" | "exact",                       # режим совпадения
-        "target": "...",   # путь / url / текст / имя действия (зависит от типа)
-        "response": "Хорошо, запускаю Discord",              # что ответить (опц.)
-        "steps": [ {подкоманды} ],                           # только для sequence
+        "triggers": ["запусти дискорд", "открой discord"],  # activation phrases
+        "match": "contains" | "exact",                       # the match mode
+        "target": "...",   # a path / url / text / action name (depends on the type)
+        "response": "Хорошо, запускаю Discord",              # what to answer (optional)
+        "steps": [ {subcommands} ],                          # for sequence only
     }
 
-Хранятся в общем конфиге (settings["custom_commands"]).
-Выполнение кроссплатформенное: приложения/папки/сайты открываются штатными
-средствами ОС.
+They are kept in the shared config (settings["custom_commands"]).
+Execution is cross-platform: applications/folders/sites are opened by the
+OS's standard means.
 """
 
 import os
@@ -27,6 +27,11 @@ import shutil
 import subprocess
 import webbrowser
 
+from core.logging_setup import get_logger
+
+
+log = get_logger("commands")
+
 
 COMMAND_TYPES = [
     ("app",      "Программа",        "🖥️"),
@@ -35,10 +40,104 @@ COMMAND_TYPES = [
     ("speak",    "Озвучить текст",   "🔊"),
     ("system",   "Системное действие", "⚙️"),
     ("sequence", "Последовательность", "🔗"),
+    # --- what a sequence is built out of (`4.0b-A09`) ------------------
+    #
+    # `pause` has been executable since 2.0.0 and was **never offered**:
+    # the editor filled its list of kinds from the table above, and the
+    # table did not have it. A capability nobody can reach is not a
+    # capability; found by asking why a person could not put a wait
+    # between "launch" and "maximise".
+    ("pause",    "Подождать",        "⏳"),
+    # Repetition and choice. These are control flow over **calls of
+    # declared tools**, not a way to run something arbitrary: a step
+    # inside them is an ordinary step and goes the same path with the
+    # same gates. That is the line the plan draws, and it is not crossed
+    # by letting a person say "three times" or "only in the evening".
+    ("repeat",   "Повторить",        "🔁"),
+    ("while",    "Повторять пока",   "🔄"),
+    ("if",       "Если",             "🔀"),
+    ("stop",     "Остановить сценарий", "⏹"),
+    ("call",     "Вызвать команду",  "📎"),
+    ("set",      "Запомнить значение", "🏷"),
 ]
 
-# Действия над окном самой Рины выполняет главное окно (host),
-# действия с префиксом sys_ — voice/system_control (громкость, медиа, ПК).
+#: What a condition can ask about.
+#:
+#: Deliberately short, and every one of them answerable **locally and
+#: instantly**. A condition that has to go and look at something takes as
+#: long as the thing it looks at, and a command that hangs on an unreachable
+#: network share is worse than one that cannot ask about it at all.
+CONDITIONS = [
+    ("after",       "Сейчас позже, чем"),
+    ("before",      "Сейчас раньше, чем"),
+    ("weekday",     "Сегодня будний день"),
+    ("weekend",     "Сегодня выходной"),
+    ("date_is",     "Сегодня число"),
+    ("exists",      "Файл или папка есть"),
+    ("missing",     "Файла или папки нет"),
+    # --- what is going on outside the command -------------------------
+    #
+    # These ask the machine, and the machine is the shell's (ADR 0009):
+    # the core asks and is answered. Nothing is remembered — the answer is
+    # used for the branch and dropped, the same rule as `4.0b-A03` and for
+    # the same reason (`T-19`).
+    ("app_active",  "Сейчас открыта программа"),
+    ("app_running", "Программа запущена"),
+    ("ollama",      "Ollama на связи"),
+    # A variable set earlier in this same run.
+    ("var_is",      "Значение равно"),
+    ("var_set",     "Значение задано"),
+]
+
+#: Kinds that are steps of a sequence and not commands in their own right.
+#:
+#: A command of type "wait" would be a command that does nothing on purpose;
+#: a command that is only a repeat or only a condition says nothing about
+#: what it repeats or chooses between. All three are meaningful **inside** a
+#: sequence and empty outside one.
+#:
+#: The core says this rather than the shell, because it is a statement about
+#: what these things mean, not about how to show them (ADR 0006). A shell
+#: deciding it for itself would be a second place where it is decided.
+STEP_ONLY = frozenset({"pause", "repeat", "while", "if", "stop", "call",
+                       "set"})
+
+#: How many times a repeat may run, and how deep control flow may nest.
+#:
+#: Both are limits against a slip rather than against an attacker: "repeat
+#: 1000 times" is almost always a typo, and a person who meant it can say
+#: so twice. The nesting limit is what stops a card from being able to
+#: describe an unbounded amount of work.
+MAX_REPEAT = 50
+MAX_DEPTH = 5
+
+#: How many rounds "repeat while" may take before it is stopped.
+#:
+#: A condition that never stops holding is not a mistake anybody notices
+#: while writing it — "while the file is missing" is perfectly sensible and
+#: perfectly endless if the file never appears. The cap is what keeps a
+#: scenario a scenario rather than a way to occupy the machine forever.
+MAX_WHILE = 200
+
+#: How long a variable's name and value may be. They are written by the
+#: person, kept for the length of one run, and never stored.
+MAX_NAME = 64
+MAX_VALUE = 1000
+
+
+class ScenarioStopped(Exception):
+    """
+    A step asked for the whole scenario to stop.
+
+    An exception rather than a return value, because stopping has to unwind
+    through the repeats and branches it happens to be inside. Threading a
+    "and now stop" flag back out through every one of them would mean every
+    caller remembering to look at it, and the one that forgot would keep
+    going after the person said to stop.
+    """
+
+# Actions on Rina's own window are performed by the main window (host);
+# actions with the sys_ prefix by voice/system_control (volume, media, PC).
 SYSTEM_ACTIONS = [
     ("minimize",             "Свернуть окно Рины"),
     ("show",                 "Показать окно Рины"),
@@ -58,8 +157,8 @@ SYSTEM_ACTIONS = [
     ("sys_shutdown",         "Выключить компьютер"),
 ]
 
-# Действия, которые нельзя выполнять без подтверждения: ошибка распознавания
-# или случайно совпавшая фраза не должна выключать компьютер.
+# Actions that must not be performed without confirmation: a recognition
+# error or an accidentally matching phrase must not shut the computer down.
 DESTRUCTIVE_ACTIONS = {"sys_shutdown", "sys_restart", "sys_sleep", "quit"}
 
 
@@ -71,7 +170,7 @@ def action_label(action_id):
 
 
 def command_needs_confirm(command):
-    """Есть ли в команде (или её шагах) необратимое действие."""
+    """Is there an irreversible action in the command (or in its steps)."""
     if command.get("type") == "system":
         return command.get("target") in DESTRUCTIVE_ACTIONS
     if command.get("type") == "sequence":
@@ -95,7 +194,7 @@ def make_command(cmd_type="app", triggers=None, target="", response="",
         "triggers": triggers or [],
         "match": match,
         "target": target,
-        # чем является target: файл/путь или идентификатор приложения Магазина
+        # what the target is: a file/path or a Store application's identifier
         "target_kind": target_kind,
         "response": response,
         "steps": steps or [],
@@ -117,7 +216,7 @@ def type_icon(cmd_type):
 
 
 # ---------------------------------------------------------------------------
-# Хранилище
+# The store
 # ---------------------------------------------------------------------------
 class UserCommandStore:
     def __init__(self, settings):
@@ -127,8 +226,45 @@ class UserCommandStore:
         return list(self._settings.get("custom_commands", []) or [])
 
     def save_all(self, commands):
-        self._settings.set("custom_commands", commands)
-        self._settings.save()
+        """
+        Write the list as a whole.
+
+        Under a transaction, like everything else here: the neighbouring
+        methods open one and this one did not. The lock is reentrant, so a
+        nested call from inside somebody else's transaction works as
+        before.
+
+        **This alone is not enough, and it is worth saying why.** The lock
+        makes the write indivisible but not the read-modify-write: two
+        threads that read the same list will each append their own, and the
+        second will overwrite the first entirely. That is what `merge` is
+        for.
+        """
+        with self._settings.transaction():
+            self._settings.set("custom_commands", commands)
+            self._settings.save()
+
+    def merge(self, incoming, new_id):
+        """
+        Add the incoming commands to our own. Returns (added, skipped).
+
+        Reading, merging and writing under one transaction. Apart they lose
+        somebody else's edit entirely: an import from a file and an answer
+        from Rina run on different threads, both read the list, both append
+        their own, and whoever got there second is the one who saves.
+
+        The merging lives here rather than in the caller for exactly that
+        reason: a transaction's boundaries must coincide with the
+        boundaries of read-modify-write, and the caller is not obliged to
+        remember it.
+        """
+        from core.data_transfer import merge_commands
+
+        with self._settings.transaction():
+            merged, added, skipped = merge_commands(
+                self.all(), incoming, new_id)
+            self.save_all(merged)
+        return added, skipped
 
     def add(self, command):
         with self._settings.transaction():
@@ -158,7 +294,7 @@ class UserCommandStore:
                     c["enabled"] = bool(enabled)
             self.save_all(cmds)
 
-    # статистика запусков
+    # launch statistics
     def bump_stat(self, command_id):
         with self._settings.transaction():
             stats = dict(self._settings.get("command_stats", {}) or {})
@@ -171,16 +307,16 @@ class UserCommandStore:
 
 
 # ---------------------------------------------------------------------------
-# Сопоставление и выполнение
+# Matching and execution
 # ---------------------------------------------------------------------------
 def matches(command, text):
     """
-    Подходит ли команда под распознанный текст.
+    Does the command suit the recognised text.
 
-    Сравнение нечёткое: распознавание речи путает окончания и буквы
-    («зопусти дискорт»), а точное вхождение подстроки такие варианты теряет.
-    Режим «Точное совпадение» тоже допускает погрешность распознавания,
-    но требует совпадения фразы целиком, а не её вхождения.
+    The comparison is fuzzy: speech recognition muddles endings and letters
+    ("зопусти дискорт"), and an exact substring match loses such variants.
+    The "Exact match" mode also allows for a recognition error, but requires
+    the whole phrase to match rather than to be contained.
     """
     if not command.get("enabled", True):
         return False
@@ -203,12 +339,12 @@ def matches(command, text):
 
 def missing_path(target) -> bool:
     """
-    Цель выглядит путём, но такого пути нет.
+    The target looks like a path, but there is no such path.
 
-    Команда живёт дольше программы: путь мог остаться от удалённого или
-    перемещённого приложения. Короткое имя («discord») путём не считаем —
-    его разрешает сама ОС по реестру App Paths, и это допустимый способ
-    задать команду.
+    A command outlives a program: the path may be left over from a deleted
+    or moved application. A short name ("discord") is not counted as a path
+    — the OS itself resolves it through the App Paths registry, and that is
+    a permissible way of setting a command.
     """
     target = str(target or "")
     if not target:
@@ -219,7 +355,7 @@ def missing_path(target) -> bool:
 
 
 def _open_path(path):
-    """Открыть файл/папку/приложение штатно для ОС."""
+    """Open a file/folder/application in the OS's standard way."""
     if not path:
         return False
     if missing_path(path):
@@ -230,7 +366,7 @@ def _open_path(path):
         elif sys.platform == "darwin":
             subprocess.Popen(["open", path])
         else:
-            # если это исполняемый в PATH — запустим, иначе xdg-open
+            # if this is an executable in PATH — we launch it, otherwise xdg-open
             if shutil.which(path):
                 subprocess.Popen([path])
             else:
@@ -240,11 +376,285 @@ def _open_path(path):
         return False
 
 
-def execute(command, host=None, emit=None):
+def _fresh_state(lookup=None, machine=None, trace=False):
     """
-    Выполняет команду. host — объект с методами для системных действий
-    (minimize/show/quit/mute/unmute) и say(text). Возвращает (ok, response_text).
+    What a scenario carries with it for the length of one run.
+
+    Variables live here and nowhere else. They are **not** stored: a value a
+    person set in the middle of a scenario is working notes, and keeping it
+    on disk would turn "remember 5" into a new kind of personal data with a
+    page, a lifetime and a way to forget it. When the run ends, it is gone.
+
+    `seen` is the guard against a command that calls itself, directly or
+    round a ring. `lookup` finds another command by its number; `machine`
+    answers the questions that are about the computer rather than about the
+    card, and both are handed in because neither belongs to this module.
     """
+    return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine,
+            # Where in the tree we are, as a prefix: "2.steps." while
+            # inside the third node's body.
+            "at": "",
+            # Whether anybody is watching the run step by step. A trial
+            # from the editor asks for it; a command fired by voice has
+            # nobody looking at a canvas.
+            "trace": trace}
+
+
+def _say_step(emit, state, where, doing):
+    """
+    Tell whoever is watching which step is running.
+
+    Only while somebody is watching. A trial from the editor asks for it; a
+    scenario fired by voice has nobody looking at a canvas, and filling the
+    event channel with steps nobody reads would be paying for a picture
+    that is not on a screen.
+    """
+    if emit is None or not (state or {}).get("trace"):
+        return
+    try:
+        emit("command.step", path=where, state=doing)
+    except Exception:
+        # A scenario must not fall over because a picture could not be
+        # drawn. The steps keep running; the canvas simply stops moving.
+        log.exception("Не удалось сообщить о шаге сценария")
+
+
+def _in_branch(command, branch, host, emit, depth, state):
+    """
+    Run one branch of a node, remembering where in the tree it is.
+
+    The prefix is put back afterwards rather than left: the node's own
+    siblings come next, and a path that kept growing would report the step
+    after a repeat as though it were inside it.
+    """
+    was = (state or {}).get("at", "")
+    if state is not None:
+        state["at"] = was + branch + "."
+    try:
+        return _run_steps(command.get(branch) or [], host, emit, depth, state)
+    finally:
+        if state is not None:
+            state["at"] = was
+
+
+def _run_steps(steps, host, emit, depth, state):
+    """
+    Perform a list of steps in order, one level deeper.
+
+    The depth is carried rather than counted globally: two sequences side by
+    side are not nesting, and a limit that thought they were would refuse
+    perfectly ordinary commands. Past the limit the steps are simply not
+    run — a card that describes an unbounded amount of work does not get to
+    do an unbounded amount of work.
+    """
+    if depth >= MAX_DEPTH:
+        log.warning("Слишком глубокая вложенность шагов, дальше не идём")
+        return False
+    ok = True
+    for at, step in enumerate(steps or []):
+        # The path is where the step stands, written out: "2.steps.0" is
+        # the first step inside the third node. Built from the indices
+        # rather than from an identifier on the step — a step has none, and
+        # giving it one would put a field in the core's card for the sake
+        # of a picture in a window.
+        where = f"{(state or {}).get('at', '')}{at}"
+        _say_step(emit, state, where, "running")
+
+        was = (state or {}).get("at", "")
+        if state is not None:
+            state["at"] = where + "."
+        try:
+            step_ok, _ = execute(step, host, emit, depth + 1, state)
+        finally:
+            if state is not None:
+                state["at"] = was
+
+        _say_step(emit, state, where, "done" if step_ok else "failed")
+        ok = ok and step_ok
+    return ok
+
+
+def _call_command(command, host, emit, depth, state):
+    """
+    Run another command of the person's own, by its number.
+
+    **A command may not call itself, directly or round a ring.**
+
+    The depth limit already bounds this — depth is carried down through a
+    call, so a ring runs out of depth like anything else. Said exactly,
+    because the first version of this comment claimed the opposite ("two
+    commands calling each other stay at depth one apiece"), and the check
+    written from it passed with the guard below removed: it was watching
+    the depth limit work and crediting the guard.
+
+    The guard is still here and still worth having. It stops a ring **at
+    the first repeat** instead of five levels down, which is the difference
+    between one refused call and five performed ones on the way; and it
+    says so in the log, where "too deep" would have sent somebody looking
+    for deep nesting they never wrote.
+    """
+    lookup = state.get("lookup")
+    wanted = str(command.get("target", ""))
+    if lookup is None or not wanted:
+        return False
+
+    if wanted in state["seen"]:
+        log.warning("Команда %s уже выполняется — по кругу не пойдём", wanted)
+        return False
+
+    other = None
+    try:
+        other = lookup(wanted)
+    except Exception:
+        log.exception("Не удалось найти команду %s", wanted)
+    if not other:
+        return False
+
+    state["seen"].add(wanted)
+    try:
+        ok, _ = execute(other, host, emit, depth + 1, state)
+        return ok
+    finally:
+        # Removed on the way out: calling the same command twice **in
+        # sequence** is perfectly ordinary, and only calling it while it is
+        # already running is a ring.
+        state["seen"].discard(wanted)
+
+
+def _ask_machine(state, question, about=""):
+    """
+    A question about the computer, asked of whoever has one.
+
+    The core has no system calls of its own (ADR 0009). Without a shell the
+    answer is empty rather than a guess: a condition that cannot be
+    established is false, and a command that branched on a guess would do
+    the wrong half of itself in silence.
+    """
+    ask = (state or {}).get("machine")
+    if ask is None:
+        return ""
+    try:
+        return ask(question, about) or ""
+    except Exception:
+        log.exception("Не удалось спросить у оболочки: %s", question)
+        return ""
+
+
+def _condition_holds(kind, value, name="", state=None):
+    """
+    Whether a condition is met, answered here and now.
+
+    Two kinds of question live here. Ones about the card and the clock are
+    answered outright. Ones about the machine — which program is in front,
+    whether something is running — are asked of the shell and the answer is
+    **dropped**: it decides a branch and is not kept, the same rule as
+    `4.0b-A03` and for the same reason (`T-19`). Knowing what somebody has
+    open is information of the same kind as the words they said.
+
+    Everything is answered quickly or not at all. A condition that has to go
+    and look at something slow takes as long as the thing it looks at, and a
+    command hanging on an unreachable share is worse than one that cannot
+    ask about it.
+    """
+    import datetime
+
+    now = datetime.datetime.now()
+    text = str(value or "")
+
+    if kind in ("after", "before"):
+        try:
+            hour, _, minute = text.partition(":")
+            when = now.replace(hour=int(hour), minute=int(minute or 0),
+                               second=0, microsecond=0)
+        except (TypeError, ValueError):
+            # An unreadable time is not a reason to guess. "Later than
+            # nonsense" is false, and the branch simply does not run.
+            return False
+        return now >= when if kind == "after" else now < when
+    if kind == "weekday":
+        return now.weekday() < 5
+    if kind == "weekend":
+        return now.weekday() >= 5
+    if kind == "date_is":
+        # "The 1st" — the day of the month, for things done monthly.
+        try:
+            return now.day == int(text)
+        except (TypeError, ValueError):
+            return False
+    if kind in ("exists", "missing"):
+        there = bool(text) and os.path.exists(text)
+        return there if kind == "exists" else not there
+
+    if kind == "app_active":
+        front = _ask_machine(state, "foreground")
+        return bool(text) and text.lower() in str(front).lower()
+    if kind == "app_running":
+        return bool(text) and bool(_ask_machine(state, "running", text))
+    if kind == "ollama":
+        from core import llm
+
+        try:
+            return bool(llm.status()[0])
+        except Exception:
+            return False
+
+    if kind == "var_is":
+        return str((state or {}).get("vars", {}).get(name, "")) == text
+    if kind == "var_set":
+        return bool(str((state or {}).get("vars", {}).get(name, "")))
+
+    # An unknown condition — from a newer version's file, or a typo — is
+    # false. Said exactly, because "false" is not the same as "nothing
+    # happens": the "otherwise" branch is what a person wrote for the case
+    # when the condition does not hold, and running it is the least
+    # surprising reading. What must not happen is the *then* branch running
+    # on a condition nobody could evaluate.
+    return False
+
+
+def execute(command, host=None, emit=None, depth=0, state=None,
+            lookup=None, machine=None, trace=False):
+    """
+    Performs a command. host is an object with methods for system actions
+    (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
+    response_text).
+
+    `state` carries what one run of a scenario needs — its variables, which
+    commands it is already inside, and the two things it can ask of the
+    outside. It is made here when there is none, so an ordinary call needs
+    to know nothing about any of it.
+    """
+    from core.i18n import t as tr
+
+    outermost = state is None
+    if outermost:
+        state = _fresh_state(lookup, machine, trace)
+
+    # The stop signal is caught **here**, at the outermost call, and
+    # nowhere else. Caught deeper it would stop a branch rather than the
+    # scenario, which is not what "stop the scenario" says.
+    if outermost:
+        # The command itself is a step too, and says so.
+        #
+        # Without this a command of one action reports nothing at all: it
+        # never reaches `_run_steps`, because there is no list of steps to
+        # run. The canvas would then show a trial of such a command as
+        # nothing happening, which is the one thing a trial must not look
+        # like.
+        _say_step(emit, state, "", "running")
+        try:
+            done = _perform(command, host, emit, depth, state)
+            _say_step(emit, state, "", "done" if done[0] else "failed")
+            return done
+        except ScenarioStopped:
+            log.info("Сценарий остановлен шагом «остановить»")
+            _say_step(emit, state, "", "done")
+            return True, command.get("response", "") or _default_response(
+                command, True)
+    return _perform(command, host, emit, depth, state)
+
+
+def _perform(command, host, emit, depth, state):
     from core.i18n import t as tr
 
     ctype = command.get("type")
@@ -253,13 +663,13 @@ def execute(command, host=None, emit=None):
 
     ok = True
     if ctype == "app" and command.get("target_kind") == "uwp":
-        # приложение Магазина: запускается по идентификатору, а не по пути
+        # a Store application: launched by identifier, not by path
         from voice import app_index
         ok = app_index.launch(
             app_index.AppEntry(target, target, "uwp", "learned"))
     elif ctype == "app" or ctype == "folder":
         if missing_path(target):
-            # называем причину: «не получилось» не подсказывает, что делать
+            # we name the reason: "it did not work" does not suggest what to do
             ok = False
             response = response or tr(
                 "Не нашла «{target}» — программу удалили или перенесли.",
@@ -275,15 +685,15 @@ def execute(command, host=None, emit=None):
         except Exception:
             ok = False
     elif ctype == "speak":
-        # для «озвучить текст» ответом является сам текст (target),
-        # если отдельный response не задан
+        # for "say the text out loud" the answer is the text itself (target),
+        # if no separate response is set
         if not response:
             response = target
     elif ctype == "system":
         ok = _run_system_action(target, host, emit)
     elif ctype == "pause":
-        # пауза между шагами: дать программе время запуститься.
-        # Ограничиваем сверху, чтобы опечатка не подвесила выполнение надолго.
+        # a pause between steps: to give the program time to start.
+        # We limit it from above, so a typo does not hang execution for long.
         import time
         try:
             seconds = max(0.0, min(float(str(target).replace(",", ".")), 60.0))
@@ -292,31 +702,92 @@ def execute(command, host=None, emit=None):
         time.sleep(seconds)
         ok = True
     elif ctype == "sequence":
+        ok = _in_branch(command, "steps", host, emit, depth, state)
+    elif ctype == "stop":
+        # Nothing after this runs, at any depth. See `ScenarioStopped`.
+        raise ScenarioStopped()
+    elif ctype == "set":
+        # Working notes for the length of the run. Trimmed, because a
+        # name or a value of any size at all would be a way to fill memory
+        # from a card.
+        # The name in `name`, what to remember in `value` — the same two
+        # fields the conditions about a variable read. `target` is taken as
+        # a fallback so a card written before this settled still works.
+        name = str(command.get("name", ""))[:MAX_NAME].strip()
+        what = command.get("value") or target
+        if name:
+            state["vars"][name] = str(what)[:MAX_VALUE]
+        ok = bool(name)
+    elif ctype == "call":
+        ok = _call_command(command, host, emit, depth, state)
+    elif ctype == "while":
+        # A condition that never stops holding is not a mistake anybody
+        # notices while writing it: "while the file is missing" is
+        # sensible and endless if the file never appears.
         ok = True
-        for step in command.get("steps", []):
-            step_ok, _ = execute(step, host, emit)
-            ok = ok and step_ok
+        rounds = 0
+        # `value`, not `target`: a condition's operand lives in `value`
+        # for `if` and must live in the same place here. It read `target`
+        # at first — always empty on a `while` — so the loop never began
+        # and both its checks reported zero rounds.
+        while _condition_holds(command.get("condition", ""),
+                               command.get("value", ""),
+                               command.get("name", ""), state):
+            if rounds >= MAX_WHILE:
+                log.warning("«Повторять пока» дошло до предела в %d кругов",
+                            MAX_WHILE)
+                ok = False
+                break
+            rounds += 1
+            if not _in_branch(command, "steps", host, emit, depth, state):
+                ok = False
+                break
+    elif ctype == "repeat":
+        # "Three times" rather than three copies of the same step. The count
+        # is capped: "repeat 1000 times" is almost always a slip, and a
+        # person who meant it can say it twice.
+        try:
+            times = int(command.get("count", 1) or 1)
+        except (TypeError, ValueError):
+            times = 1
+        times = max(0, min(times, MAX_REPEAT))
+        ok = True
+        for _ in range(times):
+            if not _in_branch(command, "steps", host, emit, depth, state):
+                # A repeat stops at the first failure rather than trying
+                # again four more times. Whatever went wrong is unlikely to
+                # go right on its own, and repeating a failing action is the
+                # one thing nobody wants a computer to be enthusiastic about.
+                ok = False
+                break
+    elif ctype == "if":
+        met = _condition_holds(command.get("condition", ""),
+                               command.get("value", ""),
+                               command.get("name", ""), state)
+        branch = "steps" if met else "otherwise"
+        ok = _in_branch(command, branch, host, emit, depth, state)
     else:
         ok = False
 
     if not response:
-        # дефолтный ответ
+        # the default answer
         response = _default_response(command, ok)
     return ok, response
 
 
 def _run_system_action(action, host, emit=None):
-    # действия с компьютером (громкость, медиа, блокировка) — им host не нужен
+    # actions on the computer (volume, media, locking) — they need no host
     if str(action).startswith("sys_"):
         from voice import system_control
         from core.i18n import t as tr
         message = system_control.run(action[4:])
-        # run() возвращает текст и при неудаче — сравниваем именно с ним,
-        # иначе шаг последовательности отчитывался бы «Готово» после сбоя
+        # run() returns text on failure too — so we compare against exactly
+        # that, or a step of a sequence would report "Done" after a failure
         return bool(message) and message != tr("Не получилось выполнить действие.")
 
-    # действия над окном Рины трогают виджеты, а команда может выполняться
-    # в фоновом потоке (распознавание речи) — уводим их в GUI-поток сигналом
+    # actions on Rina's window touch widgets, and a command may run in a
+    # background thread (speech recognition) — we take them into the GUI
+    # thread with a signal
     mapping = {
         "minimize": "action_minimize",
         "show": "action_show",
@@ -326,14 +797,15 @@ def _run_system_action(action, host, emit=None):
     }
     if action not in mapping:
         return False
-    # Событие идёт в переданную шину, а не в модульный синглтон: иначе
-    # действие уходит мимо того ядра, которое его затеяло (4.0-B05).
+    # The event goes to the bus that was passed in rather than to the module
+    # singleton: otherwise the action goes past the very core that started
+    # it (4.0-B05).
     if emit is not None:
         from core.protocol import Events
 
         emit(Events.WINDOW_ACTION, action=action)
         return True
-    # запасной путь, если шину не передали
+    # the fallback path, if no bus was passed in
     if host is not None and hasattr(host, mapping[action]):
         try:
             getattr(host, mapping[action])()

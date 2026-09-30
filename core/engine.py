@@ -1,30 +1,36 @@
 """
-Ядро ассистента: распознавание, конвейер команд, озвучка, напоминания.
+The assistant's core: recognition, the command pipeline, speech, reminders.
 
-Здесь нет ни одного импорта Qt — и это главное свойство модуля. Ядро можно
-запустить без окна (в тестах, из консоли, в отдельном процессе), а оболочка
-подписывается на события шины и решает, как их показывать.
+There is not one Qt import here — and that is the module's chief property.
+The core can be started without a window (in tests, from the console, in a
+separate process), and the shell subscribes to the bus's events and decides
+how to show them.
 
-Разделение обязанностей:
-  ядро     — что делать: понять фразу, выполнить, ответить, запланировать;
-  оболочка — как это выглядит: окна, всплывающие подсказки, значок в трее.
+The division of duties:
+  the core  — what to do: understand the phrase, perform it, answer, plan;
+  the shell — how it looks: windows, pop-up hints, the tray icon.
 
-Всё блокирующее (микрофон, синтез речи, паузы в последовательностях) уходит
-в фоновые потоки: ядро не должно зависеть от того, кто его вызвал.
+Everything blocking (the microphone, speech synthesis, pauses in sequences)
+goes into background threads: the core must not depend on who called it.
 """
 
 import queue
+import contextvars
 import threading
 import time
 
 from core.events import bus
+from core.trace import trace_scope
 from core.i18n import t as tr
 from core import router as router_mod
 from core import dialog as dialog_mod
 from core.dialog import Dialog, Question
 from core.executor import Executor
+from core.toolrunner import NO_SHELL, ToolContext, ToolRunner
 from voice.wake import get_wake_words
 from voice.reminders import ReminderStore
+from voice.sessions import SessionStore
+from voice.todo import TodoStore
 from core.logging_setup import get_logger, safe, security_log
 from core.protocol import Events
 from core.features import default_features
@@ -40,76 +46,223 @@ log = get_logger("engine")
 
 
 class RinaEngine:
-    """Логика ассистента, независимая от интерфейса."""
+    """The assistant's logic, independent of the interface."""
 
-    # через минуту заданный вопрос считается неактуальным
+    # after a minute a question that was asked counts as stale
     PENDING_TTL = 60
 
-    # Слова согласия и отказа живут в роутере: это часть разбора, и роутер
-    # обязан работать, не поднимая ядро. Здесь — псевдонимы, чтобы не менять
-    # обращения RinaEngine.YES_WORDS по коду и в тестах.
+    # The words of consent and refusal live in the router: they are part of
+    # parsing, and the router is obliged to work without raising the core.
+    # Here are aliases, so that references to RinaEngine.YES_WORDS need not
+    # change through the code and in the tests.
     YES_WORDS = router_mod.YES_WORDS
     NO_WORDS = router_mod.NO_WORDS
 
     def __init__(self, plugin_manager=None, event_bus=None, settings=None,
                  features=None):
         """
-        settings — любой объект по core.settings_api.SettingsProvider.
-        По умолчанию общее хранилище приложения; в тестах — MemorySettings,
-        чтобы не трогать файл пользователя.
+        settings — any object matching core.settings_api.SettingsProvider.
+        By default the application's shared store; in tests MemorySettings,
+        so as not to touch the user's file.
 
-        features — по core.features.FeatureProvider. По умолчанию бесплатный
-        план, где доступно всё.
+        features — matching core.features.FeatureProvider. By default the
+        free plan, where everything is available.
         """
         self.bus = event_bus or bus
+        #: Who speaks instead of the local speaker. Set by the protocol's
+        #: server side (4.0-E04); until it is set, the core speaks itself, as
+        #: in 3.1.0 — the Qt windowed application uses exactly this.
+        self.voice_out = None
+        #: Who touches the machine instead of the core itself (4.0-G01,
+        #: ADR 0009). Until it is set, the core acts itself, as in 3.1.0.
+        self.system_out = None
+        #: Who listens to the microphone instead of the core (`4.0-G`).
+        #:
+        #: The microphone belongs to the shell for exactly the reason
+        #: launching programs and system actions do: whoever parses speech
+        #: must not hold the device. Until this is set the core listens for
+        #: itself — that is how 3.1.0 works, where there is no shell at all.
+        #:
+        #: It exists because the declared 4.0 path had never once run. The
+        #: shell sent sound, the core piled it into the segmenter — and both
+        #: a single listen and "always listening" opened **their own**
+        #: microphone and never looked at that sound. Two sets of ears, and
+        #: the one working was the one the architecture says must not.
+        self.ears_outside = False
+
+        #: Where to get the program index from. In 4.0 that is the shell
+        #: (4.0-G06): the registry and the Start menu are Windows data, and
+        #: reading them from a process that is obliged to work without
+        #: Windows means settling half of win32 inside the core.
+        self.apps_source = None
+        #: Called when the engine writes a setting itself — see
+        #: `_settings_changed`. Set from outside, like `voice_out`.
+        self.settings_changed = None
+        #: Called to cut off speech in progress — see `_hush_previous`.
+        self.hush_out = None
+        self._apps_cache = None
+        #: Who opens a page in a browser. The same place as the rest of what
+        #: touches the machine; until it is set, the core opens it itself,
+        #: as in 3.1.0.
+        self.browser_out = None
+
+        #: Who creates the process. The shell too (4.0-G05).
+        self.launch_out = None
+        #: Who to tell about a question that was asked (4.0-F11). Set by the
+        #: server side: only the shell can ask a person.
+        self.on_question = None
         self._settings = settings if settings is not None else default_settings()
         self._features = features if features is not None else default_features()
-        settings = self._settings          # локальное имя для кода ниже
+        settings = self._settings          # a local name for the code below
         self._plugins = plugin_manager
         self._busy = False
         self._always_listen = False
         self._always_thread = None
         self._stop_always = threading.Event()
+
+        #: Until when the wake word may be left out, because a
+        #: conversation is going on (`4.0b-E06`).
+        #:
+        #: The complaint that started this: "the activation word has to be
+        #: said before every phrase". A person says a name once and then
+        #: talks; saying it again before each sentence is addressing a
+        #: machine, not speaking to somebody.
+        self._talking_until = 0.0
+        self._talking_since = 0.0
+        self._talk_timer = None
+
+        #: Whether the shell has been told the microphone is wanted. See
+        #: `_hold_ear`: two things hold it, and only one of them can
+        #: speak at a time.
+        self._ear_open = False
         self._cmd_store = UserCommandStore(settings)
         self._history = HistoryStore(settings)
-        self._host = None                    # действия над окном (см. set_host)
-        # «Рина сейчас говорит». Считаем говорящих, а не держим один флаг:
-        # при перекрывающихся ответах первый закончивший сбрасывал флаг,
-        # микрофон открывался под ещё звучащую речь, и Рина слышала себя.
+        self._host = None                    # actions on the window (see set_host)
+        # "Rina is speaking right now". We count speakers rather than
+        # keeping one flag: with overlapping replies the first to finish
+        # cleared the flag, the microphone opened under speech still
+        # sounding, and Rina heard herself.
         self._speaking = threading.Event()
+
+        #: What was launched last — as the person said it (`4.0b-A04`).
+        #:
+        #: In memory rather than in the store: a correction follows a
+        #: launch, in the same conversation. A "last" that survived a
+        #: restart would refer to a session the person no longer remembers,
+        #: and would teach the wrong thing.
+        self._last_launch_query = ""
         self._speak_lock = threading.Lock()
         self._speak_count = 0
         self._reminders = ReminderStore(settings)
+        self._todo = TodoStore(settings)
+        self._sessions = SessionStore(settings)
+        #: What is in front, and since when (`4.0b-A02`). A pair,
+        #: not a history: see `_credit_foreground`.
+        self._in_front = ("", 0.0)
+        #: What focus mode is holding back (`4.0b-A05`). One, not a
+        #: queue — see `offer`.
+        self._held_offer = None
 
-        # Разбор, память о заданном вопросе и исполнение разведены по
-        # отдельным объектам (4.0-B02, B03, B04). Ядро их связывает.
+        # Parsing, memory of the question asked, and execution are separated
+        # into distinct objects (4.0-B02, B03, B04). The core ties them
+        # together.
         self._dialog = Dialog()
-        self._executor = Executor(
-            # Через лямбду, а не связанным методом: озвучку и шину ядро
-            # может подменить позже (тесты, оболочка), и исполнитель обязан
-            # следовать за текущей, а не за той, что была при сборке.
-            say=lambda text, sound="response": self.say(text, sound=sound),
-            emit=lambda name, **data: self._emit(name, **data),
-            settings=settings,
-            reminders_store=self._reminders,
-            command_store=self._cmd_store,
-            on_alias=self._remember_choice,
+
+        # Everything that changes the world goes through the tool registry
+        # (4.0-C03). The executor below does nothing itself — it turns
+        # intents into calls.
+        # The beta's telemetry (`4.0b-D05`): counts nothing while it is off,
+        # which is the default. Before the tools, which count through it.
+        from core.telemetry import Telemetry
+
+        self.telemetry = Telemetry(settings)
+
+        self._tools = ToolRunner(
+            ToolContext(
+                settings=settings,
+                reminders=self._reminders,
+                todo=self._todo,
+                sessions=self._sessions,
+                release_held=lambda: self.release_held(),
+                commands=self._cmd_store,
+                plugins=plugin_manager,
+                # Through a lambda rather than a bound method: the core may
+                # substitute speech and the bus later (tests, the shell), and
+                # the tools are obliged to follow the current one rather than
+                # the one that existed at assembly time.
+                emit=lambda name, **data: self._emit(name, **data),
+                host=None,
+                on_alias=self._remember_choice,
+                # Through a lambda for the same reason as speech: the shell
+                # appears later than the tools are assembled.
+                # `NO_SHELL` is a code rather than a phrase: the registry
+                # branches on it, and prose would have to be matched by
+                # substring — which breaks on the first translation.
+                system_out=lambda action: (self.system_out(action)
+                                           if self.system_out else
+                                           (False, NO_SHELL)),
+                open_url=lambda url: (self.browser_out(url)
+                                     if self.browser_out else
+                                     (False, NO_SHELL)),
+                launch_app=lambda launch, kind: (
+                    self.launch_out(launch, kind) if self.launch_out
+                    else (False, NO_SHELL)),
+                # The same list as the router's: see `_apps`.
+                apps=self._apps,
+                # For "Why?" (`4.0b-B04`). Through lambdas because the
+                # runner is being built on this very line: the journal and
+                # the registry belong to it, and taking them now would take
+                # them from an object that does not exist yet.
+                journal=lambda: None,
+                registry=lambda: None,
+            ),
+            features=self._features,
+            telemetry=self.telemetry,
         )
 
-        # планировщик напоминаний: обычный поток, а не таймер интерфейса
+        # And now that the runner exists, the two fields point at its own
+        # journal and its own registry. An explanation must come out of the
+        # journal that is actually being written to; a second one would
+        # agree with the first only by accident.
+        self._tools._ctx.journal = self._tools.audit
+        self._tools._ctx.registry = self._tools._registry
+
+        # A plugin's tools are created and removed together with the plugin
+        # (`4.0-H03`). A subscription rather than a one-off walk: a plugin is
+        # switched on and off at any moment, and the registry is obliged to
+        # follow that.
+        if plugin_manager is not None:
+            plugin_manager.changed.connect(self._sync_plugin_tools)
+            self._sync_plugin_tools()
+
+            # A plugin speaks through the core rather than by itself: it has
+            # neither a voice nor a window. In 3.1.0 the application's window
+            # listened to its line; there is no window any more, and without
+            # this subscription a plugin wrote a note and said nothing about
+            # it.
+            plugin_manager.response.connect(
+                lambda plugin_id, text: self.say(text))
+        self._executor = Executor(
+            say=lambda text, sound="response": self.say(text, sound=sound),
+            tools=self._tools,
+            emit=lambda name, **data: self._emit(name, **data),
+        )
+
+        # the reminder scheduler: an ordinary thread, not an interface timer
         self._stop_reminders = threading.Event()
         self._reminder_thread = None
 
-        # Очередь команд. Конвейер запускает программы, ходит в сеть и ждёт
-        # ответа модели — в потоке интерфейса это секунды замороженного окна.
-        # Очередь одна на все источники: конвейер держит общее состояние
-        # (незакрытый уточняющий вопрос), и параллельная обработка его портит.
+        # The command queue. The pipeline launches programs, goes to the
+        # network and waits for the model's answer — in the interface thread
+        # that is seconds of a frozen window. One queue for every source: the
+        # pipeline holds shared state (an unclosed clarifying question), and
+        # parallel handling spoils it.
         self._commands = queue.Queue()
         self._command_worker = None
         self._command_lock = threading.Lock()
 
     # ------------------------------------------------------------------
-    # события
+    # events
     # ------------------------------------------------------------------
     def _emit(self, name, **payload):
         self.bus.emit(name, **payload)
@@ -117,23 +270,25 @@ class RinaEngine:
     @property
     def features(self):
         """
-        Доступность возможностей. Спрашивать только здесь.
+        The availability of capabilities. Ask only here.
 
-        Оболочка показывает состояние, но не решает его: решение принимает
-        ядро, иначе его можно обойти со стороны интерфейса (4.0-B08).
+        The shell shows the state but does not decide it: the decision is
+        taken by the core, or it could be circumvented from the interface
+        (4.0-B08).
         """
         return self._features
 
     def set_host(self, host):
-        """host выполняет действия над окном (свернуть/показать/выйти)."""
+        """host performs actions on the window (minimise/show/quit)."""
         self._host = host
+        self._tools._ctx.host = host
         self._executor._host = host
 
     # ------------------------------------------------------------------
-    # озвучка
+    # speech
     # ------------------------------------------------------------------
     def say(self, text, sound="response"):
-        """Ответить: записать в историю, сообщить оболочке и произнести."""
+        """Answer: write to the history, tell the shell, and say it out loud."""
         from voice import sounds
 
         if sound == "response":
@@ -149,7 +304,23 @@ class RinaEngine:
 
     def _speak_blocking(self, text):
         if not self._settings.get("voice_reply", True):
-            return  # режим «молчать» — только текст, без голоса
+            return  # the "stay silent" mode: text only, no voice
+
+        # If somebody outside takes the voice, they take it whole. In the
+        # split program that is the shell (4.0-E04): the core synthesises,
+        # the shell plays. There must not be two paths, or one and the same
+        # line will one day sound twice — from the shell's speaker and from
+        # the core's.
+        if self.voice_out is not None:
+            self._begin_speaking()
+            try:
+                self.voice_out(text)
+            except Exception as e:                       # noqa: BLE001
+                self._emit(Events.ERROR, text=tr("Ошибка озвучки: ") + str(e))
+            finally:
+                self._end_speaking()
+            return
+
         engine = tts_mod.get_engine(self._settings.get("tts_engine", "silent"))
         self._begin_speaking()
         try:
@@ -162,7 +333,7 @@ class RinaEngine:
         except Exception as e:
             self._emit(Events.ERROR, text=tr("Ошибка озвучки: ") + str(e))
         finally:
-            # пауза после речи, чтобы «хвост» не попал обратно в микрофон
+            # a pause after speech, so the "tail" does not get back into the microphone
             time.sleep(0.4)
             self._end_speaking()
 
@@ -182,10 +353,10 @@ class RinaEngine:
             time.sleep(0.1)
 
     # ------------------------------------------------------------------
-    # микрофон
+    # the microphone
     # ------------------------------------------------------------------
     def listen_once(self):
-        """Однократное прослушивание (по горячей клавише)."""
+        """A single listen (on a hotkey)."""
         if self._busy:
             return
         self._busy = True
@@ -195,7 +366,24 @@ class RinaEngine:
         from voice import sounds
 
         sounds.play_activation(self._settings)
+
+        # With a shell the core does not touch the microphone: it has
+        # announced that it is listening, and the sound will arrive over the
+        # data channel. `_hear` cuts it into phrases and starts recognition
+        # itself — what is left here is to hold the window open and say when
+        # it closed.
+        if self.ears_outside:
+            self._hold_ear()
+            try:
+                time.sleep(self.listen_seconds())
+            finally:
+                self._busy = False
+                # And **not** "stopped" outright: the mode may still be
+                # holding the ear. See `_hold_ear`.
+                self._hold_ear()
+            return
         self._emit(Events.LISTENING_STARTED)
+
         result = None
         try:
             engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
@@ -204,9 +392,9 @@ class RinaEngine:
                 timeout=self.listen_seconds(),
             )
         except Exception as e:
-            # Раньше здесь был только finally: индикатор гас, исключение
-            # уносило поток, и пользователь видел, что «ничего не произошло»,
-            # без единой подсказки почему.
+            # There used to be only a finally here: the indicator went out,
+            # the exception carried off the thread, and the user saw that
+            # "nothing happened", without a single hint as to why.
             log.exception("Сбой распознавания")
             self.say(tr("Не получилось распознать речь: ") + str(e),
                      sound="error")
@@ -219,23 +407,177 @@ class RinaEngine:
             return
         if result.ok and result.text:
             self._emit(Events.RECOGNIZED, text=result.text)
-            # по хоткею слово активации не нужно: пользователь уже позвал явно
+            # on a hotkey the wake word is not needed: the user has already called explicitly
             self.handle_command_async(result.text, require_wake=False,
                                       source="voice")
         elif result.error:
-            # движки отдают текст ошибки по-русски — переводим на границе
+            # the engines give the error text in Russian — we translate at the boundary
             self._emit(Events.ERROR, text=tr(result.error))
+
+    #: How long a conversation stays open after the last thing said.
+    #:
+    #: Long enough to draw breath and go on; short enough that a phrase
+    #: said to somebody else in the room a minute later is not taken for a
+    #: command. Fifteen seconds is about as long as a pause can be and
+    #: still belong to the same exchange.
+    TALK_WINDOW = 15.0
+
+    #: And how long one conversation may last altogether.
+    #:
+    #: **The boundary written into the plan.** An open conversation is an
+    #: open ear — the same surface as `T-19` — and it has to be finite,
+    #: visible, and close itself. Extended turn by turn without a ceiling
+    #: it would satisfy the first two and quietly fail the third: an
+    #: afternoon of talking near the machine would leave the word
+    #: optional until the program was shut down.
+    TALK_LIMIT = 180.0
+
+    def _hold_ear(self):
+        """
+        Say whether sound should be coming at all — once, for everybody.
+
+        **Two things hold the microphone open** — the "always listening"
+        mode and a one-off listen on a hotkey — and each of them used to
+        announce its own beginning and end. The shell believes the last
+        thing it was told, so a one-off listen inside the mode said
+        "stopped" when its eight seconds ran out, the shell shut the
+        microphone, and the mode went on being on with nothing listening.
+        A person met that as "always listening does not work — she does
+        not hear me", and then as the same thing on the hotkey: eight
+        seconds of hearing and silence after.
+
+        So the question is asked of the engine rather than of whoever
+        happens to be finishing: is anybody still holding the ear open.
+        A release is only a release when the last holder lets go.
+        """
+        wanted = bool(self._always_listen or self._busy)
+        if wanted == self._ear_open:
+            return
+        self._ear_open = wanted
+        self._emit(Events.CAPTURING, active=wanted)
+        self._emit(Events.LISTENING_STARTED if wanted
+                   else Events.LISTENING_STOPPED)
+        log.info("Микрофон %s (режим %s, разовое %s)",
+                 "открыт" if wanted else "закрыт",
+                 "вкл" if self._always_listen else "выкл",
+                 "идёт" if self._busy else "нет")
+
+    def talking(self, now=None):
+        """Is a conversation open right now."""
+        now = time.monotonic() if now is None else now
+        return now < self._talking_until
+
+    def talk_after_speaking(self, seconds):
+        """
+        Her own reply must not eat the conversation's window.
+
+        **The whole feature was unusable because of this.** The window
+        opens when the phrase is understood, and then Rina answers: a
+        second or two before the first sound, nine seconds of speech.
+        By the time the person can say the next thing without her name,
+        fifteen seconds have gone and the window has closed — met in a
+        person's journal three times in a row, thirty seconds between
+        "что ты умеешь" and the answer to it:
+
+            `13:11:55  Команда (voice): 'что ты умеешь?'`
+            `13:12:25  'Хорошо, запустите им.'`
+            `13:12:26  Расслышано, но не мне (wake)`
+
+        The window is a person's opportunity to speak, so it has to
+        begin when they **can** speak — after she stops. The length of
+        the reply is known exactly: it is the sound that was sent.
+        """
+        if not self.talking():
+            return          # nothing to hold open
+        self._open_talk(after=max(0.0, float(seconds)))
+
+    def _open_talk(self, after=0.0):
+        """
+        Start a conversation, or push its end further off.
+
+        `after` is how much of what follows is Rina talking: the window
+        is measured from the end of that, not from now.
+        """
+        now = time.monotonic()
+        fresh = not self.talking(now)
+        if fresh:
+            self._talking_since = now
+
+        # The ceiling wins over the extension: the last exchange of a long
+        # conversation gets a shorter window, and then it is over.
+        until = min(now + after + self.TALK_WINDOW,
+                    self._talking_since + self.TALK_LIMIT)
+        if until <= now:
+            self._close_talk()
+            return
+
+        self._talking_until = until
+        self._emit(Events.CONVERSATION, open=True,
+                   seconds=round(until - now, 1))
+        self._arm_talk_timer()
+
+    def _close_talk(self):
+        """End the conversation: the wake word is needed again."""
+        if self._talk_timer is not None:
+            self._talk_timer.cancel()
+            self._talk_timer = None
+        if self._talking_until == 0.0:
+            return
+        self._talking_until = 0.0
+        self._talking_since = 0.0
+        self._emit(Events.CONVERSATION, open=False, seconds=0.0)
+
+    def _arm_talk_timer(self):
+        """
+        Close it by the clock, not by the next phrase.
+
+        A conversation that ended only when something else was said would
+        be open for hours in a quiet room, and nothing would say so. It
+        closes itself, and the closing is announced — that is two thirds
+        of the boundary this feature was given.
+        """
+        if self._talk_timer is not None:
+            self._talk_timer.cancel()
+        left = max(0.05, self._talking_until - time.monotonic())
+        self._talk_timer = threading.Timer(left, self._talk_ran_out)
+        self._talk_timer.daemon = True
+        self._talk_timer.start()
+
+    def _talk_ran_out(self):
+        # Extended while the timer was waiting: rearm rather than close.
+        if self.talking():
+            self._arm_talk_timer()
+            return
+        self._close_talk()
 
     def set_always_listen(self, on):
         on = bool(on)
         if on == self._always_listen:
             return
         self._always_listen = on
+
+        # Written down, not only remembered. The setting existed in the
+        # store's defaults and was read by nobody and written by nobody: the
+        # dialogue page asked settings for it and got the default every
+        # time, so the switch showed "off" while the mode was on. A person
+        # met that as the button resetting whenever they changed tabs.
+        try:
+            self._settings.set("always_listen", on)
+            self._settings.save()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось запомнить режим «всегда слушать»")
+
         self._emit(Events.ALWAYS_LISTEN, enabled=on)
+        # A conversation belongs to an open microphone. Switching the mode
+        # off leaves it hanging otherwise: the word would still be
+        # optional for the next quarter minute, with nothing listening.
+        if not on:
+            self._close_talk()
         if on:
-            # у каждого запуска свой признак остановки: старый поток может ещё
-            # ждать микрофон, и общий сброшенный флаг оставлял бы его в работе —
-            # тогда одна фраза распознавалась и выполнялась дважды
+            # every start has its own stop flag: an old thread may still be
+            # waiting on the microphone, and a shared cleared flag would
+            # leave it running — then one phrase was recognised and performed
+            # twice
             self._stop_always = threading.Event()
             self._always_thread = threading.Thread(
                 target=self._always_worker, args=(self._stop_always,),
@@ -249,6 +591,24 @@ class RinaEngine:
 
     def _always_worker(self, stop_flag=None):
         stop_flag = stop_flag or self._stop_always
+
+        # With a shell the listening window stays open while the mode is
+        # on: the sound arrives by itself, `_hear` cuts it into phrases, and
+        # the wake word is required — checked in the same place as it is for
+        # typed text.
+        if self.ears_outside:
+            self._hold_ear()
+            try:
+                while not stop_flag.wait(0.2):
+                    pass
+            finally:
+                # The mode is already off by the time we are here — the
+                # flag is what woke us — so this asks the same question
+                # and gets the right answer even if a one-off listen is
+                # running.
+                self._hold_ear()
+            return
+
         engine = stt_mod.get_engine(self._settings.get("stt_engine", "disabled"))
         if engine.id == "disabled":
             self._emit(Events.ERROR, text=tr(
@@ -258,7 +618,7 @@ class RinaEngine:
             return
 
         while not stop_flag.is_set():
-            # пока Рина говорит — не слушаем, иначе распознаётся её же голос
+            # while Rina is speaking we do not listen, or her own voice gets recognised
             if self._speaking.is_set():
                 self._wait_while_speaking()
                 continue
@@ -273,17 +633,17 @@ class RinaEngine:
             if stop_flag.is_set():
                 break
             if result.ok and result.text:
-                # здесь слово активации обязательно: иначе ассистент реагировал
-                # бы на любой разговор в комнате
+                # here the wake word is obligatory: otherwise the assistant
+                # would react to any conversation in the room
                 self.handle_command_async(result.text, require_wake=True,
                                           source="always", wait=True)
                 self._wait_while_speaking()
 
     # ------------------------------------------------------------------
-    # напоминания
+    # reminders
     # ------------------------------------------------------------------
     def start_reminders(self):
-        """Запускает проверку запланированного (раз в секунду, в фоне)."""
+        """Starts checking what is planned (once a second, in the background)."""
         if self._reminder_thread is not None:
             return
         self._stop_reminders.clear()
@@ -291,23 +651,167 @@ class RinaEngine:
             target=self._reminder_worker, daemon=True)
         self._reminder_thread.start()
 
+    def note_foreground(self, launch):
+        """
+        The shell reports: the person switched to this program
+        (`4.0b-A03`, `4.0b-A02`).
+
+        **By default the core still remembers nothing.** The event is
+        compared with the waiting reminders and forgotten: not which
+        program is in front, nor which was before, nor how long was
+        spent in it. Knowing which programs somebody opens is
+        information of the same kind as the text of their words
+        (`T-19`), and the surest way not to lose such a history is not
+        to keep one.
+
+        **A working session is the one case where a history is kept, and
+        it takes two switches and an open session to get there**
+        (`4.0b-A02`, `T-22`). `watch_apps` lets Rina see the change at
+        all — without it this method is never called. `session_apps`
+        lets her write it down. And even then nothing accumulates
+        unless a session is open, because there is nowhere to put it:
+        the chronicle belongs to a named stretch of work, not to the
+        program. Turn either switch off, or close the session, and the
+        paragraph above is true again word for word.
+
+        **Two fields, not a log.** What is held between events is the
+        program in front and the moment it came forward; when the next
+        change arrives, the time between them is credited to the one
+        that is leaving. A running total per application in the open
+        session is a far smaller thing than a list of switches with
+        their timestamps, and it answers the only question anybody asked
+        of it — "what did this stretch of work go on".
+
+        What arrives is a **path**, not a window name: a person changes the
+        window title themselves by opening somebody else's file in an
+        editor, and matching on it would mean matching against the contents
+        of somebody else's document.
+        """
+        launch = str(launch or "")
+        if not launch:
+            return 0
+        self._credit_foreground(launch)
+        fired = self._reminders.triggered(
+            {"kind": "app.foreground", "launch": launch})
+        for item in fired:
+            self._fire_reminder(item)
+        return len(fired)
+
+    def _credit_foreground(self, launch, now=None):
+        """
+        Give the program that is leaving the time it was in front.
+
+        Held outside the session on purpose. The pair "what is in front
+        and since when" exists whether or not anybody is recording, and
+        putting it in the store would mean a write on every window
+        change — for a person who never switched the recording on.
+        """
+        import time as _time
+
+        now = now if now is not None else _time.time()
+        was, since = self._in_front
+        self._in_front = (launch, now)
+        if not was or was == launch or not since:
+            return
+        if not self._settings.get("session_apps", False):
+            return
+        self._sessions.saw(self._app_name(was), now - since)
+
+    @staticmethod
+    def _app_name(launch):
+        """
+        The program, as a person would name it — not its full path.
+
+        A path names a place on somebody's disk, and a session is read
+        back to them out loud. `C:\\Users\\...\\Code.exe` in an answer is
+        both unreadable and more than was asked for.
+        """
+        import os as _os
+
+        base = _os.path.basename(str(launch or "")).strip()
+        stem, ext = _os.path.splitext(base)
+        return stem or base
+
+    def _fire_reminder(self, item):
+        """
+        One firing opens a trace chain of its own (4.0-D15).
+
+        Shared by the clock and by the occasion: a firing is a firing, and
+        these two paths have no reason to differ. While they did differ,
+        what was bound to an event did not reach the journal the way
+        everything else did.
+
+        **She says it out loud, and that had been lost in the port.**
+        3.1.0 spoke the reminder, showed it and notified; 4.0 kept only
+        the event, and the one thing the shell did with it was a tray
+        balloon — shown solely when the window was hidden. So a reminder
+        that came due while somebody had the window open did nothing
+        observable at all: no voice, no banner, a row quietly turning
+        grey in a tab they were not looking at. On an assistant whose
+        whole point is answering aloud, an alarm that says nothing is
+        the one thing it must not be.
+
+        Said here rather than in the shell because Rina's lines are the
+        core's (ADR 0007), and because the next shell — mobile, voice,
+        no screen at all — would otherwise have to rediscover that a
+        reminder is worth saying.
+        """
+        from voice import reminders as reminders_mod
+
+        with trace_scope():
+            self._reminders.mark_done(item["id"])
+            # The snapshot was taken before the mark and still says
+            # done: false. Sending it as it is means telling the shell that
+            # a reminder fired which by its own words did not: the event
+            # would contradict the store, from which the shell will take
+            # the list a second later.
+            self._emit(Events.REMINDER_FIRED, item={**item, "done": True})
+            self.say(reminders_mod.say_fired(item))
+
+    def _warn_ahead(self, item, lead):
+        """
+        Say that something is coming, while there is still time to act.
+
+        Marked before it is said, not after. Speaking goes to another
+        thread and takes as long as speech takes; a mark that waited for
+        it would let the next tick, one second later, find the same lead
+        still owed and say it again.
+        """
+        from voice import reminders as reminders_mod
+
+        with trace_scope():
+            self._reminders.mark_warned(item["id"], lead)
+            self.say(reminders_mod.say_ahead(item, lead))
+
     def _reminder_worker(self):
+        """
+        The scheduler: once a second it looks whether it is time.
+
+        **Every firing opens a trace chain of its own** (4.0-D15). A reminder
+        is called by nobody — it is itself the beginning of an action, and
+        everything that follows it (an event to the shell, a spoken phrase,
+        journal entries) belongs to one chain. Without this a fired alarm
+        would look in the journal like a set of unconnected lines, and there
+        would be nothing to work out "why did she start talking at night"
+        with.
+        """
         store = self._reminders
         while not self._stop_reminders.wait(1.0):
             try:
+                for item, lead in store.ahead_due():
+                    self._warn_ahead(item, lead)
                 for item in store.due():
-                    store.mark_done(item["id"])
-                    self._emit(Events.REMINDER_FIRED, item=item)
+                    self._fire_reminder(item)
             except Exception:
-                pass          # сбой чтения не должен убивать планировщик
+                pass          # a read failure must not kill the scheduler
 
     # ------------------------------------------------------------------
-    # слово активации
+    # the wake word
     # ------------------------------------------------------------------
     def _extract_command(self, text, require_wake):
         """
-        Текст команды без слова активации.
-        None — активации не было и команду надо проигнорировать.
+        The command's text without the wake word.
+        None means there was no activation and the command must be ignored.
         """
         if not require_wake:
             return text.strip()
@@ -320,63 +824,333 @@ class RinaEngine:
         return strip_wake(text, wake_words)
 
     # ------------------------------------------------------------------
-    # уточняющие вопросы и исполнение
+    # clarifying questions and execution
     # ------------------------------------------------------------------
-    # Решает, что значит фраза, — роутер (core/router.py).
-    # Помнит незакрытый вопрос — диалог (core/dialog.py).
-    # Делает — исполнитель (core/executor.py).
-    # Ядру остаётся связать их и вести историю.
+    # What a phrase means is decided by the router (core/router.py).
+    # The unclosed question is remembered by the dialogue (core/dialog.py).
+    # The doing is done by the executor (core/executor.py).
+    # What is left to the core is tying them together and keeping the history.
+
+    def _sync_plugin_tools(self, *_):
+        """
+        Bring the registry into line with the switched-on plugins (`4.0-H03`).
+
+        Called on every change of the set: switched on — the tools appeared,
+        switched off — they vanished. A registry that remembers a
+        switched-off plugin's tool will call it one day, and by then the
+        plugin is no longer loaded.
+
+        There is deliberately no separate "refresh" here: the only way to
+        find out that the registry has drifted from reality is to compare it
+        with reality every time.
+        """
+        if self._plugins is None:
+            return
+
+        for plugin_id, loaded in self._plugins.plugins.items():
+            prefix = self._plugins.tool_prefix(plugin_id)
+            already = [n for n in self._tools.registry.names()
+                       if n.startswith(prefix)]
+
+            if not loaded.enabled or loaded.error:
+                if already:
+                    self._tools.drop_tools(prefix)
+                continue
+
+            if already:
+                continue                # already created
+
+            for tool, run in self._plugins.declared_tools(plugin_id):
+                try:
+                    self._tools.add_tool(tool, run)
+                except ValueError:
+                    # The name is taken: the plugin declared two tools with
+                    # one name. Its defect, and it is already in its journal.
+                    pass
+
+    def installed_apps(self):
+        """
+        The programs as the launcher sees them — for whoever else needs the
+        same list: recognition is hinted with how they are said
+        (`4.0b-V08`), and a second list would disagree with this one about
+        what is installed.
+        """
+        return self._apps()
+
+    def _apps(self):
+        """
+        The list of programs: the shell's, if there is one, otherwise our own.
+
+        Our own path stays for the sake of the 3.1.0 application, which
+        lives in one process and has no shell at all. As soon as 3.1.0 is
+        withdrawn, it will go too — along with half of
+        `voice/app_index.py`.
+        """
+        if self.apps_source is None:
+            from voice import app_index
+
+            return app_index.cached_index() or []
+
+        if self._apps_cache is None:
+            from voice.app_index import AppEntry
+
+            self._apps_cache = [AppEntry.from_dict(item)
+                                for item in self.apps_source()]
+        return self._apps_cache
+
+    #: The sources that arrive by ear.
+    BY_EAR = ("voice", "always")
+
+    def _unbidden(self, source):
+        """
+        Did this phrase arrive without anybody meaning to say it.
+
+        **The open microphone is half the answer, and it was taken for
+        the whole.** `RouterContext.unbidden` is a fact — whether
+        anybody meant to say this — and it was computed from the mode
+        alone. So a line the person **typed** while "always listen" was
+        on counted as noise in the room, and every rule that guards
+        against chance speech fired on a deliberate sentence.
+
+        What it cost: «Какая погода в Хабаровске?», typed, the model
+        asked and failed — and instead of the search that was supposed
+        to catch that, «Извини, я не поняла команду». The guard exists
+        so a browser does not open on a cough. Nobody coughs a sentence
+        into a text box.
+
+        The docstring of `unbidden` says it already: a fact, not a
+        label; the name of a source says where a phrase came in, and
+        this rule is about whether anybody meant it. Typing is the
+        meaning it.
+        """
+        return bool(self._always_listen) and source in self.BY_EAR
 
     def _router_context(self, source, require_wake):
-        """Всё, что роутер должен знать о мире, — снимок на этот момент."""
+        """Everything the router needs to know about the world — a snapshot at this moment."""
         from voice import app_index, app_launcher
         from core import llm
 
         question = self._dialog.current()
         return router_mod.RouterContext(
-            apps=app_index.cached_index() or [],
+            # Handed over as a way to get it, not got: see
+            # `RouterContext.apps_source` — a sum must not wait for the
+            # list of programs.
+            apps_source=self._apps,
             aliases=dict(self._settings.get("app_aliases", {}) or {}),
             pending=question.to_dict() if question else None,
             wake_words=tuple(get_wake_words(self._settings)),
-            require_wake=require_wake,
+            # The wake word is not asked for while a conversation is
+            # open (`4.0b-E06`): it is said once, and what follows is the
+            # same exchange.
+            require_wake=require_wake and not self.talking(),
             source=source,
+            # Asked of ourselves rather than read off the name of the
+            # source: see `RouterContext.unbidden` and `_unbidden`.
+            unbidden=self._unbidden(source),
             reminders_active=len(self._reminders.active()),
-            llm_enabled=llm.is_enabled(),
+            # Asked of **this core's** settings, not of the module-level
+            # singleton `llm.is_enabled()` reads.
+            #
+            # That singleton is the hidden global `4.0-B05` and `4.0-B06`
+            # were about, and one place still reached for it. What it
+            # cost: `tools/test_router.py` hands the core a stand-in
+            # store with no model in it, and the router still asked the
+            # machine — so the check went green or red depending on
+            # whether whoever ran it had Ollama switched on. It was green
+            # for months and turned red the first day somebody enabled a
+            # model, having measured nothing about the program in
+            # between.
+            llm_enabled=bool(self._settings.get("llm_enabled", False)),
             web_fallback=bool(self._settings.get("web_search_fallback", True)),
+            last_launch_query=self._last_launch_query,
+            todo_find=self._todo.matches,
+            # Whether a session is open changes what the answer to
+            # "finish it" is, and nothing else; the router still
+            # decides nothing about sessions it cannot see.
+            session_open=self._sessions.current() is not None,
         )
+
+    @property
+    def todo(self):
+        """The list of things to do (`4.0b-A13`) — for the protocol."""
+        return self._todo
+
+    @property
+    def sessions(self):
+        """Working sessions (`4.0b-A02`) — for the protocol."""
+        return self._sessions
 
     def _remember_choice(self, query, entry):
         from voice import app_launcher
 
-        app_launcher.remember(query, entry.launch, entry.kind, entry.name)
+        app_launcher.remember(query, entry.launch, entry.kind, entry.name,
+                              settings=self._settings)
+
+    def ask_for(self, prompt, intent, args=None, slot="", options=()):
+        """
+        Say something and wait for an answer that will be acted on.
+
+        The general shape of Rina asking (`4.0b-E06`): the question
+        carries what to do, so a new thing to ask about needs no new
+        kind of question. With a `slot` the answer is a value and the
+        options are suggestions; without one it is yes or no.
+        """
+        self.say(prompt)
+        self._ask(dialog_mod.Question.asked(prompt, intent, args, slot,
+                                            options))
+
+    def offer(self, key, value, about, sentence):
+        """
+        Say something is now possible, and offer to switch it on.
+
+        Rina's own initiative (`4.0b-E06`), and deliberately the narrowest
+        kind of it: what she offers is always one setting taking one
+        value, and always something the person has just brought about
+        themselves. Nothing new is learned about anybody to make the
+        offer — the boundary the plan draws around initiative.
+
+        **Focus holds it back rather than throws it away** (`4.0b-A05`).
+        Inside a focused session the offer is kept and made once when
+        the session closes. Dropping it would make focus a way of
+        losing things: the voice a person waited an hour to download
+        would finish, say nothing, and never mention itself again.
+        Making it anyway would make the mode a promise Rina breaks.
+
+        One offer is kept, not a queue. Two offers about the same
+        setting are the same offer, and a list of everything that
+        happened during three hours of work is not an interruption
+        avoided — it is an interruption postponed and made worse.
+        """
+        if self._sessions.focused():
+            self._held_offer = (key, value, about, sentence)
+            return
+        self.say(sentence)
+        self._ask(dialog_mod.Question.offer_setting(key, value, about))
+
+    def release_held(self):
+        """
+        Give back the one thing focus held, and raise its question.
+
+        Returns the sentence rather than saying it. Whoever closed the
+        session is about to speak — "session closed, two hours" — and
+        an offer said from here would come out **before** that, which
+        is the wrong order for something that has been waiting an hour
+        already. The caller puts it at the end of its own answer.
+
+        The question itself is raised here, because a pending question
+        is the dialogue's and not the caller's.
+        """
+        held = self._held_offer
+        self._held_offer = None
+        if held is None:
+            return ""
+        key, value, about, sentence = held
+        self._ask(dialog_mod.Question.offer_setting(key, value, about))
+        return sentence
+
+    def _take_offer(self, intent):
+        """The person agreed: switch it on and say so."""
+        key = str(intent.arg("key") or "")
+        value = str(intent.arg("value") or "")
+        if not key:
+            return
+        self._dialog.answered()
+        self._settings.set(key, value)
+        self._settings.save()
+        self._settings_changed()
+        self.say(tr("Включила: {about}.", about=intent.arg("about") or key))
+
+    def _hush_previous(self):
+        """Stop whatever is being said: something new has been asked."""
+        if self.hush_out is None:
+            return
+        try:
+            self.hush_out()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось оборвать прежнюю реплику")
+
+    def _settings_changed(self):
+        """
+        The engine has written a setting itself — tell whoever must rebuild.
+
+        The core's voice is rebuilt from the settings, and it is rebuilt
+        by whoever serves `settings.set` over the wire. A setting written
+        from in here takes a different road and would otherwise apply
+        only after the next restart — the very defect `4.0b-V05` was
+        about, met through another door.
+        """
+        if self.settings_changed is None:
+            return
+        try:
+            self.settings_changed()
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось применить изменённую настройку")
 
     def _ask(self, question):
-        """Задать вопрос и озвучить его."""
+        """Ask a question and say it out loud."""
         self._dialog.ask(question)
+        self._announce_question(question)
+
+    def _announce_question(self, question):
+        """Report outwards that a question has been asked (4.0-F11)."""
+        if self.on_question is None:
+            return
+        try:
+            self.on_question(question)
+        except Exception:                                # noqa: BLE001
+            log.exception("Не удалось объявить заданный вопрос")
+
+    def answer_question(self, yes: bool) -> None:
+        """
+        Answer the question that was asked on the person's behalf.
+
+        **By the same path as by voice.** Consent goes through parsing, as
+        if the person had said "yes": it has exactly one road, and a second
+        implementation of consent is a second place where a safe action can
+        go wrong. The words are taken from the router rather than from the
+        interface: this is part of parsing, not a label on a button.
+        """
+        word = (router_mod.YES_WORDS if yes else router_mod.NO_WORDS)[0]
+        self.handle_command_async(word, source="typed")
 
 
     def _run_user_command(self, user_cmd):
-        """Выполнить пользовательскую команду — через исполнителя."""
+        """Perform a user command — through the executor."""
         return self._executor.run_user_command(user_cmd)
 
 
     def run_command_by_id(self, command_id):
         """
-        Выполнить команду по её id (кнопка «Выполнить» в списке).
+        Perform a command by its id (the "Run" button in the list).
 
-        Тоже в фоне: последовательность с паузами выполняется секундами,
-        а нажимают кнопку из потока интерфейса.
+        In the background too: a sequence with pauses takes seconds to
+        perform, and the button is pressed from the interface thread.
         """
         for cmd in self._cmd_store.all():
             if cmd.get("id") == command_id:
                 self._ensure_command_worker()
+                ctx = contextvars.copy_context()
                 threading.Thread(
-                    target=self._run_user_command, args=(cmd,),
+                    target=ctx.run, args=(self._run_user_command, cmd),
                     name="rina-run-command", daemon=True).start()
                 return
 
+    def try_command(self, card):
+        """
+        Try a command being assembled, without saving it (`4.0b-A09`).
+
+        In the background for the same reason as `run_command_by_id`: a
+        sequence with pauses takes seconds, and the press comes from the
+        interface thread.
+        """
+        self._ensure_command_worker()
+        ctx = contextvars.copy_context()
+        threading.Thread(
+            target=ctx.run, args=(self._executor.try_user_command, card),
+            name="rina-try-command", daemon=True).start()
+
     # ------------------------------------------------------------------
-    # очередь команд
+    # the command queue
     # ------------------------------------------------------------------
     def _ensure_command_worker(self):
         with self._command_lock:
@@ -389,13 +1163,13 @@ class RinaEngine:
 
     def _command_loop(self):
         while True:
-            text, require_wake, source, done = self._commands.get()
+            text, require_wake, source, done, ctx = self._commands.get()
             try:
-                self.handle_command(text, require_wake=require_wake,
-                                    source=source)
+                ctx.run(self.handle_command, text,
+                        require_wake=require_wake, source=source)
             except Exception as e:
-                # без этого исключение уносило бы воркер, и все следующие
-                # команды остались бы в очереди навсегда
+                # without this an exception would carry off the worker, and
+                # every following command would stay in the queue forever
                 log.exception("Сбой обработки команды")
                 try:
                     self.say(tr("Не получилось выполнить команду: ") + str(e),
@@ -408,30 +1182,43 @@ class RinaEngine:
     def handle_command_async(self, text, require_wake=False, source="typed",
                              wait=False):
         """
-        Поставить команду в очередь обработки.
+        Put a command into the handling queue.
 
-        Оболочка вызывает это вместо handle_command: конвейер работает в
-        своём потоке, окно остаётся живым, а порядок команд сохраняется.
-        wait=True нужен режиму «всегда слушать»: он не должен слушать
-        дальше, пока предыдущая фраза не отработала.
+        The shell calls this instead of handle_command: the pipeline works
+        in its own thread, the window stays alive, and the order of commands
+        is preserved. wait=True is needed by the "always listen" mode: it
+        must not listen further until the previous phrase has been dealt
+        with.
         """
         self._ensure_command_worker()
         done = threading.Event()
-        self._commands.put((text, require_wake, source, done))
+        # The execution context is put into the queue along with the
+        # command. The end-to-end trace (4.0-D15) rides in it: the worker
+        # thread is long-lived and serves many commands in a row, so it
+        # cannot be tied to one of them — the context belongs to the command,
+        # not to the thread.
+        #
+        # The first run of the two processes showed this outright: Rina's
+        # answer arrived with a trace that did not match the request's, and
+        # there was nothing to tie request to answer with across two
+        # journals.
+        self._commands.put((text, require_wake, source, done,
+                            contextvars.copy_context()))
         if wait:
             done.wait()
         return done
 
     # ------------------------------------------------------------------
-    # конвейер команд
+    # the command pipeline
     # ------------------------------------------------------------------
     def handle_command(self, text, require_wake=False, source="typed"):
         ctx = self._router_context(source, require_wake)
         intent = router_mod.route(text, ctx)
 
-        # Индекс программ мог быть ещё не построен: в 3.1.0 его строила первая
-        # же команда запуска. Повторяем разбор ровно один раз и только когда
-        # индекс пуст — иначе первое «громче» ждало бы обхода диска.
+        # The program index may not have been built yet: in 3.1.0 it was
+        # built by the very first launch command. We repeat the parse exactly
+        # once and only when the index is empty — otherwise the first
+        # "louder" would wait for a walk of the disk.
         if intent.name == "app.not_found" and not ctx.apps:
             from voice import app_index
 
@@ -439,7 +1226,68 @@ class RinaEngine:
             if ctx.apps:
                 intent = router_mod.route(text, ctx)
 
+        # Written into the open session, if one is open (`4.0b-A02`).
+        #
+        # **This is the text of a command, which the journal refuses to
+        # keep at all** (`T-05`: «текста команды в журнале нет никогда»,
+        # even with `log_texts` on). The two are not in conflict, and
+        # the difference is worth stating rather than leaving to be
+        # noticed. The journal exists to work out what happened after
+        # something went wrong, and for that "what was launched" is
+        # enough — the words add nothing and cost a recording of
+        # somebody's speech. A session exists to answer "what did I do
+        # yesterday", and there the words **are** the answer. It is
+        # opened by name, read back on request, shown row by row in
+        # "what Rina knows about me", and forgotten one session at a
+        # time. `T-22`.
+        #
+        # After the parse rather than before: a phrase that turned out
+        # not to be addressed to her is not a command that was given.
+        if intent.name != "silence":
+            self._sessions.remember_command(text)
+            # What the command was understood as — a name from the
+            # catalogue, never the command (`core/telemetry.py`).
+            self.telemetry.intent(intent.name)
+
         if intent.name == "silence":
+            # Said out loud in the journal, because from outside this is
+            # the same silence as not hearing at all — and a person met
+            # both and could not tell them apart. "Heard, but the name
+            # was not in it" and "heard nothing" want opposite fixes: the
+            # first is about how one speaks to her, the second about the
+            # microphone.
+            log.info("Расслышано, но не мне (%s): %s", intent.stage,
+                     safe(text))
+            return
+
+        # She was spoken to — so the conversation is open, and for the
+        # next little while the name need not be said again (`4.0b-E06`).
+        # Only for what was said aloud: a typed line needs no wake word
+        # anyway, and opening the ear because somebody typed would be
+        # answering a question nobody asked.
+        if source in ("voice", "always"):
+            self._open_talk()
+
+        # **A new command replaces the answer to the old one.**
+        #
+        # Asked something else, she stops saying the previous thing:
+        # finishing an answer nobody is waiting for any more is talking
+        # over the person who moved on. Met as a mess — a command said
+        # three times because it seemed unheard, three answers, and all
+        # of them at once.
+        #
+        # Here rather than where speech is sent, because the rule is
+        # about commands and not about speech: a reminder going off in
+        # the middle of an answer waits its turn instead of eating it.
+        self._hush_previous()
+
+        if intent.name == "offer.accepted":
+            # The "yes" goes into the conversation like any other word.
+            # Without it the record reads "Switch it on?" — "Switched
+            # on", with nobody having agreed to anything in between.
+            self._history.add("user", text, source=source)
+            self._emit(Events.HISTORY_CHANGED)
+            self._take_offer(intent)
             return
 
         if intent.name == "ask.wake":
@@ -453,7 +1301,25 @@ class RinaEngine:
         self._history.add("user", command, source=source)
         self._emit(Events.HISTORY_CHANGED)
 
-        # Фраза была ответом на заданный вопрос — роутер это уже понял.
+        # Remember what was launched, so that a correction has something
+        # to attach to (`4.0b-A04`). What is remembered is **the word that
+        # was said**, not the program: what has to be learned is how the
+        # person names things, and "no, I meant Chrome" refers to the word
+        # rather than to what opened.
+        #
+        # Only a successful launch: there is nothing to correct about "not
+        # found" — there it was the search that erred, not the choice.
+        #
+        # And only for one turn. "Following a launch" means exactly
+        # following: without clearing it the memory lived for the whole
+        # session, and "no, I meant Chrome" said an hour later silently
+        # rewrote a word the person had long stopped talking about. The
+        # suite caught this itself — a correction attached to a launch from
+        # somebody else's case.
+        self._last_launch_query = (intent.arg("query") or ""
+                                   if intent.name == "app.launch" else "")
+
+        # The phrase was an answer to the question asked — the router has already worked that out.
         if intent.stage == "pending":
             self._dialog.answered()
             if intent.name == "cancelled":
@@ -463,40 +1329,70 @@ class RinaEngine:
             self._executor.execute(intent, source)
             return
 
-        # Не ответ — вопрос снимается. Так ведёт себя 3.1.0: любая
-        # нераспознанная реплика забывает заданный вопрос (инвентарь, §6).
+        # Not an answer — the question is withdrawn. That is how 3.1.0
+        # behaves: any unrecognised line forgets the question asked
+        # (inventory, §6).
         self._dialog.dropped()
 
-        # Плагины и пользовательские команды роутер пока не разбирает:
-        # плагин — чужой код, и «взял бы он фразу» узнаётся только запуском.
+        # The router does not yet parse plugins and user commands: a plugin
+        # is somebody else's code, and "would it take the phrase" is found
+        # out only by running it.
         if self._dispatch_plugin(command):
             return
         if self._dispatch_user_command(command):
             return
 
-        # Языковая модель — единственное, что ядро делает само: ответ идёт
-        # секундами, и ждать его в этом потоке нельзя.
+        # The language model is the only thing the core does itself: the
+        # answer takes seconds, and it cannot be waited for in this thread.
         if intent.name == "llm.answer":
             self._ask_llm_async(command, source)
             return
 
-        # Намерение, после которого ждём ответа, сначала становится вопросом.
-        # Какие именно — знает core/intent.py, а не набор условий здесь.
-        if intent.needs_answer:
-            self._dialog.ask(self._question_for(intent))
+        # An intent after which we wait for an answer is first performed
+        # (the question has to be spoken), and then becomes the question
+        # asked. The order matters: the confirmation is issued during
+        # execution, and its identifier has to go into the question.
+        result = self._executor.execute(intent, source)
 
-        self._executor.execute(intent, source)
+        if intent.needs_answer:
+            question = self._question_for(intent, result)
+            self._dialog.ask(question)
+            self._announce_question(question)
 
     @staticmethod
-    def _question_for(intent):
-        """Намерение, ждущее ответа, -> заданный вопрос."""
+    def _question_for(intent, result=None):
+        """
+        An intent awaiting an answer -> a question asked.
+
+        For a dangerous action the confirmation that was issued is put into
+        the question: a person's consent applies to a particular call, not
+        to the fact that the question was once asked (4.0-C05).
+        """
+        confirmation_id = ""
+        if result is not None:
+            confirmation_id = str(result.data.get("confirmation_id", ""))
+
         if intent.name == "app.ambiguous":
             return Question(kind=dialog_mod.CHOOSE_APP,
                             options=tuple(intent.arg("options") or ()),
                             query=intent.arg("query") or "")
+        if intent.name == "music.ask":
+            # The suggestions travel with the question; the answer may
+            # be neither of them, and then it is taken as said. See
+            # `dialog.ASKED`.
+            from voice import music
+
+            return Question.asked(intent.text or "", "music.play",
+                                  slot="genre", options=music.SUGGESTED)
+        if intent.name == "todo.ambiguous":
+            return Question(kind=dialog_mod.CHOOSE_TODO,
+                            options=tuple(intent.arg("options") or ()),
+                            query=intent.arg("query") or "")
         if intent.name == "system.confirm":
-            return Question.confirm_action(intent.arg("action"))
-        return Question.confirm_command(intent.arg("command_id") or "")
+            return Question.confirm_action(intent.arg("action"),
+                                           confirmation_id)
+        return Question.confirm_command(intent.arg("command_id") or "",
+                                        confirmation_id)
 
     def _dispatch_plugin(self, command):
         if self._plugins is None:
@@ -506,8 +1402,8 @@ class RinaEngine:
                 log.debug("Команду обработал плагин")
                 return True
         except Exception:
-            # плагин — чужой код; его сбой не должен рвать конвейер,
-            # но и пропадать бесследно тоже не должен
+            # a plugin is somebody else's code; its failure must not tear
+            # the pipeline, but must not vanish without trace either
             log.exception("Сбой плагина при разборе команды")
         return False
 
@@ -532,57 +1428,69 @@ class RinaEngine:
 
 
     def _ask_llm_async(self, command, source):
-        """Спрашивает модель в фоне и отвечает, когда та ответит."""
-        from core import llm
+        """
+        Asks the model in the background and answers when it answers.
 
+        Through the registry rather than directly: going to the model is a
+        network call with the `network.local` permission, and it is obliged
+        to land in the call journal along with the rest (4.0-C06, C07).
+        """
         def worker():
             self._emit(Events.THINKING, active=True)
             try:
-                answer = llm.ask(command, self._history.all())
-            except llm.LLMError:
-                # модель не ответила — ведём себя как без неё
+                result = self._tools.call(
+                    "ask_model",
+                    {"question": command, "context": self._history.all()},
+                    source=source)
+            finally:
                 self._emit(Events.THINKING, active=False)
-                self._fallback_reply(command, source)
+
+            if result.ok and result.message:
+                self.say(result.message)
                 return
-            except Exception:
-                self._emit(Events.THINKING, active=False)
-                self._fallback_reply(command, source)
-                return
-            self._emit(Events.THINKING, active=False)
-            self.say(answer)
+            # the model did not answer — we behave as if it were not there
+            self._fallback_reply(command, source)
 
         threading.Thread(target=worker, daemon=True).start()
 
     def _fallback_reply(self, command, source):
         """
-        Запасной вариант — поиск в интернете.
+        The fallback — a search on the internet.
 
-        В режиме «всегда слушать» не ищем: туда попадают шум и случайная
-        речь, открывать по ним браузер нельзя.
+        With the microphone open on her own initiative we do not search:
+        noise and chance speech land here, and a browser must not be
+        opened on them. Asked of `_unbidden`, which is the same fact the
+        router is given — and asked of it rather than of the mode,
+        because a typed line is nobody's chance speech.
         """
-        if self._settings.get("web_search_fallback", True) and source != "always":
-            from voice import websearch
-
-            found = websearch.fallback_search(
-                command, self._settings.get("search_engine", websearch.DEFAULT_ENGINE))
-            if found:
-                self.say(found)
+        allowed = (self._settings.get("web_search_fallback", True)
+                   and not self._unbidden(source))
+        if allowed:
+            result = self._tools.call("web_search", {"query": command},
+                                      source=source)
+            if result.ok:
+                # The wording differs from an explicit search: the person
+                # did not ask to search, and it is more honest to say so.
+                self.say(tr("Не нашла такой команды — поищу «{query}» "
+                            "в интернете.", query=command))
                 return
 
         self.say(tr("Извини, я не поняла команду."), sound="error")
 
     # ------------------------------------------------------------------
-    # настройки, зависящие от языка и микрофона
+    # settings that depend on the language and the microphone
     # ------------------------------------------------------------------
     def listen_seconds(self):
         try:
             value = int(self._settings.get("listen_seconds", 8))
         except (TypeError, ValueError):
             return 8
-        return max(3, min(20, value))
+        # The floor is in the schema now, where it can be read back; this
+        # only guards a profile written before that.
+        return max(3, min(60, value))
 
     def lang_code(self):
-        """Язык распознавания = язык интерфейса (единая настройка)."""
+        """The recognition language = the interface language (one setting)."""
         lang_map = {"Русский": "ru", "English": "en", "Українська": "uk",
                     "Español": "es", "Deutsch": "de"}
         return lang_map.get(self._settings.get("ui_language", "Русский"), "ru")

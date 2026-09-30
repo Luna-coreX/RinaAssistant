@@ -30,6 +30,9 @@ MANIFEST
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
+# Not PyInstaller's: the shell's own, named in Rina.Shell.csproj. Ignored,
+# a fresh clone did not build (CS1926). tools/check_tracked.py holds this.
+!shell/Rina.Shell/app.manifest
 *.spec
 
 # Installer logs
@@ -143,8 +146,10 @@ venv.bak/
 # Rope project settings
 .ropeproject
 
-# mkdocs documentation
-/site
+# mkdocs documentation — не используется; `/site` здесь стоял из
+# шаблона и прятал страницу продукта (`4.0b-D01`), которая лежит ровно
+# там. Исключение снято; проверка `tools/check_site.py` следит, чтобы оно
+# не вернулось.
 
 # mypy
 .mypy_cache/
@@ -190,3 +195,8 @@ out/
 
 # Рабочий каталог скилла дизайна.
 .impeccable/
+
+# Сборка оболочки
+shell/**/bin/
+shell/**/obj/
+docs/4.0-beta funcs.txt

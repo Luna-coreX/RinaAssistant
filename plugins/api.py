@@ -1,32 +1,65 @@
 """
-Публичный API плагинов Rina.
+Rina's public plugin API. Version 4.
 
-Каждый плагин — папка в plugins/ с plugin.json (манифест) и main.py
-(класс-наследник Plugin). Класс находится по полю "entry" манифеста
-либо автоматически (первый наследник Plugin).
+Every plugin is a folder in plugins/ with a plugin.json (the manifest) and a
+main.py (a class inheriting from Plugin). The class is found by the
+manifest's "entry" field, or automatically (the first subclass of Plugin).
 
-Возможности плагина (все хуки необязательны):
-  - on_enable / on_disable         — жизненный цикл
-  - on_command(text) -> bool       — обработка команды
-  - on_event(name, data)           — произвольные события
-  - create_page() -> QWidget|None  — своя ВКЛАДКА в приложении
-  - settings_schema() -> [Field]   — декларативные настройки (панель строит app)
-  - page_title / page_icon         — как назвать вкладку в сайдбаре
+**A plugin declares rather than does.** The decision is
+[ADR 0010](../docs/adr/0010-plugin-api.md). It declares three things, and
+all three as data:
 
-Через self.ctx доступны сервисы приложения:
-  - respond(text)                  — Рина озвучит/покажет текст
-  - log(msg)                       — лог плагина
-  - get_setting/set_setting        — свои настройки (хранятся в конфиге)
-  - open_window(widget, title)     — показать доп. окно
-  - notify(title, message)         — уведомление (трей)
+  - **tools** (`tools()`) — what it can do; they go into the core's registry
+    and get permissions, confirmations and journalling there on a par with
+    the built-in ones;
+  - **a page** (`page()`) — how it looks; as a description by the version 2
+    schema (`plugins/page_spec.py`), without widgets;
+  - **permissions** — what it needs from the machine; as a list in the
+    manifest, before the first run.
 
-Совместимость: манифест может указывать "api_version". Текущая версия — API_VERSION.
+Why: the core asks a person for consent to "launching programs" and refuses
+without it, while a plugin beside it could call `subprocess` and ask
+nothing. While the plugins were three demonstrations, that was a theoretical
+hole; with third-party ones it becomes the only one that matters.
+
+A plugin's capabilities (every hook is optional):
+  - on_enable / on_disable         — the life cycle
+  - on_command(text) -> bool       — handling a command
+  - on_event(name, data)           — arbitrary events
+  - tools() -> [PluginTool]        — the declared tools (v4)
+  - page() -> [Element]            — a page of its own, as a description
+  - on_action(action, value)       — a button on the page was pressed
+  - settings_schema() -> [Field]   — declarative settings
+
+Through self.ctx the application's services are available:
+  - respond(text)                  — Rina will speak/show the text
+  - log(msg)                       — the plugin's log
+  - get_setting/set_setting        — its own settings (kept in the config)
+  - notify(title, message)         — a notification (the tray)
+
+What is **gone**: `create_page()` and `open_window()`. A ready-made widget
+tied the core to a particular shell — that was a direct blocker of the
+process split. A version 1-3 plugin does not load, and the person is told
+why (`4.0-H05`).
+
+Compatibility: the manifest states "api_version". The current one is
+API_VERSION.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
-API_VERSION = 3   # версия API плагинов (растёт при несовместимых изменениях)
+#: The plugin API's version. Grows on incompatible changes.
+#:
+#: 4 — a plugin declares tools and a page; `create_page` is gone.
+API_VERSION = 4
+
+#: The lowest version the core still loads.
+#:
+#: It deliberately coincides with the current one: a plugin that gives out a
+#: widget cannot be "partly supported" — a C# shell will not draw a
+#: `QWidget` in any way at all.
+MIN_API_VERSION = 4
 
 
 @dataclass
@@ -39,7 +72,12 @@ class PluginManifest:
     entry: str = ""
     icon: str = "🧩"
     path: str = ""
-    api_version: int = 1     # какую версию API ожидает плагин
+    api_version: int = 1     # which API version the plugin expects
+    #: What the plugin asks of the machine (`4.0-H06`). The names come from
+    #: the `core/permissions.py` catalogue; a second catalogue "for plugins"
+    #: would mean two languages about one and the same thing. Not all of it
+    #: is available: see ADR 0010.
+    permissions: tuple = ()
 
     @staticmethod
     def from_dict(d: dict, path: str = "") -> "PluginManifest":
@@ -53,17 +91,59 @@ class PluginManifest:
             icon=str(d.get("icon", "🧩")),
             path=path,
             api_version=int(d.get("api_version", 1)),
+            permissions=tuple(str(p) for p in (d.get("permissions") or ())),
         )
 
     def api_compatible(self) -> bool:
-        # плагин совместим, если его api_version не выше текущей
-        return self.api_version <= API_VERSION
+        """Do we load such a plugin at all."""
+        return MIN_API_VERSION <= self.api_version <= API_VERSION
+
+    def why_incompatible(self) -> str:
+        """
+        Why it was not loaded — in human words (`4.0-H05`).
+
+        A silent "the plugin simply does not work" looks like a breakage in
+        Rina rather than an outdated plugin. So the reason, the version and
+        what the author should do are all named.
+        """
+        if self.api_version > API_VERSION:
+            return (f"Плагину нужна версия API {self.api_version}, "
+                    f"а эта сборка поддерживает {API_VERSION}. "
+                    f"Обновите Рину.")
+        return (f"Плагин написан под API {self.api_version}, а нужна "
+                f"версия {API_VERSION}: страница описывается методом "
+                f"page(), а не create_page(). Обновите плагин.")
+
+
+@dataclass
+class PluginTool:
+    """
+    A tool declared by a plugin.
+
+    It goes into the core's registry under the name `plugin.<id>.<name>` and
+    gets exactly the same gates there as a built-in one: the permission
+    check, confirmation of the irreversible, a journal entry saying which
+    plugin started this.
+
+    `run(args)` is called by the core, not by the plugin: a plugin does not
+    decide when its tool works — it declared what it can do and waits.
+    """
+
+    name: str
+    summary: str
+    run: object = None
+    #: The arguments — by the same `Param` as the built-in tools'.
+    params: tuple = ()
+    #: What has to be allowed. An empty set means nothing.
+    permissions: tuple = ()
+    #: Ask the person on every call.
+    confirm_required: bool = False
 
 
 class PluginContext:
     """
-    Прослойка между плагином и приложением. Плагин зависит только от неё,
-    а не от внутренностей UI.
+    A layer between the plugin and the application. A plugin depends only on
+    it, not on the UI's innards.
     """
 
     def __init__(self, manifest: PluginManifest, host):
@@ -74,7 +154,7 @@ class PluginContext:
         self._host.log(self.manifest.id, str(message))
 
     def respond(self, text: str):
-        """Рина озвучит/покажет текст."""
+        """Rina will speak/show the text."""
         self._host.respond(self.manifest.id, str(text))
 
     def get_setting(self, key: str, default=None):
@@ -83,37 +163,32 @@ class PluginContext:
     def set_setting(self, key: str, value):
         self._host.set_plugin_setting(self.manifest.id, key, value)
 
-    def open_window(self, widget, title="", width=420, height=320):
-        """Показать дополнительное окно с содержимым widget."""
-        return self._host.open_plugin_window(
-            self.manifest.id, widget, title or self.manifest.name, width, height)
-
     def notify(self, title, message):
-        """Показать уведомление (через трей, если доступен)."""
+        """Show a notification (through the tray, if it is available)."""
         self._host.notify_from_plugin(self.manifest.id, title, message)
 
 
 class Plugin:
     """
-    Базовый класс плагина. Наследники переопределяют нужные хуки.
+    A plugin's base class. Subclasses override the hooks they need.
     """
 
-    # заголовок/иконка вкладки (если плагин отдаёт create_page)
-    page_title = None    # по умолчанию берётся имя из манифеста
-    page_icon = None     # по умолчанию иконка из манифеста
+    # the tab's title/icon (if the plugin gives out create_page)
+    page_title = None    # by default the name from the manifest is taken
+    page_icon = None     # by default the icon from the manifest
 
     def __init__(self, context: PluginContext):
         self.ctx = context
         self.manifest = context.manifest
 
-    # --- удобные прокси ---
+    # --- convenient proxies ---
     def log(self, message):
         self.ctx.log(message)
 
     def respond(self, text):
         self.ctx.respond(text)
 
-    # --- хуки жизненного цикла ---
+    # --- the life-cycle hooks ---
     def on_enable(self):
         pass
 
@@ -126,43 +201,77 @@ class Plugin:
     def on_event(self, name: str, data: dict = None):
         pass
 
-    # --- расширения UI (необязательные) ---
+    # --- UI extensions (optional) ---
     def page(self):
         """
-        Описать свою вкладку списком элементов (см. plugins/page_spec.py).
-        Приложение само её нарисует, поэтому плагин не зависит от Qt и
-        не сломается при смене оболочки. [] или None — вкладки нет.
+        Describe your own tab as a list of elements (see
+        plugins/page_spec.py). The application draws it itself, so the
+        plugin does not depend on Qt and will not break when the shell
+        changes. [] or None means there is no tab.
 
-        Это рекомендуемый способ (API v2).
+        This is the recommended way (API v2).
+        """
+        return None
+
+    def home(self):
+        """
+        Describe a tile for the home screen (API v4, `4.0b-A07`).
+
+        The line above said "API v5" for two releases while `API_VERSION`
+        stood at 4 and every bundled plugin declared 4 and drew a tile —
+        that is, it named a version that has never existed. Found by the
+        page that documents this API, which asks the class rather than the
+        prose.
+
+        The same elements as `page`, and the same rule: you say what, the
+        application decides how. `[]` or `None` means no tile — and that is
+        the right answer for most plugins. The home screen is one screen for
+        everybody, and a plugin that puts itself there is taking room from
+        whatever else is on it.
+
+        **It has to be short.** A tile that grows becomes a page, and there
+        is already a place for a page. The application keeps only the first
+        few elements and says so rather than scrolling a home screen.
+
+        **It is drawn often** — the home screen is where a person lands —
+        so build it from what you already know rather than going to the
+        network here. Fetch on your own schedule and answer from memory.
         """
         return None
 
     def on_action(self, action: str, value=None):
         """
-        Нажали кнопку с этим action на вкладке плагина.
-        После вызова страница пересобирается автоматически.
+        A button with this action on the plugin's tab was pressed.
+        After the call the page is rebuilt automatically.
         """
         pass
 
-    def create_page(self):
+    def tools(self):
         """
-        Устаревший способ (API v1): вернуть готовый QWidget.
+        Declare tools (API v4).
 
-        Работает, но привязывает плагин к Qt — в новых плагинах используйте
-        page(). Если определены оба, приоритет у page().
-        """
-        return None
+        A list of `PluginTool`. The names inside a plugin are short — the
+        core adds the `plugin.<id>.` prefix itself, so that two plugins with
+        a `roll` tool do not fight over one name.
 
-    def settings_schema(self):
-        """
-        Вернуть список Field (см. ui/plugins/settings_spec.py) — тогда
-        приложение само построит панель настроек плагина. [] — нет настроек.
+        The permissions are checked **before** registration: what a plugin
+        is not entitled to (ADR 0010) is not granted, and the tool itself is
+        not created — a tool without the permission it needs would refuse
+        anyway, but only after the person had seen it and called it.
         """
         return []
 
-    # --- удобный доступ к своим настройкам с учётом схемы ---
+    def settings_schema(self):
+        """
+        Return a list of Field (see ui/plugins/settings_spec.py) — then the
+        application builds the plugin's settings panel itself. [] means
+        there are no settings.
+        """
+        return []
+
+    # --- convenient access to one's own settings, respecting the schema ---
     def setting(self, key, default=None):
-        # значение из конфига, иначе default из схемы, иначе переданный default
+        # the value from the config, else the schema's default, else the one passed in
         val = self.ctx.get_setting(key, None)
         if val is not None:
             return val

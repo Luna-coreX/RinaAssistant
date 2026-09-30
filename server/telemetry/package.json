@@ -1,0 +1,12 @@
+{
+  "name": "rina-telemetry",
+  "private": true,
+  "description": "The beta's telemetry collector (4.0b-D05). Goes with 4.0.0 Stable (4.0-S04).",
+  "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^1.0.0"
+  }
+}

@@ -1,0 +1,1038 @@
+"""
+Running tools: the only path by which anything happens at all.
+
+Plan item 4.0-C03. The registry (core/toolbox.py) describes what Rina can
+do; here it is performed — and only here.
+
+Every call passes four gates in an unchanging order:
+
+    1. does such a tool exist                 -> tool.unknown
+    2. are the arguments suitable             -> tool.invalid_arguments
+    3. is the dangerous action confirmed      -> confirmation.*
+    4. and only then — execution
+
+The order is not accidental. The argument check comes before confirmation so
+that a person is not asked about a call that will not take place anyway. The
+confirmation check comes before execution — otherwise it is meaningless.
+
+**Why the implementations live here rather than in the executor.** The
+task's criterion is "the executor has not one path around the registry".
+While a side effect can be called directly, the prohibition rests on
+discipline. Gathered in one module and reachable only through
+`ToolRunner.call`, they rest on the way the code is built: to get around the
+gates one must not merely forget but deliberately write a way around.
+
+The dependencies come from outside as one context object — which is why the
+tools are checked with stand-in stores, without raising the application.
+
+There is no Qt here: the module lies in the core.
+"""
+
+import time
+from dataclasses import dataclass
+from typing import Any, Callable
+
+from core.audit import AuditLog, redact_args
+from core.confirmations import ConfirmationError, ConfirmationLedger
+from core.i18n import t as tr
+from core.logging_setup import (get_logger, safe, security_log,
+                                texts_allowed)
+from core.permissions import PERMISSIONS
+from core.tools import ToolError, UnknownTool
+from core.toolbox import default_registry
+
+
+log = get_logger("tools")
+
+
+@dataclass
+class ToolContext:
+    """Everything the tools use. Passed in from outside."""
+
+    settings: Any = None
+    reminders: Any = None
+    #: Things to do (`4.0b-A13`). A store of their own rather than a field
+    #: on the reminders: they grow independently and live different spans.
+    todo: Any = None
+    #: Working sessions (`4.0b-A02`). Its own store for the same
+    #: reason as the list: written while somebody works, read after.
+    sessions: Any = None
+    #: Say the offer focus mode held back (`4.0b-A05`).
+    release_held: Callable = None
+    commands: Any = None
+    plugins: Any = None
+    emit: Callable = None
+    host: Any = None
+    #: Remember the choice of program under the word that was said.
+    on_alias: Callable = None
+    #: Who touches the machine: volume, media, power, a screenshot.
+    #: In 4.0 that is the shell (ADR 0009); in 3.1.0 it was empty and the
+    #: core did it itself.
+    system_out: Callable = None
+    #: Who launches programs. The same place as the system layer, and for
+    #: the same reason: somebody else must stand between an intent and the
+    #: creation of a process, and that somebody is not whoever listens to the
+    #: microphone.
+    launch_app: Callable = None
+    #: Who opens a page in a browser.
+    #:
+    #: The last side effect without a seam. Launching a program goes through
+    #: the shell (`4.0-G05`), a system action goes through the shell
+    #: (ADR 0009) — and opening a browser went straight from the core to the
+    #: machine. It is the same kind of act as launching: somebody else's
+    #: process is started, and the one who parsed the phrase should not be
+    #: the one who starts it.
+    #:
+    #: It was found the way such things are found: a check that builds a real
+    #: engine opened the person's browser, because a phrase it fed in was not
+    #: recognised and the fallback search is on by default. The check could
+    #: have switched a setting off; the setting was not the problem.
+    #:
+    #: Until it is set, the core opens the browser itself — the 3.1.0 path,
+    #: exactly as with launching.
+    open_url: Callable = None
+
+    #: Where to get the program index from.
+    #:
+    #: It appeared because without it the tools searched a **different** list
+    #: from the router's: the router asked the shell (4.0-G06), and they
+    #: asked the scanner's cache, which in 4.0 nobody fills. Rina offered a
+    #: choice of three and then answered that she had found none.
+    apps: Callable = None
+
+    #: The call journal, for "Why?" (`4.0b-B04`).
+    #:
+    #: Handed in like everything else here rather than opened on the spot: a
+    #: tool that opened its own journal would explain from a different one
+    #: than the runner writes to, and the two would agree only by accident.
+    journal: Any = None
+
+    #: What to ask about the computer: which program is in front, whether
+    #: one is running (`4.0b-A09`). The shell answers (ADR 0009), and the
+    #: answer is used for a branch and dropped — never kept (`T-19`).
+    machine_out: Callable = None
+
+    #: The tool catalogue, so an explanation can name what was done in the
+    #: words the catalogue already uses. A second set of names for the same
+    #: tools would drift from the first.
+    registry: Any = None
+
+
+class ToolResult:
+    """What a tool returned."""
+
+    __slots__ = ("ok", "value", "message", "error_code", "reason")
+
+    def __init__(self, ok=True, value=None, message="", error_code="",
+                 reason=""):
+        self.ok = ok
+        self.value = value
+        self.message = message
+        self.error_code = error_code
+        #: Why it turned out this way, in one word (`4.0b-B04`).
+        #:
+        #: Set by the tool, because the tool is the only place that knows.
+        #: "Where did that path come from" cannot be worked out afterwards
+        #: from the journal: by then there is a path and no memory of
+        #: whether it came from a word the person taught, from the Start
+        #: menu, or from a folder they pointed at. Written down at the
+        #: moment of the decision or not at all.
+        self.reason = reason
+
+    @classmethod
+    def done(cls, message="", value=None, reason=""):
+        return cls(True, value, message, reason=reason)
+
+    @classmethod
+    def failed(cls, message, error_code="internal", reason=""):
+        return cls(False, None, message, error_code, reason)
+
+    def __repr__(self):
+        state = "ok" if self.ok else f"ошибка {self.error_code}"
+        return f"<ToolResult {state}: {self.message!r}>"
+
+
+# ---------------------------------------------------------------------------
+# The implementations. Reachable only through ToolRunner.call.
+# ---------------------------------------------------------------------------
+#: "There is no shell on the line" — a code, not a phrase.
+#:
+#: The core reaches the shell through a callable that is always present:
+#: whether the shell exists is known only at call time, because it connects
+#: later than the tools are assembled. So "there is nobody to ask" is
+#: reported the same way as any other failure — by a returned answer — and
+#: has to be told apart from "the shell was asked and it refused".
+#:
+#: A code rather than prose for the same reason as `refused`: matching on a
+#: substring of a sentence broke the moment the shell was translated.
+NO_SHELL = "no_shell"
+
+
+def _index(ctx):
+    """
+    The program index — the same one the router sees.
+
+    Exactly one source: two lists answering one question will one day answer
+    differently, and that has already happened.
+    """
+    source = getattr(ctx, "apps", None)
+    if source is not None:
+        return source() or []
+
+    from voice import app_index
+
+    return app_index.cached_index() or []
+
+
+def _launch_app(ctx, args):
+    from voice import app_index
+
+    name = args["name"]
+    entry = None
+    for candidate in _index(ctx):
+        if candidate.name == name:
+            entry = candidate
+            break
+    if entry is None:
+        return ToolResult.failed(
+            tr("Не нашла программу «{name}».", name=name), "app.not_found",
+            "not_indexed")
+
+    # The shell launches (ADR 0009): it is also what checks the canonical
+    # path, the forbidden directory and the signature, and it is what asks
+    # the person if the file is unsigned (4.0-G10). The core reaches this
+    # point having already **decided** what to launch; "may I" is not its
+    # question.
+    launch = getattr(ctx, "launch_app", None)
+    started, why = launch(entry.launch, entry.kind) if launch else (False,
+                                                                    NO_SHELL)
+
+    # Without a shell we launch it ourselves. That is the 3.1.0 path: one
+    # process, no shell at all, and a core that refuses to launch anything
+    # there is simply broken. Unlike a system action, which has deliberately
+    # no reserve (see `_run_system`), launching a program was always the
+    # core's own — the shell took it over along with the signature check.
+    #
+    # Only on `NO_SHELL`, never on a refusal or a failure: a shell that was
+    # asked and said no has answered, and asking around it would turn the
+    # question into a formality.
+    #
+    # This branch was unreachable for a while: `ToolContext.launch_app` is
+    # always a callable, so `launch is None` was never true, and a core
+    # without a shell answered "the program was removed or moved" — blaming
+    # the person's disk for our own missing half. Two of the seven recorded
+    # sessions had been red because of it.
+    if not started and why == NO_SHELL:
+        started, why = app_index.launch(entry), ""
+
+    # Where the path came from — kept for "Why?" (`4.0b-B04`). The index
+    # entry knows: a word the person taught, the Start menu, the desktop, a
+    # folder they pointed at. A moment later there is only a path.
+    if not started:
+        # "The person refused" is not a fault: they answered, and the
+        # answer was no. The error code is the same as for a denied
+        # permission — for the core it is one and the same event, and the
+        # question should not be repeated.
+        #
+        # The shell replies with a code, not a phrase: matching on a
+        # substring of prose broke the moment the shell was translated.
+        if why == "refused":
+            return ToolResult.failed(tr("Не стала запускать."),
+                                     "permission.denied", entry.source)
+        return ToolResult.failed(
+            tr("Не получилось запустить {app} — программу удалили "
+               "или перенесли.", app=entry.name), "app.launch_failed",
+            entry.source)
+
+    query = args.get("query")
+    if query and ctx.on_alias:
+        ctx.on_alias(query, entry)
+    return ToolResult.done(tr("Запускаю {app}.", app=entry.name), entry.name,
+                           reason=entry.source)
+
+
+def _list_apps(ctx, args):
+    entries = _index(ctx)
+    query = (args.get("query") or "").strip().lower()
+    if query:
+        entries = [e for e in entries if query in e.name.lower()]
+    entries = entries[:args.get("limit", 20)]
+    return ToolResult.done(value=[e.to_dict() for e in entries])
+
+
+_VOLUME = {"up": "volume_up", "down": "volume_down", "mute": "volume_mute"}
+_MEDIA = {"next": "media_next", "previous": "media_prev",
+          "play_pause": "media_play_pause"}
+
+
+def _run_system(ctx, action_id):
+    """
+    Perform a system action — by the shell's hands (ADR 0009).
+
+    The core decides **what** to do and **how to say so about it**; the
+    shell touches the machine. The word stays here not out of stubbornness:
+    "Volume turned up" is Rina's line, and its language is set by the core
+    (`4.0-F08`); the shell answers with the fact "it worked".
+
+    There is no way around it, not even in reserve: a core that can shut the
+    computer down itself is dangerous precisely because it can. Without the
+    shell the action is not performed — and that is right, because without
+    it there is nobody to ask for it either.
+    """
+    from voice import system_control
+
+    do = getattr(ctx, "system_out", None)
+    ok, detail = do(action_id) if do else (False, NO_SHELL)
+
+    # "There is nobody to ask" and "we asked and it did not work" are
+    # different things, and a person is told different things. The first
+    # used to be unreachable for the same reason as in `_launch_app`, and
+    # the answer named a failure that never happened.
+    if not ok and detail == NO_SHELL:
+        return ToolResult.failed(
+            tr("Системные действия делает оболочка, а связи с ней нет."),
+            "internal")
+    if not ok:
+        return ToolResult.failed(tr("Не получилось выполнить действие."),
+                                 "internal")
+    if action_id == "screenshot" and detail:
+        return ToolResult.done(tr("Снимок сохранён: ") + detail)
+    return ToolResult.done(tr(system_control.DONE_MESSAGES.get(action_id)
+                              or "Готово."))
+
+
+def _set_volume(ctx, args):
+    return _run_system(ctx, _VOLUME[args["action"]])
+
+
+def _media_control(ctx, args):
+    return _run_system(ctx, _MEDIA[args["action"]])
+
+
+def _lock_screen(ctx, args):
+    return _run_system(ctx, "lock")
+
+
+def _power_action(ctx, args):
+    return _run_system(ctx, args["action"])
+
+
+def _take_screenshot(ctx, args):
+    # A screenshot used to be asked for with the `window.action` event:
+    # capturing the screen was a Qt operation and worked only from the
+    # interface thread. Now it is an ordinary system action — the shell
+    # takes the screenshot itself and answers with a path to the file — and
+    # the "do something with the window" event stayed for what it always
+    # was: for the window.
+    return _run_system(ctx, "screenshot")
+
+
+def _create_reminder(ctx, args):
+    import time
+
+    from voice import reminders
+
+    seconds = args.get("seconds")
+    at = args.get("at")
+    text = args.get("text") or ""
+    on = reminders.clean_trigger(args.get("on"))
+
+    # A switched-off watch is a refusal, not silent agreement. Creating a
+    # reminder that will never fire is worse than creating none: a person
+    # counts on it and learns the truth at exactly the moment when counting
+    # on it turned out to be in vain.
+    if on and not (ctx.settings and ctx.settings.get("watch_apps", False)):
+        return ToolResult.failed(
+            tr("Не могу: я не слежу за тем, какие программы открыты. "
+               "Это включается в настройках, в разделе «Программы»."),
+            "permission.denied")
+
+    fire_at = at if at else time.time() + (seconds or 0)
+    ctx.reminders.add(args["kind"], fire_at, text, on=on)
+
+    # Something bound to an occasion answers about the occasion, not about
+    # the clock: saying "I will remind you at 03:17" about a reminder that
+    # is waiting for a program would name a time nobody promised.
+    if on:
+        if text:
+            return ToolResult.done(
+                tr("Напомню, когда откроешь {app}: {text}.",
+                   app=on.get("app") or "", text=text))
+        return ToolResult.done(
+            tr("Напомню, когда откроешь {app}.", app=on.get("app") or ""))
+
+    if seconds:
+        left = reminders.humanize_left(seconds)
+        if text:
+            return ToolResult.done(
+                tr("Напомню через {left}: {text}.", left=left, text=text))
+        return ToolResult.done(tr("Засекла {left}.", left=left))
+
+    when = reminders.when_text(fire_at)
+    if text:
+        return ToolResult.done(
+            tr("Напомню в {time}: {text}.", time=when, text=text))
+    return ToolResult.done(tr("Разбужу в {time}.", time=when))
+
+
+def _list_reminders(ctx, args):
+    from voice import reminders
+
+    items = sorted(ctx.reminders.active(), key=lambda r: r.get("fire_at", 0))
+    if not items:
+        return ToolResult.done(tr("Ничего не запланировано."), [])
+    message = tr("Запланировано: ") + "; ".join(
+        reminders.describe(i) for i in items[:5])
+    return ToolResult.done(message, items)
+
+
+def _cancel_reminder(ctx, args):
+    target = args.get("id")
+    if target:
+        removed = 1 if ctx.reminders.remove(target) else 0
+    else:
+        removed = ctx.reminders.clear_active()
+    if not removed:
+        return ToolResult.done(tr("Нечего отменять."), 0)
+    return ToolResult.done(tr("Отменила: {count}.", count=removed), removed)
+
+
+def _scenario(ctx):
+    """
+    What a scenario may reach for: other commands, and the machine.
+
+    Handed in rather than fetched, for the reason everything else here is:
+    the module that performs a step has no business knowing where the
+    command store lives or which side owns the computer.
+    """
+    def find(command_id):
+        if ctx.commands is None:
+            return None
+        for candidate in ctx.commands.all():
+            if str(candidate.get("id")) == str(command_id):
+                return candidate
+        return None
+
+    return {"lookup": find, "machine": getattr(ctx, "machine_out", None)}
+
+
+def _run_user_command(ctx, args):
+    import threading
+
+    from voice.user_commands import execute
+
+    command_id = args["command_id"]
+    command = None
+    for candidate in ctx.commands.all():
+        if candidate.get("id") == command_id:
+            command = candidate
+            break
+    if command is None:
+        return ToolResult.failed(tr("Не получилось выполнить команду."),
+                                 "internal")
+
+    ctx.commands.bump_stat(command_id)
+    if command.get("type") == "sequence":
+        # There is sometimes a pause between steps; the calling thread must not be blocked.
+        def worker():
+            execute(command, ctx.host, ctx.emit, **_scenario(ctx))
+
+        threading.Thread(target=worker, daemon=True).start()
+        return ToolResult.done(tr("Выполняю последовательность."))
+
+    ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
+    return (ToolResult.done(response) if ok
+            else ToolResult.failed(response, "internal"))
+
+
+def _try_user_command(ctx, args):
+    """
+    Run a command that is still being assembled.
+
+    What keeps this a call of declared tools rather than an arbitrary
+    action is `execute` below: it knows a fixed set of kinds and does
+    nothing with one it does not know. The sanitising the card goes
+    through first is the import path's, and on this path it buys the caps
+    — fifty steps, a thousand characters of target — not the refusals.
+
+    Nothing is written down. A trial does not go into the command store,
+    does not bump the run counter, and leaves no command behind if the
+    person closes the editor: they were trying it out, not keeping it.
+    """
+    import threading
+
+    from core.data_transfer import sanitize_command
+    from voice.user_commands import execute
+
+    card = args["command"]
+    if not isinstance(card, dict):
+        return ToolResult.failed(tr("Нечего пробовать."), "internal")
+    command = sanitize_command(card)
+
+    # A trial is watched, and says which step it is on (`4.0b-A09`). An
+    # ordinary run is not: the events would go to a window that is not
+    # showing a canvas.
+    watched = dict(_scenario(ctx), trace=True)
+
+    if command.get("type") == "sequence":
+        def worker():
+            execute(command, ctx.host, ctx.emit, **watched)
+
+        threading.Thread(target=worker, daemon=True).start()
+        return ToolResult.done(tr("Пробую последовательность."))
+
+    ok, response = execute(command, ctx.host, ctx.emit, **watched)
+    return (ToolResult.done(response) if ok
+            else ToolResult.failed(response, "internal"))
+
+
+def _explain_last(ctx, args):
+    """
+    Why the last thing happened — or did not (`4.0b-B04`).
+
+    Everything said comes out of one journal record and the tool catalogue.
+    An explanation assembled from anything else could disagree with the
+    journal, and then there would be two accounts of one event with nothing
+    to say which is true.
+    """
+    from core import why
+
+    journal = getattr(ctx, "journal", None)
+    record = why.last_doing(journal)
+    if record is None:
+        return ToolResult.done(
+            tr("Я пока ничего не делала — объяснять нечего."))
+    return ToolResult.done(
+        why.explain(record, registry=getattr(ctx, "registry", None)),
+        value=record.get("id"), reason=record.get("tool", ""))
+
+
+def _dispatch_plugin_command(ctx, args):
+    if ctx.plugins is None:
+        return ToolResult.done(value=False)
+    try:
+        taken = bool(ctx.plugins.dispatch_command(args["text"]))
+    except Exception:
+        # A plugin is somebody else's code. Its failure does not tear the pipeline, nor does it vanish.
+        log.exception("Сбой плагина при разборе команды")
+        return ToolResult.done(value=False)
+    return ToolResult.done(value=taken)
+
+
+def _calculate(ctx, args):
+    from voice import calculator
+
+    found = calculator.classify(args["expression"])
+    if not found:
+        return ToolResult.failed(tr("Извини, я не поняла команду."),
+                                 "tool.invalid_arguments")
+    name, result = found
+    if name == "calc.zero_division":
+        return ToolResult.done(tr("На ноль делить нельзя."))
+    return ToolResult.done(
+        tr("Получается {result}.", result=result["result"]),
+        result["result"])
+
+
+# The module rather than its pieces: the sayings belong beside the store
+# that knows what a session is, for the same reason `_list_todo` reaches
+# for `voice.todo`.
+from voice import sessions as sessions_mod
+
+
+def _start_session(ctx, args):
+    session = ctx.sessions.start(str(args.get("goal", "")))
+    if session is None:
+        return ToolResult.failed(tr("Не поняла, над чем начать."),
+                                 "tool.invalid_arguments")
+    return ToolResult.done(sessions_mod.say_started(session), value=session)
+
+
+def _finish_session(ctx, args):
+    open_one = ctx.sessions.current()
+    if open_one is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    # Measured before closing: afterwards the answer would have to work
+    # the length out from two stored numbers, and the one place that
+    # knows both is the store.
+    was_focused = bool(open_one.get("focus"))
+    session = ctx.sessions.finish(str(args.get("note", "")))
+    spent = ctx.sessions.spent(session)
+    # What focus held back is said now, while the person is listening
+    # to the closing anyway — and after it, not before. `4.0b-A05`.
+    held = (ctx.release_held() if was_focused and ctx.release_held
+            else "")
+    said = sessions_mod.say_session(
+        session, spent,
+        prefix=sessions_mod.say_finished(session, spent))
+    return ToolResult.done((said + " " + held).strip() if held else said,
+                           value=session)
+
+
+def _note_session(ctx, args):
+    text = str(args.get("text", ""))
+    if not text.strip():
+        return ToolResult.failed(tr("Не поняла, что записать."),
+                                 "tool.invalid_arguments")
+    session = ctx.sessions.note(text)
+    if session is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    return ToolResult.done(tr("Записала в сессию: {text}.", text=text.strip()),
+                           value=session)
+
+
+def _folder_session(ctx, args):
+    path = str(args.get("path", ""))
+    if not path.strip():
+        return ToolResult.failed(tr("Не поняла, какой каталог."),
+                                 "tool.invalid_arguments")
+    if ctx.sessions.current() is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    # Said out loud is not the same as agreed to be kept. The switch is
+    # the standing answer; the phrase is only this once.
+    if not (ctx.settings and ctx.settings.get("session_folders", False)):
+        return ToolResult.done(
+            tr("Каталоги я не запоминаю — это включается в настройках."))
+    ctx.sessions.remember_folder(path)
+    return ToolResult.done(tr("Запомнила каталог: {path}.", path=path))
+
+
+def _which_session(ctx, args):
+    session = ctx.sessions.current()
+    if session is None:
+        return ToolResult.done(tr("Сейчас нет открытой сессии."))
+    spent = ctx.sessions.spent(session)
+    said = sessions_mod.say_session(
+        session, spent,
+        prefix=tr("Идёт сессия {goal}, уже {spent}.",
+                  goal=session["goal"],
+                  spent=sessions_mod._spell(spent)))
+    if session["focus"]:
+        said += " " + tr("Режим фокуса включён.")
+    return ToolResult.done(said, value=session)
+
+
+def _last_session(ctx, args):
+    session = ctx.sessions.last()
+    if session is None:
+        return ToolResult.done(tr("Прошлых сессий пока нет."))
+    return ToolResult.done(
+        sessions_mod.say_session(session, ctx.sessions.spent(session)),
+        value=session)
+
+
+def _worked_on(ctx, args):
+    query = str(args.get("query", ""))
+    # "На этой неделе" is a decision about the calendar, and it is taken
+    # here rather than in the store: the store is asked for a period and
+    # does not invent one.
+    since = time.time() - sessions_mod.WEEK
+    total, count = ctx.sessions.worked(query, since=since)
+    return ToolResult.done(sessions_mod.say_worked(query, total, count),
+                           value={"seconds": total, "sessions": count})
+
+
+def _set_focus(ctx, args):
+    on = bool(args.get("on"))
+    if ctx.sessions.current() is None:
+        # Focus is a property of a session, not a mode of the program.
+        # Without one there is nothing to be focused on, and inventing a
+        # session here would start a stretch of work nobody named.
+        # One literal on one line, because the check that asks whether
+        # everything Rina says has English reads the first string of a
+        # call and a split literal hides the rest of the sentence from
+        # it. A shorter line is also the better sentence.
+        return ToolResult.done(
+            tr("Фокус живёт внутри сессии — сначала начните сессию."))
+    ctx.sessions.set_focus(on)
+    return ToolResult.done(tr("Фокус включён. Сама заговаривать не буду.")
+                           if on else
+                           tr("Фокус выключен."))
+
+
+def _add_todo(ctx, args):
+    item = ctx.todo.add(str(args["text"]))
+    if item is None:
+        return ToolResult.failed(tr("Не поняла, что записать."),
+                                 "tool.invalid_arguments")
+    return ToolResult.done(tr("Записала: {text}.", text=item["text"]),
+                           value=item)
+
+
+def _list_todo(ctx, args):
+    """
+    What waits — and, if there is any, what is planned for today.
+
+    The two are different things and stay different: a thing to do has
+    no clock, a reminder is nothing but one. They are said together
+    because the question is one question. Somebody asking "what have I
+    got today" is not asking about a data structure, and answering
+    «Дел нет» while a meeting stands at six would be true and useless.
+
+    The plans are added only when there are some. An answer that ends
+    "and nothing is planned" reports an absence nobody asked about, and
+    turns every answer into two sentences; saying nothing when there is
+    nothing is what makes the sentence worth hearing when it appears.
+    """
+    from voice import reminders as reminders_mod
+    from voice import todo as todo_mod
+
+    items = ctx.todo.all(done=False)
+    said = todo_mod.say_list(items)
+    planned = reminders_mod.say_today(
+        reminders_mod.today(ctx.reminders.active()) if ctx.reminders else [])
+    if planned:
+        said = said + " " + planned
+    return ToolResult.done(said, value=items)
+
+
+def _close_todo(ctx, args):
+    todo_id = str(args["todo_id"])
+    # What was closed is asked **before** closing it: afterwards it is no
+    # longer on the open list, and there would be nothing left to name.
+    named = next((i["text"] for i in ctx.todo.all() if i["id"] == todo_id), "")
+    if not ctx.todo.close(todo_id):
+        return ToolResult.failed(tr("Такого дела нет."), "internal")
+    return ToolResult.done(tr("Готово: {text}.", text=named))
+
+
+def _play_music(ctx, args):
+    """
+    Put music on: a video site, searched for the genre.
+
+    **Nothing is named by hand.** A link to the best Lo-Fi stream today
+    is a dead link in a year, and a person told "включаю Lo-Fi Girl"
+    and shown an error is worse off than one told what was actually
+    done. So the genre becomes a search on the site where such things
+    live, and Rina says what she opened.
+    """
+    from voice import music, websearch
+
+    genre = (args.get("genre") or "").strip()
+    url = websearch.youtube_url(music.search_for(genre))
+    said = tr("Включаю {genre}.", genre=genre) if genre \
+        else tr("Включаю музыку.")
+
+    opener = getattr(ctx, "open_url", None)
+    if opener is not None:
+        opened, why = opener(url)
+        if why != NO_SHELL:
+            return (ToolResult.done(said) if opened
+                    else ToolResult.failed(
+                        tr("Не удалось открыть браузер."), "internal"))
+
+    if websearch.open_url(url):
+        return ToolResult.done(said)
+    return ToolResult.failed(tr("Не удалось открыть браузер."), "internal")
+
+
+def _web_search(ctx, args):
+    from voice import websearch
+
+    engine = args.get("engine") or ctx.settings.get(
+        "search_engine", websearch.DEFAULT_ENGINE)
+    query = args["query"]
+
+    # Through whoever opens pages, and only ourselves if nobody does. The
+    # same shape as `_launch_app`: `NO_SHELL` means "there was nobody to
+    # ask", which is different from "we asked and were refused".
+    opener = getattr(ctx, "open_url", None)
+    if opener is not None:
+        opened, why = opener(websearch.search_url(query, engine))
+        if why != NO_SHELL:
+            if opened:
+                return ToolResult.done(
+                    tr("Ищу «{query}» в {engine}.", query=query,
+                       engine=websearch.engine_label(engine)))
+            return ToolResult.failed(
+                tr("Не удалось открыть браузер для поиска."), "internal")
+
+    if websearch.open_search(query, engine):
+        return ToolResult.done(
+            tr("Ищу «{query}» в {engine}.", query=query,
+               engine=websearch.engine_label(engine)))
+    return ToolResult.failed(tr("Не удалось открыть браузер для поиска."),
+                             "internal")
+
+
+def _ask_model(ctx, args):
+    from core import llm
+
+    try:
+        answer = llm.ask(args["question"], args.get("context"))
+    except llm.LLMError as e:
+        # **Said out loud, because it was silent and that cost an
+        # evening.** The caller turns this into "the model did not
+        # answer" and drops the text; the journal then held twenty-one
+        # seconds of nothing between the question and the apology, and
+        # why it failed had to be guessed at. The reason is about the
+        # server, never about what was said, so it is safe here.
+        log.warning("Модель не ответила: %s", e)
+        return ToolResult.failed(str(e), "llm.unavailable")
+    except Exception as e:
+        log.exception("Модель не ответила")
+        return ToolResult.failed(str(e), "llm.unavailable")
+    return ToolResult.done(answer, answer)
+
+
+def _teach_alias(ctx, args):
+    """
+    Remember that the person calls this program by this word (`4.0b-A04`).
+
+    Through the registry rather than around it, although nothing dangerous
+    happens here: a learned match changes the behaviour of launching — that
+    is, it changes the world, only not now but next time. A tool that
+    changes behaviour and does not reach the call journal is precisely the
+    entry that will be missing when working out "why did she open the wrong
+    thing".
+    """
+    from voice import app_launcher
+
+    word = str(args["word"]).strip()
+    app_launcher.remember(word, str(args["launch"]),
+                          str(args.get("kind") or "file"), str(args["name"]),
+                          settings=ctx.settings)
+    return ToolResult.done(
+        tr("Запомнила: «{word}» — это {app}.", word=word, app=args["name"]),
+        {"word": word, "app": args["name"]})
+
+
+def _forget_alias(ctx, args):
+    """Forget one learned match."""
+    from voice import app_launcher
+
+    word = str(args["word"]).strip()
+    app_launcher.forget(word, settings=ctx.settings)
+    return ToolResult.done(tr("Забыла «{word}».", word=word), {"word": word})
+
+
+IMPLEMENTATIONS = {
+    "launch_app": _launch_app,
+    "list_apps": _list_apps,
+    "teach_alias": _teach_alias,
+    "forget_alias": _forget_alias,
+    "set_volume": _set_volume,
+    "media_control": _media_control,
+    "lock_screen": _lock_screen,
+    "power_action": _power_action,
+    "take_screenshot": _take_screenshot,
+    "create_reminder": _create_reminder,
+    "list_reminders": _list_reminders,
+    "cancel_reminder": _cancel_reminder,
+    "run_user_command": _run_user_command,
+    "try_user_command": _try_user_command,
+    "explain_last": _explain_last,
+    "dispatch_plugin_command": _dispatch_plugin_command,
+    "calculate": _calculate,
+    "start_session": _start_session,
+    "finish_session": _finish_session,
+    "note_session": _note_session,
+    "folder_session": _folder_session,
+    "which_session": _which_session,
+    "last_session": _last_session,
+    "worked_on": _worked_on,
+    "set_focus": _set_focus,
+    "add_todo": _add_todo,
+    "list_todo": _list_todo,
+    "close_todo": _close_todo,
+    "web_search": _web_search,
+    "play_music": _play_music,
+    "ask_model": _ask_model,
+}
+
+
+# ---------------------------------------------------------------------------
+class ToolRunner:
+    """The only way to perform anything."""
+
+    def __init__(self, context, registry=None, confirmations=None,
+                 features=None, audit=None, telemetry=None):
+        self._ctx = context
+        #: The beta's telemetry (`4.0b-D05`), counted at the same place as
+        #: the journal and for the same reason: every call passes here.
+        self._telemetry = telemetry
+        self._registry = registry or default_registry()
+        self._confirmations = confirmations or ConfirmationLedger()
+        self._features = features
+        # The call journal (4.0-C06). Written here, because this is the only
+        # place where all six fields are known at once: the time, the tool,
+        # the arguments, the initiator, the permissions and the result.
+        self._audit = audit if audit is not None else AuditLog()
+
+        #: The implementations of plugins' tools (`4.0-H03`). On the
+        #: instance rather than in a module dictionary: two cores in one
+        #: process must not share other plugins' tools (`4.0-B05`), and a
+        #: plugin that is removed is obliged to take its tools with it.
+        self._added = {}
+
+        missing = set(self._registry.names()) - set(IMPLEMENTATIONS)
+        if missing:
+            raise RuntimeError(
+                f"объявлены, но не реализованы: {sorted(missing)}")
+
+    def add_tool(self, tool, run):
+        """
+        Add a plugin's tool to the registry.
+
+        A plugin declares rather than does (ADR 0010): a declared tool goes
+        the same path as a built-in one — the permission check, the
+        confirmation of the irreversible, the journal entry saying who
+        started this. A plugin calling `subprocess` itself would get around
+        all of that, and then a person's consent to "launching programs"
+        would be self-deception.
+        """
+        self._registry.register(tool)
+        self._added[tool.name] = run
+        return tool
+
+    def drop_tools(self, prefix):
+        """Remove the tools of a switched-off plugin."""
+        gone = [name for name in self._added if name.startswith(prefix)]
+        for name in gone:
+            self._added.pop(name, None)
+            self._registry.forget(name)
+        return gone
+
+    @property
+    def registry(self):
+        return self._registry
+
+    @property
+    def confirmations(self):
+        return self._confirmations
+
+    @property
+    def audit(self):
+        return self._audit
+
+    # ------------------------------------------------------------------
+    def needs_confirmation(self, name):
+        return self._registry.get(name).confirm_required
+
+    def request_confirmation(self, name, args=None, preview="", ttl=None):
+        """
+        Issue a confirmation for a particular call.
+
+        Called when a person is asked a question: the identifier is put into
+        the question asked and presented when the person agrees.
+        """
+        tool = self._registry.get(name)
+        checked = self._registry.validate(name, args)
+        confirmation = self._confirmations.issue(
+            tool.name, checked, ttl=ttl, preview=preview)
+        # **Redacted, like everything else that is written down.**
+        # `core/audit.py` derived the rule and the security journal did
+        # not follow it: the very arguments the database carefully turns
+        # into lengths were written here in full — and this journal is
+        # never level-gated, so «найди в интернете ...» went into it
+        # whatever the person had chosen. Same rule, one place.
+        security_log().info(
+            "Запрошено подтверждение: %s %s", tool.name,
+            redact_args(tool, checked, verbatim=texts_allowed()))
+        return confirmation
+
+    # ------------------------------------------------------------------
+    def call(self, name, args=None, confirmation_id=None,
+             source="typed", trace_id=""):
+        """
+        Perform a tool. The only door.
+
+        Gate errors are returned as a ToolResult with a code rather than
+        raised: the caller has to say something to the person anyway, and an
+        exception per wrong argument would turn the pipeline into a
+        staircase of try/except.
+        """
+        started = time.perf_counter()
+
+        try:
+            tool = self._registry.get(name)
+        except UnknownTool as e:
+            log.warning("Неизвестный инструмент: %s", name)
+            # We record even this: an attempt to call something that does
+            # not exist is a trace of somebody's mistake, and later it will
+            # show the model's misses.
+            self._write(name, args, source, (), False, e.code,
+                        started, confirmation_id, trace_id)
+            return ToolResult.failed(e.message, e.code)
+
+        try:
+            checked = self._registry.validate(name, args)
+        except ToolError as e:
+            log.warning("Аргументы отклонены: %s", e.message)
+            self._write(tool, args, source, tool.permissions, False, e.code,
+                        started, confirmation_id, trace_id)
+            return ToolResult.failed(e.message, e.code)
+
+        if tool.confirm_required:
+            try:
+                confirmation = self._confirmations.redeem(
+                    confirmation_id, tool.name, checked)
+            except ConfirmationError as e:
+                security_log().warning(
+                    "Опасное действие отклонено без подтверждения: %s %s (%s)",
+                    tool.name,
+                    redact_args(tool, checked, verbatim=texts_allowed()),
+                    e.code)
+                self._write(tool, checked, source, tool.permissions, False,
+                            e.code, started, confirmation_id, trace_id)
+                return ToolResult.failed(
+                    tr("Это действие нужно подтвердить."), e.code)
+            security_log().warning(
+                "Опасное действие подтверждено и выполняется: %s %s "
+                "(подтверждение %s)", tool.name,
+                redact_args(tool, checked, verbatim=texts_allowed()),
+                confirmation.id)
+
+        # At DEBUG too, and that is the level a person is asked to
+        # switch on when something is wrong — so this is exactly the
+        # line that would hand over a conversation in a bug report.
+        log.debug("Вызов %s(%s) из %s", tool.name,
+                  redact_args(tool, checked, verbatim=texts_allowed()),
+                  source)
+        try:
+            run = self._added.get(tool.name) or IMPLEMENTATIONS[tool.name]
+            result = run(self._ctx, checked)
+        except Exception as e:
+            log.exception("Инструмент %s упал", tool.name)
+            self._write(tool, checked, source, tool.permissions, False,
+                        "internal", started, confirmation_id, trace_id)
+            return ToolResult.failed(str(e), "internal")
+
+        self._write(tool, checked, source, tool.permissions, result.ok,
+                    result.error_code, started, confirmation_id, trace_id,
+                    getattr(result, "reason", ""))
+        return result
+
+    def _write(self, tool, args, source, permissions, ok, error_code,
+               started, confirmation_id, trace_id, reason=""):
+        """An entry in the call journal. A journal failure does not get in the way of work."""
+        if self._telemetry is not None:
+            try:
+                self._telemetry.tool(getattr(tool, "name", tool), ok,
+                                     error_code, reason)
+            except Exception:                           # noqa: BLE001
+                log.debug("Телеметрия не сосчитала вызов", exc_info=True)
+        if self._audit is None:
+            return
+        try:
+            from core.logging_setup import texts_allowed
+
+            self._audit.record(
+                tool=tool, args=args, source=source, permissions=permissions,
+                ok=ok, error_code=error_code,
+                duration_ms=int((time.perf_counter() - started) * 1000),
+                confirmation_id=confirmation_id or "", trace_id=trace_id or "",
+                reason=reason or "", verbatim=texts_allowed())
+        except Exception:
+            log.exception("Не удалось записать вызов в журнал")
+
+    # ------------------------------------------------------------------
+    def describe(self):
+        """The registry as dicts — for the protocol and for the shell."""
+        return self._registry.describe()
+
+    def permissions_of(self, name):
+        return sorted(self._registry.get(name).permissions)
+
+    def permission_titles(self, name):
+        return [PERMISSIONS[p].title for p in self.permissions_of(name)]

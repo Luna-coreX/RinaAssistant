@@ -1,16 +1,31 @@
 # -*- coding: utf-8 -*-
 """
-B05: два ядра в одном процессе не мешают друг другу.
+B05: two cores in one process do not get in each other's way.
 
-Критерий приёмки задачи. Скрытое глобальное состояние проявляется именно
-здесь: если где-то остался модульный синглтон, второе ядро либо перехватит
-чужое событие, либо ответит на чужой вопрос, либо оба промолчат.
+The task's acceptance criterion. Hidden global state shows up precisely
+here: if a module singleton is left somewhere, the second core will either
+intercept the other's event, or answer the other's question, or both will
+stay silent.
 """
 import os
 import sys
 
 sys.path.insert(0, r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
 os.chdir(r"C:\DevStation\PCDev\DesktopApps\RinaAssistant")
+
+# Every side effect at once. Listing them by hand in every test — as the
+# first edition did — means forgetting one some day: back then the browser
+# was forgotten, and a "yes" without a question asked went into a web search
+# as a real tab on the developer's machine.
+#
+# And before the store below is touched. This block used to come after it,
+# so the store loaded the developer's own profile, took the settings this
+# check wants and saved them there: every run switched «Отвечать моделью»
+# off on the real machine, along with the commands, the reminders and the
+# history it emptied.
+from tools.sandbox import neutralise
+
+box = neutralise()
 
 from core import logging_setup
 logging_setup.setup()
@@ -19,14 +34,6 @@ from core.settings_store import settings
 settings.load()
 settings.update({"llm_enabled": False, "web_search_fallback": True,
                  "custom_commands": [], "reminders": [], "history": []})
-
-# Все побочные эффекты разом. Перечислять их в каждом тесте вручную —
-# как было в первой редакции — значит однажды забыть один: тогда забылся
-# браузер, и «да» без заданного вопроса ушло в веб-поиск настоящей
-# вкладкой на машине разработчика.
-from tools.sandbox import neutralise
-
-box = neutralise()
 
 from core.engine import RinaEngine
 from core.events import EventBus, bus as global_bus
@@ -48,6 +55,14 @@ def make():
     engine.say = lambda text, sound="response": said.append(text)
     events = []
     engine.bus.on("window.action", lambda d: events.append(d.get("action")))
+
+    # A stub shell: since 4.0-G01 the core asks it to perform a system
+    # action rather than performing it itself (ADR 0009). One per core — that
+    # is the whole point of the check: a request must not go to the wrong
+    # one.
+    done = []
+    engine.system_out = lambda action: (done.append(action), (True, ""))[1]
+    engine.did = done
     return engine, said, events
 
 
@@ -58,8 +73,16 @@ on_global = []
 global_bus.on("window.action", lambda d: on_global.append(d.get("action")))
 
 print("=== события не растекаются ===")
-A.handle_command("сделай скриншот")
-check("событие дошло до своего ядра", events_a == ["screenshot"],
+# A window action comes as a command of its own: "свернись" is
+# `window.action`, and it stayed an event. A screenshot no longer suits that
+# — since 4.0-G03 the shell takes it with a system call, and it has no
+# event.
+settings.set("custom_commands", [{
+    "id": "cmd_win", "enabled": True, "type": "system", "target": "minimize",
+    "triggers": ["свернись"], "match": "contains", "response": "", "steps": [],
+}])
+A.handle_command("свернись")
+check("событие дошло до своего ядра", events_a == ["minimize"],
       f"| {events_a}")
 check("чужое ядро его не увидело", events_b == [], f"| {events_b}")
 check("в глобальную шину ничего не ушло", on_global == [],

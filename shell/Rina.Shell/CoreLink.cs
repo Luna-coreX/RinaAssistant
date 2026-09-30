@@ -1,0 +1,948 @@
+using System.IO;
+using System.Text.Json.Nodes;
+using System.Windows;
+using Rina.Protocol;
+
+using static Rina.Shell.Strings.Loc;
+
+namespace Rina.Shell;
+
+/// <summary>
+/// The window's link to the core: state, finish, events.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Plan items <c>4.0-F07</c> (themes) and <c>4.0-F12</c> (showing the
+/// link).
+/// </para>
+/// <para>
+/// <b>Everything that comes from the core is carried into the window's
+/// thread.</b> The reading pump lives in a thread of its own, and elements
+/// may only be touched from the interface thread. This is exactly the
+/// reason a Qt adapter existed in 3.1.0: the core always worked in the
+/// background, and all that changed is that it now sits in another
+/// process.
+/// </para>
+/// <para>
+/// <b>The finish is chosen by the person and stored by the core.</b> The
+/// shell does not read the settings file — it asks (<c>4.0-B06</c>,
+/// ADR 0006). Until the core answers, the window is already drawn with the
+/// default finish: waiting for the core in order to show the window would
+/// make startup a hostage of another process.
+/// </para>
+/// </remarks>
+public sealed class CoreLink : IAsyncDisposable
+{
+    private const string FinishKey = "finish";
+
+    private readonly MainWindow _window;
+    private readonly CoreSupervisor _boss;
+
+    public CoreLink(MainWindow window, CoreLaunch launch)
+    {
+        _window = window;
+        _boss = new CoreSupervisor(launch);
+
+        _boss.StateChanged += (state, why) => OnUi(() =>
+            _window.ShowCoreState(state, why));
+
+        // Every loss of the core goes into the shell's journal with its
+        // reason and the core's last lines. A reconnect with no reason
+        // yet is the attempt starting, not a loss — it is not written.
+        _boss.StateChanged += (state, why) =>
+        {
+            if (state == CoreState.Ready)
+            {
+                if (_boss.Restarts > 0 || _boss.Attempt > 1)
+                    Platform.ShellLog.Info($"core back: {why}");
+                return;
+            }
+            if (state is not (CoreState.Reconnecting or CoreState.Failed)
+                || why.Length == 0)
+                return;
+            var tail = string.Join(Environment.NewLine,
+                _boss.LastCoreLog.Split('\n').TakeLast(15)
+                     .Select(line => "    " + line.TrimEnd('\r')));
+            Platform.ShellLog.Warn(
+                $"core {state}: {why}"
+                + (tail.Trim().Length > 0 ? Environment.NewLine + tail : ""));
+        };
+
+        // Not `OnUi(async () => ...)`: the `Func<Task>` overload called
+        // itself, because `() => _ = work()` is a `Func<Task>` too. A stack
+        // overflow on the very first connection. The overload is gone: the
+        // caller starts anything asynchronous, and one and the same simple
+        // function does the carrying into the window's thread.
+        _boss.Connected += connection => OnUi(
+            () => { _ = LoadFinishAsync(connection); });
+        _boss.Connected += connection => OnUi(
+            () => { _ = CheckUpdatesIfDueAsync(connection); });
+
+        _boss.Connected += connection => OnUi(
+            () => { _ = LoadLanguageAsync(connection); });
+
+        _boss.EventReceived += message => OnUi(() =>
+        {
+            _window.OnCoreEvent(message);
+            FollowListening(message);
+            if (message.Method == Rina.Protocol.Events.SpeechStop) Hush();
+            CoreEvent?.Invoke(message);
+        });
+
+        _boss.Connected += connection =>
+            connection.RequestReceived += request => OnUi(
+                () => { _ = OnCoreRequestAsync(connection, request); });
+
+        // Sound is set up together with the link. Before that it was
+        // absent from the live program altogether: `AudioLink` existed, was
+        // checked, and was created by nobody but the check itself. The core
+        // dutifully synthesised and sent speech into a data channel nobody
+        // read — Rina answered in text and stayed silent.
+        _boss.Connected += connection => OnUi(() => StartVoice(connection));
+
+        // The first run (`4.0b-A14`). Asked of the core rather than kept by
+        // the shell: reinstalling the shell over an old profile is not a
+        // first run, and reinstalling the core over none is. The core owns
+        // the settings, so the core owns the answer.
+        _boss.Connected += _ => OnUi(() => OfferSetupAsync());
+
+        // Plugin sections appear once the core is connected: before that
+        // there is nobody to ask.
+        _boss.Connected += connection => OnUi(
+            () => { _ = RefreshPluginSectionsAsync(); });
+    }
+
+    /// <summary>
+    /// Ask which plugins have a page of their own and give them a section.
+    /// </summary>
+    /// <remarks>
+    /// Called after a plugin is switched on as well: the section must
+    /// appear at once rather than after a restart. The list comes from the
+    /// core whole, and the shell compares it with its own — that way
+    /// switching off takes the section away without a separate message
+    /// about it.
+    /// </remarks>
+    public async Task RefreshPluginSectionsAsync()
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        if (!connection.MayCall(Methods.PluginsList)) return;
+
+        try
+        {
+            var answer = await connection.CallAsync(Methods.PluginsList, null,
+                                                    TimeSpan.FromSeconds(15));
+            if (answer.IsError) return;
+
+            var listed = (answer.Payload["items"]?.AsArray() ?? [])
+                .OfType<JsonObject>()
+                .Where(p => p["enabled"]?.GetValue<bool>() == true
+                            && p["has_page"]?.GetValue<bool>() == true)
+                .Select(p => (p["plugin_id"]?.GetValue<string>() ?? "",
+                              p["page_title"]?.GetValue<string>()
+                              ?? p["name"]?.GetValue<string>() ?? "",
+                              p["page_icon"]?.GetValue<string>() ?? ""))
+                .Where(p => p.Item1.Length > 0)
+                .ToList();
+
+            OnUi(() => _window.ShowPluginSections(listed));
+        }
+        catch
+        {
+            // We did not get to ask — the column stays as it was. A
+            // plugin's section is not worth showing a person an error for.
+        }
+    }
+
+    private Audio.Speaker? _speaker;
+    private Audio.AudioLink? _voice;
+
+    /// <summary>The speaker and the sound channel; `null` while there is no link.</summary>
+    public Audio.AudioLink? Voice => _voice;
+
+    /// <summary>
+    /// Set up sound on a new link.
+    /// </summary>
+    /// <remarks>
+    /// The old household is thrown away: a new link means a different core,
+    /// and the previous core's speech stream is not continued but begun
+    /// afresh.
+    /// </remarks>
+    private void StartVoice(CoreConnection connection)
+    {
+        _voice?.Dispose();
+        _speaker?.Dispose();
+
+        _speaker = new Audio.Speaker();
+        _voice = new Audio.AudioLink(connection, connection.Data,
+                                     new Audio.Microphone(), _speaker);
+
+        // The strip shows a real level rather than one and the same
+        // number: an instrument whose needle knows two positions is a lamp.
+        _voice.Level += level => OnUi(() =>
+        {
+            _window.ShowLevel(level);
+            Level?.Invoke(level);
+        });
+        _ = ApplyAudioSettingsAsync();
+
+        // If the core already said it was listening — it restores the mode
+        // right after the handshake — the microphone opens now. See
+        // `FollowListening`: the two arrive in either order, and only this
+        // makes the order not matter.
+        if (Capturing)
+        {
+            CaptureStarts++;
+            _ = _voice.StartCaptureAsync();
+        }
+    }
+
+    /// <summary>The devices the person chose — from the core's settings.</summary>
+    private async Task ApplyAudioSettingsAsync()
+    {
+        var values = await GetAsync("input_device", "output_device");
+        if (values is null || _voice is null) return;
+        _voice.UseDevices(values["input_device"]?.GetValue<string>() ?? "default",
+                          values["output_device"]?.GetValue<string>() ?? "default");
+    }
+
+    public CoreState State => _boss.State;
+
+    /// <summary>Which attempt at raising the core is under way.</summary>
+    public int Attempt => _boss.Attempt;
+
+    /// <summary>The current link; `null` while there is none.</summary>
+    public CoreConnection? Connection => _boss.Connection;
+
+    /// <summary>Core events for the pages. Already in the window's thread.</summary>
+    public event Action<Envelope>? CoreEvent;
+
+    /// <summary>How loud the microphone is right now.</summary>
+    /// <remarks>
+    /// Passed on rather than reached for. The sound link is created and
+    /// destroyed with the connection, and a page that held on to it would
+    /// be holding an object that had already gone.
+    /// </remarks>
+    public event Action<float>? Level;
+
+    /// <summary>Is Rina speaking out loud at this moment.</summary>
+    /// <remarks>
+    /// Not an event and not a message: this is the state of the audio
+    /// queue, and the audio does not announce itself. The core sends the
+    /// text of an answer and then the sound of it; the moment she really
+    /// stops is the moment the last frame has played, and only this side
+    /// knows it. Taking `assistant.response` for "talking" would light the
+    /// figure up for the length of a message rather than for the length of
+    /// a sentence said aloud.
+    /// </remarks>
+    public bool Speaking => _voice is { Pending: > 0 };
+
+    /// <summary>How loud Rina's own voice is at this instant, 0 to 1.</summary>
+    public double Speech => _voice?.Speech ?? 0;
+
+    public Task StartAsync() => _boss.StartAsync();
+
+    /// <summary>Ask the core for the interface language and apply it.</summary>
+    /// <remarks>
+    /// There is one setting for the whole program and it lives in the core,
+    /// while each side translates itself
+    /// ([ADR 0007](../../docs/adr/0007-localisation.md)): the interface's
+    /// words belong to the shell, Rina's lines to the core.
+    /// </remarks>
+    private async Task LoadLanguageAsync(CoreConnection connection)
+    {
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject { ["keys"] = new JsonArray(LanguageKey) },
+                TimeSpan.FromSeconds(10));
+            var language = answer.Payload["values"]?[LanguageKey]
+                           ?.GetValue<string>();
+            if (language is not null) OnUi(() => Strings.Loc.Use(language));
+        }
+        catch
+        {
+            // We did not get to ask — we stay in the original language. A
+            // program in Russian is better than a program that did not open
+            // because of a language.
+        }
+    }
+
+    private const string LanguageKey = "ui_language";
+
+    /// <summary>
+    /// The automatic update check, when the person turned it on.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked on every connection and gated by <see cref="Update.Updater.Due"/>:
+    /// a reconnect after a crash is not a reason to ask again. The time is
+    /// kept only for an answer — up to date, newer, or not installable. No
+    /// answer at all (the network is down) means asking again at the next
+    /// start rather than a day later.
+    /// </para>
+    /// <para>
+    /// It tells rather than installs: a found update is a notification,
+    /// and the About page is where it is looked at. Installing is a
+    /// decision, and it stays the person's.
+    /// </para>
+    /// </remarks>
+    private async Task CheckUpdatesIfDueAsync(CoreConnection connection)
+    {
+        try
+        {
+            var values = await GetAsync("check_updates");
+            var enabled = values?["check_updates"]?.GetValue<bool>() == true;
+            var found = await new Update.Updater([ProtocolVersion.Current])
+                .CheckIfDueAsync(enabled, Kept.UpdatesAskedAt(), DateTime.UtcNow,
+                                 App.ShellVersion, connection.CoreVersion,
+                                 connection.DataVersion);
+            if (found is null || found.Verdict == Update.Verdict.Unknown) return;
+            Kept.UpdatesAskedAt(DateTime.UtcNow);
+            if (found.Verdict is Update.Verdict.UpToDate
+                or Update.Verdict.Incompatible) return;
+            _window.Tray?.Notify(S("Есть обновление Рины"), found.Explanation);
+        }
+        catch (Exception error)
+        {
+            Platform.ShellLog.Error("automatic update check", error);
+        }
+    }
+
+    /// <summary>Ask the core for the chosen finish and apply it.</summary>
+    private async Task LoadFinishAsync(CoreConnection connection)
+    {
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject
+                {
+                    ["keys"] = new JsonArray(FinishKey, "accent"),
+                }, TimeSpan.FromSeconds(10));
+            var finish = answer.Payload["values"]?[FinishKey]?.GetValue<string>();
+            var accent = answer.Payload["values"]?["accent"]?.GetValue<string>();
+            if (finish is not null) OnUi(() =>
+            {
+                App.ApplyFinish(finish);
+                // The accent after the finish: it replaces the finish's
+                // colours, and the reverse order would bring the original
+                // back for the very first frame.
+                App.ApplyAccent(finish, accent ?? App.DefaultAccent);
+                _window.ShowFinish(finish);
+            });
+        }
+        catch
+        {
+            // We could not ask — we stay with the one already drawn. A
+            // finish is not worth showing a person an error for.
+        }
+    }
+
+    /// <summary>Read the settings the shell is in charge of.</summary>
+    /// <remarks>
+    /// The tray, autostart and hotkeys are stored in the core and carried
+    /// out by the shell: the core holds the intent, the shell brings the
+    /// system into line. The registry and the keyboard are the system, and
+    /// in 4.0 the system layer belongs to the shell.
+    /// </remarks>
+    /// <summary>Show the setup wizard, if this is a first run.</summary>
+    /// <remarks>
+    /// <para>
+    /// Once per install, and only when the core says so. The wizard is
+    /// marked done as soon as it closes, whatever the person chose: a
+    /// wizard that comes back because somebody skipped the downloads is a
+    /// wizard that punishes them for saying no.
+    /// </para>
+    /// <para>
+    /// The downloads are started **after** it closes and run in the
+    /// background. Making somebody watch a progress bar before they are
+    /// allowed to use the program would be charging them for the download
+    /// twice — once in traffic and once in waiting.
+    /// </para>
+    /// </remarks>
+    private async void OfferSetupAsync()
+    {
+        if (_setupShown) return;
+        var state = await AskAsync(Methods.SetupState);
+        if (state?["needed"]?.GetValue<bool>() != true) return;
+        _setupShown = true;
+
+        await RunSetupAsync();
+        await AskAsync(Methods.SetupFinish);
+    }
+
+    /// <summary>
+    /// Show the wizard and start whatever was chosen in it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Public, because after the first run the wizard was unreachable — not
+    /// only for the person who had already seen it, but for anyone. Somebody
+    /// who skipped the downloads had no way back to them except editing the
+    /// settings file by hand.
+    /// </para>
+    /// <para>
+    /// <b>Asking for it does not touch `first_run`.</b> That flag governs
+    /// whether the wizard appears **by itself**, and a person who opened it
+    /// deliberately has not un-run their first run. Only
+    /// <see cref="OfferSetupAsync"/> marks it done, and only after the
+    /// automatic showing.
+    /// </para>
+    /// </remarks>
+    public async Task RunSetupAsync()
+    {
+        var wizard = new Pages.SetupWindow(this);
+
+        // The owner only if there is one to own it. Setting `Owner` to a
+        // window that has not been shown throws, and the throw was not
+        // caught: the application died. Nobody met it, because in ordinary
+        // use the window is up by the time the core connects — but starting
+        // minimised or to the tray is an ordinary way to start, and a first
+        // run in that state would have killed Rina outright.
+        if (_window.IsLoaded && _window.IsVisible) wizard.Owner = _window;
+
+        try
+        {
+            await wizard.LoadAsync();
+            wizard.ShowDialog();
+        }
+        catch (Exception exc)                            // noqa
+        {
+            // A wizard that cannot open is a wizard that did not run. It is
+            // not a reason to take the assistant with it: everything it
+            // offers can be done in the settings afterwards.
+            Platform.ShellLog.Error("setup wizard would not open", exc);
+            return;
+        }
+
+        var wanted = wizard.Chosen;
+        if (wanted.Count == 0) return;
+        var ids = new JsonArray();
+        foreach (var id in wanted) ids.Add(id);
+        // The reply carries a task id per item; progress arrives as ordinary
+        // `task.progress` (§9), which the settings page already shows.
+        await AskAsync(Methods.ModelsFetch, new JsonObject { ["ids"] = ids });
+    }
+
+    private bool _setupShown;
+
+    /// <summary>Ask the core a question and give back its answer.</summary>
+    /// <remarks>
+    /// On the link rather than in a page: the settings page had its own
+    /// copy, and the setup wizard would have made a second. Three copies of
+    /// "call, wait twenty seconds, swallow the error" drift apart at the
+    /// first change to any of them.
+    /// </remarks>
+    public async Task<JsonObject?> AskAsync(string method,
+                                            JsonObject? payload = null)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return null;
+        try
+        {
+            var answer = await connection.CallAsync(method, payload,
+                                                    TimeSpan.FromSeconds(20));
+            return answer.IsError ? null : answer.Payload;
+        }
+        catch { return null; }
+    }
+
+    public async Task<JsonObject?> GetAsync(params string[] keys)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return null;
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsGet,
+                new JsonObject
+                {
+                    ["keys"] = new JsonArray(keys.Select(k => (JsonNode)k!)
+                                                 .ToArray()),
+                }, TimeSpan.FromSeconds(10));
+            return answer.IsError ? null : answer.Payload["values"]?.AsObject();
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Tell the core which program the person switched to
+    /// (<c>4.0b-A03</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A path and nothing else — see <c>T-19</c> in the threat model. The
+    /// core answers how many reminders fired; nothing here uses that
+    /// number, and nothing keeps it.
+    /// </para>
+    /// <para>
+    /// Failures are silent on purpose. A switch between windows is not a
+    /// person's request, and a note saying "could not reach the core"
+    /// after every alt-tab would be noise about something they never
+    /// asked for.
+    /// </para>
+    /// </remarks>
+    public async Task ForegroundAsync(string launch)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        try
+        {
+            await connection.CallAsync(Methods.SystemForeground,
+                new JsonObject { ["launch"] = launch },
+                TimeSpan.FromSeconds(5));
+        }
+        catch { /* см. выше */ }
+    }
+
+    /// <summary>Change the finish and remember the choice in the core.</summary>
+    public async Task SetFinishAsync(string finish)
+    {
+        App.ApplyFinish(finish);
+        if (_boss.Connection is not { Ready: true } connection) return;
+        try
+        {
+            await connection.CallAsync(Methods.SettingsSet, new JsonObject
+            {
+                ["values"] = new JsonObject { [FinishKey] = finish },
+            }, TimeSpan.FromSeconds(10));
+        }
+        catch
+        {
+            // Already shown; if it was not remembered we shall find out at the next start.
+        }
+    }
+
+    /// <summary>
+    /// The core asks for permission — ask the person (<c>4.0-F11</c>, §11).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// One window for everything dangerous: two simultaneous questions
+    /// about something irreversible are two ways of agreeing without
+    /// looking.
+    /// </para>
+    /// <para>
+    /// <b>Refusal by default.</b> Whatever happens — the window was closed,
+    /// the deadline passed, the shell did not understand the request — the
+    /// answer is "no". Consent is only ever explicit.
+    /// </para>
+    /// </remarks>
+    private async Task OnCoreRequestAsync(CoreConnection connection,
+                                          Envelope request)
+    {
+        // --- the system layer (ADR 0009) -------------------------------
+        // The core decided what to do; the shell touches the machine. The
+        // answer is a fact, not a suggestion: the words are the core's to
+        // say.
+        if (request.Method == "system.do")
+        {
+            var action = request.Payload["action"]?.GetValue<string>() ?? "";
+            var (ok, detail) = Platform.Machine.Do(action);
+            Platform.Journal.Action(action, ok);
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = ok,
+                ["detail"] = detail,
+            });
+            return;
+        }
+
+        // What is going on outside the command (`4.0b-A09`). Asked by the
+        // core when a scenario's condition needs it; answered here because
+        // the machine is the shell's (ADR 0009). Nothing is written down on
+        // either side — the answer decides a branch and is gone (`T-19`).
+        if (request.Method == "system.context")
+        {
+            var question = request.Payload["question"]?.GetValue<string>()
+                           ?? "";
+            var about = request.Payload["about"]?.GetValue<string>() ?? "";
+            var answer = question switch
+            {
+                "foreground" => Platform.Foreground.Now(),
+                "running" => Platform.Foreground.Running(about) ? "1" : "",
+                _ => "",
+            };
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["answer"] = answer,
+            });
+            return;
+        }
+
+        if (request.Method == "apps.index")
+        {
+            await ReplyIndexAsync(connection, request);
+            return;
+        }
+
+        if (request.Method == "apps.launch")
+        {
+            var launch = request.Payload["launch"]?.GetValue<string>() ?? "";
+            var kind = request.Payload["kind"]?.GetValue<string>() ?? "file";
+            var outcome = Platform.Launcher.Start(launch, kind, trusted: false);
+
+            // Something unsigned needs consent on its first launch. The
+            // shell asks, not the core: the shell has the window, and the
+            // shell is what sees the signature.
+            if (outcome.NeedsTrust)
+                outcome = await AskTrustAsync(launch, kind);
+
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = outcome.Ok,
+                ["reason"] = outcome.Reason,
+            });
+            return;
+        }
+
+        // The core opens a speech stream with a request of its own: sound
+        // has a format, and the rate is declared rather than guessed. An
+        // answer is obligatory — otherwise the core waits in silence.
+        if (request.Method == Methods.StreamOpen)
+        {
+            var kind = request.Payload["kind"]?.GetValue<string>() ?? "";
+            var rate = request.Payload["format"]?["rate"]?.GetValue<int>()
+                       ?? Audio.Microphone.SampleRate;
+            // The core puts the stream number in the envelope; without it there is nothing to open.
+            var stream = request.StreamId
+                         ?? request.Payload["stream_id"]?.GetValue<int>() ?? 0;
+            var credit = stream == 0
+                         ? 0 : _voice?.StartPlayback(stream, kind, rate) ?? 0;
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["accepted"] = credit > 0,
+                ["credit"] = credit,
+            });
+            return;
+        }
+
+        if (request.Method == Methods.StreamClose)
+        {
+            _voice?.StopPlayback();
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["closed"] = true,
+            });
+            return;
+        }
+
+        if (request.Method != Methods.PermissionRequest)
+        {
+            // A method the shell does not know is no reason to stay
+            // silent: the core is waiting for an answer, and silence turns
+            // into its timeout.
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["granted"] = false,
+                // The reason goes to the core and to the log, not to the person.
+                ["reason"] = "the shell does not know this request", // not UI
+            });
+            return;
+        }
+
+        var preview = request.Payload["preview"]?.GetValue<string>()
+                      ?? S("Точно выполнить?");
+        var reason = request.Payload["reason"]?.GetValue<string>() ?? "";
+        var ttl = request.Payload["ttl"]?.GetValue<int>() ?? 60;
+
+        var granted = false;
+        try
+        {
+            _asking?.Withdraw();
+            var window = new Pages.ConfirmWindow(preview, reason, ttl);
+            if (_window.IsVisible) window.Owner = _window;
+            _asking = window;
+            window.ShowDialog();
+            granted = window.Result == Pages.Consent.Granted;
+        }
+        catch
+        {
+            granted = false;        // не смогли спросить — значит не разрешено
+        }
+        finally
+        {
+            _asking = null;
+        }
+
+        await connection.ReplyAsync(request, new JsonObject
+        {
+            ["request_id"] = request.Payload["request_id"]?.DeepClone(),
+            ["granted"] = granted,
+            ["scope"] = "once",
+        });
+    }
+
+    private Pages.ConfirmWindow? _asking;
+
+    /// <summary>Say to Rina what was typed.</summary>
+    /// <remarks>
+    /// The answer will come as an event rather than from this call: a
+    /// command may think for seconds and say several things along the way.
+    /// </remarks>
+    public async Task HandleAsync(string text, string source = "typed")
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        try
+        {
+            await connection.CallAsync(Methods.CommandHandle, new JsonObject
+            {
+                ["text"] = text,
+                ["source"] = source,
+                ["require_wake"] = false,
+            }, TimeSpan.FromSeconds(15));
+        }
+        catch { /* ядро занято или ушло */ }
+    }
+
+    /// <summary>Toggle a setting the person is in charge of.</summary>
+    public async Task<bool> SetAsync(string key, JsonNode value)
+    {
+        if (_boss.Connection is not { Ready: true } connection) return false;
+        try
+        {
+            var answer = await connection.CallAsync(Methods.SettingsSet,
+                new JsonObject
+                {
+                    ["values"] = new JsonObject { [key] = value },
+                }, TimeSpan.FromSeconds(10));
+            return !answer.IsError;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>How many times capture has been started — for the check.</summary>
+    public int CaptureStarts { get; private set; }
+
+    /// <summary>Is the microphone streaming to the core right now.</summary>
+    public bool Capturing { get; private set; }
+
+    /// <summary>
+    /// The core says it is listening — so open the microphone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Nobody did this, and that is why she could not hear.</b> The
+    /// whole declared path — the shell captures, the data channel carries,
+    /// the core cuts phrases and recognises — existed, was checked end to
+    /// end in <c>--check-audio</c>, and was started by nobody but that
+    /// check. In the running application <c>StartCaptureAsync</c> had not a
+    /// single caller.
+    /// </para>
+    /// <para>
+    /// The same failure is already written down one layer below, about the
+    /// sound link itself: "it existed, was checked, and was created by
+    /// nobody but the check". A path that only a check walks is a path that
+    /// works only for the check, and both times the check was green while a
+    /// person was talking to a program that was not listening.
+    /// </para>
+    /// <para>
+    /// The microphone follows what the core declares rather than a button:
+    /// there are three ways listening starts — a hotkey, the wake word, and
+    /// "always listening" — and the core is where all three already meet.
+    /// Wiring the shell to each of them separately would be three places to
+    /// keep in step.
+    /// </para>
+    /// </remarks>
+    /// <summary>
+    /// The person cut in: stop talking now (<c>4.0b-E12</c>).
+    /// </summary>
+    /// <remarks>
+    /// Interrupted, not drained. Everywhere else the queue is allowed to
+    /// play out — cutting the end off an utterance was a defect once and
+    /// is written up as one. Here the opposite is true: what is left in
+    /// the queue is a second of talking over somebody who has just asked
+    /// her to stop.
+    /// </remarks>
+    private void Hush() => _voice?.Interrupt();
+
+    private void FollowListening(Envelope message)
+    {
+        var wanted = message.Method switch
+        {
+            "listening.started" => true,
+            "listening.stopped" => false,
+            "listening.always" =>
+                message.Payload["enabled"]?.GetValue<bool>() == true,
+            _ => (bool?)null,
+        };
+        if (wanted is null || wanted == Capturing) return;
+
+        // "Always listening" being switched off must not shut the
+        // microphone if a single listen is going on at that moment, and the
+        // other way round. The core sends both, and the last one wins —
+        // which is what a person means by whichever they did last.
+        Capturing = wanted.Value;
+
+        // The sound link is built when the connection is established, and
+        // the core announces the restored listening mode at about the same
+        // moment. Whichever arrives first, the answer must be the same, so
+        // an announcement that finds no microphone is remembered rather
+        // than lost — `StartVoice` asks. Without this the state said
+        // "capturing" while nothing captured, and the correcting event
+        // never came: the core had already said its piece.
+        if (_voice is null) return;
+
+        if (wanted.Value)
+        {
+            CaptureStarts++;
+            _ = _voice.StartCaptureAsync();
+        }
+        else
+        {
+            _ = _voice.StopCaptureAsync();
+        }
+    }
+
+    /// <summary>Listen once — on a hotkey.</summary>
+    public async Task ListenOnceAsync()
+    {
+        if (_boss.Connection is not { Ready: true } connection) return;
+        if (!connection.MayCall(Methods.SpeechListenOnce)) return;
+        try
+        {
+            await connection.CallAsync(Methods.SpeechListenOnce, null,
+                                       TimeSpan.FromSeconds(10));
+        }
+        catch { /* ядро занято или ушло */ }
+    }
+
+    /// <summary>
+    /// Hand the core the program index.
+    /// </summary>
+    /// <remarks>
+    /// Assembled in a background thread: walking the Start menu and
+    /// checking signatures takes seconds, and doing that in the window's
+    /// thread means freezing the window exactly where the person is waiting
+    /// for an answer.
+    /// </remarks>
+    private async Task ReplyIndexAsync(CoreConnection connection,
+                                       Envelope request)
+    {
+        var refresh = request.Payload["refresh"]?.GetValue<bool>() ?? false;
+        var folders = (await GetAsync("program_folders"))?["program_folders"]
+                      ?.AsArray().Select(f => f?.GetValue<string>() ?? "")
+                      .Where(f => f.Length > 0).ToArray() ?? [];
+
+        var entries = await Task.Run(
+            () => Platform.AppIndex.Get(folders, refresh));
+
+        var listed = new JsonArray();
+        foreach (var entry in entries)
+            listed.Add(new JsonObject
+            {
+                ["name"] = entry.Name,
+                ["launch"] = entry.Launch,
+                ["kind"] = entry.Kind,
+                ["source"] = entry.Source,
+                ["signed"] = entry.Signed,
+                ["aliases"] = new JsonArray(
+                    entry.Aliases.Select(a => (JsonNode)a!).ToArray()),
+                ["checked_at"] = entry.CheckedAt
+                    .ToString("yyyy-MM-ddTHH:mm:ssZ"),
+            });
+
+        await connection.ReplyAsync(request, new JsonObject
+        {
+            ["entries"] = listed,
+        });
+    }
+
+    /// <summary>
+    /// Ask about something unsigned and launch it if permission was given.
+    /// </summary>
+    /// <remarks>
+    /// Everything one can decide by is shown: the name, the full path, the
+    /// absence of a signature. "Always trust" is remembered and is taken
+    /// back in settings (<c>4.0-G10</c>).
+    /// </remarks>
+    private async Task<Platform.Launcher.Outcome> AskTrustAsync(string launch,
+                                                                string kind)
+    {
+        var path = Platform.AppIndex.Canonical(launch);
+        var answer = await OnUiAsync(() =>
+        {
+            var source = Platform.AppIndex.Get()
+                .FirstOrDefault(e => string.Equals(
+                    e.Launch, path, StringComparison.OrdinalIgnoreCase))
+                ?.Source ?? "";
+            var ask = new Pages.TrustWindow(path, source);
+            ask.ShowDialog();
+            return ask.Answer;
+        });
+
+        if (answer == Pages.TrustWindow.Reply.Never)
+            // The reason goes to the core, not to the person: Rina answers
+            // in words. It is a code rather than a phrase — matching on a
+            // substring of prose breaks on the first translation, and
+            // breaks silently.
+            return new Platform.Launcher.Outcome(false, "refused");
+
+        if (answer == Pages.TrustWindow.Reply.Always)
+            Platform.Trust.Remember(path);
+
+        return Platform.Launcher.Start(launch, kind, trusted: true);
+    }
+
+    private static Task<T> OnUiAsync<T>(Func<T> work)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess())
+            return Task.FromResult(work());
+        return dispatcher.InvokeAsync(work).Task;
+    }
+
+    private static void OnUi(Action work)
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.CheckAccess()) work();
+        else dispatcher.BeginInvoke(work);
+    }
+
+    public ValueTask DisposeAsync() => _boss.DisposeAsync();
+
+    /// <summary>Where the core lies relative to the shell.</summary>
+    public static CoreLaunch FindCore()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "rina_core.py")))
+            dir = Path.GetDirectoryName(dir);
+        var root = dir ?? AppContext.BaseDirectory;
+        return new CoreLaunch(Interpreter(root),
+                              Path.Combine(root, "rina_core.py"), root);
+    }
+
+    /// <summary>
+    /// Which Python to run the core with.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The project's environment, if there is one — and only then whatever
+    /// `python` turns up in `PATH`. The difference is not cosmetic: the
+    /// voices, the recognition models and the sound are installed <b>in the
+    /// environment</b>, not in the system interpreter. A core started with
+    /// "just python" comes up, answers everything, and honestly reports
+    /// that there is not one synthesis engine and not one recognition
+    /// engine — the program looks as if it works and does exactly none of
+    /// what it exists for.
+    /// </para>
+    /// <para>
+    /// In 3.1.0 the question did not arise: the program was started with
+    /// the same interpreter it lived in. By splitting the processes we
+    /// handed the choice of interpreter to the shell — and we are obliged
+    /// to choose deliberately.
+    /// </para>
+    /// </remarks>
+    public static string Interpreter(string root)
+    {
+        string[] candidates =
+        [
+            // The runtime we ship comes first (ADR 0011). On a person's
+            // machine it is the one that runs and the only one: it is
+            // exactly the interpreter we tested against, and it does not
+            // depend on what happens to be installed.
+            Path.Combine(AppContext.BaseDirectory, "runtime", "python",
+                         "python.exe"),
+
+            // After that, development. The project's environment, then `PATH`.
+            Path.Combine(root, "venv", "Scripts", "python.exe"),
+            Path.Combine(root, ".venv", "Scripts", "python.exe"),
+        ];
+        return candidates.FirstOrDefault(File.Exists) ?? "python";
+    }
+}

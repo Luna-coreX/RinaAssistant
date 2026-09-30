@@ -1,9 +1,9 @@
 """
-Действия, которым можно назначить горячие клавиши.
+Actions that can be assigned hotkeys.
 
-Основное действие «слушать» уже управляется settings["hotkey"]. Здесь —
-дополнительные действия, которые пользователь может забиндить на вкладке
-«Горячие клавиши». Их комбинации хранятся в settings["action_hotkeys"].
+The main "listen" action is already governed by settings["hotkey"]. Here are
+the extra actions the user can bind on the "Hotkeys" tab. Their combinations
+are kept in settings["action_hotkeys"].
 """
 
 # id -> (label, description, icon)

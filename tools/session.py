@@ -1,21 +1,22 @@
 """
-Запись и воспроизведение сессий (задача плана 4.0-A05).
+Recording and replaying sessions (plan item 4.0-A05).
 
-Golden-набор проверяет фразы. Есть вещи, которых он не ловит по устройству:
+The golden suite checks phrases. There are things it does not catch by
+construction:
 
-    * незакрытый вопрос, протухший по времени;
-    * подтверждение, снятое посторонней репликой;
-    * цепочку, где состояние копится через несколько шагов.
+    * an unclosed question that went stale by time;
+    * a confirmation withdrawn by an unrelated line;
+    * a chain where state accumulates over several steps.
 
-Здесь записывается **последовательность** — ввод, решение, ответ и побочные
-эффекты вместе с промежутками между шагами, — и воспроизводится с тем же
-временем. Промежуток записан явно, поэтому воспроизведение не ждёт минуту
-по-настоящему: часы подменяются.
+Here a **sequence** is recorded — the input, the decision, the answer and
+the side effects, along with the intervals between the steps — and replayed
+with the same timing. The interval is recorded explicitly, so replaying does
+not really wait a minute: the clock is substituted.
 
-Записанная сессия — это данные. После переноса ядра на C# тот же файл будет
-воспроизводиться против ядра-сервиса, как и golden-набор.
+A recorded session is data. After the core is ported to C#, the same file
+will be replayed against the core-as-a-service, just like the golden suite.
 
-Запуск:
+To run:
     python tools/session.py --list
     python tools/session.py --replay docs/golden/sessions/confirm-expired.json
     python tools/session.py --replay-all
@@ -37,25 +38,38 @@ SESSIONS_DIR = os.path.join(ROOT, "docs", "golden", "sessions")
 
 
 # ---------------------------------------------------------------------------
-# Приведение к сравнимому виду
+# Bringing things to a comparable form
 # ---------------------------------------------------------------------------
-#: Что в ответе зависит от момента запуска, а не от поведения.
+#: What in an answer depends on the moment of the run rather than on behaviour.
 _VOLATILE = (
-    # Время по часам: «02:15».
+    # The date, when a reminder falls on another day: "10.09 23:55".
+    #
+    # Masked **before** the clock, and it has to be: a session recorded
+    # in the afternoon fired at "ЧЧ:ММ", and the same session run near
+    # midnight fired at "10.09 ЧЧ:ММ" — a reminder a few minutes out had
+    # crossed into tomorrow. Rina was right to say the date; the fixture
+    # was wrong to depend on the hour at which somebody ran it.
+    (re.compile(r"\b\d{2}\.\d{2} (?=\d{1,2}:\d{2}\b)"), ""),
+    # The time by the clock: "02:15".
     (re.compile(r"\b\d{1,2}:\d{2}\b"), "ЧЧ:ММ"),
-    # Обратный отсчёт: «9 мин 59 с» — зависит от доли секунды.
-    (re.compile(r"\b\d+ мин \d+ с\b"), "N мин N с"),
+    # A countdown: "9 мин 59 с" — it depends on a fraction of a second.
+    # A zero part is not said since 2026-09-29 ("10 мин", "2 ч"), so both
+    # shapes are one here: which of them a replay gets depends on the same
+    # fraction of a second. The wording itself is asked of `humanize_left`
+    # in tools/test_reminder_voice.py.
+    (re.compile(r"\b\d+ ч(?: \d+ мин)?\b"), "N ч N мин"),
+    (re.compile(r"\b\d+ мин(?: \d+ с)?\b"), "N мин N с"),
     (re.compile(r"\b\d+ с\b"), "N с"),
 )
 
 
 def normalise(text):
     """
-    Убирает из ответа то, что меняется от прогона к прогону.
+    Removes from an answer what changes from run to run.
 
-    Сессия проверяет поведение: что Рина сказала и сделала. Показания часов
-    и остаток до срабатывания при воспроизведении будут другими всегда, и
-    сравнивать их — значит получить вечно красный тест.
+    A session checks behaviour: what Rina said and did. The clock's reading
+    and the time left until firing will always be different on a replay, and
+    comparing them means getting an eternally red test.
     """
     if not text:
         return text
@@ -64,12 +78,29 @@ def normalise(text):
     return text
 
 
+#: The fields of a reminder that are the behaviour.
+#:
+#: The list is a **permit** list rather than a deny list, and those are
+#: different things. A deny list says nothing about a new field: it arrives
+#: into the comparison by itself and turns the check red where the
+#: behaviour did not change. A permit list says nothing either — but in the
+#: other direction, and adding a field has to be decided aloud, here.
+#:
+#: What is not here: the moment of firing, the moment of creation and the
+#: random number — they differ on every run by construction, not by
+#: mistake. And `done`: at creation it is always `false` and tells nothing
+#: apart.
+BEHAVIOUR = ("kind", "text", "on")
+
+
 def normalise_effects(effects):
-    """Отметки времени в побочных эффектах — тоже не поведение."""
+
+    """Timestamps in the side effects are not behaviour either."""
     clean = {}
     for name, items in (effects or {}).items():
         if name == "reminders":
-            clean[name] = [{k: v for k, v in item.items() if k != "fire_at"}
+            clean[name] = [{k: v for k, v in item.items()
+                            if k in BEHAVIOUR}
                            for item in items]
         else:
             clean[name] = list(items)
@@ -77,15 +108,15 @@ def normalise_effects(effects):
 
 
 # ---------------------------------------------------------------------------
-# Подменные часы
+# The substitute clock
 # ---------------------------------------------------------------------------
 class FakeClock:
     """
-    Управляемое время для проверки сроков.
+    Controllable time for checking deadlines.
 
-    Подменяет часы там, где ядро смотрит на срок вопроса. Без этого проверка
-    протухания стоила бы минуты ожидания на каждый прогон — то есть её бы
-    просто не было.
+    Substitutes the clock where the core looks at a question's deadline.
+    Without this, a staleness check would cost a minute of waiting on every
+    run — that is, it simply would not exist.
     """
 
     def __init__(self, start=None):
@@ -111,7 +142,7 @@ class FakeClock:
 
 
 class _ClockModule:
-    """Заменитель модуля time с управляемым time()."""
+    """A stand-in for the time module with a controllable time()."""
 
     def __init__(self, clock):
         self._clock = clock
@@ -126,14 +157,14 @@ class _ClockModule:
 
 
 # ---------------------------------------------------------------------------
-# Запись
+# Recording
 # ---------------------------------------------------------------------------
 class SessionRecorder:
     """
-    Пишет всё, что проходит через ядро.
+    Writes down everything that passes through the core.
 
-    Прикрепляется к живому ядру, поэтому годится и для сценария в тесте, и
-    для записи настоящей сессии из приложения.
+    It attaches to a live core, so it suits both a scenario in a test and
+    recording a real session from the application.
     """
 
     def __init__(self, engine, box=None, title=""):
@@ -213,22 +244,24 @@ class SessionRecorder:
 
 
 # ---------------------------------------------------------------------------
-# Воспроизведение
+# Replaying
 # ---------------------------------------------------------------------------
 def build_engine():
-    """Свежее ядро в песочнице, с настройками в памяти."""
-    from core import logging_setup
-    logging_setup.setup()
-
+    """A fresh core in the sandbox, with settings in memory."""
+    # The sandbox before the log: set up first, the log opened in the
+    # developer's profile and wrote there for the rest of the run.
     from sandbox import neutralise
     box = neutralise()
+
+    from core import logging_setup
+    logging_setup.setup()
 
     from core.engine import RinaEngine
     from core.events import EventBus
     from core.settings_api import MemorySettings
     from voice import app_index
 
-    # Индекс фиксированный: сессия обязана воспроизводиться на любой машине.
+    # The index is fixed: a session must replay on any machine.
     from golden_runner import FAKE_APPS
     app_index._INDEX = [app_index.AppEntry(*a) for a in FAKE_APPS]
     app_index.cached_index = lambda: app_index._INDEX
@@ -240,11 +273,37 @@ def build_engine():
     })
     engine = RinaEngine(event_bus=EventBus(), settings=settings)
     engine._speak_blocking = lambda text: None
+
+    # The shell, which is not here. Since 4.0-G01 the core asks it to perform
+    # a system action and to launch a program (ADR 0009) instead of doing so
+    # itself, and the sandbox's substitutes — which stand where the core used
+    # to touch the machine — stopped being reached at all.
+    #
+    # The recorded sessions did not notice: they were recorded before that
+    # move, and their expectations are right. What broke is the harness, and
+    # `confirm-yes` had been red because of it — "shut down the computer",
+    # confirmed, ran into a core with nobody to ask.
+    #
+    # The same stub as the golden runner's, for the same reason: what is
+    # checked is that the core **decided** correctly, not that Windows can
+    # shut itself down.
+    def as_shell_do(action):
+        box.actions.append(action)
+        return True, ""
+
+    def as_shell_launch(launch, kind="file"):
+        entry = next((e for e in app_index.cached_index()
+                      if e.launch == launch), None)
+        box.launched.append(entry.name if entry else launch)
+        return True, ""
+
+    engine.system_out = as_shell_do
+    engine.launch_out = as_shell_launch
     return engine, box
 
 
 def replay(path, verbose=False):
-    """Воспроизводит сессию и печатает расхождения."""
+    """Replays a session and prints the divergences."""
     data = json.load(open(path, encoding="utf-8"))
     engine, box = build_engine()
 

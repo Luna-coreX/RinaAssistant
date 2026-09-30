@@ -1,14 +1,14 @@
 """
-Встроенные команды ассистента (то, что не покрыто плагинами).
+The assistant's built-in commands (what the plugins do not cover).
 
-Запуск программ сюда почти не попадает: этим занимается voice/app_launcher
-по индексу установленного ПО. Каталог ниже остался запасным путём для
-систем, где индекс пуст.
+Launching programs hardly comes here: voice/app_launcher deals with that
+using the index of installed software. The catalogue below remains a
+fallback path for systems where the index is empty.
 
-Запуск на Windows идёт по абсолютному пути и без оболочки. Раньше здесь
-было `Popen("discord", shell=True)`: порядок поиска Windows включает текущую
-рабочую папку, поэтому файл `discord.exe`, положенный рядом с приложением,
-выполнился бы вместо настоящей программы.
+Launching on Windows goes by an absolute path and without a shell. There
+used to be `Popen("discord", shell=True)` here: Windows's search order
+includes the current working directory, so a `discord.exe` file placed next
+to the application would run instead of the real program.
 """
 
 import os
@@ -18,12 +18,13 @@ import sys
 
 from core.i18n import t as tr
 from core.logging_setup import get_logger
+from voice.textmatch import whole_word
 
 
 log = get_logger("commands")
 
 
-# Каталог известных приложений: ключевое слово -> команды под каждую ОС.
+# The catalogue of known applications: a keyword -> commands for each OS.
 APPS = {
     "discord": {
         "names": ["discord", "дискорд"],
@@ -66,11 +67,12 @@ APPS = {
 
 def _windows_exe(name):
     """
-    Абсолютный путь к исполняемому файлу или None.
+    The absolute path to an executable, or None.
 
-    Ищем сами, а не полагаемся на поиск Windows: его порядок включает
-    текущую рабочую папку, и подложенный туда файл выполнился бы вместо
-    настоящего. Системные каталоги проверяем первыми, PATH — последним.
+    We look ourselves rather than relying on Windows's search: its order
+    includes the current working directory, and a file slipped in there
+    would run instead of the real one. We check the system directories
+    first, and PATH last.
     """
     root = os.environ.get("SystemRoot") or r"C:\Windows"
     for folder in (os.path.join(root, "System32"), root):
@@ -86,15 +88,15 @@ def _launch_windows(app) -> bool:
         subprocess.Popen([path])
         return True
     if app.get("default_browser"):
-        # конкретного Chrome может не быть, а браузер по умолчанию есть
-        # всегда — открыть его честнее, чем ответить отказом
+        # a particular Chrome may not be there, while a default browser
+        # always is — opening that is more honest than answering with a refusal
         import webbrowser
         return bool(webbrowser.open("about:blank"))
     return False
 
 
 def _launch(app_key) -> bool:
-    """Пытается запустить приложение. True при успехе."""
+    """Tries to launch an application. True on success."""
     app = APPS[app_key]
     platform = sys.platform
     try:
@@ -103,7 +105,7 @@ def _launch(app_key) -> bool:
         if platform == "darwin":
             subprocess.Popen(["open", "-a", app["darwin"]])
             return True
-        # linux и прочее
+        # linux and the rest
         cmd = app["linux"]
         exe = cmd.split()[0]
         if shutil.which(exe) is None and exe != "xdg-open":
@@ -117,8 +119,9 @@ def _launch(app_key) -> bool:
 
 def handle_builtin_command(text):
     """
-    Разбирает текст и выполняет встроенную команду.
-    Возвращает строку-ответ (для озвучки/toast) или None, если не распознано.
+    Parses the text and performs a built-in command.
+    Returns an answer string (to speak/toast), or None if nothing was
+    recognised.
     """
     from voice.textmatch import normalize, contains_phrase
     from voice import calculator, websearch
@@ -126,22 +129,23 @@ def handle_builtin_command(text):
 
     low = normalize(text)
 
-    # --- арифметика: «посчитай 15*12», «20% от 3000» ---
+    # --- arithmetic: "посчитай 15*12", "20% от 3000" ---
     calculated = calculator.try_calculate(text)
     if calculated:
         return calculated
 
-    # --- явный веб-поиск: «найди рецепт борща» ---
+    # --- an explicit web search: "найди рецепт борща" ---
     found = websearch.try_search(
         text, settings.get("search_engine", websearch.DEFAULT_ENGINE))
     if found:
         return found
 
-    # Запуск программ сюда больше не попадает: им занимается voice/app_launcher
-    # по индексу установленного ПО (он вызывается раньше в конвейере команд).
-    # APPS/_launch остались как запасной каталог для систем без индекса.
+    # Launching programs no longer comes here: voice/app_launcher deals with
+    # it using the index of installed software (it is called earlier in the
+    # command pipeline). APPS/_launch stayed as a fallback catalogue for
+    # systems without an index.
 
-    # --- простые встроенные ответы ---
+    # --- simple built-in answers ---
     topic = match_answer(low)
     if topic:
         return ANSWERS[topic]()
@@ -149,36 +153,70 @@ def handle_builtin_command(text):
     return None
 
 
-# Тема -> как ответить. Отдельной таблицей, чтобы роутер (4.0-B02) мог
-# определить тему, не получая готовую фразу: намерение и его озвучка — разные
-# вещи, и после разделения текст ответа собирает ядро, а не разбор.
+# A topic -> how to answer. As a separate table, so that the router
+# (4.0-B02) can determine the topic without receiving a ready-made phrase:
+# an intent and its speaking are different things, and after the split the
+# text of an answer is assembled by the core, not by the parse.
+# **Being addressed is not yet a command, but it is already a
+# conversation.**
+#
+# Of six ordinary ways of addressing her — hello, thank you, goodbye,
+# how are you, who are you, what can you do — one was answered. The
+# rest ran to the end of the parse and got "Извини, я не поняла
+# команду", and with "always listening" off, a web search for the word
+# "привет".
+#
+# Not decoration. The target model of behaviour ends on «Спасибо,
+# Рина» — «Всегда рада помочь», and an assistant that answers "did not
+# understand" to a greeting does not enter that conversation at all.
+# The answers stay short: being addressed is closed with one line and
+# does not pretend to be a conversation that is not there yet.
 ANSWERS = {
     "name": lambda: tr("Меня зовут Рина, я твой голосовой ассистент."),
-    "thanks": lambda: tr("Всегда пожалуйста!"),
+    "thanks": lambda: tr("Всегда рада помочь."),
+    "hello": lambda: tr("Привет. Слушаю."),
+    "bye": lambda: tr("До встречи."),
+    "how_are_you": lambda: tr("У меня всё ровно. Чем помочь?"),
     "capabilities": lambda: tr(
         "Я могу запускать приложения, считать, искать в интернете и "
         "выполнять команды плагинов. Попробуй сказать: запусти браузер."),
 }
 
+# Kept narrow on purpose. The stages that carry a real errand — things
+# to do, reminders, system actions, launching — all run before this
+# one, so "какие дела" reaches the list and "напомни сказать привет"
+# reaches the reminders. What arrives here is what none of them wanted.
 ANSWER_PHRASES = {
     "name": ("как тебя зовут", "твоё имя", "твое имя", "your name",
-             "who are you"),
+             "who are you", "ты кто", "кто ты"),
     "thanks": ("спасибо", "благодарю", "thank", "thanks"),
+    "hello": ("привет", "здравствуй", "здорово", "доброе утро",
+              "добрый день", "добрый вечер", "hello", "hi there"),
+    "bye": ("пока", "до свидания", "до встречи", "спокойной ночи",
+            "goodbye", "bye"),
+    "how_are_you": ("как дела", "как ты", "как жизнь", "how are you"),
     "capabilities": ("что ты умеешь", "твои возможности", "what can you do",
                      "your capabilities"),
 }
 
 
 def match_answer(low):
-    """Тема встроенного ответа или None. Чистая функция."""
+    """The topic of a built-in answer, or None. A pure function.
+
+    As whole words: «пока» lives inside «покажи», and «покажи задачи»
+    was answered «До встречи» for as long as this used `in`. The first
+    fix here was a regexp of its own; it is the shared `whole_word`
+    now, because the same failure turned up in the music genres a day
+    later and two copies of one rule drift.
+    """
     for topic, phrases in ANSWER_PHRASES.items():
-        if any(phrase in low for phrase in phrases):
+        if any(whole_word(low, one) for one in phrases):
             return topic
     return None
 
 
 def known_commands():
-    """Для отображения в UI (вкладка «Команды»)."""
+    """For showing in the UI (the "Commands" tab)."""
     cmds = [
         (tr("Запусти <название программы>"),
          tr("Находит и запускает любую установленную программу")),

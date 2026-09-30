@@ -1,0 +1,60 @@
+<Window x:Class="Rina.Shell.Pages.ConfirmWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Style="{StaticResource Window.Apparatus}"
+        Title="{loc:S 'Подтверждение'}" Width="520" SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        MinWidth="520" MinHeight="0" ResizeMode="NoResize">
+
+  <!--
+    One point for every dangerous action (4.0-F11, §11).
+
+    Danger is marked by hatching, not by colour: the colour of danger wears
+    out through repetition, whereas hatching occurs in one place and
+    therefore always means one and the same thing. There is no red in the
+    palette at all.
+
+    The second device is emptiness: what is irreversible is set apart by a
+    gap twice the usual one. It works for someone who cannot make out the
+    pattern too.
+  -->
+  <Grid Margin="32">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" x:Name="Preview" Style="{StaticResource Text.Title}"
+               TextWrapping="Wrap" Text="{loc:S 'Точно выполнить?'}" />
+
+    <TextBlock Grid.Row="1" x:Name="Reason" Style="{StaticResource Text.Meta}"
+               TextWrapping="Wrap" Margin="0,12,0,0" />
+
+    <!-- A gap of 64: the irreversible is set apart by emptiness (§4 of the design system) -->
+    <Grid Grid.Row="2" Margin="0,64,0,0">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="Auto" />
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+
+      <Button Grid.Column="0" x:Name="Confirm" Style="{StaticResource Btn.Danger}"
+              Content="{loc:S 'Выполнить'}" Click="OnConfirm" />
+
+      <TextBlock Grid.Column="1" x:Name="Countdown"
+                 Style="{StaticResource Text.Figure}"
+                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+      <Button Grid.Column="2" x:Name="Refuse" Style="{StaticResource Btn}"
+              Content="{loc:S 'Отмена'}" Click="OnRefuse" IsCancel="True" />
+    </Grid>
+
+    <TextBlock Grid.Row="3" Style="{StaticResource Text.Meta}"
+               Margin="0,16,0,0" TextWrapping="Wrap"
+               Text="{loc:S 'Если не ответить, действие не выполнится.'}" />
+  </Grid>
+</Window>

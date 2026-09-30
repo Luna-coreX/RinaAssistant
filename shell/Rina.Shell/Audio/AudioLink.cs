@@ -1,0 +1,321 @@
+using System.Text.Json.Nodes;
+using Rina.Protocol;
+using Rina.Protocol.Transport;
+
+namespace Rina.Shell.Audio;
+
+/// <summary>
+/// Sound between the microphone, the core and the speaker.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Plan items <c>4.0-F09</c> and <c>4.0-F10</c>: capture into the core and
+/// playback out of the core, both over the data channel with
+/// backpressure.
+/// </para>
+/// <para>
+/// <b>The credit is honoured, not assumed.</b> The receiver announces how
+/// many bytes it is ready to take; the sender has no right to keep more
+/// than that in flight. The microphone is a source that cannot wait: it
+/// gives out a chunk every hundred milliseconds regardless of whether the
+/// core keeps up. Without credit the queue would grow in silence, and the
+/// failure would look like "the program ate a gigabyte".
+/// </para>
+/// <para>
+/// <b>What to do with a chunk there is no credit for.</b> It is dropped,
+/// not accumulated. For sound that is right: a stale chunk of speech is of
+/// no use to anyone, and it is better to lose a hundred milliseconds than
+/// to fall a second behind and recognise yesterday's words. What is
+/// dropped is counted — losing it in silence is not allowed.
+/// </para>
+/// <para>
+/// <b>Rina can be interrupted</b> (<c>4.0b-E12</c>). The microphone stays
+/// open while she speaks, because a person who cannot cut in stops
+/// talking to her and starts waiting her out — and waiting somebody out
+/// is not a conversation.
+/// </para>
+/// <para>
+/// It used to be muted, and for a real reason: synthesised speech reaches
+/// the microphone, is recognised, and Rina answers herself. The reason has
+/// not gone away; the answer to it has moved. The core knows what it is
+/// saying and throws out a phrase that is its own words coming back, and
+/// while she talks only two things act at all — her name and "stop".
+/// Muting solved the echo by making the room inaudible; this solves it by
+/// telling her voice from anybody else's.
+/// </para>
+/// </remarks>
+public sealed class AudioLink : IDisposable
+{
+    private const string InputKind = "audio.input";
+    private const string OutputKind = "audio.output";
+
+    private readonly CoreConnection _connection;
+    private readonly DataChannel _data;
+    private readonly Microphone _microphone;
+    private readonly Speaker _speaker;
+
+    private int _inputStream;
+    private long _credit;
+    private CancellationTokenSource? _reading;
+
+    /// <summary>How many bytes were dropped for want of credit.</summary>
+    public long Dropped { get; private set; }
+
+    /// <summary>How many bytes went to the core.</summary>
+    public long Sent { get; private set; }
+
+    /// <summary>How many bytes of speech were received from the core.</summary>
+    public long Received { get; private set; }
+
+    /// <summary>How much of what was received is not yet played.</summary>
+    public int Pending => _speaker.Pending;
+
+    /// <summary>How loud Rina's own voice is at this instant, 0 to 1.</summary>
+    public double Speech => _speaker.Speech;
+
+    /// <summary>The microphone level, 0..1 — for the instrument strip.</summary>
+    public event Action<float>? Level;
+
+    public AudioLink(CoreConnection connection, DataChannel data,
+                     Microphone microphone, Speaker speaker)
+    {
+        _connection = connection;
+        _data = data;
+        _microphone = microphone;
+        _speaker = speaker;
+
+        _microphone.Captured += OnCaptured;
+        _microphone.Level += level => Level?.Invoke(level);
+        _connection.EventReceived += OnEvent;
+    }
+
+    /// <summary>
+    /// Which devices to use. The names come from the core's settings.
+    /// </summary>
+    /// <remarks>
+    /// The core stores the choice but does not see the devices themselves:
+    /// sound in 4.0 belongs to the shell (<c>4.0-F09</c>). So the name is
+    /// resolved here, and "default" is not a name but a mark meaning "not
+    /// chosen".
+    /// </remarks>
+    public void UseDevices(string input, string output)
+    {
+        _inputDevice = input is "default" or "" ? 0 : Microphone.IndexOf(input);
+        _speaker.Device = output is "default" or "" ? 0 : Speaker.IndexOf(output);
+    }
+
+    private int _inputDevice;
+
+    /// <summary>
+    /// Open a stream of sound into the core.
+    /// </summary>
+    /// <param name="deviceIndex">
+    /// The device number; <c>-1</c> means whatever is chosen in settings.
+    /// </param>
+    /// <param name="listen">
+    /// Whether to switch the device on. Opening a stream and starting to
+    /// listen are different actions: sound may come from a file during a
+    /// voice check, and then the microphone is not needed at all.
+    /// </param>
+    public async Task<bool> StartCaptureAsync(int deviceIndex = -1,
+                                              bool listen = true)
+    {
+        if (!_connection.MayCall(Methods.StreamOpen)) return false;
+
+        _inputStream = 11;
+        _credit = 0;
+        Dropped = Sent = Granted = 0;
+
+        var answer = await _connection.CallAsync(Methods.StreamOpen, new JsonObject
+        {
+            ["stream_id"] = _inputStream,
+            ["kind"] = InputKind,
+            ["format"] = new JsonObject
+            {
+                ["encoding"] = "pcm_s16le",
+                ["rate"] = Microphone.SampleRate,
+                ["channels"] = Microphone.Channels,
+            },
+        }, TimeSpan.FromSeconds(10));
+        if (answer.IsError) return false;
+
+        // **The first credit arrives the same way as every later one** — as
+        // a `stream.credit` event, which the core sends just before it
+        // answers. The answer also names the grant, and the shell used to
+        // add *that* instead; so the opening credit travelled one road and
+        // every replenishment another, and when the second road turned out
+        // to be closed the first went on working. What a person met was a
+        // microphone that heard the first two seconds of a stream and
+        // nothing after — 64 KB at 16 kHz is exactly two seconds — while
+        // every one-off listen, being a new stream, got its two seconds
+        // afresh. One road, or a break in the road nobody uses at startup
+        // stays invisible until somebody speaks for longer than the window.
+
+        _reading = new CancellationTokenSource();
+        _ = Task.Run(() => ReadAsync(_reading.Token));
+        if (listen)
+            _microphone.Start(deviceIndex < 0 ? _inputDevice : deviceIndex);
+        return true;
+    }
+
+    public async Task StopCaptureAsync()
+    {
+        _microphone.Stop();
+        if (_inputStream == 0) return;
+
+        var closing = _inputStream;
+        _inputStream = 0;
+        try
+        {
+            await _connection.CallAsync(Methods.StreamClose, new JsonObject
+            {
+                ["stream_id"] = closing,
+            }, TimeSpan.FromSeconds(5));
+        }
+        catch { /* ядро могло уйти раньше */ }
+        _data.Forget(closing);
+    }
+
+    private void OnCaptured(byte[] chunk) => Push(chunk);
+
+    /// <summary>
+    /// Send a chunk of sound to the core. <c>false</c> — not enough credit.
+    /// </summary>
+    /// <remarks>
+    /// Open to the outside rather than only to the microphone: sound comes
+    /// from places other than a device — from a file during a voice check,
+    /// from a recording while a complaint is being looked into. The path
+    /// must be the same one, or it is not the path being checked.
+    /// </remarks>
+    public bool Push(ReadOnlySpan<byte> chunk)
+    {
+        var stream = _inputStream;
+        if (stream == 0) return false;
+
+        // The credit is checked before sending, not after: "already sent,
+        // sorry" is not backpressure but an impression of it.
+        if (Interlocked.Read(ref _credit) < chunk.Length)
+        {
+            Dropped += chunk.Length;
+            return false;
+        }
+        Interlocked.Add(ref _credit, -chunk.Length);
+        Sent += chunk.Length;
+        _ = _data.SendAsync(stream, chunk.ToArray());
+        return true;
+    }
+
+    /// <summary>How many bytes may be sent right now.</summary>
+    public long Credit => Interlocked.Read(ref _credit);
+
+    /// <summary>How much credit has ever been granted — for the checks.</summary>
+    public long Granted { get; private set; }
+
+    private void OnEvent(Envelope message)
+    {
+        if (message.Method != Events.StreamCredit) return;
+        if (message.StreamId != _inputStream) return;
+        var bytes = message.Payload["bytes"]?.GetValue<int>() ?? 0;
+        Granted += bytes;
+        Interlocked.Add(ref _credit, bytes);
+    }
+
+    /// <summary>Listen to the data channel: synthesised speech comes from there.</summary>
+    private async Task ReadAsync(CancellationToken token)
+    {
+        try
+        {
+            while (!token.IsCancellationRequested)
+            {
+                var frame = await _data.ReceiveAsync(token).ConfigureAwait(false);
+                Received += frame.Payload.Length;
+                _speaker.Enqueue(frame.Payload);
+
+                // Credit is returned as playback proceeds, not as data is
+                // received: otherwise the core packs our queue a minute
+                // ahead, and "stop" stops being instant.
+                //
+                // The rule was written here from the start; the code
+                // underneath it granted credit the moment the sound
+                // arrived, which is the opposite. A comment describing what
+                // the code does not do is worse than no comment: it is read
+                // as a guarantee, and the queue overflowed behind it for
+                // every utterance a person ever heard.
+                await _speaker.RoomAsync(frame.Payload.Length, token)
+                              .ConfigureAwait(false);
+                await _connection.CallAsync(Methods.StreamCredit, new JsonObject
+                {
+                    ["stream_id"] = frame.StreamId,
+                    ["bytes"] = frame.Payload.Length,
+                }, TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException) { /* закрываемся */ }
+        catch (ChannelClosedException) { /* ядро ушло */ }
+    }
+
+    /// <summary>
+    /// The core opened a speech stream: start listening to the data channel.
+    /// </summary>
+    /// <remarks>
+    /// Reading the channel used to begin only together with microphone
+    /// capture — that is, speech could be heard only if Rina had been
+    /// listened to beforehand. Playback and capture are independent: Rina
+    /// answers what was typed by hand too.
+    ///
+    /// Returns the credit issued: the receiver announces how much it is
+    /// ready to take, and this is no formality — a speaker is slower than a
+    /// wire.
+    /// </remarks>
+    public int StartPlayback(int streamId, string kind, int sampleRate)
+    {
+        if (kind != OutputKind) return 0;
+
+        _outputStream = streamId;
+        _speaker.Reopen(sampleRate);
+
+        if (_reading is null)
+        {
+            _reading = new CancellationTokenSource();
+            _ = Task.Run(() => ReadAsync(_reading.Token));
+        }
+        return PlaybackCredit;
+    }
+
+    /// <summary>How many bytes of speech the shell is ready to take at once.</summary>
+    /// <remarks>
+    /// Half a second of sound at 24 kHz. Any more and "stop" stops being
+    /// instant: what can be cut off is what has not been sent yet, not what
+    /// is already lying in our queue.
+    /// </remarks>
+    private const int PlaybackCredit = 24000 * 2 / 2;
+
+    private int _outputStream;
+
+    /// <summary>The speech stream was closed by the core.</summary>
+    /// <remarks>
+    /// Drained, not interrupted. "The core has finished sending" and "the
+    /// person has finished hearing" are a second apart, and cutting at the
+    /// first of them threw away the end of every utterance. Interrupting is
+    /// what "stop" does, and stopping is a different thing a person asks
+    /// for out loud.
+    /// </remarks>
+    public void StopPlayback()
+    {
+        _outputStream = 0;
+        _speaker.Drain();
+    }
+
+    /// <summary>Cut the speech off: "stop" is obliged to be instant.</summary>
+    public void Interrupt() => _speaker.Interrupt();
+
+    public void Dispose()
+    {
+        _reading?.Cancel();
+        _connection.EventReceived -= OnEvent;
+        _microphone.Captured -= OnCaptured;
+        _microphone.Dispose();
+        _speaker.Dispose();
+        _reading?.Dispose();
+    }
+}

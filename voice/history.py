@@ -1,12 +1,13 @@
 """
-История взаимодействий: распознанные фразы, введённые команды и ответы Рины.
+The history of interactions: recognised phrases, typed commands and Rina's
+answers.
 
-Хранится в конфиге (settings["history"]) как список записей:
+Kept in the config (settings["history"]) as a list of entries:
     {"ts": 1700000000.0, "kind": "user"|"assistant"|"system",
      "text": "...", "source": "voice"|"typed"|"..."}
 
-Запись включается настройкой save_history. Ограничиваем размер, чтобы файл
-не разрастался.
+Recording is switched on by the save_history setting. We limit the size, so
+the file does not grow unchecked.
 """
 
 import time
@@ -23,11 +24,11 @@ class HistoryStore:
 
     def all(self):
         """
-        Записи журнала, приведённые к ожидаемому виду.
+        The journal's entries, brought to the expected form.
 
-        Файл истории могли отредактировать руками или повредить при сбое;
-        одна испорченная запись не должна ломать всю вкладку, поэтому мусор
-        отбрасывается здесь, а не в каждом месте показа.
+        The history file may have been edited by hand or damaged in a
+        failure; one spoiled entry must not break the whole tab, so the
+        rubbish is discarded here rather than in every place that shows it.
         """
         clean = []
         for entry in (self._settings.get("history", []) or []):
@@ -51,8 +52,9 @@ class HistoryStore:
         text = str(text).strip()
         if not text:
             return
-        # чтение, изменение и запись — одной неделимой операцией: иначе
-        # одновременный ответ и напоминание затирают записи друг друга
+        # reading, changing and writing as one indivisible operation:
+        # otherwise a simultaneous answer and reminder overwrite each other's
+        # entries
         with self._settings.transaction():
             entries = self.all()
             entries.append({
@@ -61,7 +63,7 @@ class HistoryStore:
                 "text": text,
                 "source": source,
             })
-            # обрезаем до последних MAX_ENTRIES
+            # we trim to the last MAX_ENTRIES
             if len(entries) > MAX_ENTRIES:
                 entries = entries[-MAX_ENTRIES:]
             self._settings.set("history", entries)

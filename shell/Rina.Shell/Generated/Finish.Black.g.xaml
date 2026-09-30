@@ -1,0 +1,126 @@
+<!--
+    Порождено из docs/design/tokens.json.
+    Не править руками: правьте токены и перезапустите
+    python tools/gen_xaml_tokens.py
+
+    Здесь только значения. Стили — решения о том, как выглядит контрол, —
+    пишутся и читаются человеком и живут в Styles/.
+-->
+
+<!-- Отделка «Чёрное» -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <Color x:Key="Color.Face">#1b1b19</Color>
+  <SolidColorBrush x:Key="C.Face" Color="#1b1b19" />
+  <Color x:Key="Color.FaceHigh">#272621</Color>
+  <SolidColorBrush x:Key="C.FaceHigh" Color="#272621" />
+  <Color x:Key="Color.FaceLow">#141412</Color>
+  <SolidColorBrush x:Key="C.FaceLow" Color="#141412" />
+  <Color x:Key="Color.FaceSunk">#0f0f0e</Color>
+  <SolidColorBrush x:Key="C.FaceSunk" Color="#0f0f0e" />
+  <Color x:Key="Color.Seam">#343330</Color>
+  <SolidColorBrush x:Key="C.Seam" Color="#343330" />
+  <Color x:Key="Color.Glass">#0a0b0c</Color>
+  <SolidColorBrush x:Key="C.Glass" Color="#0a0b0c" />
+  <Color x:Key="Color.GlassText">#eceae5</Color>
+  <SolidColorBrush x:Key="C.GlassText" Color="#eceae5" />
+  <Color x:Key="Color.GlassDim">#8a887f</Color>
+  <SolidColorBrush x:Key="C.GlassDim" Color="#8a887f" />
+  <Color x:Key="Color.Ink">#dedace</Color>
+  <SolidColorBrush x:Key="C.Ink" Color="#dedace" />
+  <Color x:Key="Color.InkSoft">#a29d90</Color>
+  <SolidColorBrush x:Key="C.InkSoft" Color="#a29d90" />
+  <Color x:Key="Color.InkFaint">#7d7869</Color>
+  <SolidColorBrush x:Key="C.InkFaint" Color="#7d7869" />
+  <Color x:Key="Color.Signal">#f2731c</Color>
+  <SolidColorBrush x:Key="C.Signal" Color="#f2731c" />
+  <Color x:Key="Color.SignalSunk">#cf5c12</Color>
+  <SolidColorBrush x:Key="C.SignalSunk" Color="#cf5c12" />
+  <Color x:Key="Color.Hatch">#dedace</Color>
+  <SolidColorBrush x:Key="C.Hatch" Color="#dedace" />
+  <Color x:Key="Color.Live">#6fbf73</Color>
+  <SolidColorBrush x:Key="C.Live" Color="#6fbf73" />
+
+  <Color x:Key="Color.Shadow">#000000</Color>
+  <SolidColorBrush x:Key="C.Glass.Bar" Color="#00141412" />
+  <SolidColorBrush x:Key="C.Glass.Column" Color="#00141412" />
+  <SolidColorBrush x:Key="C.Glass.Strip" Color="#9e0f0f0e" />
+  <SolidColorBrush x:Key="C.Glass.Control" Color="#8c272621" />
+  <SolidColorBrush x:Key="C.Glass.Raised" Color="#80272621" />
+  <SolidColorBrush x:Key="C.Glass.Popup" Color="#e6272621" />
+  <SolidColorBrush x:Key="C.Glass.Overlay" Color="#80272621" />
+  <SolidColorBrush x:Key="C.Glass.Field" Color="#f20a0b0c" />
+  <SolidColorBrush x:Key="C.Edge" Color="#24dedace" />
+
+  <sys:Double x:Key="Nebula.Steps">5</sys:Double>
+  <sys:Double x:Key="Nebula.Scale">3.2</sys:Double>
+  <sys:Double x:Key="Nebula.Warp">1.1</sys:Double>
+
+  <Color x:Key="Color.Nebula.Amber.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Amber.1">#18130f</Color>
+  <Color x:Key="Color.Nebula.Amber.2">#2c1f16</Color>
+  <Color x:Key="Color.Nebula.Amber.3">#412714</Color>
+  <Color x:Key="Color.Nebula.Amber.4">#512b0f</Color>
+  <Color x:Key="Color.Nebula.Amber.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Amber.Calm.1">#191613</Color>
+  <Color x:Key="Color.Nebula.Amber.Calm.2">#261d17</Color>
+  <Color x:Key="Color.Nebula.Amber.Calm.3">#332216</Color>
+  <Color x:Key="Color.Nebula.Amber.Calm.4">#3c2513</Color>
+
+  <Color x:Key="Color.Nebula.Ember.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Ember.1">#181213</Color>
+  <Color x:Key="Color.Nebula.Ember.2">#2e1e1f</Color>
+  <Color x:Key="Color.Nebula.Ember.3">#442523</Color>
+  <Color x:Key="Color.Nebula.Ember.4">#562723</Color>
+  <Color x:Key="Color.Nebula.Ember.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Ember.Calm.1">#191515</Color>
+  <Color x:Key="Color.Nebula.Ember.Calm.2">#271d1d</Color>
+  <Color x:Key="Color.Nebula.Ember.Calm.3">#34211f</Color>
+  <Color x:Key="Color.Nebula.Ember.Calm.4">#40221f</Color>
+
+  <Color x:Key="Color.Nebula.Brass.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Brass.1">#14140f</Color>
+  <Color x:Key="Color.Nebula.Brass.2">#262215</Color>
+  <Color x:Key="Color.Nebula.Brass.3">#362c15</Color>
+  <Color x:Key="Color.Nebula.Brass.4">#423211</Color>
+  <Color x:Key="Color.Nebula.Brass.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Brass.Calm.1">#171713</Color>
+  <Color x:Key="Color.Nebula.Brass.Calm.2">#221f17</Color>
+  <Color x:Key="Color.Nebula.Brass.Calm.3">#2c2617</Color>
+  <Color x:Key="Color.Nebula.Brass.Calm.4">#332914</Color>
+
+  <Color x:Key="Color.Nebula.Moss.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Moss.1">#101512</Color>
+  <Color x:Key="Color.Nebula.Moss.2">#1a241b</Color>
+  <Color x:Key="Color.Nebula.Moss.3">#22311f</Color>
+  <Color x:Key="Color.Nebula.Moss.4">#283a1e</Color>
+  <Color x:Key="Color.Nebula.Moss.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Moss.Calm.1">#141715</Color>
+  <Color x:Key="Color.Nebula.Moss.Calm.2">#1a211a</Color>
+  <Color x:Key="Color.Nebula.Moss.Calm.3">#1f291d</Color>
+  <Color x:Key="Color.Nebula.Moss.Calm.4">#232e1c</Color>
+
+  <Color x:Key="Color.Nebula.Steel.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Steel.1">#0e1418</Color>
+  <Color x:Key="Color.Nebula.Steel.2">#16242c</Color>
+  <Color x:Key="Color.Nebula.Steel.3">#1c303b</Color>
+  <Color x:Key="Color.Nebula.Steel.4">#1f3846</Color>
+  <Color x:Key="Color.Nebula.Steel.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Steel.Calm.1">#131718</Color>
+  <Color x:Key="Color.Nebula.Steel.Calm.2">#182125</Color>
+  <Color x:Key="Color.Nebula.Steel.Calm.3">#1c282e</Color>
+  <Color x:Key="Color.Nebula.Steel.Calm.4">#1d2d35</Color>
+
+  <Color x:Key="Color.Nebula.Orchid.0">#040403</Color>
+  <Color x:Key="Color.Nebula.Orchid.1">#131316</Color>
+  <Color x:Key="Color.Nebula.Orchid.2">#222128</Color>
+  <Color x:Key="Color.Nebula.Orchid.3">#302c34</Color>
+  <Color x:Key="Color.Nebula.Orchid.4">#3b323c</Color>
+  <Color x:Key="Color.Nebula.Orchid.Calm.0">#0d0d0b</Color>
+  <Color x:Key="Color.Nebula.Orchid.Calm.1">#161617</Color>
+  <Color x:Key="Color.Nebula.Orchid.Calm.2">#1f1f22</Color>
+  <Color x:Key="Color.Nebula.Orchid.Calm.3">#28262a</Color>
+  <Color x:Key="Color.Nebula.Orchid.Calm.4">#2f292f</Color>
+</ResourceDictionary>

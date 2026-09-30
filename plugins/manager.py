@@ -1,9 +1,10 @@
 """
-Менеджер плагинов: обнаружение, загрузка, включение/выключение, диспетчеризация.
+The plugin manager: discovery, loading, switching on and off, dispatch.
 
-Устойчивость к ошибкам — приоритет: битый или падающий плагин не должен
-ронять приложение. Любая ошибка при загрузке/вызове хука ловится и пишется
-в лог плагина, сам плагин помечается как сбойный.
+Robustness against errors is the priority: a broken or crashing plugin must
+not drop the application. Any error while loading or calling a hook is
+caught and written to the plugin's log, and the plugin itself is marked
+broken.
 """
 
 import os
@@ -14,8 +15,6 @@ import importlib.util
 import inspect
 import traceback
 
-from PySide6.QtCore import QObject, Signal
-
 from core.i18n import t as tr
 from core.logging_setup import get_logger, security_log
 from plugins.api import Plugin, PluginManifest, PluginContext, API_VERSION
@@ -24,9 +23,25 @@ from core.settings_store import settings
 
 log = get_logger("plugins")
 
+#: How many elements a home tile may have.
+#:
+#: A tile that grows becomes a page, and a page has its own place. The
+#: number lives here rather than in the shell because it is a decision about
+#: the home screen, not about drawing.
+HOME_TILE_LIMIT = 4
+
+#: How much an archive may unpack to.
+#:
+#: A plugin is code and a manifest — kilobytes. Without a limit an archive
+#: of a few hundred kilobytes that unpacks to a disk's worth of zeros fills
+#: the drive before anything has been checked: the manifest is read only
+#: after `extractall`. The sizes an archive declares are summed before a
+#: byte is written.
+ARCHIVE_UNPACKED_LIMIT = 50 * 1024 * 1024
+
 
 def plugins_dir() -> str:
-    """Каталог с плагинами (рядом с проектом)."""
+    """The plugins' directory (next to the project)."""
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     path = os.path.join(here, "plugins")
     os.makedirs(path, exist_ok=True)
@@ -34,18 +49,38 @@ def plugins_dir() -> str:
 
 
 class PluginInstallError(Exception):
-    """Папка или архив не похожи на плагин."""
+    """The folder or archive does not look like a plugin."""
 
 
-# Имя плагина становится именем папки, поэтому допускаем только простое имя:
-# буквы, цифры, «_», «-», точка внутри. Ни разделителей пути, ни «.»/«..».
+# A plugin's name becomes the folder's name, so we allow only a plain name:
+# letters, digits, "_", "-", a dot inside. No path separators, no "."/"..".
 _PLUGIN_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9._-]*$")
 
 
+#: Names Windows reserves for devices. A folder cannot be made with one,
+#: and a file opened at such a path is the device rather than a file.
+#:
+#: Found by fuzzing (`4.0b-C02`): `id: "nul"` in somebody's
+#: `plugin.json` passed the pattern — it is letters and nothing else —
+#: and `os.path.abspath` turned the result into a device path. The
+#: install refused it, but only because that path stopped looking like a
+#: folder inside the directory; `con`, `prn` and `com1` do **not** trip
+#: that check — they look like ordinary paths and are devices all the
+#: same. So the name is refused here, where the reason can be said,
+#: rather than left to the shape of a path.
+_DEVICE_NAMES = frozenset(
+    ["con", "prn", "aux", "nul"]
+    + [f"com{n}" for n in range(1, 10)]
+    + [f"lpt{n}" for n in range(1, 10)])
+
+
 def _safe_plugin_id(raw):
-    """Проверенное имя плагина или PluginInstallError."""
+    """A checked plugin name, or PluginInstallError."""
     plugin_id = re.sub(r"[^\w.-]+", "_", str(raw or "").strip())
+    # The extension does not save it: `nul.txt` is the same device.
+    stem = plugin_id.split(".", 1)[0].lower()
     if (not plugin_id or plugin_id in (".", "..")
+            or stem in _DEVICE_NAMES
             or not _PLUGIN_ID_RE.match(plugin_id)):
         security_log().warning("Отклонено имя плагина из plugin.json: %r", raw)
         raise PluginInstallError(tr("Недопустимое имя плагина в plugin.json"))
@@ -54,12 +89,12 @@ def _safe_plugin_id(raw):
 
 def install_plugin(source_path):
     """
-    Устанавливает плагин из папки или .zip в каталог plugins/.
+    Installs a plugin from a folder or a .zip into the plugins/ directory.
 
-    Проверяем содержимое до копирования: манифест и main.py обязательны,
-    иначе в каталоге плагинов появится мусор, который каждый запуск будет
-    показываться как сбойный плагин.
-    Возвращает id установленного плагина.
+    We check the contents before copying: the manifest and main.py are
+    required, or the plugins directory will gain rubbish that will show up
+    as a broken plugin on every start.
+    Returns the id of the installed plugin.
     """
     import shutil
     import zipfile
@@ -75,6 +110,14 @@ def install_plugin(source_path):
         elif source_path.lower().endswith(".zip"):
             try:
                 with zipfile.ZipFile(source_path) as archive:
+                    unpacked = sum(info.file_size for info in archive.infolist())
+                    if unpacked > ARCHIVE_UNPACKED_LIMIT:
+                        security_log().warning(
+                            "Архив плагина распаковывается в %d байт при "
+                            "пределе %d и не установлен", unpacked,
+                            ARCHIVE_UNPACKED_LIMIT)
+                        raise PluginInstallError(
+                            tr("Архив слишком велик для плагина"))
                     archive.extractall(tmp)
             except (zipfile.BadZipFile, OSError) as e:
                 raise PluginInstallError(tr("Не удалось распаковать архив: ") + str(e))
@@ -97,8 +140,9 @@ def install_plugin(source_path):
 
         base = os.path.abspath(plugins_dir())
         target = os.path.abspath(os.path.join(base, plugin_id))
-        # Имя берётся из чужого файла, поэтому проверяем результат, а не только
-        # исходную строку: путь обязан остаться прямо внутри каталога плагинов.
+        # The name is taken from somebody else's file, so we check the
+        # result rather than only the original string: the path is obliged
+        # to stay directly inside the plugins directory.
         if os.path.dirname(target) != base or target == base:
             security_log().warning(
                 "Путь установки плагина ведёт за пределы каталога: %s", target)
@@ -107,17 +151,18 @@ def install_plugin(source_path):
             raise PluginInstallError(tr("Этот плагин уже установлен"))
         replaced = os.path.isdir(target)
         if replaced:
-            # обновление поверх: удаляем только то, что само является плагином
+            # updating over the top: we delete only what is itself a plugin
             if not os.path.isfile(os.path.join(target, "plugin.json")):
                 raise PluginInstallError(tr("В папке назначения не плагин"))
             shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(staged, target)
 
     if replaced:
-        # Под этим id уже был плагин, и он мог быть включён. Код нового плагина
-        # выполняется при включении, поэтому не наследуем чужое «включено»:
-        # иначе подсунутый архив с чужим id запускался бы сам, без ведома
-        # пользователя. Пусть включит осознанно.
+        # There already was a plugin under this id, and it may have been
+        # switched on. A new plugin's code runs when it is switched on, so we
+        # do not inherit somebody else's "on": otherwise a slipped-in archive
+        # with somebody else's id would run by itself, without the user
+        # knowing. Let them switch it on deliberately.
         _disable_saved(plugin_id)
         security_log().warning(
             "Плагин %s заменён установкой из %s и принудительно выключен",
@@ -129,7 +174,7 @@ def install_plugin(source_path):
 
 
 def _disable_saved(plugin_id):
-    """Убирает плагин из списка включённых в настройках."""
+    """Removes a plugin from the list of switched-on ones in the settings."""
     enabled = [p for p in (settings.get("enabled_plugins", []) or [])
                if p != plugin_id]
     settings.set("enabled_plugins", enabled)
@@ -137,7 +182,7 @@ def _disable_saved(plugin_id):
 
 
 def _find_plugin_root(base):
-    """Ищет папку с plugin.json — архив часто содержит одну вложенную папку."""
+    """Looks for the folder with plugin.json — an archive often holds one nested folder."""
     if os.path.isfile(os.path.join(base, "plugin.json")):
         return base
     for name in sorted(os.listdir(base)):
@@ -149,31 +194,77 @@ def _find_plugin_root(base):
 
 
 class LoadedPlugin:
-    """Обёртка над экземпляром плагина + его состояние."""
+    """A wrapper around a plugin's instance plus its state."""
     def __init__(self, manifest: PluginManifest):
         self.manifest = manifest
-        self.instance = None      # экземпляр Plugin (если загружен)
+        self.instance = None      # the Plugin instance (if loaded)
         self.enabled = False
-        self.error = None         # текст ошибки, если сбой
-        self.logs = []            # последние строки лога
+        self.error = None         # the error text, if it failed
+        self.logs = []            # the log's last lines
 
 
-class PluginManager(QObject):
-    # сигналы для UI
-    changed = Signal()                    # список/состояние изменились
-    log_added = Signal(str, str)          # (plugin_id, message)
-    response = Signal(str, str)           # (plugin_id, text) — плагин что-то ответил
-    pages_changed = Signal()              # набор вкладок плагинов изменился
-    window_requested = Signal(str, object, str, int, int)  # (pid, widget, title, w, h)
-    notify_requested = Signal(str, str, str)   # (pid, title, message)
+class Signal:
+    """
+    Notifying subscribers. A stand-in for `PySide6.QtCore.Signal`.
 
+    The plugin manager lived in an application with a window and notified it
+    with Qt signals. In 4.0 the plugins belong to the **core**, and the core
+    is obliged to work where there is no interface library at all
+    (`rina_core.check_headless`): one transitive import of Qt and the split
+    is broken.
+
+    The surface is preserved deliberately — `connect` and `emit` — so that
+    the 3.1.0 application goes on working without changes on its side. The
+    difference is that the call happens **in the same thread** rather than
+    through the window's event queue: the core has no window queue, and it
+    matters more to a subscriber to get the notification than to get it in
+    somebody else's thread.
+    """
+
+    def __init__(self, *types):
+        self._types = types
+        self._listeners = []
+
+    def connect(self, listener):
+        if listener not in self._listeners:
+            self._listeners.append(listener)
+        return listener
+
+    def disconnect(self, listener=None):
+        if listener is None:
+            self._listeners.clear()
+        elif listener in self._listeners:
+            self._listeners.remove(listener)
+
+    def emit(self, *args):
+        # A subscriber that dropped its handler must not cut off the
+        # notification to the rest: the plugin has already shown that it can
+        # be unreliable, and burying half the subscribers with it is not
+        # what we want.
+        for listener in list(self._listeners):
+            try:
+                listener(*args)
+            except Exception:                            # noqa: BLE001
+                log.exception("Подписчик сигнала уронил обработчик")
+
+
+class PluginManager:
     def __init__(self, parent=None):
-        super().__init__(parent)
+        # The signals belong to each manager rather than being shared by
+        # the class: in Qt they were declared in the class body but bound to
+        # the instance. Leaving them in the body here would mean two
+        # managers sharing subscribers.
+        self.changed = Signal()               # the list/state changed
+        self.log_added = Signal(str, str)     # (plugin_id, message)
+        self.response = Signal(str, str)      # the plugin said something
+        self.pages_changed = Signal()         # the set of tabs changed
+        self.window_requested = Signal(str, object, str, int, int)
+        self.notify_requested = Signal(str, str, str)
         self.plugins = {}   # id -> LoadedPlugin
 
-    # ---------- обнаружение ----------
+    # ---------- discovery ----------
     def discover(self):
-        """Сканирует каталог плагинов и читает манифесты (без загрузки кода)."""
+        """Scans the plugins directory and reads the manifests (without loading code)."""
         self.plugins.clear()
         base = plugins_dir()
         enabled_ids = set(settings.get("enabled_plugins", []) or [])
@@ -187,12 +278,13 @@ class PluginManager(QObject):
                 with open(manifest_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 manifest = PluginManifest.from_dict(data, path=folder)
-                # Имя папки — единственный надёжный идентификатор: id внутри
-                # plugin.json пишет автор плагина, и совпадение с чужим id
-                # отдало бы ему настройки и место соседа в списке.
+                # The folder's name is the only reliable identifier: the id
+                # inside plugin.json is written by the plugin's author, and
+                # a clash with somebody else's id would hand them that
+                # plugin's settings and its place in the list.
                 manifest.id = name
             except Exception as e:
-                # битый манифест — показываем как сбойный плагин
+                # a broken manifest — we show it as a broken plugin
                 manifest = PluginManifest(id=name, name=name, path=folder)
                 lp = LoadedPlugin(manifest)
                 lp.error = f"Ошибка манифеста: {e}"
@@ -200,11 +292,12 @@ class PluginManager(QObject):
                 continue
 
             lp = LoadedPlugin(manifest)
-            # проверка совместимости API
+            # the API compatibility check
             if not manifest.api_compatible():
-                lp.error = (f"Плагину нужна версия API {manifest.api_version}, "
-                            f"а приложение поддерживает до {API_VERSION}. "
-                            f"Обновите приложение.")
+                # The reason, the version and what to do, in one sentence
+                # (4.0-H05). A silent "it does not work" looks like a
+                # breakage in Rina rather than an outdated plugin.
+                lp.error = manifest.why_incompatible()
             self.plugins[manifest.id] = lp
 
         broken = [p.manifest.id for p in self.plugins.values() if p.error]
@@ -213,14 +306,14 @@ class PluginManager(QObject):
         for pid in broken:
             log.warning("Плагин «%s»: %s", pid, self.plugins[pid].error)
 
-        # включаем те, что были включены ранее
+        # we switch on the ones that were on before
         for pid in enabled_ids:
             if pid in self.plugins:
                 self.enable(pid, persist=False)
 
         self.changed.emit()
 
-    # ---------- загрузка кода ----------
+    # ---------- loading the code ----------
     def _load_instance(self, lp: LoadedPlugin) -> bool:
         manifest = lp.manifest
         main_py = os.path.join(manifest.path, "main.py")
@@ -238,7 +331,7 @@ class PluginManager(QObject):
             lp.error = tr("Ошибка импорта:\n") + traceback.format_exc(limit=3)
             return False
 
-        # находим класс плагина
+        # we find the plugin's class
         plugin_cls = None
         if manifest.entry:
             plugin_cls = getattr(module, manifest.entry, None)
@@ -260,12 +353,12 @@ class PluginManager(QObject):
             lp.error = tr("Ошибка инициализации:\n") + traceback.format_exc(limit=3)
             return False
 
-    # ---------- включение / выключение ----------
+    # ---------- switching on / off ----------
     def enable(self, plugin_id: str, persist=True):
         lp = self.plugins.get(plugin_id)
         if not lp or lp.enabled:
             return
-        # несовместимые по API не включаем
+        # we do not switch on ones incompatible by API
         if not lp.manifest.api_compatible():
             self.changed.emit()
             return
@@ -304,9 +397,9 @@ class PluginManager(QObject):
         settings.set("enabled_plugins", ids)
         settings.save()
 
-    # ---------- диспетчеризация ----------
+    # ---------- dispatch ----------
     def dispatch_command(self, text: str) -> bool:
-        """Прогоняет команду по включённым плагинам. True если кто-то обработал."""
+        """Runs a command past the switched-on plugins. True if somebody handled it."""
         for lp in self.plugins.values():
             if lp.enabled and lp.instance is not None:
                 try:
@@ -332,7 +425,7 @@ class PluginManager(QObject):
             self.log(lp.manifest.id,
                      f"Ошибка {method}:\n" + traceback.format_exc(limit=2))
 
-    # ---------- сервисы для плагинов (PluginContext) ----------
+    # ---------- services for plugins (PluginContext) ----------
     def log(self, plugin_id: str, message: str):
         lp = self.plugins.get(plugin_id)
         if lp is not None:
@@ -354,17 +447,17 @@ class PluginManager(QObject):
         settings.save()
 
     def open_plugin_window(self, plugin_id, widget, title, width, height):
-        # UI-поток подхватит сигнал и создаст окно
+        # the UI thread will pick the signal up and create the window
         self.window_requested.emit(plugin_id, widget, title, width, height)
 
     def notify_from_plugin(self, plugin_id, title, message):
         self.notify_requested.emit(plugin_id, title, message)
 
-    # ---------- доступ к вкладкам плагинов ----------
+    # ---------- access to plugins' tabs ----------
     def page_plugins(self):
         """
-        Список (plugin_id, LoadedPlugin) включённых плагинов, у которых есть
-        своя вкладка (create_page вернул виджет). Порядок стабильный.
+        A list of (plugin_id, LoadedPlugin) of switched-on plugins with a
+        page. The order is stable.
         """
         result = []
         for pid, lp in self.plugins.items():
@@ -377,14 +470,104 @@ class PluginManager(QObject):
         return result
 
     def _has_page(self, lp):
-        # вкладка есть, если переопределён page() (API v2) или create_page() (v1).
-        # Проверяем «дёшево»: отличается ли метод от базового.
-        cls = type(lp.instance)
-        return (cls.page is not Plugin.page
-                or cls.create_page is not Plugin.create_page)
+        # There is a page if `page()` is overridden. We check it "cheaply":
+        # does the method differ from the base one. `create_page` is not
+        # considered at all any more — a plugin that gives out a widget does
+        # not load (4.0-H05).
+        return type(lp.instance).page is not Plugin.page
+
+    # ---------- the declared tools (4.0-H03) ----------
+    def tool_prefix(self, plugin_id):
+        """
+        Under what name a plugin's tools live in the registry.
+
+        The prefix is obligatory: two plugins with a `roll` tool would
+        otherwise fight over one name, and whichever was switched on later
+        would win.
+        """
+        return f"plugin.{plugin_id}."
+
+    def declared_tools(self, plugin_id):
+        """
+        What the plugin declared — already with checked permissions.
+
+        Returns a list of `(Tool, run)`: the first is the description for
+        the core's registry, the second is what to call. A tool asking for
+        what a plugin may not have (ADR 0010) is **not created at all**: it
+        would refuse anyway, but only after the person had seen it and
+        called it.
+        """
+        from core.permissions import plugin_allowed
+        from core.tools import Tool
+
+        lp = self.plugins.get(plugin_id)
+        if not lp or lp.instance is None:
+            return []
+
+        declared = []
+        try:
+            declared = list(lp.instance.tools() or [])
+        except Exception:                                # noqa: BLE001
+            self.log(plugin_id,
+                     tr("Ошибка tools:\n") + traceback.format_exc(limit=2))
+            return []
+
+        allowed_by_manifest, refused = plugin_allowed(lp.manifest.permissions)
+        if refused:
+            self.log(plugin_id,
+                     "Не выдано разрешений: " + ", ".join(refused))
+
+        made = []
+        for one in declared:
+            wanted = set(str(p) for p in (one.permissions or ()))
+            if not wanted.issubset(set(allowed_by_manifest)):
+                self.log(plugin_id,
+                         f"Инструмент «{one.name}» не заведён: просит "
+                         f"{sorted(wanted - set(allowed_by_manifest))}")
+                continue
+            try:
+                tool = Tool(
+                    name=self.tool_prefix(plugin_id) + str(one.name),
+                    summary=str(one.summary),
+                    params=tuple(one.params or ()),
+                    permissions=frozenset(wanted),
+                    confirm_required=bool(one.confirm_required),
+                )
+            except Exception:                            # noqa: BLE001
+                self.log(plugin_id,
+                         tr("Ошибка tools:\n") + traceback.format_exc(limit=2))
+                continue
+            made.append((tool, self._wrap(plugin_id, one)))
+        return made
+
+    def _wrap(self, plugin_id, declared):
+        """
+        A wrapper around a call into the plugin.
+
+        A plugin is unreliable by definition — it is somebody else's code —
+        so its exception turns into a tool's failure rather than into the
+        core falling over. And it is written to the plugin's log: the author
+        needs to learn what broke, and the person that it did not work.
+        """
+        from core.toolrunner import ToolResult
+
+        def run(ctx, args):
+            try:
+                answer = declared.run(args) if declared.run else None
+            except Exception:                            # noqa: BLE001
+                self.log(plugin_id,
+                         tr("Ошибка инструмента:\n")
+                         + traceback.format_exc(limit=3))
+                return ToolResult.failed(
+                    tr("Плагин не справился."), "internal")
+            if isinstance(answer, ToolResult):
+                return answer
+            return ToolResult.done(str(answer) if answer is not None else "")
+
+        return run
 
     def get_plugin_page_spec(self, plugin_id):
-        """Декларативное описание вкладки (список элементов) или []."""
+        """The declarative description of a tab (a list of elements), or []."""
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
             return []
@@ -395,38 +578,51 @@ class PluginManager(QObject):
                      tr("Ошибка page:\n") + traceback.format_exc(limit=2))
             return []
 
+    def home_tiles(self):
+        """
+        The tiles switched-on plugins want on the home screen (`4.0b-A07`).
+
+        Asked of everything that is on, in one call: the home screen draws
+        them together, and asking one at a time would make the screen appear
+        in pieces.
+
+        A plugin that throws here loses its tile and nothing else. The home
+        screen is the first thing a person sees, and a plugin is somebody
+        else's code (`T-04`): it may not take the screen down with it.
+        """
+        tiles = []
+        for plugin_id, lp in self.plugins.items():
+            if not lp.enabled or lp.instance is None:
+                continue
+            try:
+                elements = lp.instance.home() or []
+            except Exception:
+                self.log(plugin_id, tr("Ошибка home:")
+                         + "\n" + traceback.format_exc(limit=2))
+                continue
+            if not elements:
+                continue
+            tiles.append({
+                "id": plugin_id,
+                "title": getattr(lp.manifest, "name", plugin_id),
+                # Trimmed here rather than by whoever draws: how much fits on
+                # the home screen is a decision about the home screen, and
+                # asking every plugin to behave would be asking politely.
+                "elements": [e.to_dict() if hasattr(e, "to_dict") else e
+                             for e in elements[:HOME_TILE_LIMIT]],
+                "trimmed": len(elements) > HOME_TILE_LIMIT,
+            })
+        return tiles
+
     def dispatch_action(self, plugin_id, action, value=None):
-        """Нажата кнопка на вкладке плагина."""
+        """A button on the plugin's tab was pressed."""
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
             return
         self._safe_call(lp, "on_action", action, value)
 
-    def build_plugin_page(self, plugin_id):
-        """Создать виджет вкладки плагина (или None)."""
-        lp = self.plugins.get(plugin_id)
-        if not lp or lp.instance is None:
-            return None
-
-        # API v2: плагин описывает страницу, рисуем её сами
-        if type(lp.instance).page is not Plugin.page:
-            try:
-                from plugins.page_view import PluginPageView
-                return PluginPageView(plugin_id, self)
-            except Exception:
-                self.log(plugin_id,
-                         tr("Ошибка page:\n") + traceback.format_exc(limit=2))
-                return None
-
-        # API v1: устаревший путь с готовым QWidget
-        try:
-            return lp.instance.create_page()
-        except Exception:
-            self.log(plugin_id, tr("Ошибка create_page:\n") + traceback.format_exc(limit=2))
-            return None
-
     def plugin_page_meta(self, plugin_id):
-        """(title, icon) для вкладки плагина."""
+        """(title, icon) for the plugin's tab."""
         lp = self.plugins.get(plugin_id)
         if not lp:
             return (plugin_id, "🧩")
@@ -451,5 +647,5 @@ class PluginManager(QObject):
             return []
 
 
-# единый экземпляр
+# one instance
 plugin_manager = PluginManager()

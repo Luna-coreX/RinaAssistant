@@ -1,0 +1,108 @@
+<UserControl x:Class="Rina.Shell.Pages.SessionsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:loc="clr-namespace:Rina.Shell.Strings"
+             xmlns:ui="clr-namespace:Rina.Shell.Styles">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Grid.Row="0" Text="{loc:S 'Сессии'}"
+               Style="{StaticResource Text.Title}" Margin="0,0,0,16" />
+
+    <!--
+      The open one stands on its own above the list, not first in it.
+
+      It is a different thing from the rest: it has no end, its length
+      grows while you look at it, and it is the only one anything can be
+      done to. As the first row of a list it read as the newest of the
+      finished ones, and the button to close it sat in a column where
+      every other row had nothing.
+    -->
+    <StackPanel Grid.Row="1" Margin="0,0,0,16">
+      <Border x:Name="Open" Style="{StaticResource Card}"
+              Margin="0,0,0,16" Visibility="Collapsed">
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+          <StackPanel Grid.Column="0">
+            <TextBlock Text="{loc:S 'ИДЁТ СЕЙЧАС'}"
+                       Style="{StaticResource Text.Section}"
+                       Margin="0,0,0,12" />
+            <TextBlock x:Name="OpenGoal" Style="{StaticResource Text.Body}"
+                       TextWrapping="Wrap" />
+            <TextBlock x:Name="OpenDetail" Style="{StaticResource Text.Meta}"
+                       Margin="0,4,0,0" TextWrapping="Wrap" />
+          </StackPanel>
+          <!-- Focus is a state of this session, so it is said here and
+               nowhere else. -->
+          <TextBlock x:Name="OpenFocus" Grid.Column="1"
+                     Text="{loc:S 'фокус'}"
+                     Style="{StaticResource Text.Meta}"
+                     VerticalAlignment="Center" Margin="0,0,16,0"
+                     Visibility="Collapsed" />
+          <TextBlock x:Name="OpenSpent" Grid.Column="2"
+                     Style="{StaticResource Text.Figure}"
+                     VerticalAlignment="Center" Margin="0,0,16,0" />
+        </Grid>
+      </Border>
+
+      <Grid x:Name="CloseRow" Margin="0,0,0,16" Visibility="Collapsed">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBox x:Name="Note" Grid.Column="0"
+                 Style="{StaticResource Field}"
+                 ui:Ui.Hint="{loc:S 'чем всё кончилось — если есть что сказать'}" />
+        <Button Grid.Column="1" Style="{StaticResource Btn.Primary}"
+                Content="{loc:S 'Завершить'}" Margin="12,0,0,0"
+                Click="OnFinish" />
+      </Grid>
+
+      <TextBlock x:Name="Legend" Text="{loc:S 'ПРОШЛЫЕ'}"
+                 Style="{StaticResource Text.Section}" Margin="0,0,0,12"
+                 Visibility="Collapsed" />
+    </StackPanel>
+
+    <ContentControl x:Name="Empty" Grid.Row="2" Visibility="Collapsed" />
+
+    <ScrollViewer x:Name="List" Grid.Row="2"
+                  VerticalScrollBarVisibility="Auto"
+                  ui:Smooth.Scrolling="True">
+      <Border Style="{StaticResource Rows}">
+        <ItemsControl x:Name="Items">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Style="{StaticResource Rows.Item}">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Grid.Column="0">
+                    <TextBlock Text="{Binding Goal}"
+                               Style="{StaticResource Text.Body}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding Detail}"
+                               Style="{StaticResource Text.Meta}"
+                               Margin="0,2,0,0" TextWrapping="Wrap" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="1" Text="{Binding Spent}"
+                             Style="{StaticResource Text.Figure}"
+                             VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Border>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

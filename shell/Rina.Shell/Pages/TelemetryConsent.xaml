@@ -1,0 +1,34 @@
+<Window x:Class="Rina.Shell.Pages.TelemetryConsent"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:Rina.Shell.Styles"
+        xmlns:loc="clr-namespace:Rina.Shell.Strings"
+        Title="{loc:S 'Телеметрия беты'}" Width="560"
+        SizeToContent="Height" WindowStyle="None" ResizeMode="NoResize"
+        AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <!-- Asked again at the moment of switching on (4.0b-D05): the box in the
+       wizard or the row in settings is one click, and what it starts is a
+       report a day to somebody else's server. The safe answer is the
+       primary one and the one Escape gives, as in TrustWindow. -->
+  <Border Background="{DynamicResource C.Face}"
+          BorderBrush="{DynamicResource C.Signal}" BorderThickness="2"
+          CornerRadius="{StaticResource Radius.Window}" Padding="24">
+    <StackPanel>
+      <TextBlock Text="{loc:S 'Включить телеметрию беты?'}"
+                 Style="{StaticResource Text.Title}" Margin="0,0,0,12" />
+      <TextBlock Text="{loc:S 'Раз в сутки Рина будет отправлять разработчику короткий отчёт: чем пользовались и где что-то не сработало.'}"
+                 Style="{StaticResource Text.Body}" TextWrapping="Wrap" />
+
+      <StackPanel x:Name="Body" Margin="0,4,0,20" />
+
+      <StackPanel ui:Ui.Gap="{StaticResource Sp.Inner}" Orientation="Horizontal">
+        <Button x:Name="Agree" Style="{StaticResource Btn}"
+                Content="{loc:S 'Включить'}" Click="OnAgree" />
+        <Button Style="{StaticResource Btn.Primary}" Margin="8,0,0,0"
+                Content="{loc:S 'Не включать'}" Click="OnDecline"
+                IsCancel="True" IsDefault="True" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</Window>

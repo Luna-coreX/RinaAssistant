@@ -1,0 +1,611 @@
+using System.Text.Json.Nodes;
+using Rina.Protocol;
+using System.Diagnostics;
+using System.Windows;
+using System.Windows.Controls;
+
+using static Rina.Shell.Strings.Loc;
+
+namespace Rina.Shell.Pages;
+
+/// <summary>
+/// About: what it is built from and where to go.
+/// </summary>
+/// <remarks>
+/// <para>
+/// Noted by a person: "about" in the footer was text that could not be
+/// clicked.
+/// </para>
+/// <para>
+/// <b>There are four versions, and all four are shown.</b> This follows
+/// directly from
+/// [ADR 0004](../../../docs/adr/0004-versioning-and-compatibility.md): the
+/// shell, the core, the protocol and the data schema are updated
+/// separately, and the question "what version do I have" without saying
+/// "of what" no longer has a single answer. Someone who came here because
+/// of a fault needs all four — otherwise they will name one and be asked
+/// about another.
+/// </para>
+/// <para>
+/// <b>A link opens in the browser, not inside the window.</b> Rina has no
+/// browser of her own and never will: a page opened inside an assistant is
+/// somebody else's code that we handed our own window to.
+/// </para>
+/// </remarks>
+public partial class AboutPage : UserControl
+{
+    private readonly CoreLink? _link;
+
+    /// <summary>How many "built from" rows — for the end-to-end check.</summary>
+    public int PartCount => Parts.Children.Count;
+
+    public AboutPage(CoreLink? link)
+    {
+        InitializeComponent();
+        _link = link;
+
+        Spaced.Text = Spread(SecondTier);
+        // What is written and what is read are now two things: the
+        // second tier has spaces between its letters, and a screen
+        // reader given «A s s i s t a n t» spells it out. The name it
+        // announces is the name.
+        System.Windows.Automation.AutomationProperties.SetName(
+            Wordmark, $"Rina {SecondTier}");
+
+        Version.Text = ShellVersion;
+        BuildLinks();
+        BuildPlaces();
+        Flow();
+        // The ink is the finish's, and a person may change the finish
+        // while this page is open. A brush built once would keep the
+        // old one.
+        App.AccentChanged += Flow;
+        Unloaded += (_, _) => App.AccentChanged -= Flow;
+        Loaded += async (_, _) => await ShowPartsAsync();
+    }
+
+    /// <summary>The second tier of the name.</summary>
+    private const string SecondTier = "Assistant";
+
+    /// <summary>
+    /// Set a word out, letter by letter.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: «предлагаю попробовать растянуть „Assistant“, т.е.
+    /// типа „A s s i s t a n t“». It is what a wordmark does with its
+    /// quieter half — the wide word under the tall one reads as a
+    /// setting for it rather than as a second word.
+    /// </para>
+    /// <para>
+    /// <b>By spaces, and knowingly so.</b> WPF has no letter spacing on
+    /// a <c>TextBlock</c>, which is why the design system removed
+    /// tracking from the tokens rather than leave a number nobody
+    /// applies. This is not tracking brought back: it is one word, on
+    /// one wordmark, set out by hand — and what it costs is that the
+    /// written text is no longer the word, which is paid for above by
+    /// giving the block the real name.
+    /// </para>
+    /// <para>
+    /// A thin space, not an ordinary one: an ordinary space at this
+    /// size pulls the letters into separate words.
+    /// </para>
+    /// </remarks>
+    private static string Spread(string word) =>
+        string.Join(' ', word.ToCharArray());
+
+    /// <summary>
+    /// The name, with a slow light running through it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Asked for: "make the heading a little more interesting — centre
+    /// it, change the size and the structure, perhaps animate it
+    /// slightly, give it some flow."
+    /// </para>
+    /// <para>
+    /// <b>A moving brush, not moving letters.</b> Letters that slide are
+    /// something to watch; ink that changes slowly is something to
+    /// glance at, and this is a page one glances at. The gradient runs
+    /// between the page's own ink and the accent — no new colour — and
+    /// it repeats, so the light arrives from the left for ever instead
+    /// of snapping back.
+    /// </para>
+    /// <para>
+    /// Six seconds. Not a motion token: those are for a change of state
+    /// — a press, a panel — and they are measured in a fifth of a
+    /// second. This is weather, not a transition, and weather that took
+    /// two hundred milliseconds would be a flicker.
+    /// </para>
+    /// <para>
+    /// <b>It stops when the page goes.</b> An animation on a brush of a
+    /// page nobody is looking at is a timer that never ends; the page is
+    /// built afresh on every visit, and there would be one more each
+    /// time.
+    /// </para>
+    /// </remarks>
+    private void Flow()
+    {
+        var ink = (System.Windows.Media.SolidColorBrush)
+            FindResource("C.Ink");
+        var lit = (System.Windows.Media.SolidColorBrush)
+            FindResource("C.Signal");
+
+        var run = new System.Windows.Media.LinearGradientBrush
+        {
+            StartPoint = new Point(0, 0),
+            EndPoint = new Point(1, 0),
+            MappingMode = System.Windows.Media.BrushMappingMode
+                                .RelativeToBoundingBox,
+            SpreadMethod = System.Windows.Media.GradientSpreadMethod.Repeat,
+            GradientStops =
+            [
+                new System.Windows.Media.GradientStop(ink.Color, 0.0),
+                new System.Windows.Media.GradientStop(lit.Color, 0.5),
+                new System.Windows.Media.GradientStop(ink.Color, 1.0),
+            ],
+        };
+
+        var slide = new System.Windows.Media.TranslateTransform();
+        run.RelativeTransform = slide;
+        Wordmark.Foreground = run;
+
+        var move = new System.Windows.Media.Animation.DoubleAnimation
+        {
+            From = 0,
+            To = 1,
+            Duration = TimeSpan.FromSeconds(6),
+            RepeatBehavior = System.Windows.Media.Animation
+                                   .RepeatBehavior.Forever,
+        };
+        slide.BeginAnimation(
+            System.Windows.Media.TranslateTransform.XProperty, move);
+        _flowing = slide;
+        Unloaded += (_, _) => Still();
+    }
+
+    private System.Windows.Media.TranslateTransform? _flowing;
+
+    private void Still() => _flowing?.BeginAnimation(
+        System.Windows.Media.TranslateTransform.XProperty, null);
+
+    /// <summary>Is the name flowing — for the check.</summary>
+    public bool NameFlows =>
+        Wordmark.Foreground is System.Windows.Media.LinearGradientBrush
+        {
+            RelativeTransform: System.Windows.Media.TranslateTransform,
+        };
+
+    /// <summary>
+    /// How light the ink is at the left of the name — for the check.
+    /// </summary>
+    /// <remarks>
+    /// <b>The left third, not the whole.</b> The gradient repeats once
+    /// across the name, so at every moment the whole of it is somewhere
+    /// on the letters and the average over all of them barely moves —
+    /// a check on that average would call a frozen brush "flowing". A
+    /// third of the width holds part of the cycle, and that part
+    /// travels.
+    ///
+    /// Only ink, never paper: the gaps between letters are transparent,
+    /// and counting them would drown the reading in nothing.
+    /// </remarks>
+    public double NameInk()
+    {
+        UpdateLayout();
+        var wide = Math.Max(1, (int)Wordmark.ActualWidth);
+        var tall = Math.Max(1, (int)Wordmark.ActualHeight);
+        var frame = new System.Windows.Media.Imaging.RenderTargetBitmap(
+            wide, tall, 96, 96,
+            System.Windows.Media.PixelFormats.Pbgra32);
+        // Through a brush, not straight. `Render` puts a visual where it
+        // stands inside its parent, and this one stands a hundred and
+        // sixty points in — off the right edge of a bitmap its own
+        // size, which is why the first reading was a bitmap of nothing.
+        var draw = new System.Windows.Media.DrawingVisual();
+        using (var paint = draw.RenderOpen())
+            paint.DrawRectangle(
+                new System.Windows.Media.VisualBrush(Wordmark), null,
+                new Rect(0, 0, wide, tall));
+        frame.Render(draw);
+        var pixels = new byte[wide * tall * 4];
+        frame.CopyPixels(pixels, wide * 4, 0);
+
+        double sum = 0;
+        var seen = 0;
+        for (var y = 0; y < tall; y++)
+            for (var x = 0; x < wide / 3; x++)
+            {
+                var spot = (y * wide + x) * 4;
+                if (pixels[spot + 3] < 64) continue;
+                sum += (pixels[spot] + pixels[spot + 1] + pixels[spot + 2])
+                       / 3.0;
+                seen++;
+            }
+        return seen > 0 ? sum / seen : 0;
+    }
+
+    /// <summary>Where the name stands in its card — for the check.</summary>
+    public (double Left, double Right) NameSides()
+    {
+        UpdateLayout();
+        var card = (FrameworkElement)Wordmark.Parent;
+        var at = Wordmark.TransformToAncestor(card)
+                         .Transform(new Point(0, 0));
+        return (at.X, card.ActualWidth - at.X - Wordmark.ActualWidth);
+    }
+
+    /// <summary>What the last check said — for the end-to-end check.</summary>
+    public string UpdateSaid => UpdateState.Text;
+
+    /// <summary>
+    /// Ask whether there is anything newer.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Plan item <c>4.0-U03</c>. The client lives in the shell
+    /// ([ADR 0009](../../../docs/adr/0009-system-layer.md)): downloading a
+    /// file and putting it on disk is the system layer's work, and only
+    /// whoever stops the core may replace the core's files.
+    /// </para>
+    /// <para>
+    /// <b>The button is always there, even when the automatic check is
+    /// off.</b> The `check_updates` setting governs whether we ask on our
+    /// own; a person who came to ask by hand has already answered that
+    /// question.
+    /// </para>
+    /// </remarks>
+    private async void OnCheckUpdates(object sender, RoutedEventArgs e)
+    {
+        CheckNow.IsEnabled = false;
+        UpdateState.Text = S("Спрашиваю…");
+        UpdateNote.Text = "";
+        try
+        {
+            var found = await new Update.Updater([ProtocolVersion.Current])
+                .CheckAsync(ShellVersion, CoreVersion, DataSchema);
+
+            UpdateState.Text = found.Explanation;
+            UpdateNote.Text = found.Verdict switch
+            {
+                Update.Verdict.UpToDate => "",
+                Update.Verdict.Unknown => S("Проверить не вышло — попробуйте позже."),
+                Update.Verdict.Incompatible => S("Установить эту пару нельзя."),
+                _ => S("Установка появится вместе с установщиком."),
+            };
+            UpdateState.SetResourceReference(ForegroundProperty,
+                found.Verdict is Update.Verdict.Unknown
+                                 or Update.Verdict.Incompatible
+                    ? "C.Signal" : "C.Ink");
+        }
+        finally
+        {
+            CheckNow.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// The core's version: it is named in the handshake.
+    /// </summary>
+    /// <remarks>
+    /// Zero means "the core is not connected". Checking for updates is
+    /// still allowed then: the shell updates separately from the core, and
+    /// that is the whole point of separate versions (ADR 0004).
+    /// </remarks>
+    private string CoreVersion
+        => _link?.Connection is { Ready: true, CoreVersion.Length: > 0 } live
+            ? live.CoreVersion : "0.0.0";
+
+    /// <summary>
+    /// The version of the data schema on disk.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// From the handshake — the same source as the row that shows it. The
+    /// core names it there deliberately (<c>4.0-U01</c>, ADR 0004): the file
+    /// on disk belongs to the core, and it is not a setting.
+    /// </para>
+    /// <para>
+    /// It used to be asked for with <c>settings.get</c> as
+    /// <c>config_version</c>, and that always came back empty: the key is
+    /// marked secret, and the core does not hand secret keys out — it is
+    /// the state of the store rather than a setting. So the number was
+    /// always zero, and the rollback guard in <see cref="Update.Updater"/>,
+    /// which compares it, never fired. The guard's own check passed all the
+    /// while: it calls the updater directly and passes the schema by hand.
+    /// A check of the mechanism agrees with its author; what was broken was
+    /// the wiring to it.
+    /// </para>
+    /// <para>
+    /// Zero still means "we do not know" — before the handshake there is
+    /// nowhere to take the number from — and a rollback is then not
+    /// forbidden by schema. That is a decision, not an oversight: an unknown
+    /// number is no reason to refuse.
+    /// </para>
+    /// </remarks>
+    private int DataSchema =>
+        _link?.Connection is { Ready: true, DataVersion: > 0 } live
+            ? live.DataVersion : 0;
+
+    /// <summary>
+    /// What to put in place of an unknown version.
+    /// </summary>
+    /// <remarks>
+    /// Not through `S(...)`: a dash is a mark, not a word, and there is no
+    /// point translating it. A string that ends up in the translation table
+    /// for nothing demands attention in every language afterwards.
+    /// </remarks>
+    private const string Unknown = "—";
+
+    /// <summary>The shell's version — from the assembly.</summary>
+    private static string ShellVersion => App.ShellVersion;
+
+    private async Task ShowPartsAsync()
+    {
+        Parts.Children.Clear();
+        Add(S("Оболочка"), ShellVersion, S("окно, звук, системный слой"));
+
+        var connection = _link?.Connection;
+        Add(S("Ядро"),
+            connection?.CoreVersion is { Length: > 0 } core ? core : S("нет связи"),
+            S("разбор команд, память, речь"));
+        Add(S("Протокол"),
+            connection is { Ready: true } ready
+                ? ready.NegotiatedVersion.ToString() : Unknown,
+            S("на чём они разговаривают"));
+
+        // The data schema comes from the handshake: the file on disk
+        // belongs to the core, and it is not handed out as a setting. The
+        // same number the update check compares against (see `DataSchema`).
+        Add(S("Данные на диске"),
+            DataSchema > 0 ? DataSchema.ToString() : Unknown,
+            S("формат настроек и истории"));
+        await Task.CompletedTask;
+    }
+
+    private void Add(string what, string version, string why)
+    {
+        var line = new Border { Style = (Style)FindResource("Rows.Item") };
+        var row = new Grid();
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(160),
+        });
+        row.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+
+        var name = new StackPanel();
+        name.Children.Add(new TextBlock
+        {
+            Text = what,
+            Style = (Style)FindResource("Text.Body"),
+        });
+        name.Children.Add(new TextBlock
+        {
+            Text = why,
+            Style = (Style)FindResource("Text.Meta"),
+            TextWrapping = TextWrapping.Wrap,
+        });
+        Grid.SetColumn(name, 0);
+        row.Children.Add(name);
+
+        var shown = new TextBlock
+        {
+            Text = version,
+            Style = (Style)FindResource("Text.Figure"),
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        Grid.SetColumn(shown, 1);
+        row.Children.Add(shown);
+
+        line.Child = row;
+        Parts.Children.Add(line);
+
+        if (Parts.Children[^1] is Border last)
+        {
+            foreach (var one in Parts.Children.OfType<Border>())
+                one.BorderThickness = new Thickness(0, 0, 0, 1);
+            last.BorderThickness = new Thickness(0);
+        }
+    }
+
+    /// <summary>
+    /// Collect a diagnostic bundle and show where it landed.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Where to save it we ask with a dialog: the archive is going to
+    /// leave the program, and the person chooses the place for it
+    /// (§6, ADR 0009). A name with a timestamp is offered — a second
+    /// bundle must not overwrite the first when the request is "collect
+    /// one more after it happens again".
+    /// </para>
+    /// <para>
+    /// The folder opens straight away: a bundle is collected in order to
+    /// be sent, and before sending it is worth looking inside — what is in
+    /// it is written in its own first line.
+    /// </para>
+    /// </remarks>
+    private async void OnRunSetup(object sender, RoutedEventArgs e)
+    {
+        if (_link is null) return;
+        RunSetup.IsEnabled = false;
+        try { await _link.RunSetupAsync(); }
+        finally { RunSetup.IsEnabled = true; }
+    }
+
+    private async void OnCollectDiagnostics(object sender, RoutedEventArgs e)
+    {
+        CollectDiagnostics.IsEnabled = false;
+        DiagnosticsState.Text = S("Собираю…");
+        try
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                FileName = Platform.Diagnostics.SuggestedName(),
+                Filter = S("Архив (*.zip)|*.zip"),
+                Title = S("Куда сохранить диагностический пакет"),
+            };
+            if (dialog.ShowDialog() != true)
+            {
+                DiagnosticsState.Text = "";
+                return;
+            }
+
+            var result = await Platform.Diagnostics.CollectAsync(
+                dialog.FileName, _link);
+            DiagnosticsState.Text = result.Ok
+                ? S("Готово: {0}", Short(result.Path))
+                : S("Не вышло: {0}", result.Problem);
+            DiagnosticsState.SetResourceReference(ForegroundProperty,
+                result.Ok ? "C.InkFaint" : "C.Signal");
+            if (result.Ok)
+                Open(System.IO.Path.GetDirectoryName(result.Path) ?? "");
+        }
+        finally
+        {
+            CollectDiagnostics.IsEnabled = true;
+        }
+    }
+
+    /// <summary>
+    /// Where the data, the logs and the plugins live.
+    /// </summary>
+    /// <remarks>
+    /// This is the first thing asked when a fault is being sorted out, and
+    /// the last thing a person can find on their own: the application
+    /// directory is hidden away in `AppData`, and the path to it can
+    /// neither be guessed nor dictated over the phone.
+    ///
+    /// The folder is opened by the file manager — the same way a person
+    /// would open it if they knew the road.
+    /// </remarks>
+    private void BuildPlaces()
+    {
+        var data = Platform.DataFolder.Roaming;
+
+        foreach (var (what, path) in new[]
+        {
+            (S("Настройки, история, команды"), data),
+            (S("Журналы"), System.IO.Path.Combine(data, "logs")),
+            (S("Плагины"), System.IO.Path.Combine(
+                AppContext.BaseDirectory, "..", "..", "..", "..", "plugins")),
+        })
+        {
+            var row = new Border
+            {
+                Style = (Style)FindResource("Rows.Item"),
+            };
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = new GridLength(1, GridUnitType.Star),
+            });
+            grid.ColumnDefinitions.Add(new ColumnDefinition
+            {
+                Width = GridLength.Auto,
+            });
+
+            var about = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            about.Children.Add(new TextBlock
+            {
+                Text = what,
+                Style = (Style)FindResource("Text.Body"),
+            });
+            about.Children.Add(new TextBlock
+            {
+                Text = Short(path),
+                Style = (Style)FindResource("Text.Meta"),
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                ToolTip = path,
+            });
+            Grid.SetColumn(about, 0);
+            grid.Children.Add(about);
+
+            var open = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = S("Открыть"),
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            var target = path;
+            open.Click += (_, _) => Open(target);
+            Grid.SetColumn(open, 1);
+            grid.Children.Add(open);
+
+            row.Child = grid;
+            Places.Children.Add(row);
+        }
+
+        if (Places.Children[^1] is Border tail)
+            tail.BorderThickness = new Thickness(0);
+    }
+
+    /// <summary>A shorter path: the home directory is replaced by "~".</summary>
+    private static string Short(string path)
+    {
+        try
+        {
+            var full = System.IO.Path.GetFullPath(path);
+            var home = Environment.GetFolderPath(
+                Environment.SpecialFolder.UserProfile);
+            return home.Length > 0 && full.StartsWith(home)
+                ? "~" + full[home.Length..] : full;
+        }
+        catch
+        {
+            return path;
+        }
+    }
+
+    private void BuildLinks()
+    {
+        foreach (var (title, url) in new[]
+        {
+            (S("Сайт"), "https://neurosync-foundry-portal.pages.dev/"),
+            (S("Исходники"), "https://github.com/Luna-coreX/RinaAssistant"),
+            (S("Сообщить о неполадке"),
+             "https://github.com/Luna-coreX/RinaAssistant/issues"),
+        })
+        {
+            var button = new Button
+            {
+                Style = (Style)FindResource("Btn"),
+                Content = title,
+                Margin = new Thickness(0, 0, 8, 0),
+                ToolTip = url,
+            };
+            var target = url;
+            button.Click += (_, _) => Open(target);
+            Links.Children.Add(button);
+        }
+    }
+
+    /// <summary>
+    /// Open a link in the person's browser.
+    /// </summary>
+    /// <remarks>
+    /// <c>UseShellExecute</c> is the same as double-clicking a link in the
+    /// file manager: it opens the browser the person chose themselves. If
+    /// it did not work, we say so instead of keeping quiet: a button that
+    /// does nothing looks like a broken program rather than a missing
+    /// browser.
+    /// </remarks>
+    private void Open(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = url,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception error)
+        {
+            Note.Text = S("Не вышло открыть ссылку: {0}", error.Message);
+        }
+    }
+}
