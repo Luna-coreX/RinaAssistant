@@ -35,10 +35,10 @@ import secrets
 import threading
 import time
 
-#: Where reports go. Empty until the collector is deployed
-#: (`server/telemetry/`); while it is empty nothing is sent, and the privacy
-#: page says so rather than letting a person believe otherwise.
-ENDPOINT = ""
+#: Where reports go: the collector in `server/telemetry/`, on Vercel. Left
+#: empty, nothing is sent, and the privacy page says so rather than letting
+#: a person believe otherwise.
+ENDPOINT = "https://rina-telemetry.vercel.app/api/v1/report"
 
 #: The shape of a report. The collector refuses any other.
 SCHEMA = 1
