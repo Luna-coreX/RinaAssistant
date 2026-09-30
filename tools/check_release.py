@@ -83,6 +83,14 @@ check("ядро на месте", os.path.isfile(entry))
 for name in ("core", "voice", "plugins"):
     check(f"пакет {name} уехал", os.path.isdir(os.path.join(where, name)))
 
+# The developer's checks of the plugin API (`plugins/*_test`) stay home:
+# the beta promises six plugins, and one of those checks reaches the network.
+shipped_plugins = os.path.join(where, "plugins")
+stray = sorted(n for n in (os.listdir(shipped_plugins)
+                           if os.path.isdir(shipped_plugins) else [])
+               if n.endswith("_test"))
+check("проверочные плагины не уехали", not stray, f"| {stray}")
+
 # The shell is published as a separate step: the build can be run without
 # it (`--skip-shell`), so its absence is not a failure but something said
 # out loud.

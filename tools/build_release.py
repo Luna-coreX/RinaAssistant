@@ -106,6 +106,21 @@ CORE_FILES = ["rina_core.py", "version.py"]
 #: not for the person.
 SKIP_DIRS = {"__pycache__", ".git", "venv", ".venv", "node_modules"}
 
+#: A plugin folder named `*_test` is a developer's check of the plugin API
+#: (`weather_api_test` asks the network for the weather), not a plugin the
+#: beta ships: the README and the site promise six, and a seventh with a
+#: way out to the network would arrive unannounced. It stays in the
+#: repository and stays out of the release; `check_release.py` holds that.
+DEV_PLUGIN_SUFFIX = "_test"
+
+
+def _plugins_ignore(base, names):
+    skipped = set(shutil.ignore_patterns(*SKIP_DIRS, "*.pyc")(base, names))
+    if os.path.basename(os.path.normpath(base)) == "plugins":
+        skipped |= {n for n in names if n.endswith(DEV_PLUGIN_SUFFIX)
+                    and os.path.isdir(os.path.join(base, n))}
+    return skipped
+
 CACHE = os.path.join(ROOT, "build", "cache")
 
 
@@ -262,7 +277,8 @@ def copy_core(out):
             shutil.rmtree(target)
         shutil.copytree(
             name, target,
-            ignore=shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"))
+            ignore=_plugins_ignore if name == "plugins"
+            else shutil.ignore_patterns(*SKIP_DIRS, "*.pyc"))
     for name in CORE_FILES:
         shutil.copy2(name, os.path.join(out, name))
     say("ядро скопировано", ", ".join(CORE_TREE + CORE_FILES))
