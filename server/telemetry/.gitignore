@@ -1,3 +1,6 @@
-# Written by `vercel link` and `npm install`; neither belongs in the repository.
+# Written by `vercel link`, `vercel env pull` and `npm install`. The .env files
+# hold the database connection string with its password; none of it belongs
+# in the repository.
 .vercel/
+.env*
 node_modules/

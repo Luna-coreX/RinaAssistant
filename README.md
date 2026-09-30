@@ -82,7 +82,7 @@ This is not a rearrangement of folders. It is what makes the rest possible:
 - a plugin that hangs no longer takes Rina with it: each lives in its own process;
 - the interface was **designed anew** rather than ported, because the shell is new code regardless.
 
-No new user-facing capabilities: the 4.0-port boundary forbids losing behaviour and does not ask for more. What behaviour existed is pinned by 134 recorded utterances and seven recorded sessions.
+The move itself added nothing and lost nothing: the port was bound to keep every behaviour of 3.1.0 and asked for nothing more, and that behaviour is pinned by 134 recorded utterances and seven recorded sessions. New things came with the beta, on that ground: work sessions, reminders tied to a program, learning from corrections, a focus mode, a to-do list, a visual command builder, a new home tab and a first-run setup.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 

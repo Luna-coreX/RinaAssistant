@@ -19,8 +19,9 @@ The rules, without which there is no point:
       the core separately anyway.
 
 The order of the steps repeats 3.1.0's pipeline literally
-(docs/INVENTORY-3.1.0.md, §1) — otherwise the behaviour changes, and the
-4.0-port boundary forbids that.
+(docs/INVENTORY-3.1.0.md, §1). The 4.0-port boundary forbade changing it,
+and the golden suite still pins it: a change of order is a change of
+behaviour, made on purpose and with the suite updated alongside.
 
 What the router does not yet decide: plugins and user commands. A plugin is
 somebody else's code, and "would it take the phrase" is found out only by
