@@ -301,6 +301,49 @@ answer = remote["plugin.dice.roll"](None, {"sides": 6})
 check("инструмент выполняется в чужом процессе", answer.ok,
       f"| {answer.message}")
 
+# A parameter's default crosses the wire. The core rebuilds each `Param`
+# from the description the plugin sent at the introduction, and it used to
+# leave `default` behind: the registry then had nothing to substitute, and
+# an optional argument simply did not arrive at `run`.
+from core.tools import validate
+
+defaulted = os.path.join(plugins_dir(), "проверка_умолчания")
+try:
+    os.makedirs(defaulted, exist_ok=True)
+    io.open(os.path.join(defaulted, "plugin.json"), "w",
+            encoding="utf-8").write(json.dumps(
+                {"id": "умолчание", "name": "Умолчание", "api_version": 4},
+                ensure_ascii=False))
+    io.open(os.path.join(defaulted, "main.py"), "w", encoding="utf-8").write(
+        "from core.tools import Param\n"
+        "from plugins.api import Plugin, PluginTool\n\n\n"
+        "class Defaulted(Plugin):\n"
+        "    def tools(self):\n"
+        "        return [PluginTool(\n"
+        "            name='count', summary='Назвать число.',\n"
+        "            params=(Param('n', 'integer', 'Число.', required=False,\n"
+        "                          default=7),),\n"
+        "            run=lambda args: str(args.get('n')))]\n")
+    hosted.discover()
+    check("плагин с умолчанием поднят", hosted.enable("проверка_умолчания"),
+          f"| {hosted.plugins.get('проверка_умолчания') and hosted.plugins['проверка_умолчания'].error}")
+    made = dict((t.name, (t, r)) for t, r in hosted.declared_tools("проверка_умолчания"))
+    tool, run = made.get("plugin.проверка_умолчания.count", (None, None))
+    check("умолчание параметра доехало до ядра",
+          tool is not None and tool.param("n").default == 7,
+          f"| {tool and tool.param('n')}")
+    if tool is not None:
+        filled = validate(tool, {})
+        check("реестр подставляет его, если аргумент не пришёл",
+              filled == {"n": 7}, f"| {filled}")
+        said = run(None, filled)
+        check("и плагин получает его в run", said.ok and said.message == "7",
+              f"| {said.message!r}")
+finally:
+    hosted.disable("проверка_умолчания", persist=False)
+    shutil.rmtree(defaulted, ignore_errors=True)
+    hosted.discover()
+
 hosted.enable("notes")
 spoken = []
 hosted.response.connect(lambda pid, text: spoken.append((pid, text)))

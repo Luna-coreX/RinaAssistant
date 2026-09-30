@@ -467,6 +467,24 @@
     "size": "L",
     "title": "Плагин в отдельном процессе"
   },
+  "4.0-H08": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Панель настроек плагина по схеме"
+  },
+  "4.0-H09": {
+    "done": false,
+    "milestone": "4.1+",
+    "size": "M",
+    "title": "События ядра для плагинов"
+  },
+  "4.0-H10": {
+    "done": false,
+    "milestone": "4.1+",
+    "size": "M",
+    "title": "Вызов объявленных инструментов"
+  },
   "4.0-I01": {
     "done": true,
     "milestone": "4.0-port",

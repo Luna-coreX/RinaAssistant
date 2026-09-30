@@ -128,12 +128,18 @@ class HostedPlugin:
 
         launcher = os.path.join(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__))), "plugins", "host.py")
+        # The error stream is read here as UTF-8 (`_drain_errors`), so the
+        # plugin is told to write it in UTF-8. Left to itself, Python on a
+        # Russian Windows writes the console's code page, and a plugin's
+        # Cyrillic `print` reached its log as mojibake. The checks never saw
+        # it: the regression starts everything with UTF-8 already set.
+        env = dict(os.environ, PYTHONIOENCODING="utf-8")
         try:
             self._proc = subprocess.Popen(
                 [sys.executable, "-u", launcher, self.folder],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                cwd=os.path.dirname(launcher))
+                cwd=os.path.dirname(launcher), env=env)
         except Exception as exc:                         # noqa: BLE001
             self.error = f"Плагин не запустился: {exc}"
             return False
@@ -601,7 +607,10 @@ class HostedPlugins:
                           required=bool(p.get("required", True)),
                           choices=tuple(p.get("choices") or ()),
                           minimum=p.get("minimum"),
-                          maximum=p.get("maximum"))
+                          maximum=p.get("maximum"),
+                          # Without it the registry has nothing to put in
+                          # place of an omitted optional argument.
+                          default=p.get("default"))
                     for p in (one.get("params") or ()))
                 tool = Tool(
                     name=self.tool_prefix(plugin_id) + str(one.get("name", "")),
