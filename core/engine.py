@@ -192,6 +192,9 @@ class RinaEngine:
                 # the one that existed at assembly time.
                 emit=lambda name, **data: self._emit(name, **data),
                 host=None,
+                # A scenario speaks as it runs (`4.0b-K01`); through a
+                # lambda for the same reason as the bus.
+                say=lambda text: self.say(text),
                 on_alias=self._remember_choice,
                 # Through a lambda for the same reason as speech: the shell
                 # appears later than the tools are assembled.
@@ -226,6 +229,10 @@ class RinaEngine:
         # agree with the first only by accident.
         self._tools._ctx.journal = self._tools.audit
         self._tools._ctx.registry = self._tools._registry
+        # And a person's own command reaches the registry through the same
+        # runner, the only door (`4.0b-K01`).
+        self._tools._ctx.call_block = self._tools.call_block
+        self._tools._ctx.block_effect = self._tools.block_effect
 
         # A plugin's tools are created and removed together with the plugin
         # (`4.0-H03`). A subscription rather than a one-off walk: a plugin is

@@ -92,6 +92,9 @@
   "«{0}»: не понял значение.": {
     "English": "“{0}”: didn’t understand the value."
   },
+  "«Выполняю последовательность»": {
+    "English": "“Running the sequence”"
+  },
   "«Готово»": {
     "English": "“Done”"
   },
@@ -133,6 +136,9 @@
   },
   "Бета-возможность: поведение может измениться в следующих версиях.": {
     "English": "A beta capability: its behaviour may change in later versions."
+  },
+  "Блок недоступен": {
+    "English": "Block unavailable"
   },
   "Будильник": {
     "Deutsch": "Wecker",
@@ -326,6 +332,9 @@
   "ДИАГНОСТИКА": {
     "English": "DIAGNOSTICS"
   },
+  "Да": {
+    "English": "Yes"
+  },
   "Дальше": {
     "English": "Next"
   },
@@ -472,6 +481,9 @@
   },
   "Записывать тексты реплик в журнал. По умолчанию выключено": {
     "English": "Write reply texts to the log. Off by default"
+  },
+  "Заполнять нечего.": {
+    "English": "Nothing to fill in."
   },
   "Запоминать время по программам в сессии": {
     "English": "Remember time per application in a session"
@@ -1559,6 +1571,9 @@
   "Эта программа не подписана": {
     "English": "This program isn’t signed"
   },
+  "Этой возможности сейчас нет — шаг не выполнится.": {
+    "English": "This ability isn’t available now — the step won’t run."
+  },
   "Я вас слушаю.": {
     "English": "I am listening."
   },
@@ -1592,6 +1607,9 @@
   "без имени": {
     "English": "unnamed"
   },
+  "без настроек": {
+    "English": "no settings"
+  },
   "бета": {
     "English": "beta"
   },
@@ -1609,6 +1627,9 @@
   },
   "выбирать не из чего": {
     "English": "nothing to choose from"
+  },
+  "да": {
+    "English": "yes"
   },
   "делать": {
     "English": "do"
@@ -1633,6 +1654,9 @@
   },
   "источник обновлений обязан быть https, а это «{0}»": {
     "English": "the update source must be https, and this is “{0}”"
+  },
+  "как обычно": {
+    "English": "as usual"
   },
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
@@ -1700,6 +1724,12 @@
   "не удалось спросить источник: {0}": {
     "English": "could not ask the source: {0}"
   },
+  "недоступно": {
+    "English": "unavailable"
+  },
+  "нет": {
+    "English": "no"
+  },
   "нет связи": {
     "English": "no connection"
   },
@@ -1733,6 +1763,9 @@
   "ответ не объект": {
     "English": "the answer is not an object"
   },
+  "ответом самого блока": {
+    "English": "with the block’s own answer"
+  },
   "папка с моделью": {
     "English": "folder with the model"
   },
@@ -1765,6 +1798,9 @@
   },
   "секунд": {
     "English": "seconds"
+  },
+  "словами своих шагов": {
+    "English": "with the words of its steps"
   },
   "такое сочетание не подойдёт": {
     "English": "that combination won’t work"
@@ -1804,6 +1840,9 @@
   },
   "через час": {
     "English": "in an hour"
+  },
+  "число": {
+    "English": "number"
   },
   "что произнести": {
     "English": "what to say"

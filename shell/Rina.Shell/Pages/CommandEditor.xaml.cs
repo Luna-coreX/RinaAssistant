@@ -53,6 +53,12 @@ public partial class CommandEditor : UserControl
     private int _maxDepth = 5;
     private readonly List<(string Value, string Title, bool Destructive)>
         _actions = [];
+    //: Rina's own abilities as blocks (`4.0b-K01`): each with its name,
+    //: what it does and the fields a person fills in, as the core sent
+    //: them. Kept as the core's JSON rather than mapped into types here:
+    //: the fields are drawn from it directly, and a copy in other shapes
+    //: would be one more thing to keep in step with the registry.
+    private readonly List<JsonObject> _blocks = [];
     private string _id = "";
 
     /// <summary>The person saved the command; the page re-reads the list.</summary>
@@ -102,6 +108,10 @@ public partial class CommandEditor : UserControl
             _actions.Add((action["value"]?.GetValue<string>() ?? "",
                           action["title"]?.GetValue<string>() ?? "",
                           action["destructive"]?.GetValue<bool>() ?? false));
+
+        foreach (var block in kinds["tools"]?.AsArray()
+                              .OfType<JsonObject>() ?? [])
+            _blocks.Add(block);
 
         if (existing is not null) Fill(existing);
         Roam();
@@ -155,7 +165,8 @@ public partial class CommandEditor : UserControl
         {
             var only = NewStep(kind);
             foreach (var field in new[] { "target", "value", "name",
-                                          "condition", "count" })
+                                          "condition", "count",
+                                          "tool", "args" })
                 if (command[field] is { } had) only[field] = had.DeepClone();
             _chain.Add(only);
         }
@@ -174,7 +185,8 @@ public partial class CommandEditor : UserControl
     /// a sequence of one is the same as the thing inside it.
     /// </remarks>
     private static bool StandsAlone(string kind) =>
-        kind is "app" or "folder" or "website" or "speak" or "system";
+        kind is "app" or "folder" or "website" or "speak" or "system"
+            or "tool";
 
     /// <summary>The whole command in one sentence.</summary>
     /// <remarks>
@@ -208,8 +220,34 @@ public partial class CommandEditor : UserControl
 
         var answer = Response.Text.Trim();
         Summary.Text = S("{0} → {1}. Ответит: {2}.", said, happens,
-                         answer.Length > 0 ? $"«{answer}»" : S("«Готово»"));
+                         answer.Length > 0 ? $"«{answer}»" : DefaultAnswer());
     }
+
+    /// <summary>What the command answers when the card says nothing.</summary>
+    /// <remarks>
+    /// The core's rule (`4.0b-K01`): a single block answers with its own
+    /// answer, a sequence whose steps speak says nothing before them, and a
+    /// silent sequence says that it is running. «Готово» for all three was
+    /// a promise of a word nobody would hear.
+    /// </remarks>
+    private string DefaultAnswer()
+    {
+        var only = _chain.Count == 1 ? _chain[0] as JsonObject : null;
+        var kind = only?["type"]?.GetValue<string>() ?? "";
+        if (only is not null && StandsAlone(kind))
+            return kind == "tool" ? S("ответом самого блока") : S("«Готово»");
+        return Speaks(_chain) ? S("словами своих шагов")
+                              : S("«Выполняю последовательность»");
+    }
+
+    /// <summary>Does any step, at any depth, say something by itself?</summary>
+    private bool Speaks(JsonArray steps) =>
+        steps.OfType<JsonObject>().Any(step =>
+            step["type"]?.GetValue<string>() == "speak"
+            || (step["type"]?.GetValue<string>() == "tool"
+                && BlockOf(step)?["effect"]?.GetValue<string>() == "query")
+            || (step["steps"] is JsonArray inner && Speaks(inner))
+            || (step["otherwise"] is JsonArray other && Speaks(other)));
 
     /// <summary>Enter adds the phrase — the hands are already there.</summary>
     private void OnTriggerKey(object sender, System.Windows.Input.KeyEventArgs e)
@@ -326,9 +364,8 @@ public partial class CommandEditor : UserControl
 
         var step = _picked;
         var kind = step["type"]?.GetValue<string>() ?? "speak";
-        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
-        PickedTitle.Text = ((known.Icon ?? "") + " "
-                            + (known.Title ?? kind)).ToUpperInvariant();
+        var (icon, title) = Heading(step, kind);
+        PickedTitle.Text = (icon + " " + title).ToUpperInvariant();
 
         foreach (var control in Fields(step, kind))
             Picked.Children.Add(control);
@@ -493,6 +530,10 @@ public partial class CommandEditor : UserControl
                 Label(S("Дальше ничего не выполнится."));
                 break;
 
+            case "tool":
+                BlockFields(step, made, Label);
+                break;
+
             default:
                 Label(kind switch
                 {
@@ -530,6 +571,196 @@ public partial class CommandEditor : UserControl
                 break;
         }
         return made;
+    }
+
+    /// <summary>The block the step names, as the core described it.</summary>
+    private JsonObject? BlockOf(JsonObject step)
+    {
+        var name = step["tool"]?.GetValue<string>() ?? "";
+        return _blocks.FirstOrDefault(
+            b => b["name"]?.GetValue<string>() == name);
+    }
+
+    /// <summary>What a node is called: the kind, or the block it is.</summary>
+    /// <remarks>
+    /// A block's own name rather than "Rina's ability": a canvas of five
+    /// nodes all titled the same says nothing until each one is opened.
+    /// </remarks>
+    private (string Icon, string Title) Heading(JsonObject step, string kind)
+    {
+        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
+        var icon = known.Icon ?? "•";
+        if (kind != "tool") return (icon, known.Title ?? kind);
+        return (icon, BlockOf(step)?["title"]?.GetValue<string>()
+                      ?? S("Блок недоступен"));
+    }
+
+    /// <summary>
+    /// The fields of a block, each drawn by the type of its argument.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The fields come from the core with the block — its name, type,
+    /// choices and their names — so a new ability arrives here with its
+    /// fields and nothing in the window has to learn about it.
+    /// </para>
+    /// <para>
+    /// Values are kept in the types the registry checks: a number as a
+    /// number, a switch as a switch. A "5" kept as text would be refused by
+    /// the registry when the command runs, long after the person who typed
+    /// it has left the editor.
+    /// </para>
+    /// </remarks>
+    private void BlockFields(JsonObject step, List<UIElement> made,
+                             Action<string> label)
+    {
+        var block = BlockOf(step);
+        if (block is null)
+        {
+            // A block the core no longer offers — a plugin switched off,
+            // a card from a newer version. Said rather than shown empty:
+            // an empty panel reads as "nothing to fill in".
+            label(S("Этой возможности сейчас нет — шаг не выполнится."));
+            return;
+        }
+        if (step["args"] is not JsonObject args)
+        {
+            args = new JsonObject();
+            step["args"] = args;
+        }
+
+        void Changed()
+        {
+            DrawSteps();
+            ShowSummary();
+        }
+
+        var fields = block["fields"]?.AsArray().OfType<JsonObject>().ToList()
+                     ?? [];
+        if (fields.Count == 0)
+            label(S("Заполнять нечего."));
+
+        foreach (var field in fields)
+        {
+            var name = field["name"]?.GetValue<string>() ?? "";
+            var type = field["type"]?.GetValue<string>() ?? "string";
+            label((field["title"]?.GetValue<string>() ?? name).TrimEnd('.'));
+
+            if (field["choices"] is JsonArray choices)
+            {
+                var pick = new ComboBox { Style = (Style)FindResource("Choice") };
+                if (!(field["required"]?.GetValue<bool>() ?? false))
+                    pick.Items.Add(new ComboBoxItem
+                    {
+                        Content = S("как обычно"),
+                        Tag = "",
+                    });
+                foreach (var choice in choices.OfType<JsonObject>())
+                    pick.Items.Add(new ComboBoxItem
+                    {
+                        Content = choice["title"]?.GetValue<string>() ?? "",
+                        Tag = choice["value"]?.GetValue<string>() ?? "",
+                    });
+                var now = args[name]?.GetValue<string>() ?? "";
+                pick.SelectedItem = pick.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => (string?)i.Tag == now)
+                    ?? pick.Items.OfType<ComboBoxItem>().FirstOrDefault();
+                pick.SelectionChanged += (_, _) =>
+                {
+                    var tag = (pick.SelectedItem as ComboBoxItem)?.Tag as string
+                              ?? "";
+                    if (tag.Length == 0) args.Remove(name);
+                    else args[name] = tag;
+                    Changed();
+                };
+                made.Add(pick);
+            }
+            else if (type == "boolean")
+            {
+                var on = new CheckBox
+                {
+                    Style = (Style)FindResource("Toggle"),
+                    IsChecked = args[name]?.GetValue<bool>() ?? false,
+                    HorizontalAlignment = HorizontalAlignment.Left,
+                    Margin = new Thickness(0, 2, 0, 0),
+                    ToolTip = S("Да"),
+                };
+                // A switch has a value even untouched: "off" is an answer,
+                // and the registry requires one.
+                args[name] = on.IsChecked == true;
+                on.Click += (_, _) =>
+                {
+                    args[name] = on.IsChecked == true;
+                    Changed();
+                };
+                made.Add(on);
+            }
+            else
+            {
+                var box = new TextBox
+                {
+                    Style = (Style)FindResource("Field"),
+                    Text = args[name] is JsonValue had
+                        ? (had.TryGetValue<string>(out var text) ? text
+                           : had.ToJsonString())
+                        : "",
+                };
+                if (type is "integer" or "number")
+                    Styles.Ui.SetHint(box, S("число"));
+                box.TextChanged += (_, _) =>
+                {
+                    var written = box.Text.Trim();
+                    if (written.Length == 0)
+                        args.Remove(name);
+                    else if (type == "integer"
+                             && long.TryParse(written, out var whole))
+                        args[name] = whole;
+                    else if (type == "number"
+                             && double.TryParse(
+                                 written.Replace(',', '.'),
+                                 System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture,
+                                 out var exact))
+                        args[name] = exact;
+                    else
+                        // Kept as typed, number or not: the registry says
+                        // what is wrong with it when the command is tried,
+                        // in words, which beats a field that silently
+                        // refuses a keystroke.
+                        args[name] = written;
+                    Changed();
+                };
+                made.Add(box);
+            }
+        }
+    }
+
+    /// <summary>What a block step was given, in a few words.</summary>
+    private string BlockShort(JsonObject step)
+    {
+        var block = BlockOf(step);
+        if (block is null) return S("недоступно");
+        var args = step["args"] as JsonObject;
+        var parts = new List<string>();
+        foreach (var field in block["fields"]?.AsArray().OfType<JsonObject>()
+                              ?? [])
+        {
+            var name = field["name"]?.GetValue<string>() ?? "";
+            if (args?[name] is not JsonValue value) continue;
+            if (value.TryGetValue<bool>(out var yes))
+            {
+                parts.Add((field["title"]?.GetValue<string>() ?? name)
+                          .TrimEnd('.') + ": " + (yes ? S("да") : S("нет")));
+                continue;
+            }
+            var said = value.TryGetValue<string>(out var text)
+                ? text : value.ToJsonString();
+            // A choice is shown by its name, not its code.
+            var named = field["choices"]?.AsArray().OfType<JsonObject>()
+                .FirstOrDefault(c => c["value"]?.GetValue<string>() == said);
+            parts.Add(named?["title"]?.GetValue<string>() ?? said);
+        }
+        return parts.Count > 0 ? string.Join(", ", parts) : "";
     }
 
     private Button Hand(string mark, string tip, Action press)
@@ -578,19 +809,40 @@ public partial class CommandEditor : UserControl
     private void OfferKinds(FrameworkElement near, JsonArray steps, int at)
     {
         var menu = new ContextMenu { PlacementTarget = near };
+
+        void Put(JsonObject made)
+        {
+            steps.Insert(Math.Clamp(at, 0, steps.Count), made);
+            _picked = made;
+            _pickedOwner = steps;
+            _pickedAt = at;
+            DrawSteps();
+            ShowSummary();
+        }
+
         foreach (var (value, title, icon) in _stepKinds)
         {
             var item = new MenuItem { Header = icon + "  " + title };
-            item.Click += (_, _) =>
+            if (value == "tool")
             {
-                var made = NewStep(value);
-                steps.Insert(Math.Clamp(at, 0, steps.Count), made);
-                _picked = made;
-                _pickedOwner = steps;
-                _pickedAt = at;
-                DrawSteps();
-                ShowSummary();
-            };
+                // Rina's abilities open as a submenu of their own names
+                // (`4.0b-K01`). One entry "Rina's ability" followed by a
+                // dropdown would hide eighteen things behind one word; laid
+                // out flat they would bury the kinds above them.
+                if (_blocks.Count == 0) continue;
+                foreach (var block in _blocks)
+                {
+                    var name = block["name"]?.GetValue<string>() ?? "";
+                    var one = new MenuItem
+                    {
+                        Header = block["title"]?.GetValue<string>() ?? name,
+                    };
+                    one.Click += (_, _) => Put(NewBlock(block));
+                    item.Items.Add(one);
+                }
+            }
+            else
+                item.Click += (_, _) => Put(NewStep(value));
             menu.Items.Add(item);
         }
         menu.IsOpen = true;
@@ -611,6 +863,34 @@ public partial class CommandEditor : UserControl
         ["value"] = kind is "if" or "while" ? "18:00" : "",
         ["name"] = "",
     };
+
+    /// <summary>A fresh step of one block, with its defaults filled in.</summary>
+    /// <remarks>
+    /// A required choice starts on its first option: a dropdown that comes
+    /// up empty in a node somebody just added is a question with no default
+    /// answer, the same reason a system action starts on a harmless one.
+    /// </remarks>
+    private static JsonObject NewBlock(JsonObject block)
+    {
+        var step = NewStep("tool");
+        step["tool"] = block["name"]?.GetValue<string>() ?? "";
+        var args = new JsonObject();
+        foreach (var field in block["fields"]?.AsArray().OfType<JsonObject>()
+                              ?? [])
+        {
+            var name = field["name"]?.GetValue<string>() ?? "";
+            if (field["default"] is { } given)
+                args[name] = given.DeepClone();
+            else if ((field["required"]?.GetValue<bool>() ?? false)
+                     && field["choices"]?.AsArray().FirstOrDefault()
+                         is JsonObject first)
+                args[name] = first["value"]?.DeepClone();
+            else if (field["type"]?.GetValue<string>() == "boolean")
+                args[name] = false;
+        }
+        step["args"] = args;
+        return step;
+    }
 
     private static string? Pick(string kind)
     {
@@ -652,6 +932,12 @@ public partial class CommandEditor : UserControl
         {
             var named = _actions.FirstOrDefault(a => a.Value == target);
             return $"{title} · {(named.Title.Length > 0 ? named.Title : target)}";
+        }
+        if (kind == "tool")
+        {
+            var (_, block) = Heading(step, kind);
+            var given = BlockShort(step);
+            return given.Length > 0 ? $"{block} · {given}" : block;
         }
         return target.Length > 0 ? $"{title} · {target}" : title;
     }
@@ -713,6 +999,14 @@ public partial class CommandEditor : UserControl
                 ? new JsonArray()
                 : new JsonArray(_chain.Select(s => s!.DeepClone()).ToArray()),
         };
+        // A command of one block is saved as that block (`4.0b-K01`), the
+        // way "open the browser" is saved as itself and not as a sequence
+        // of one: it then answers with the block's own answer.
+        if (alone && only!["type"]?.GetValue<string>() == "tool")
+        {
+            card["tool"] = only["tool"]?.DeepClone() ?? "";
+            card["args"] = only["args"]?.DeepClone() ?? new JsonObject();
+        }
         return card;
     }
 
@@ -781,6 +1075,35 @@ public partial class CommandEditor : UserControl
         DrawSteps();
         ShowSummary();
     }
+
+    /// <summary>How many of Rina's abilities came as blocks — for the check.</summary>
+    public int BlocksOffered => _blocks.Count;
+
+    /// <summary>
+    /// Put a block in, the way the palette does, and fill one field — for
+    /// the check.
+    /// </summary>
+    /// <remarks>
+    /// Through <see cref="NewBlock"/>, the same as a click in the submenu,
+    /// so the defaults a person would get are the defaults checked.
+    /// </remarks>
+    public bool InsertBlockForCheck(int at, string tool, string field = "",
+                                    string value = "")
+    {
+        var block = _blocks.FirstOrDefault(
+            b => b["name"]?.GetValue<string>() == tool);
+        if (block is null) return false;
+        var step = NewBlock(block);
+        if (field.Length > 0 && step["args"] is JsonObject args)
+            args[field] = value;
+        _chain.Insert(Math.Clamp(at, 0, _chain.Count), step);
+        DrawSteps();
+        ShowSummary();
+        return true;
+    }
+
+    /// <summary>The one-sentence summary under the editor — for the check.</summary>
+    public string SummaryForCheck => Summary.Text;
 
     /// <summary>Put a node inside another one — for the check.</summary>
     public bool NestStepForCheck(int outer, string branch, string kind,

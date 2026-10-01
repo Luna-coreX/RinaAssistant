@@ -446,6 +446,29 @@ work.ask("commands.list")
 items = work.read(1)[0].payload["items"]
 check("список своих команд отдаётся", isinstance(items, list), f"| {items}")
 
+# The editor's blocks come from the registry (`4.0b-K01`), with the fields
+# a person fills in — so the window offers what the core will run.
+work.ask("commands.kinds")
+offered = work.read(1)[0].payload
+blocks = {b["name"]: b for b in offered.get("tools") or []}
+check("блоки пришли из реестра",
+      {"add_todo", "create_reminder", "start_session", "set_focus"}
+      <= set(blocks), f"| {sorted(blocks)}")
+check("вид шага «возможность Рины» объявлен",
+      any(k["value"] == "tool" for k in offered["kinds"]))
+check("у блока есть название и поля",
+      blocks.get("add_todo", {}).get("title")
+      and [f["name"] for f in blocks["add_todo"]["fields"]] == ["text"],
+      f"| {blocks.get('add_todo')}")
+kind_field = next((f for f in blocks.get("create_reminder", {})
+                   .get("fields", []) if f["name"] == "kind"), {})
+check("варианты поля подписаны словами, а не кодами",
+      [c["value"] for c in kind_field.get("choices", [])]
+      == ["timer", "reminder", "alarm"]
+      and kind_field["choices"][0]["title"] != "timer", f"| {kind_field}")
+check("то, что команде нельзя, блоком не предлагается",
+      not {"try_user_command", "power_action", "close_todo"} & set(blocks))
+
 # A command in the form the constructor puts it in: phrases and a kind,
 # not a "name". The first edition sent `name`/`kind`, which the store does
 # not have at all, and the check passed only because the import parsed

@@ -1143,7 +1143,39 @@ class ProtocolServer:
                         for action, title in user_commands.SYSTEM_ACTIONS],
             "matches": [{"value": "contains", "title": tr("Фраза встречается")},
                         {"value": "exact", "title": tr("Фраза целиком")}],
+            # Rina's own abilities as blocks (`4.0b-K01`), from the
+            # registry rather than from a table: which tools are blocks is
+            # decided on the tool, and a list kept here would be the table
+            # that fell behind all over again.
+            "tools": self._blocks(),
         }
+
+    def _blocks(self):
+        """The registry's blocks, with the fields a person fills in."""
+        from core.i18n import t as tr
+
+        runner = getattr(self.engine, "_tools", None)
+        if runner is None:
+            return []
+
+        def field(param):
+            out = {"name": param.name, "type": param.type,
+                   "title": tr(param.description),
+                   "required": param.required}
+            if param.choices:
+                out["choices"] = [
+                    {"value": value,
+                     "title": tr(param.labels[i]) if param.labels else value}
+                    for i, value in enumerate(param.choices)]
+            for key in ("minimum", "maximum", "default"):
+                if getattr(param, key) is not None:
+                    out[key] = getattr(param, key)
+            return out
+
+        return [{"name": tool.name, "title": tr(tool.title),
+                 "effect": tool.automation,
+                 "fields": [field(tool.param(name)) for name in tool.asks]}
+                for tool in runner.blocks()]
 
     def _commands_save(self, message: Envelope) -> dict:
         """

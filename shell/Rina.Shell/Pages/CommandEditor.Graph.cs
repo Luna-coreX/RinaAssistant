@@ -213,7 +213,7 @@ public partial class CommandEditor
                            double x, double y, string path)
     {
         var kind = step["type"]?.GetValue<string>() ?? "speak";
-        var known = _stepKinds.FirstOrDefault(k => k.Value == kind);
+        var (icon, title) = Heading(step, kind);
         var chosen = ReferenceEquals(step, _picked);
 
         // The grip. Without it nothing on the node says it can be moved:
@@ -254,7 +254,7 @@ public partial class CommandEditor
         whole.Children.Add(body);
         body.Children.Add(new TextBlock
         {
-            Text = (known.Icon ?? "•") + "  " + (known.Title ?? kind),
+            Text = icon + "  " + title,
             Style = (Style)FindResource("Text.Body"),
         });
         body.Children.Add(new TextBlock
@@ -990,6 +990,9 @@ public partial class CommandEditor
                        + step["value"]?.GetValue<string>();
             case "call":
                 return target.Length > 0 ? target : S("не выбрана");
+            case "tool":
+                var given = BlockShort(step);
+                return given.Length > 0 ? given : S("без настроек");
             default:
                 return target.Length > 0 ? target : S("не заполнено");
         }

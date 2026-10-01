@@ -120,6 +120,7 @@ def main() -> int:
     # directions, and the price of the list is one line when a new
     # table appears.
     from core import llm, models
+    from core.toolbox import default_registry
     from voice import hotkey_actions, system_control, user_commands
 
     tables = {
@@ -130,6 +131,15 @@ def main() -> int:
         "COMMAND_TYPES": [title for _v, title, _i
                           in user_commands.COMMAND_TYPES],
         "CONDITIONS": [title for _v, title in user_commands.CONDITIONS],
+        # The editor's blocks (`4.0b-K01`): the name, and every field and
+        # choice a person sees on one.
+        "BLOCKS": [word for tool in default_registry().all()
+                   if tool.automation in ("action", "query")
+                   for word in (tool.title,
+                                *(tool.param(a).description
+                                  for a in tool.asks),
+                                *(label for a in tool.asks
+                                  for label in tool.param(a).labels))],
         "SYSTEM_ACTIONS": [title for _v, title
                            in user_commands.SYSTEM_ACTIONS],
         "DONE_MESSAGES": list(system_control.DONE_MESSAGES.values()),

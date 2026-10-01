@@ -139,6 +139,15 @@ public partial class CommandsPage : UserControl
             : _kinds["kinds"]?.AsArray().OfType<JsonObject>()
                 .FirstOrDefault(k => k["value"]?.GetValue<string>() == kind)
                 ?["title"]?.GetValue<string>() ?? kind;
+        // A block is named by what it is (`4.0b-K01`): a list where every
+        // such command reads "Rina's ability" says nothing about any of them.
+        if (kind == "tool")
+        {
+            var tool = item?["tool"]?.GetValue<string>() ?? "";
+            target = _kinds?["tools"]?.AsArray().OfType<JsonObject>()
+                .FirstOrDefault(b => b["name"]?.GetValue<string>() == tool)
+                ?["title"]?.GetValue<string>() ?? tool;
+        }
         return target.Length > 0 ? $"{title} · {target}" : title;
     }
 

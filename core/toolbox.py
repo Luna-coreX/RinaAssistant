@@ -29,6 +29,7 @@ from core.tools import Param, Tool, ToolRegistry
 LAUNCH_APP = Tool(
     name="launch_app",
     summary="Запустить установленную программу по её имени в индексе.",
+    automation="kind:app",
     params=(
         Param("name", "string",
               "Отображаемое имя программы, как оно записано в индексе."),
@@ -46,6 +47,9 @@ LAUNCH_APP = Tool(
 TEACH_ALIAS = Tool(
     name="teach_alias",
     summary="Запомнить, что этим словом человек зовёт эту программу.",
+    automation="no",
+    automation_note=(
+        "Правка словаря Рины, а не действие: выученное слово живёт годами, а команда срабатывает снова и снова."),
     params=(
         Param("word", "string",
               "Как человек говорит: «код», «браузер», «студия»."),
@@ -69,6 +73,9 @@ TEACH_ALIAS = Tool(
 FORGET_ALIAS = Tool(
     name="forget_alias",
     summary="Забыть выученное соответствие для одного слова.",
+    automation="no",
+    automation_note=(
+        "Правка словаря Рины, а не действие — то же, что у запоминания слова."),
     params=(Param("word", "string", "Слово, которое надо забыть."),),
     permissions=set(),
     idempotent=True,
@@ -79,6 +86,9 @@ FORGET_ALIAS = Tool(
 LIST_APPS = Tool(
     name="list_apps",
     summary="Найденные на компьютере программы.",
+    automation="no",
+    automation_note=(
+        "Ответ — список программ для выбора на экране, а не то, что говорят вслух посреди сценария."),
     params=(
         Param("query", "string", "Отбор по имени; пусто — весь список.",
               required=False),
@@ -98,6 +108,7 @@ LIST_APPS = Tool(
 SET_VOLUME = Tool(
     name="set_volume",
     summary="Прибавить, убавить или переключить звук.",
+    automation="kind:system",
     params=(
         Param("action", "string", "Что сделать с громкостью.",
               choices=("up", "down", "mute")),
@@ -111,6 +122,7 @@ SET_VOLUME = Tool(
 MEDIA_CONTROL = Tool(
     name="media_control",
     summary="Управление воспроизведением: следующий, предыдущий, пауза.",
+    automation="kind:system",
     params=(
         Param("action", "string", "Действие плеера.",
               choices=("next", "previous", "play_pause")),
@@ -124,6 +136,7 @@ MEDIA_CONTROL = Tool(
 LOCK_SCREEN = Tool(
     name="lock_screen",
     summary="Заблокировать рабочий стол.",
+    automation="kind:system",
     params=(),
     permissions={"system.lock"},
     idempotent=True,            # locking what is locked is harmless
@@ -134,6 +147,7 @@ LOCK_SCREEN = Tool(
 POWER_ACTION = Tool(
     name="power_action",
     summary="Выключить, перезагрузить или усыпить компьютер.",
+    automation="kind:system",
     params=(
         Param("action", "string", "Что сделать с питанием.",
               choices=("shutdown", "restart", "sleep")),
@@ -151,6 +165,7 @@ POWER_ACTION = Tool(
 TAKE_SCREENSHOT = Tool(
     name="take_screenshot",
     summary="Снять экран и сохранить снимок в «Изображения».",
+    automation="kind:system",
     params=(),
     permissions={"screen.capture"},
     idempotent=False,           # every call creates a new file
@@ -165,9 +180,13 @@ TAKE_SCREENSHOT = Tool(
 CREATE_REMINDER = Tool(
     name="create_reminder",
     summary="Поставить таймер, напоминание или будильник.",
+    automation="action",
+    title="Поставить напоминание",
+    asks=("kind", "seconds", "text"),
     params=(
         Param("kind", "string", "Вид записи.",
-              choices=("timer", "reminder", "alarm")),
+              choices=("timer", "reminder", "alarm"),
+              labels=("Таймер", "Напоминание", "Будильник")),
         Param("seconds", "integer", "Через сколько секунд сработает.",
               required=False, minimum=1, maximum=315360000),
         Param("at", "number", "Точный момент срабатывания, секунды с эпохи.",
@@ -186,6 +205,8 @@ CREATE_REMINDER = Tool(
 LIST_REMINDERS = Tool(
     name="list_reminders",
     summary="Что сейчас запланировано.",
+    automation="query",
+    title="Что запланировано",
     params=(),
     permissions=set(),
     idempotent=True,
@@ -196,6 +217,8 @@ LIST_REMINDERS = Tool(
 CANCEL_REMINDER = Tool(
     name="cancel_reminder",
     summary="Отменить одну запись или все сразу.",
+    automation="action",
+    title="Отменить всё запланированное",
     params=(
         Param("id", "string", "Что отменить; пусто — отменить всё.",
               required=False),
@@ -214,6 +237,7 @@ CANCEL_REMINDER = Tool(
 RUN_USER_COMMAND = Tool(
     name="run_user_command",
     summary="Выполнить команду, заведённую пользователем.",
+    automation="kind:call",
     params=(
         Param("command_id", "string", "Идентификатор команды."),
     ),
@@ -228,6 +252,9 @@ RUN_USER_COMMAND = Tool(
 TRY_USER_COMMAND = Tool(
     name="try_user_command",
     summary="Выполнить команду, ещё не сохранённую, — проба из конструктора.",
+    automation="no",
+    automation_note=(
+        "Проба несохранённой команды из конструктора; внутри сценария пробовать нечего."),
     params=(
         Param("command", "object", "Карточка команды целиком."),
     ),
@@ -260,6 +287,9 @@ TRY_USER_COMMAND = Tool(
 EXPLAIN_LAST = Tool(
     name="explain_last",
     summary="Объяснить последнее действие.",
+    automation="no",
+    automation_note=(
+        "Внутри сценария последнее действие — сам сценарий, и объяснение объясняло бы себя."),
     params=(),
     # Reads the call journal and changes nothing. It is a tool all the
     # same, for the same reason `list_reminders` is one: everything that
@@ -275,6 +305,9 @@ EXPLAIN_LAST = Tool(
 DISPATCH_PLUGIN_COMMAND = Tool(
     name="dispatch_plugin_command",
     summary="Передать фразу плагинам.",
+    automation="no",
+    automation_note=(
+        "Передаёт плагинам фразу целиком; инструменты плагинов приходят в конструктор своими блоками (4.0-H10)."),
     params=(
         Param("text", "string", "Фраза целиком."),
     ),
@@ -295,6 +328,9 @@ DISPATCH_PLUGIN_COMMAND = Tool(
 ADD_TODO = Tool(
     name="add_todo",
     summary="Записать дело — то, что ждёт, а не срабатывает.",
+    automation="action",
+    title="Записать дело",
+    asks=("text",),
     params=(Param("text", "string", "Что надо сделать."),),
     # Launches nothing and touches no system: it writes to its own
     # settings.
@@ -309,6 +345,8 @@ ADD_TODO = Tool(
 LIST_TODO = Tool(
     name="list_todo",
     summary="Какие дела ждут.",
+    automation="query",
+    title="Какие дела ждут",
     params=(),
     permissions=set(),
     idempotent=True,
@@ -319,6 +357,9 @@ LIST_TODO = Tool(
 CLOSE_TODO = Tool(
     name="close_todo",
     summary="Пометить дело сделанным.",
+    automation="no",
+    automation_note=(
+        "Дело закрывается по идентификатору, а он одноразовый: сохранённая с ним команда сработала бы однажды, а дальше закрывала бы то, чего уже нет."),
     params=(Param("todo_id", "string", "Идентификатор дела."),),
     permissions=set(),
     # Closing what is closed is the same as closing it once.
@@ -334,6 +375,9 @@ CLOSE_TODO = Tool(
 CALCULATE = Tool(
     name="calculate",
     summary="Посчитать арифметическое выражение.",
+    automation="query",
+    title="Посчитать",
+    asks=("expression",),
     params=(
         Param("expression", "string", "Выражение или фраза со счётом."),
     ),
@@ -346,9 +390,13 @@ CALCULATE = Tool(
 TELL_TIME = Tool(
     name="tell_time",
     summary="Сказать время, дату или день недели.",
+    automation="query",
+    title="Время и дата",
+    asks=("what",),
     params=(
         Param("what", "string", "О чём спросили.", required=False,
-              choices=("time", "date", "weekday"), default="time"),
+              choices=("time", "date", "weekday"), default="time",
+              labels=("Время", "Дата", "День недели")),
     ),
     # Reads the system clock, which is no secret. It used to live in the
     # "Часы" example plugin, and plugins are off on a fresh install
@@ -362,10 +410,15 @@ TELL_TIME = Tool(
 WEB_SEARCH = Tool(
     name="web_search",
     summary="Открыть поиск в браузере.",
+    automation="action",
+    title="Поиск в интернете",
+    asks=("query", "engine"),
     params=(
         Param("query", "string", "Что искать."),
         Param("engine", "string", "Поисковая система.", required=False,
-              choices=("google", "yandex", "duckduckgo", "bing")),
+              choices=("google", "yandex", "duckduckgo", "bing"),
+              # The same names `voice/websearch.py::ENGINES` gives them.
+              labels=("Google", "Яндекс", "DuckDuckGo", "Bing")),
     ),
     permissions={"network.external"},
     idempotent=True,            # the same query gives the same page
@@ -376,6 +429,9 @@ WEB_SEARCH = Tool(
 PLAY_MUSIC = Tool(
     name="play_music",
     summary="Открыть музыку выбранного жанра.",
+    automation="action",
+    title="Включить музыку",
+    asks=("genre",),
     params=(
         Param("genre", "string", "Жанр или что именно поставить.",
               required=False),
@@ -394,6 +450,9 @@ PLAY_MUSIC = Tool(
 ASK_MODEL = Tool(
     name="ask_model",
     summary="Задать вопрос языковой модели.",
+    automation="query",
+    title="Спросить модель",
+    asks=("question",),
     params=(
         Param("question", "string", "Вопрос."),
         Param("context", "array", "Последние реплики для связности.",
@@ -426,6 +485,9 @@ ASK_MODEL = Tool(
 START_SESSION = Tool(
     name="start_session",
     summary="Начать рабочую сессию с названием.",
+    automation="action",
+    title="Начать рабочую сессию",
+    asks=("goal",),
     params=(Param("goal", "string", "Над чем работа."),),
     permissions=set(),
     # Two sessions with the same name are two stretches of work, and a
@@ -438,6 +500,9 @@ START_SESSION = Tool(
 FINISH_SESSION = Tool(
     name="finish_session",
     summary="Закрыть открытую сессию, при желании с заметкой.",
+    automation="action",
+    title="Закончить сессию",
+    asks=("note",),
     params=(Param("note", "string", "Чем всё кончилось.", required=False),),
     permissions=set(),
     # Closing what is closed changes nothing.
@@ -449,6 +514,9 @@ FINISH_SESSION = Tool(
 NOTE_SESSION = Tool(
     name="note_session",
     summary="Дописать заметку к открытой сессии.",
+    automation="action",
+    title="Заметка к сессии",
+    asks=("text",),
     params=(Param("text", "string", "Что записать."),),
     permissions=set(),
     idempotent=False,
@@ -459,6 +527,9 @@ NOTE_SESSION = Tool(
 FOLDER_SESSION = Tool(
     name="folder_session",
     summary="Запомнить рабочий каталог открытой сессии.",
+    automation="action",
+    title="Рабочая папка сессии",
+    asks=("path",),
     params=(Param("path", "string", "Каталог, как его назвали."),),
     permissions=set(),
     # The same folder twice is the same folder.
@@ -470,6 +541,8 @@ FOLDER_SESSION = Tool(
 WHICH_SESSION = Tool(
     name="which_session",
     summary="Какая сессия открыта сейчас.",
+    automation="query",
+    title="Какая сессия открыта",
     params=(),
     permissions=set(),
     idempotent=True,
@@ -480,6 +553,8 @@ WHICH_SESSION = Tool(
 LAST_SESSION = Tool(
     name="last_session",
     summary="Что было в прошлой сессии.",
+    automation="query",
+    title="Что было в прошлой сессии",
     params=(),
     permissions=set(),
     idempotent=True,
@@ -490,6 +565,9 @@ LAST_SESSION = Tool(
 WORKED_ON = Tool(
     name="worked_on",
     summary="Сколько времени ушло на названное дело за неделю.",
+    automation="query",
+    title="Сколько ушло на дело",
+    asks=("query",),
     params=(Param("query", "string", "Название или его часть."),),
     permissions=set(),
     idempotent=True,
@@ -500,6 +578,9 @@ WORKED_ON = Tool(
 SET_FOCUS = Tool(
     name="set_focus",
     summary="Режим фокуса: Рина не заговаривает сама.",
+    automation="action",
+    title="Режим фокуса",
+    asks=("on",),
     params=(Param("on", "boolean", "Включить или выключить."),),
     permissions=set(),
     idempotent=True,

@@ -252,7 +252,29 @@ def sanitize_command(raw):
         # The name of a variable, for "remember" and for the conditions
         # that ask about one (`4.0b-A09`).
         "name": str(raw.get("name", ""))[:64],
+        # A block of Rina's own (`4.0b-K01`): which tool, and what was
+        # filled in. Narrowed to its shape here; whether the tool may be
+        # called from a command is decided when it runs, by the registry
+        # (`ToolRunner.call_block`), for every card however it arrived.
+        "tool": str(raw.get("tool", ""))[:64],
+        "args": _block_args(raw.get("args")),
     }
+
+
+def _block_args(raw):
+    """A block's arguments, brought to what a person can fill in."""
+    if not isinstance(raw, dict):
+        return {}
+    out = {}
+    for key, value in list(raw.items())[:20]:
+        key = str(key)[:64]
+        if isinstance(value, bool) or value is None:
+            out[key] = value
+        elif isinstance(value, (int, float)):
+            out[key] = value
+        else:
+            out[key] = str(value)[:1000]
+    return out
 
 
 def merge_commands(existing, incoming, new_id):

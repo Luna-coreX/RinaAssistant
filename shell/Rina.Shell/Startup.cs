@@ -996,6 +996,11 @@ public partial class App
                     built.InsertStepForCheck(3, "if");
                     built.NestStepForCheck(3, "steps", "speak", "добрый вечер");
                     built.NestStepForCheck(3, "otherwise", "speak", "доброе утро");
+                    // And one of Rina's own abilities, picked, so its
+                    // fields are in the picture (`4.0b-K01`).
+                    if (built.InsertBlockForCheck(4, "create_reminder",
+                                                  "text", "позвонить маме"))
+                        built.PickForCheck(4);
                     await Task.Delay(500);
                 }
             }
@@ -6603,6 +6608,45 @@ public partial class App
                   plain["type"]?.GetValue<string>() == "website"
                   && plain["target"]?.GetValue<string>() == "example.com",
                   $"| {plain["type"]} · {plain["target"]}");
+
+            // --- Rina's own abilities, as blocks (`4.0b-K01`) ---
+            //
+            // The kinds of step were a table written by hand and fell
+            // behind the registry: reminders, things to do and sessions
+            // could not be put in a command at all. They come from the
+            // core now, with their fields.
+            Check("возможности Рины пришли из ядра блоками",
+                  editor!.BlocksOffered >= 10,
+                  $"| блоков {editor!.BlocksOffered}");
+
+            editor!.ClearForCheck();
+            var put = editor!.InsertBlockForCheck(0, "add_todo", "text",
+                                                  "купить хлеб");
+            var todo = editor!.CardForCheck();
+            Check("команда из одного блока сохраняется этим блоком",
+                  put && todo["type"]?.GetValue<string>() == "tool"
+                  && todo["tool"]?.GetValue<string>() == "add_todo"
+                  && todo["args"]?["text"]?.GetValue<string>()
+                      == "купить хлеб",
+                  $"| {todo.ToJsonString()}");
+            Check("и описан словами блока, а не его кодом",
+                  !editor!.SummaryForCheck.Contains("add_todo")
+                  && editor!.SummaryForCheck.Contains("купить хлеб"),
+                  $"| {editor!.SummaryForCheck}");
+
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "speak", "Доброе утро");
+            editor!.InsertBlockForCheck(1, "tell_time");
+            var morning = editor!.CardForCheck();
+            var second = morning["steps"]?.AsArray().ElementAtOrDefault(1)
+                as JsonObject;
+            Check("блок встаёт в последовательность рядом с обычным шагом",
+                  morning["type"]?.GetValue<string>() == "sequence"
+                  && second?["tool"]?.GetValue<string>() == "tell_time",
+                  $"| {morning.ToJsonString()}");
+            Check("и приходит со своими умолчаниями",
+                  second?["args"]?["what"]?.GetValue<string>() == "time",
+                  $"| {second?["args"]?.ToJsonString()}");
 
 
             // --- dragging says it can be dragged (`4.0b-A09`) ---

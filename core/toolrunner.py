@@ -63,6 +63,19 @@ class ToolContext:
     plugins: Any = None
     emit: Callable = None
     host: Any = None
+    #: Say something aloud, the way the core answers (`4.0b-K01`).
+    #:
+    #: A scenario runs in a thread of its own and speaks as it goes: its
+    #: "say this" steps and the answers of its question blocks. Without it
+    #: a sequence was silent from end to end — the steps' words were
+    #: computed and thrown away, and the only thing said was "Выполняю
+    #: последовательность".
+    say: Callable = None
+    #: A person's own command calling a block (`4.0b-K01`): the runner's
+    #: `call_block`, set by whoever builds the runner, as the journal is.
+    call_block: Callable = None
+    #: What a block does: "action" or "query", "" for what is not a block.
+    block_effect: Callable = None
     #: Remember the choice of program under the word that was said.
     on_alias: Callable = None
     #: Who touches the machine: volume, media, power, a screenshot.
@@ -413,12 +426,51 @@ def _scenario(ctx):
                 return candidate
         return None
 
-    return {"lookup": find, "machine": getattr(ctx, "machine_out", None)}
+    return {"lookup": find, "machine": getattr(ctx, "machine_out", None),
+            "say": getattr(ctx, "say", None),
+            "call_block": getattr(ctx, "call_block", None),
+            "block_effect": getattr(ctx, "block_effect", None)}
+
+
+def _start_sequence(ctx, command, scenario, silent=None):
+    """
+    Run a sequence in a thread of its own, and say what it opens with.
+
+    A thread, because there may be pauses between steps and the caller
+    must not wait them out.
+
+    **What is said first.** The command's own answer, if it has one — it
+    was ignored for sequences until `4.0b-K01`, and a person who wrote
+    «Запускаю рабочее окружение» heard «Выполняю последовательность».
+    Without one: nothing, if the steps speak for themselves, and `silent`
+    — «Выполняю последовательность» unless the caller says otherwise — only
+    when they would otherwise say nothing at all.
+
+    The opening is said **from the thread, before the first step**, when
+    there is a voice to say it with. Returned as the tool's answer it would
+    race the steps' own words, and «Доброе утро» could come out after
+    «Сегодня четверг».
+    """
+    import threading
+
+    from voice.user_commands import execute, speaks
+
+    if silent is None:
+        silent = tr("Выполняю последовательность.")
+    opening = command.get("response") or (
+        "" if speaks(command, scenario.get("block_effect")) else silent)
+    say = scenario.get("say")
+
+    def worker():
+        if opening and say is not None:
+            say(opening)
+        execute(command, ctx.host, ctx.emit, **scenario)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return ToolResult.done("" if say is not None else opening)
 
 
 def _run_user_command(ctx, args):
-    import threading
-
     from voice.user_commands import execute
 
     command_id = args["command_id"]
@@ -433,12 +485,7 @@ def _run_user_command(ctx, args):
 
     ctx.commands.bump_stat(command_id)
     if command.get("type") == "sequence":
-        # There is sometimes a pause between steps; the calling thread must not be blocked.
-        def worker():
-            execute(command, ctx.host, ctx.emit, **_scenario(ctx))
-
-        threading.Thread(target=worker, daemon=True).start()
-        return ToolResult.done(tr("Выполняю последовательность."))
+        return _start_sequence(ctx, command, _scenario(ctx))
 
     ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
     return (ToolResult.done(response) if ok
@@ -459,8 +506,6 @@ def _try_user_command(ctx, args):
     does not bump the run counter, and leaves no command behind if the
     person closes the editor: they were trying it out, not keeping it.
     """
-    import threading
-
     from core.data_transfer import sanitize_command
     from voice.user_commands import execute
 
@@ -475,11 +520,8 @@ def _try_user_command(ctx, args):
     watched = dict(_scenario(ctx), trace=True)
 
     if command.get("type") == "sequence":
-        def worker():
-            execute(command, ctx.host, ctx.emit, **watched)
-
-        threading.Thread(target=worker, daemon=True).start()
-        return ToolResult.done(tr("Пробую последовательность."))
+        return _start_sequence(ctx, command, watched,
+                               silent=tr("Пробую последовательность."))
 
     ok, response = execute(command, ctx.host, ctx.emit, **watched)
     return (ToolResult.done(response) if ok
@@ -1023,6 +1065,39 @@ class ToolRunner:
                     result.error_code, started, confirmation_id, trace_id,
                     getattr(result, "reason", ""))
         return result
+
+    def call_block(self, name, args=None, source="command"):
+        """
+        A block of a person's own command (`4.0b-K01`).
+
+        Through `call` like everything else — the arguments are checked and
+        the call goes into the journal — and only for a tool decided as a
+        block. The card is the person's file, and the editor is not the
+        only thing that writes one: a card naming `try_user_command` or
+        `power_action` is refused here, when it runs, rather than trusted
+        because the editor would not have offered it.
+        """
+        if self.block_effect(name):
+            return self.call(name, args or {}, source=source)
+        log.warning("Команда пыталась вызвать %s — это не блок", name)
+        self._write(name, args, source, (), False, "permission.denied",
+                    time.perf_counter(), None, "")
+        return ToolResult.failed(tr("Команда не может этого сделать."),
+                                 "permission.denied")
+
+    def blocks(self):
+        """The tools a person's own command may use, in the registry's order."""
+        return [t for t in self._registry.all()
+                if t.automation in ("action", "query")]
+
+    def block_effect(self, name):
+        """"action" or "query" for a block, "" for anything else."""
+        try:
+            tool = self._registry.get(name)
+        except UnknownTool:
+            return ""
+        return tool.automation if tool.automation in ("action", "query") \
+            else ""
 
     def _write(self, tool, args, source, permissions, ok, error_code,
                started, confirmation_id, trace_id, reason=""):

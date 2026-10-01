@@ -99,11 +99,19 @@ class Param:
     minimum: Any = None
     maximum: Any = None
     default: Any = None
+    #: How each of `choices` is named to a person, in the same order
+    #: (`4.0b-K01`). The values are words of the program — `timer`,
+    #: `weekday` — and the command editor shows these instead.
+    labels: tuple = ()
 
     def __post_init__(self):
         if self.type not in TYPES:
             raise ValueError(f"{self.name}: неизвестный тип {self.type!r}")
         object.__setattr__(self, "choices", tuple(self.choices))
+        object.__setattr__(self, "labels", tuple(self.labels))
+        if self.labels and len(self.labels) != len(self.choices):
+            raise ValueError(f"{self.name}: подписей не столько же, "
+                             f"сколько вариантов")
 
     def to_dict(self):
         """A description for the protocol and for function calling (N-C01)."""
@@ -138,9 +146,36 @@ class Tool:
     #: How it may end other than in success.
     errors: tuple = ()
 
+    #: Whether a person's own command may use it (`4.0b-K01`).
+    #:
+    #: The rule is that everything Rina can do and that is safe to hand to
+    #: automation has a block in the command editor, and the decision is
+    #: written here, beside the tool, so a new tool cannot arrive without
+    #: one: `tools/test_tools.py` fails on a built-in tool whose
+    #: `automation` is empty. The values:
+    #:
+    #: - "action" — a step that does something;
+    #: - "query" — a step that only reads and answers; its answer is said;
+    #: - "kind:<kind>" — a step kind of the editor already offers it
+    #:   (`kind:system` for volume and power, `kind:call` for running a
+    #:   command), and a second block for it would be the same thing twice;
+    #: - "no" — kept out, with the reason in `automation_note`.
+    automation: str = ""
+    automation_note: str = ""
+    #: The block's name in the editor. `summary` is written for whoever
+    #: decides whether to call the tool and may be a whole sentence of
+    #: distinctions; a block in a list needs two or three words.
+    title: str = ""
+    #: The arguments a person fills in for the block, by name. The rest are
+    #: left to their defaults: `create_reminder` takes a moment in seconds
+    #: since the epoch, which is how a program says "at seven", not how a
+    #: person does.
+    asks: tuple = ()
+
     def __post_init__(self):
         object.__setattr__(self, "params", tuple(self.params))
         object.__setattr__(self, "errors", tuple(self.errors))
+        object.__setattr__(self, "asks", tuple(self.asks))
         perms = frozenset(check_permission(p) for p in self.permissions)
         object.__setattr__(self, "permissions", perms)
 

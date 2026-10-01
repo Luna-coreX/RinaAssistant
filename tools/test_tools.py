@@ -198,5 +198,58 @@ check("питание просит только power_action", power_tools == ["
       f"| {power_tools}")
 
 print()
+print("=== всё, что умеет Рина, решено для конструктора (4.0b-K01) ===")
+# The rule: everything Rina can do and that is safe to automate has a block
+# in the command editor. Kept by making the decision part of declaring a
+# tool — and by this check, so a tool cannot arrive without it.
+from voice.user_commands import COMMAND_TYPES
+
+kinds = {kind for kind, _title, _icon in COMMAND_TYPES}
+#: What a person can type or pick. An object or a list has no field a
+#: person could fill in sensibly, and a block asking for one is a block
+#: nobody can use.
+SIMPLE = {"string", "integer", "number", "boolean"}
+
+undecided = [t.name for t in registry.all() if not t.automation]
+check("у каждого инструмента есть решение", not undecided,
+      f"| без решения: {undecided}")
+
+for tool in registry.all():
+    how = tool.automation
+    if how == "no":
+        check(f"{tool.name}: исключение названо с причиной",
+              bool(tool.automation_note.strip()))
+    elif how.startswith("kind:"):
+        check(f"{tool.name}: вид шага «{how[5:]}» существует",
+              how[5:] in kinds, f"| виды: {sorted(kinds)}")
+    elif how in ("action", "query"):
+        check(f"{tool.name}: у блока есть название", bool(tool.title.strip()))
+        # A block runs inside a scenario that was confirmed as a whole, if
+        # at all; a tool that asks on every call would fail there every
+        # time. Such a tool belongs to a kind that confirms the command.
+        check(f"{tool.name}: блок не требует подтверждения на каждый вызов",
+              not tool.confirm_required)
+        names = {p.name for p in tool.params}
+        check(f"{tool.name}: поля блока — его аргументы",
+              set(tool.asks) <= names, f"| {sorted(set(tool.asks) - names)}")
+        check(f"{tool.name}: поля блока заполнимы руками",
+              all(tool.param(a).type in SIMPLE for a in tool.asks
+                  if tool.param(a)))
+        # An argument the block does not ask for has to manage on its own,
+        # or every step built from the block fails validation.
+        unasked = [p.name for p in tool.params
+                   if p.required and p.default is None
+                   and p.name not in tool.asks]
+        check(f"{tool.name}: обязательное без поля — с умолчанием",
+              not unasked, f"| {unasked}")
+    else:
+        check(f"{tool.name}: решение из словаря", False, f"| {how!r}")
+
+blocks = [t.name for t in registry.all() if t.automation in ("action", "query")]
+for wanted in ("create_reminder", "list_reminders", "add_todo", "list_todo",
+               "start_session", "finish_session", "set_focus", "tell_time"):
+    check(f"«{wanted}» собирается в команду", wanted in blocks)
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

@@ -39,6 +39,12 @@ COMMAND_TYPES = [
     ("website",  "Сайт",             "🌐"),
     ("speak",    "Озвучить текст",   "🔊"),
     ("system",   "Системное действие", "⚙️"),
+    # One of Rina's own abilities, from the tool registry (`4.0b-K01`).
+    # The kinds above were a table written by hand and fell behind the
+    # registry: reminders, things to do and sessions existed and could not
+    # be put in a command. Which tools are blocks is decided on the tool
+    # itself (`core/tools.py::Tool.automation`).
+    ("tool",     "Возможность Рины", "✨"),
     ("sequence", "Последовательность", "🔗"),
     # --- what a sequence is built out of (`4.0b-A09`) ------------------
     #
@@ -376,7 +382,8 @@ def _open_path(path):
         return False
 
 
-def _fresh_state(lookup=None, machine=None, trace=False):
+def _fresh_state(lookup=None, machine=None, trace=False, say=None,
+                 call_block=None, block_effect=None):
     """
     What a scenario carries with it for the length of one run.
 
@@ -389,8 +396,14 @@ def _fresh_state(lookup=None, machine=None, trace=False):
     round a ring. `lookup` finds another command by its number; `machine`
     answers the questions that are about the computer rather than about the
     card, and both are handed in because neither belongs to this module.
+
+    `say`, `call_block` and `block_effect` are the scenario's voice and its
+    way to Rina's own abilities (`4.0b-K01`), handed in for the same
+    reason: the voice is the core's, and the blocks are the registry's.
     """
     return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine,
+            "say": say, "call_block": call_block,
+            "block_effect": block_effect,
             # Where in the tree we are, as a prefix: "2.steps." while
             # inside the third node's body.
             "at": "",
@@ -464,14 +477,99 @@ def _run_steps(steps, host, emit, depth, state):
         if state is not None:
             state["at"] = where + "."
         try:
-            step_ok, _ = execute(step, host, emit, depth + 1, state)
+            step_ok, said = execute(step, host, emit, depth + 1, state)
         finally:
             if state is not None:
                 state["at"] = was
 
+        _voice(step, step_ok, said, state)
         _say_step(emit, state, where, "done" if step_ok else "failed")
         ok = ok and step_ok
     return ok
+
+
+def _run_block(command, state):
+    """
+    One of Rina's own abilities, as a step (`4.0b-K01`). (ok, what it said)
+
+    Through the registry, by the runner's `call_block`, and never around
+    it: the arguments are checked, the call is written in the journal with
+    `command` as the initiator, and a tool that is not a block is refused
+    there. This module only knows the card.
+    """
+    from core.i18n import t as tr
+
+    call = (state or {}).get("call_block")
+    name = str(command.get("tool", ""))
+    if call is None or not name:
+        return False, tr("Не получилось выполнить команду.")
+    args = command.get("args")
+    try:
+        result = call(name, dict(args) if isinstance(args, dict) else {})
+    except Exception:
+        log.exception("Блок %s упал", name)
+        return False, tr("Не получилось выполнить команду.")
+    return bool(result.ok), str(result.message or "")
+
+
+def _effect(step, state):
+    """What a block step does: "action", "query", or "" for anything else."""
+    if step.get("type") != "tool":
+        return ""
+    effect = (state or {}).get("block_effect")
+    try:
+        return effect(str(step.get("tool", ""))) if effect else ""
+    except Exception:
+        log.exception("Не удалось узнать, что делает блок")
+        return ""
+
+
+def speaks(command, block_effect=None):
+    """
+    Does anything in the command say something aloud by itself?
+
+    A "say" step does, and so does a question block — its answer is the
+    point of it. An action block does not: «Записала: купить хлеб» after
+    every step would turn a scenario into a report of itself, and the
+    person who wanted words wrote a "say" step.
+    """
+    state = {"block_effect": block_effect}
+    stack = [command]
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, dict):
+            continue
+        if node.get("type") == "speak" or _effect(node, state) == "query":
+            return True
+        stack.extend(node.get("steps") or [])
+        stack.extend(node.get("otherwise") or [])
+    return False
+
+
+def _voice(step, ok, said, state):
+    """
+    Say what a step inside a scenario has to say (`4.0b-K01`).
+
+    Until then nothing inside a sequence spoke: a step's words were
+    computed and dropped, and a scenario of three "say" steps was silent.
+    Said here, at the step, rather than collected and said at the end: a
+    scenario with pauses in it would otherwise speak its first line a
+    minute late.
+
+    A failed block says why, whatever kind it is: a scenario fired by voice
+    has nobody watching the canvas, and a step that failed in silence is a
+    step nobody will ever know failed.
+    """
+    say = (state or {}).get("say")
+    if say is None or not said:
+        return
+    kind = step.get("type")
+    if kind == "speak" or (kind == "tool" and (
+            not ok or _effect(step, state) == "query")):
+        try:
+            say(said)
+        except Exception:
+            log.exception("Не удалось произнести шаг сценария")
 
 
 def _call_command(command, host, emit, depth, state):
@@ -512,7 +610,10 @@ def _call_command(command, host, emit, depth, state):
 
     state["seen"].add(wanted)
     try:
-        ok, _ = execute(other, host, emit, depth + 1, state)
+        ok, said = execute(other, host, emit, depth + 1, state)
+        # A called command of one step speaks as that step would: «скажи
+        # прогноз» called from «доброе утро» is still a thing said.
+        _voice(other, ok, said, state)
         return ok
     finally:
         # Removed on the way out: calling the same command twice **in
@@ -613,7 +714,8 @@ def _condition_holds(kind, value, name="", state=None):
 
 
 def execute(command, host=None, emit=None, depth=0, state=None,
-            lookup=None, machine=None, trace=False):
+            lookup=None, machine=None, trace=False, say=None,
+            call_block=None, block_effect=None):
     """
     Performs a command. host is an object with methods for system actions
     (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
@@ -628,7 +730,8 @@ def execute(command, host=None, emit=None, depth=0, state=None,
 
     outermost = state is None
     if outermost:
-        state = _fresh_state(lookup, machine, trace)
+        state = _fresh_state(lookup, machine, trace, say, call_block,
+                             block_effect)
 
     # The stop signal is caught **here**, at the outermost call, and
     # nowhere else. Caught deeper it would stop a branch rather than the
@@ -691,6 +794,12 @@ def _perform(command, host, emit, depth, state):
             response = target
     elif ctype == "system":
         ok = _run_system_action(target, host, emit)
+    elif ctype == "tool":
+        ok, said = _run_block(command, state)
+        # The block's own answer, unless the card says what to answer: the
+        # same rule as for every other kind.
+        if not response or not ok:
+            response = said
     elif ctype == "pause":
         # a pause between steps: to give the program time to start.
         # We limit it from above, so a typo does not hang execution for long.
