@@ -974,6 +974,7 @@ public partial class CommandEditor : UserControl
             menu.Items.Add(item);
         }
         menu.IsOpen = true;
+        _palette = menu;
     }
 
     private static JsonObject NewStep(string kind) => new()
@@ -1204,6 +1205,40 @@ public partial class CommandEditor : UserControl
         _chain.Insert(Math.Clamp(at, 0, _chain.Count), step);
         DrawSteps();
         ShowSummary();
+    }
+
+    //: The palette last opened — for the check, which goes through it.
+    private ContextMenu? _palette;
+
+    /// <summary>
+    /// Reach a block the way a person does — open the palette, open the
+    /// submenu, press the block — for the check.
+    /// </summary>
+    /// <remarks>
+    /// The first check of the blocks put them in without the menu and was
+    /// green while the submenu could not open at all: the menu's template
+    /// had nowhere to show an item's own items. This one goes through the
+    /// menu, and answers whether the block was <b>visible</b> before it was
+    /// pressed.
+    /// </remarks>
+    public async Task<(bool Shown, bool Added)> ReachBlockForCheck(
+        string kindTitle, string blockTitle)
+    {
+        var before = _chain.Count;
+        OfferKinds(this, _chain, _chain.Count);
+        await Task.Delay(150);
+        var parent = _palette?.Items.OfType<MenuItem>().FirstOrDefault(
+            i => (i.Header as string ?? "").Contains(kindTitle));
+        if (parent is null) return (false, false);
+        parent.IsSubmenuOpen = true;
+        await Task.Delay(250);
+        var block = parent.Items.OfType<MenuItem>().FirstOrDefault(
+            i => (i.Header as string ?? "") == blockTitle);
+        var shown = block is { IsVisible: true, ActualHeight: > 0 };
+        block?.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+        if (_palette is not null) _palette.IsOpen = false;
+        await Task.Delay(100);
+        return (shown, _chain.Count == before + 1);
     }
 
     /// <summary>How many of Rina's abilities came as blocks — for the check.</summary>

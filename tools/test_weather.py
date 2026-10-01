@@ -230,9 +230,11 @@ except ToolFailed as refusal:
     check("без города — отказ словами", "город" in str(refusal).lower(),
           f"| {refusal}")
 tile = plugin.home()
-check("плитка без города просит его ввести",
-      any(e.kind == "input" for card in tile for e in card.children),
-      f"| {[e.kind for card in tile for e in card.children]}")
+check("на главном без города — подсказка, а поле ввода — на вкладке",
+      [e.kind for e in tile] == ["note"] and "вкладке" in tile[0].text
+      and any(e.kind == "input" for card in plugin.page()
+              for e in card.children),
+      f"| {[(e.kind, e.text) for e in tile]}")
 
 plugin.on_action("city", "нигдеград")
 check("несуществующий город назван", "нигдеград" in plugin._trouble,
@@ -255,8 +257,12 @@ check("свежие данные не запрашиваются снова",
       len(asked) == before, f"| {asked[before:]}")
 
 home = plugin.home()
-check("плитка подписана источником (CC BY 4.0)",
-      any("Open-Meteo" in str(e.text) for card in home for e in card.children))
+check("на главном — одна строка: город, температура, небо",
+      [(e.kind, e.text) for e in home] == [("text", "Казань +7° пасмурно")],
+      f"| {[(e.kind, e.text) for e in home]}")
+check("источник назван на вкладке (CC BY 4.0)",
+      any("Open-Meteo" in str(e.text) for card in plugin.page()
+          for e in card.children))
 
 # The network goes, and the data gets old.
 online["up"] = False
@@ -264,9 +270,12 @@ plugin._asked_at -= weather_main.FRESH_FOR + 60
 said = tool.run({})
 check("без сети — последнее известное, с временем, на которое оно",
       said.startswith("7 градусов") and "по данным на 6:30" in said, f"| {said}")
-caption = [e.text for card in plugin.home() for e in card.children][-1]
-check("и плитка говорит, что связи нет", "нет связи" in str(caption),
-      f"| {caption}")
+# A fetch "under way", so the glance does not start one of its own.
+plugin._asking = True
+line = [e.text for e in plugin.home()]
+check("и строка на главном называет время старых данных",
+      line == ["Казань +7° пасмурно (на 6:30)"], f"| {line}")
+plugin._asking = False
 
 empty = weather_main.WeatherPlugin(Ctx())
 empty.ctx.set_setting("place", ctx.get_setting("place"))

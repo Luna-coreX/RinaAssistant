@@ -27,8 +27,8 @@ else.** It publishes them once a working day at
 at `cbr-xml-daily.ru` first, for its UTF-8 and its "previous" field —
 which meant a third party saw every request, while the product page
 said "a request to the central bank's website". Decided 2026-09-29: the
-bank only. Yesterday's value, which turns a number into a direction, is
-asked of the same endpoint for the day before the document's date.
+bank only, and one request at a time: yesterday's rate, once asked for
+an arrow on the tile, is not asked for since the tile became one line.
 
 **Permission.** `network.external` stands in the manifest, and what
 leaves the machine is said on the plugin's card before it is switched on
@@ -46,10 +46,10 @@ import re
 import threading
 import time
 import urllib.request
-from datetime import date, timedelta
+from datetime import date
 
 from plugins.api import Plugin, PluginTool, ToolFailed
-from plugins.page_spec import Card, Note, Row, Text
+from plugins.page_spec import Text
 
 #: Where the numbers come from.
 SOURCE = "https://www.cbr.ru/scripts/XML_daily.asp"
@@ -89,7 +89,7 @@ class RatesPlugin(Plugin):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        #: What was last fetched: {"USD": (value, previous)}, the date the
+        #: What was last fetched: {"USD": roubles}, the date the
         #: bank set it for, and when it was asked.
         self._rates = {}
         self._dated = None
@@ -111,37 +111,24 @@ class RatesPlugin(Plugin):
     # --- the tile -------------------------------------------------------
     def home(self):
         """
-        Two lines and a caption, and never a request.
+        One line: «$ 83,56 ₽   € 94,88 ₽», and never a request.
 
-        Before the first answer the tile says it is looking rather than
-        being absent: a plugin that appears only once it has succeeded
-        looks broken until then, and "looking" is a state worth showing.
+        Plain text, no card, no arrows, no caption — asked for by a person:
+        the home screen is a glance. Before the first answer it says it is
+        looking rather than being absent, and a rate it could not refresh
+        says the date it is for: an old rate shown as today's is the one
+        thing a glance must not be given.
         """
         self._refresh_if_stale()
 
         if not self._rates:
-            return [Card([Note(self._trouble or "Смотрю курс…")],
-                         title="Курс")]
+            return [Text("Курс: " + (self._trouble or "смотрю…").lower())]
 
-        lines = []
-        for code in SHOWN:
-            got = self._rates.get(code)
-            if got is None:
-                continue
-            value, previous = got
-            lines.append(Row([Text(f"{SIGNS.get(code, code)} {money(value)} ₽"),
-                              Note(step(value, previous))]))
-
-        lines.append(Note(self._caption()))
-        return [Card(lines, title="Курс")]
-
-    def _caption(self):
-        said = "Центробанк"
-        if self._dated is not None:
-            said += f", курс на {spoken_date(self._dated)}"
-        if self._trouble and not self._fresh():
-            said += " — нет связи"
-        return said
+        line = "   ".join(f"{SIGNS.get(code, code)} {money(self._rates[code])} ₽"
+                           for code in SHOWN if code in self._rates)
+        if self._trouble and not self._fresh() and self._dated is not None:
+            line += f" (на {spoken_date(self._dated)})"
+        return [Text(line)]
 
     # --- aloud, and as a block -------------------------------------------
     def tools(self):
@@ -183,7 +170,7 @@ class RatesPlugin(Plugin):
             self._fetch()
         if not self._rates:
             raise ToolFailed(self._trouble or "Курс узнать не вышло.")
-        said = ", ".join(f"{NAMES[code]} {money(self._rates[code][0])} рубля"
+        said = ", ".join(f"{NAMES[code]} {money(self._rates[code])} рубля"
                          for code in SHOWN if code in self._rates)
         if not self._fresh() and self._dated is not None:
             said += f" (курс на {spoken_date(self._dated)})"
@@ -203,19 +190,13 @@ class RatesPlugin(Plugin):
 
     def _fetch(self):
         try:
+            # One request. Yesterday's rate was asked for as well, for an
+            # arrow on the tile; the tile is one plain line now, and a
+            # request for something nobody is shown is a request somebody
+            # else's server need not have seen.
             today, dated = self._from_bank()
             if today:
-                previous = {}
-                if dated is not None:
-                    # The direction is a nicety: a day that cannot be
-                    # asked about leaves the tile without an arrow, not
-                    # without a rate.
-                    try:
-                        previous, _ = self._from_bank(dated - timedelta(days=1))
-                    except Exception:                    # noqa: BLE001
-                        previous = {}
-                self._rates = {code: (value, previous.get(code, 0.0))
-                               for code, value in today.items()}
+                self._rates = dict(today)
                 self._dated = dated
                 self._asked_at = time.time()
                 self._trouble = ""
@@ -287,14 +268,3 @@ def parse_bank(page):
 def money(value):
     """A rate the way a rate is written: two places, a comma."""
     return f"{value:.2f}".replace(".", ",")
-
-
-def step(value, previous):
-    """Which way it went since the day before — or nothing, if unknown."""
-    if not previous:
-        return ""
-    difference = value - previous
-    if abs(difference) < 0.005:
-        return "без изменений"
-    mark = "▲" if difference > 0 else "▼"
-    return f"{mark} {money(abs(difference))}"

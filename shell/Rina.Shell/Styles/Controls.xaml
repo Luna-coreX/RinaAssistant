@@ -1091,20 +1091,61 @@
     </Setter>
   </Style>
 
+  <!--
+    An item, and — when it has items of its own — the submenu beside it
+    (4.0b-K01). The first edition drew the header and nothing else: an item
+    with children had nowhere to show them, so "Rina's ability" and "Find
+    out" opened onto nothing and their blocks could not be reached at all.
+    The checks were green because they put blocks in without the menu.
+  -->
   <Style TargetType="MenuItem">
     <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
     <Setter Property="Padding" Value="10,6" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="MenuItem">
-          <Border x:Name="Well" Background="Transparent"
-                  CornerRadius="{StaticResource Radius.Tight}"
-                  Padding="{TemplateBinding Padding}">
-            <ContentPresenter ContentSource="Header"
-                              VerticalAlignment="Center" />
-          </Border>
+          <Grid>
+            <Border x:Name="Well" Background="Transparent"
+                    CornerRadius="{StaticResource Radius.Tight}"
+                    Padding="{TemplateBinding Padding}">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ContentPresenter ContentSource="Header"
+                                  VerticalAlignment="Center" />
+                <TextBlock x:Name="Arrow" Grid.Column="1" Text="›"
+                           Margin="16,0,0,0" VerticalAlignment="Center"
+                           Foreground="{DynamicResource C.InkSoft}"
+                           Visibility="Collapsed" />
+              </Grid>
+            </Border>
+            <Popup x:Name="PART_Popup" Placement="Right"
+                   IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}"
+                   AllowsTransparency="True" Focusable="False"
+                   PopupAnimation="None" HorizontalOffset="4">
+              <Border Background="{DynamicResource C.Glass.Popup}"
+                      BorderBrush="{DynamicResource C.Seam}"
+                      BorderThickness="1"
+                      CornerRadius="{StaticResource Radius.Max}"
+                      Padding="4">
+                <ScrollViewer VerticalScrollBarVisibility="Auto"
+                              MaxHeight="520">
+                  <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle" />
+                </ScrollViewer>
+              </Border>
+            </Popup>
+          </Grid>
           <ControlTemplate.Triggers>
+            <Trigger Property="HasItems" Value="True">
+              <Setter TargetName="Arrow" Property="Visibility" Value="Visible" />
+            </Trigger>
             <Trigger Property="IsHighlighted" Value="True">
+              <Setter TargetName="Well" Property="Background"
+                      Value="{DynamicResource C.Glass.Raised}" />
+            </Trigger>
+            <Trigger Property="IsSubmenuOpen" Value="True">
               <Setter TargetName="Well" Property="Background"
                       Value="{DynamicResource C.Glass.Raised}" />
             </Trigger>

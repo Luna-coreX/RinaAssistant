@@ -78,18 +78,36 @@ class WeatherPlugin(Plugin):
 
     # --- the tile and the page -----------------------------------------------
     def home(self):
+        """
+        One line on the home screen: «Хабаровск +6° морось».
+
+        Plain text, no card and no captions — asked for by a person: the
+        home screen is a glance, and the details, the city field and the
+        source live on the plugin's own tab. One thing stays even here:
+        data the plugin could not refresh says the time it is for, because
+        an old reading shown as a current one is the one thing a glance
+        must not be given.
+        """
         place = self._place()
         if place is None:
-            return [Card([Note(self._trouble or
-                               "Укажите город — и здесь будет погода."),
-                          Input("city", placeholder="Город", button="OK")],
-                         title="Погода")]
+            return [Note("Погода: город задаётся на вкладке «Погода».")]
         self._refresh_if_stale()
-        title = f"Погода · {place['name']}"
         if self._data is None:
-            return [Card([Note(self._trouble or "Смотрю погоду…")],
-                         title=title)]
-        return [Card(self._shown(), title=title)]
+            return [Text(f"{place['name']} — "
+                         f"{(self._trouble or 'смотрю погоду…').lower()}")]
+        line = f"{place['name']} {self._now_short()}"
+        if not self._fresh() and self._trouble:
+            line += f" (на {words.as_of(self._data)})"
+        return [Text(line)]
+
+    def _now_short(self):
+        """«+6° морось» — the temperature and the sky, nothing else."""
+        current = self._data.get("current") or {}
+        temperature = current.get("temperature_2m")
+        head = (f"{round(temperature):+d}°".replace("+0", "0")
+                if temperature is not None else "")
+        sky = words.SKY.get(current.get("weather_code"), "")
+        return " ".join(part for part in (head, sky) if part)
 
     def page(self):
         place = self._place()
@@ -115,12 +133,8 @@ class WeatherPlugin(Plugin):
             self._set_city(value)
 
     def _shown(self):
-        current = self._data.get("current") or {}
-        sky = words.SKY.get(current.get("weather_code"), "")
-        temperature = current.get("temperature_2m")
-        head = (f"{round(temperature):+d}°".replace("+0", "0")
-                if temperature is not None else "")
-        return [Text(" ".join(part for part in (head, sky) if part)),
+        """The tab's account: now, the outlook, and the source with its age."""
+        return [Text(self._now_short()),
                 Note(words.outlook(self._data)),
                 Note(self._caption())]
 

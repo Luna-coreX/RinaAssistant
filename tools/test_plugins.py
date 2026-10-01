@@ -779,11 +779,12 @@ finally:
     urllib.request.urlopen = real_open
 hosts = sorted({url.split("/")[2] for url in dialled})
 check("запросы только к www.cbr.ru", hosts == ["www.cbr.ru"], f"| {hosts}")
-check("вчерашний курс спрошен за день до даты документа",
-      any("date_req=29/09/2026" in url for url in dialled), f"| {dialled}")
-check("и стал стрелкой: сегодня и вчера рядом",
-      plugin._rates.get("USD") == (82.1234, 81.5)
-      and plugin._rates.get("EUR") == (94.5, 95.0), f"| {plugin._rates}")
+# One request: yesterday's rate was asked for an arrow the home screen no
+# longer shows, and a request for what nobody sees need not be made.
+check("к банку один запрос, не два",
+      len(dialled) == 1 and "date_req" not in dialled[0], f"| {dialled}")
+check("курс разобран", plugin._rates.get("USD") == 82.1234
+      and plugin._rates.get("EUR") == 94.5, f"| {plugin._rates}")
 
 # Privacy-first: whatever ships and goes to the network says what it sends,
 # on its card, before it is switched on.
@@ -810,8 +811,9 @@ print()
 print("=== «Курс» как продукт (4.0b-K07) ===")
 check("ответ блока встаёт во фразу",
       fragment == "доллар 82,12 рубля, евро 94,50 рубля", f"| {fragment!r}")
-check("плитка называет дату курса", plugin._caption() ==
-      "Центробанк, курс на 30 сентября", f"| {plugin._caption()}")
+home = [e.text for e in plugin.home()]
+check("на главном — одна строка, чисто доллары и евро",
+      home == ["$ 82,12 ₽   € 94,50 ₽"], f"| {home}")
 declared = plugin.tools()[0]
 check("инструмент — читающий блок «Курс валют»",
       declared.reads and declared.title == "Курс валют")
@@ -828,8 +830,11 @@ try:
     check("без сети — последний курс, с датой, на которую он",
           stale == "доллар 82,12 рубля, евро 94,50 рубля (курс на 30 сентября)",
           f"| {stale!r}")
-    check("и плитка говорит, что связи нет",
-          plugin._caption().endswith("— нет связи"), f"| {plugin._caption()}")
+    # A fetch "under way" so the glance below does not start a real one.
+    plugin._asking = True
+    home = [e.text for e in plugin.home()]
+    check("и строка на главном называет дату старого курса",
+          home == ["$ 82,12 ₽   € 94,50 ₽ (на 30 сентября)"], f"| {home}")
 
     from plugins.api import ToolFailed
 

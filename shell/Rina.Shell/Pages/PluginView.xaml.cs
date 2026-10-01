@@ -69,11 +69,20 @@ public partial class PluginView : UserControl
     public void Draw(JsonArray elements)
     {
         _drawn = true;
+        Draws++;
         Body.Children.Clear();
         DrawnElements = 0;
         foreach (var element in elements.OfType<JsonObject>())
             Body.Children.Add(BuildElement(element, depth: 0));
     }
+
+    /// <summary>How many times the elements were drawn — for the check.</summary>
+    /// <remarks>
+    /// The home screen redraws only a tile that changed (a tile may hold a
+    /// field somebody is typing into); this is how a check tells "kept" from
+    /// "drawn again with the same content".
+    /// </remarks>
+    public int Draws { get; private set; }
 
     private void Draw(JsonObject? page)
     {

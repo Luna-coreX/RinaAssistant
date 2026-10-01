@@ -4218,6 +4218,10 @@ public partial class App
         Check("плиток нарисовано столько, сколько предложило ядро",
               shown.TilesShown == wanted,
               $"| ядро дало {wanted}, нарисовано {shown.TilesShown}");
+        // Before anything below draws tiles of its own, which stops the
+        // asking: the home screen as a person has it asks again on a timer.
+        Check("плитки переспрашиваются, пока главный экран на виду",
+              shown.TilesLive);
 
         // And the drawing itself, which must work on a machine where no
         // plugin wants a tile — otherwise the assertion above says "none
@@ -4235,6 +4239,38 @@ public partial class App
             }));
         await Until(() => shown.TilesShown == 1, 5);
         Check("объявленная плитка рисуется", shown.TilesShown == 1,
+              $"| {shown.TilesShown}");
+
+        // --- the tiles live while the home screen is in sight (`4.0b-K06`) ---
+        //
+        // Asked for by a person: "the plugins on the home screen should
+        // change in real time". Asked again on a timer — and a tile whose
+        // content did not change is not drawn again, because a tile can
+        // hold a field somebody is typing into.
+        static JsonObject Line(string id, string said) => new()
+        {
+            ["id"] = id,
+            ["elements"] = new JsonArray(new JsonObject
+            {
+                ["kind"] = "text",
+                ["text"] = said,
+            }),
+        };
+        shown.RefreshTilesForCheck([Line("погода", "Хабаровск +6° морось"),
+                                    Line("курс", "$ 83,56 ₽   € 94,88 ₽")]);
+        var weatherTile = shown.TileViewForCheck("погода");
+        var ratesTile = shown.TileViewForCheck("курс");
+        shown.RefreshTilesForCheck([Line("погода", "Хабаровск +5° морось"),
+                                    Line("курс", "$ 83,56 ₽   € 94,88 ₽")]);
+        Check("изменившаяся плитка перерисована",
+              weatherTile is { Draws: 2 }
+              && ReferenceEquals(weatherTile, shown.TileViewForCheck("погода")),
+              $"| {weatherTile?.Draws}");
+        Check("а неизменная не тронута",
+              ratesTile is { Draws: 1 }, $"| {ratesTile?.Draws}");
+        shown.RefreshTilesForCheck([Line("курс", "$ 83,56 ₽   € 94,88 ₽")]);
+        Check("и плитка выключенного плагина уходит",
+              shown.TilesShown == 1 && shown.TileViewForCheck("погода") is null,
               $"| {shown.TilesShown}");
 
 
@@ -6652,6 +6688,19 @@ public partial class App
             Check("возможности Рины пришли из ядра блоками",
                   editor!.BlocksOffered >= 10,
                   $"| блоков {editor!.BlocksOffered}");
+
+            // Through the menu, as a person reaches them. The submenu could
+            // not open at all once — reported by a person: "the new blocks
+            // cannot be clicked".
+            editor!.ClearForCheck();
+            var reached = await editor!.ReachBlockForCheck("Возможность Рины",
+                                                           "Записать дело");
+            Check("блок виден в подменю палитры", reached.Shown);
+            Check("и нажатие ставит его на холст", reached.Added);
+            var asking = await editor!.ReachBlockForCheck("Узнать",
+                                                          "Время и дата");
+            Check("и «Узнать» открывает свои блоки",
+                  asking.Shown && asking.Added);
 
             editor!.ClearForCheck();
             var put = editor!.InsertBlockForCheck(0, "add_todo", "text",

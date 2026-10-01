@@ -61,10 +61,32 @@ public partial class HomePage : UserControl
         // The remote is the window's, not the page's: the page is rebuilt on
         // every visit, and asking Windows for the media register each time
         // would be a system call for a thing that has not changed.
-        // Asked once, when the page appears: a tile is a glance, not a
-        // stream, and a plugin that wants to change it says so by the
-        // ordinary means — the page is rebuilt on every visit anyway.
-        Loaded += async (_, _) => await ShowTilesAsync();
+        // Asked when the page appears, and again every few seconds while it
+        // is in sight (`4.0b-K06`, asked for by a person: "the plugins on
+        // the home screen should change in real time"). A plugin fetches on
+        // its own schedule and its tile answers from memory; asking the
+        // tiles again is how what it fetched reaches the screen without a
+        // visit to another page and back.
+        Loaded += async (_, _) =>
+        {
+            await ShowTilesAsync();
+            // The first time sooner: a plugin switched on a moment ago says
+            // «смотрю…» until its first fetch lands, and a glance that
+            // waits a quarter of a minute for it is not a glance.
+            _tilesTimer.Interval = TimeSpan.FromSeconds(3);
+            _tilesTimer.Start();
+        };
+        Unloaded += (_, _) => _tilesTimer.Stop();
+        _tilesTimer.Tick += async (_, _) =>
+        {
+            // Not while nobody can see it: a minimised window or another
+            // page asks nothing of the plugins.
+            if (!IsVisible
+                || Window.GetWindow(this)?.WindowState == WindowState.Minimized)
+                return;
+            await ShowTilesAsync();
+            _tilesTimer.Interval = TimeSpan.FromSeconds(15);
+        };
         Screen.SizeChanged += (_, size) =>
             TileRoom.MaxHeight = Math.Max(0, size.NewSize.Height * TilesShare);
 
@@ -327,24 +349,94 @@ public partial class HomePage : UserControl
     /// </remarks>
     private async Task ShowTilesAsync()
     {
-        if (_link is null) return;
-        var told = await _link.AskAsync(Methods.PluginsHome);
-        Tiles.Items.Clear();
+        if (_link is null || _asking) return;
+        _asking = true;
+        try
+        {
+            var told = await _link.AskAsync(Methods.PluginsHome);
+            if (told is null) return;
+            ShowTiles(told["tiles"]?.AsArray() ?? []);
+        }
+        finally
+        {
+            _asking = false;
+        }
+    }
 
-        foreach (var tile in told?["tiles"]?.AsArray() ?? [])
+    //: Ask again this often while the home screen is in sight.
+    private readonly System.Windows.Threading.DispatcherTimer _tilesTimer =
+        new() { Interval = TimeSpan.FromSeconds(15) };
+
+    //: A slow core must not get a second question before the first answer.
+    private bool _asking;
+
+    //: What each tile showed last, by plugin: the view and its elements.
+    private readonly Dictionary<string, (PluginView View, string Drawn)> _shown = [];
+
+    /// <summary>Put the tiles on the screen, redrawing only what changed.</summary>
+    /// <remarks>
+    /// Only what changed, because a tile can hold a field: the "Пересчёт"
+    /// example's does, and redrawing every tile on every round would wipe
+    /// what a person was typing into it whenever the weather moved a
+    /// degree.
+    /// </remarks>
+    private void ShowTiles(JsonArray tiles)
+    {
+        var order = new List<PluginView>();
+        var seen = new HashSet<string>();
+        foreach (var tile in tiles)
         {
             if (tile is not JsonObject one) continue;
             var id = one["id"]?.GetValue<string>() ?? "";
             if (one["elements"] is not JsonArray elements
                 || elements.Count == 0) continue;
+            seen.Add(id);
 
-            var view = new PluginView(_link, id);
-            view.Draw(elements);
-            view.Margin = new Thickness(0, 0, 12, 12);
-            Fit(view);
-            Tiles.Items.Add(view);
+            var drawn = elements.ToJsonString();
+            if (!_shown.TryGetValue(id, out var had))
+            {
+                var view = new PluginView(_link, id);
+                view.Draw(elements);
+                view.Margin = new Thickness(0, 0, 12, 12);
+                Fit(view);
+                had = (view, drawn);
+            }
+            else if (had.Drawn != drawn)
+            {
+                had.View.Draw(elements);
+                had = (had.View, drawn);
+            }
+            _shown[id] = had;
+            order.Add(had.View);
+        }
+        foreach (var gone in _shown.Keys.Where(id => !seen.Contains(id)).ToList())
+            _shown.Remove(gone);
+
+        // The list itself is touched only when the set or the order of
+        // tiles changed: re-adding a view that stayed would still rebuild it.
+        if (!order.SequenceEqual(Tiles.Items.OfType<PluginView>()))
+        {
+            Tiles.Items.Clear();
+            foreach (var view in order) Tiles.Items.Add(view);
         }
     }
+
+    /// <summary>
+    /// Show these tiles as an answer of the core would — for the check,
+    /// which asserts that an unchanged tile is not redrawn.
+    /// </summary>
+    public void RefreshTilesForCheck(JsonArray tiles)
+    {
+        _tilesTimer.Stop();
+        ShowTiles(tiles);
+    }
+
+    /// <summary>Are the tiles being asked again while in sight — for the check.</summary>
+    public bool TilesLive => _tilesTimer.IsEnabled;
+
+    /// <summary>The view showing a plugin's tile — for the check.</summary>
+    public PluginView? TileViewForCheck(string id) =>
+        _shown.TryGetValue(id, out var had) ? had.View : null;
 
     /// <summary>
     /// Does what is on a tile fit on it — for the check.
@@ -459,6 +551,9 @@ public partial class HomePage : UserControl
     /// </remarks>
     public void ShowTilesForCheck(JsonArray tiles)
     {
+        // The check draws, and the core's answers must not draw over it.
+        _tilesTimer.Stop();
+        _shown.Clear();
         Tiles.Items.Clear();
         foreach (var tile in tiles)
         {
