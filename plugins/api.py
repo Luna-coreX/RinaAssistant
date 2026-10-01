@@ -149,6 +149,19 @@ class PluginTool:
     title: str = ""
 
 
+class ToolFailed(Exception):
+    """
+    A tool's refusal, worded for the person (`4.0b-K06`).
+
+    `raise ToolFailed("Город для погоды не задан.")` from `run` and the
+    person hears that sentence, and the call is a failure in the journal.
+    Any other exception is a fault: it goes to the plugin's log with its
+    traceback, and the person hears only that the plugin did not manage.
+    Before this a plugin had no way to say "I can't, because…" — only to
+    succeed or to break.
+    """
+
+
 class PluginContext:
     """
     A layer between the plugin and the application. A plugin depends only on

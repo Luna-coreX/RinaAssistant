@@ -1,0 +1,11 @@
+{
+  "id": "weather",
+  "name": "Погода",
+  "version": "1.0.0",
+  "author": "Rina Assistant",
+  "description": "Погода сейчас и до вечера — плиткой на главном экране, по вопросу вслух и блоком в своих командах. Название города и его координаты уходят в Open-Meteo.",
+  "icon": "🌤",
+  "entry": "WeatherPlugin",
+  "api_version": 4,
+  "permissions": ["network.external"]
+}

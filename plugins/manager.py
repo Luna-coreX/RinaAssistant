@@ -569,8 +569,14 @@ class PluginManager:
         from core.toolrunner import ToolResult
 
         def run(ctx, args):
+            from plugins.api import ToolFailed
+
             try:
                 answer = declared.run(args) if declared.run else None
+            except ToolFailed as refusal:
+                # Worded for the person by the plugin: said as it is, and
+                # not a fault worth a traceback in the log.
+                return ToolResult.failed(str(refusal), "internal")
             except Exception:                            # noqa: BLE001
                 self.log(plugin_id,
                          tr("Ошибка инструмента:\n")

@@ -44,7 +44,8 @@ if _HERE not in sys.path:
 from core.trace import NO_TRACE
 from core.wire.envelope import (Envelope, FrameDecoder, IdGenerator,
                                 MessageType, encode_frame)
-from plugins.api import API_VERSION, Plugin, PluginManifest, PluginContext
+from plugins.api import (API_VERSION, Plugin, PluginContext, PluginManifest,
+                         ToolFailed)
 from plugins.page_spec import page_to_dict
 
 
@@ -337,7 +338,14 @@ class Host:
         for one in (self.plugin.tools() or []):
             if str(one.name) != name or one.run is None:
                 continue
-            answer = one.run(args)
+            try:
+                answer = one.run(args)
+            except ToolFailed as refusal:
+                # A refusal the plugin worded for the person. Answered as
+                # an ordinary "no" rather than as an error with a
+                # traceback: the core then says the plugin's sentence
+                # instead of "the plugin did not answer".
+                return {"ok": False, "error": str(refusal)}
             return {"ok": True, "value": answer if answer is None
                     else str(answer)}
         return {"ok": False, "error": f"нет инструмента: {name}"}

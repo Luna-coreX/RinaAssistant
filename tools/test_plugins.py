@@ -384,6 +384,40 @@ finally:
     shutil.rmtree(defaulted, ignore_errors=True)
     hosted.discover()
 
+# A refusal worded by the plugin crosses the process boundary as words
+# (`4.0b-K06`): the person hears «Город не задан», not «the plugin did not
+# answer», and the plugin's log gets no traceback for a plain "no".
+refusing = os.path.join(plugins_dir(), "проверка_отказа")
+try:
+    os.makedirs(refusing, exist_ok=True)
+    io.open(os.path.join(refusing, "plugin.json"), "w",
+            encoding="utf-8").write(json.dumps(
+                {"id": "отказ", "name": "Отказ", "api_version": 4},
+                ensure_ascii=False))
+    io.open(os.path.join(refusing, "main.py"), "w", encoding="utf-8").write(
+        "from plugins.api import Plugin, PluginTool, ToolFailed\n\n\n"
+        "def no(args):\n"
+        "    raise ToolFailed('Город не задан.')\n\n\n"
+        "class Refusing(Plugin):\n"
+        "    def tools(self):\n"
+        "        return [PluginTool(name='ask', summary='Спросить.',\n"
+        "                           reads=True, run=no)]\n")
+    hosted.discover()
+    check("плагин с отказом поднят", hosted.enable("проверка_отказа"))
+    made = dict((t.name, r) for t, r in hosted.declared_tools("проверка_отказа"))
+    run = made.get("plugin.проверка_отказа.ask")
+    refused = run(None, {}) if run else None
+    check("отказ плагина доходит словами, а не «плагин не ответил»",
+          refused is not None and not refused.ok
+          and refused.message == "Город не задан.",
+          f"| {refused and refused.message!r}")
+    check("и процесс плагина от него не падает",
+          hosted.plugins["проверка_отказа"].alive)
+finally:
+    hosted.disable("проверка_отказа", persist=False)
+    shutil.rmtree(refusing, ignore_errors=True)
+    hosted.discover()
+
 hosted.enable("notes")
 spoken = []
 hosted.response.connect(lambda pid, text: spoken.append((pid, text)))

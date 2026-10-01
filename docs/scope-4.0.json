@@ -1020,7 +1020,7 @@
     "title": "Примеры плагинов — вне поставки"
   },
   "4.0b-K06": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "M",
     "title": "Плагин «Погода»"
