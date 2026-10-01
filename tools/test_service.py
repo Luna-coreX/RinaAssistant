@@ -35,8 +35,11 @@ os.chdir(ROOT)
 # Isolated before anything of the core is imported. A store or a log
 # made first remembers the real profile, and isolating after it moves
 # nothing: measured, this check wrote into the developer's profile.
-from sandbox import isolate_storage
+from sandbox import isolate_plugins, isolate_storage
 isolate_storage()
+# A plugin with a page of its own is an example since `4.0b-K05`, and the
+# examples are not in `plugins/`.
+isolate_plugins()
 
 from core.wire import (Envelope, FrameDecoder, IdGenerator, MessageType,
                        Session, Side, encode_frame, new_trace_id)

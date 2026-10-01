@@ -195,7 +195,8 @@ RinaAssistant/
 ├── core/         headless core: engine, router, registry, protocol, storage
 │   └── wire/     the protocol: envelope, handshake, events, channels, errors
 ├── voice/        speech, recognition, reminders, user commands, app index
-├── plugins/      plugin API, manager, plugin process, six bundled plugins and an API sample
+├── plugins/      plugin API, manager, plugin process and the plugins that ship
+├── examples/     example plugins for plugin authors; not part of the release
 ├── shell/
 │   ├── Rina.Shell/     window, pages, styles, system layer (C#, WPF)
 │   └── Rina.Protocol/  the client half of the protocol (C#)

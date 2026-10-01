@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 os.chdir(ROOT)
 
 from console import use_utf8
-from sandbox import isolate_storage, neutralise
+from sandbox import isolate_plugins, isolate_storage, neutralise
 
 # The die answers with an emoji, and on a console with a Windows code page
 # that is a `UnicodeEncodeError` right inside the result's caption. A check
@@ -30,6 +30,9 @@ from sandbox import isolate_storage, neutralise
 use_utf8()
 
 isolate_storage()
+# The examples are not in `plugins/` since `4.0b-K05`; this puts them next
+# to the shipped plugins, in a folder of the check's own.
+isolate_plugins()
 box = neutralise()
 
 from core.engine import RinaEngine

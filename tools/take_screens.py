@@ -42,9 +42,9 @@ SECTIONS = [("home", "home"), ("dialog", "dialog"), ("commands", "commands"),
             ("privacy", "privacy"), ("settings", "settings")]
 
 #: What a person might have said in their first few minutes.
-#: Only what the core answers by itself: the time, for one, is the clock
-#: plugin's, and the profile is filled without plugins — a first try left
-#: «Извини, я не поняла команду» on the privacy page.
+#: Only what the core answers by itself: the profile is filled without
+#: plugins, and a first try that asked a plugin left «Извини, я не поняла
+#: команду» on the privacy page.
 SAID = [
     "поставь таймер на 10 минут",
     "посчитай 15 умножить на 12",

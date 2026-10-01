@@ -92,6 +92,47 @@ def isolate_storage():
     return _isolated
 
 
+_plugins = ""
+
+
+def isolate_plugins():
+    """
+    A plugins' directory of the checks' own: the shipped plugins and the
+    examples side by side, in a temporary folder. Returns the path.
+
+    Since `4.0b-K05` the examples are not in `plugins/`: that folder is
+    what ships, and the examples are for whoever writes a plugin. The
+    checks still exercise them, because the guide points at them, and an
+    example that stopped working is a guide that lies.
+
+    It also moves the checks' throwaway plugins out of the repository.
+    They used to be written straight into `plugins/` and relied on a
+    `finally` to leave; a check stopped halfway left a broken plugin in
+    the tree, next to the ones that ship.
+
+    The directory reaches the plugins' processes through the environment,
+    which is why it is an environment variable rather than a patched
+    function. A repeat call does nothing.
+    """
+    global _plugins
+    if _plugins:
+        return _plugins
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    _plugins = tempfile.mkdtemp(prefix="rina-plugins-")
+    atexit.register(shutil.rmtree, _plugins, True)
+    for source in (os.path.join(root, "plugins"),
+                   os.path.join(root, "examples", "plugins")):
+        for name in sorted(os.listdir(source)):
+            folder = os.path.join(source, name)
+            if os.path.isfile(os.path.join(folder, "plugin.json")):
+                shutil.copytree(folder, os.path.join(_plugins, name),
+                                ignore=shutil.ignore_patterns("__pycache__"))
+
+    os.environ["RINA_PLUGINS_DIR"] = _plugins
+    return _plugins
+
+
 def neutralise(record=None, storage=True):
     """
     Substitutes everything that changes the world. Returns a Recorded.

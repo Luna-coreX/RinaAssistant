@@ -41,9 +41,20 @@ ARCHIVE_UNPACKED_LIMIT = 50 * 1024 * 1024
 
 
 def plugins_dir() -> str:
-    """The plugins' directory (next to the project)."""
-    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    path = os.path.join(here, "plugins")
+    """
+    The plugins' directory (next to the project).
+
+    `RINA_PLUGINS_DIR` points it elsewhere, and only the checks set it
+    (`tools/sandbox.py::isolate_plugins`). Since `4.0b-K05` the examples
+    live in `examples/plugins/`, outside what ships, and a check that
+    exercises them needs one directory holding them together with the
+    shipped plugins — and a place for its throwaway plugins that is not
+    the repository.
+    """
+    path = os.environ.get("RINA_PLUGINS_DIR")
+    if not path:
+        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        path = os.path.join(here, "plugins")
     os.makedirs(path, exist_ok=True)
     return path
 

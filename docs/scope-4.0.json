@@ -1014,7 +1014,7 @@
     "title": "Яркость экрана"
   },
   "4.0b-K05": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "S",
     "title": "Примеры плагинов — вне поставки"

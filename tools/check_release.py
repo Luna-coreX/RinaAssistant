@@ -83,13 +83,24 @@ check("ядро на месте", os.path.isfile(entry))
 for name in ("core", "voice", "plugins"):
     check(f"пакет {name} уехал", os.path.isdir(os.path.join(where, name)))
 
-# The developer's checks of the plugin API (`plugins/*_test`) stay home:
-# the beta promises six plugins, and one of those checks reaches the network.
-shipped_plugins = os.path.join(where, "plugins")
-stray = sorted(n for n in (os.listdir(shipped_plugins)
-                           if os.path.isdir(shipped_plugins) else [])
-               if n.endswith("_test"))
-check("проверочные плагины не уехали", not stray, f"| {stray}")
+# The build carries exactly the plugins in `plugins/` (`4.0b-K05`). The
+# examples live in `examples/plugins/` and are for whoever writes a plugin;
+# one that reached the build would arrive at a person unannounced, and one
+# of them reaches the network. Compared both ways: a shipped plugin missing
+# from the build is the same broken promise from the other side.
+def plugin_folders(base):
+    if not os.path.isdir(base):
+        return set()
+    return {n for n in os.listdir(base)
+            if os.path.isfile(os.path.join(base, n, "plugin.json"))}
+
+
+built_plugins = plugin_folders(os.path.join(where, "plugins"))
+meant_plugins = plugin_folders(os.path.join(ROOT, "plugins"))
+check("плагины сборки — ровно плагины поставки",
+      built_plugins == meant_plugins,
+      f"| лишние {sorted(built_plugins - meant_plugins)}, "
+      f"нет {sorted(meant_plugins - built_plugins)}")
 
 # The shell is published as a separate step: the build can be run without
 # it (`--skip-shell`), so its absence is not a failure but something said

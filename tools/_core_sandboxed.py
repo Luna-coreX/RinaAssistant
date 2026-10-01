@@ -13,8 +13,11 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
-from sandbox import neutralise
+from sandbox import isolate_plugins, neutralise
 neutralise()
+# The shell's checks open a plugin's own page, and since `4.0b-K05` the
+# plugins with pages are examples, outside `plugins/`.
+isolate_plugins()
 
 import rina_core
 sys.exit(rina_core.main(sys.argv[1:]))
