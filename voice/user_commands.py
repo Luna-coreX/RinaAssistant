@@ -28,7 +28,7 @@ import shutil
 import subprocess
 import webbrowser
 
-from core.logging_setup import get_logger
+from core.logging_setup import get_logger, safe
 
 
 log = get_logger("commands")
@@ -523,8 +523,10 @@ def fill(text, state):
         name = match.group(1).strip()
         if name in known:
             return str(known[name])
+        # The name is the person's own words: in the journal only by its
+        # length, unless writing texts there is switched on (`safe`).
         log.warning("В тексте команды значение {%s}, которого никто не узнал",
-                    name)
+                    safe(name))
         return match.group(0)
 
     return PLACEHOLDER.sub(one, text)
@@ -547,7 +549,8 @@ def _find_out(command, state):
     name = str(command.get("name", ""))[:MAX_NAME].strip()
     tool = str(command.get("tool", ""))
     if not name or _effect(command, state) != "query":
-        log.warning("«Узнать» без имени или не из читающего блока: %s", tool)
+        log.warning("«Узнать» без имени или не из читающего блока: %s",
+                    safe(tool))
         return False
     call = (state or {}).get("call_block")
     if call is None:
@@ -556,7 +559,7 @@ def _find_out(command, state):
     try:
         result = call(tool, dict(args) if isinstance(args, dict) else {})
     except Exception:
-        log.exception("Блок %s упал", tool)
+        log.exception("Блок %s упал", safe(tool))
         return False
     if not result.ok:
         return False
@@ -586,7 +589,7 @@ def _run_block(command, state):
     try:
         result = call(name, dict(args) if isinstance(args, dict) else {})
     except Exception:
-        log.exception("Блок %s упал", name)
+        log.exception("Блок %s упал", safe(name))
         return False, tr("Не получилось выполнить команду.")
     return bool(result.ok), str(result.message or "")
 

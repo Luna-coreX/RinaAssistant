@@ -380,6 +380,21 @@ public partial class PluginsPage : UserControl
             ToolTip = note.Length > 0 ? note : null,
         });
 
+        // What leaves the machine, on a line of its own and wrapped rather
+        // than cut (privacy-first). It used to live at the end of the
+        // description, and the description is cut at the card's edge: the
+        // weather plugin's «город и координаты уходят в Open-Meteo» was
+        // exactly the part nobody saw before switching it on.
+        var sends = plugin["sends"]?.GetValue<string>() ?? "";
+        if (!broken && sends.Length > 0)
+            about.Children.Add(new TextBlock
+            {
+                Text = "↗ " + sends,
+                Style = (Style)FindResource("Text.Meta"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+
         // Version and author on a line of their own, and quieter.
         //
         // They were run into the description with a middle dot — "does

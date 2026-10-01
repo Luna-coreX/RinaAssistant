@@ -90,6 +90,8 @@ class Manifest:
         self.path = folder
         self.api_version = int(data.get("api_version", 0) or 0)
         self.permissions = tuple(data.get("permissions") or ())
+        # What leaves the machine (`plugins/api.py::PluginManifest.sends`).
+        self.sends = str(data.get("sends", ""))
 
 
 class HostedPlugin:

@@ -130,6 +130,13 @@ def isolate_plugins():
                                 ignore=shutil.ignore_patterns("__pycache__"))
 
     os.environ["RINA_PLUGINS_DIR"] = _plugins
+    # A plugin importing its own module as `plugins.<id>.<module>` finds it
+    # through the package's search path, which `plugins/__init__.py` extends
+    # from this variable on import. If the package was imported already,
+    # extended here instead.
+    package = sys.modules.get("plugins")
+    if package is not None and _plugins not in package.__path__:
+        package.__path__.append(_plugins)
     return _plugins
 
 

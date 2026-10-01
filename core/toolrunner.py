@@ -1087,7 +1087,9 @@ class ToolRunner:
         try:
             tool = self._registry.get(name)
         except UnknownTool as e:
-            log.warning("Неизвестный инструмент: %s", name)
+            # By its length: since `4.0b-K01` an unknown name may come from
+            # a person's command card rather than from the program's code.
+            log.warning("Неизвестный инструмент: %s", safe(name))
             # We record even this: an attempt to call something that does
             # not exist is a trace of somebody's mistake, and later it will
             # show the model's misses.

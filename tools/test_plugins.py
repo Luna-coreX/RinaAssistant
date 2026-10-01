@@ -418,6 +418,17 @@ finally:
     shutil.rmtree(refusing, ignore_errors=True)
     hosted.discover()
 
+# An example with a module of its own loads outside the program's
+# `plugins/` too. It failed exactly there once the examples moved
+# (`4.0b-K05`): «No module named 'plugins.convert'».
+converted = hosted.enable("convert")
+check("пример со своим модулем загружается и вне plugins/ программы",
+      converted and hosted.plugins["convert"].alive,
+      f"| {hosted.plugins.get('convert') and hosted.plugins['convert'].error}")
+# Switched off for good, not only for this host: `enable` wrote it into the
+# settings, and the next host in this check would bring it back up.
+hosted.disable("convert")
+
 hosted.enable("notes")
 spoken = []
 hosted.response.connect(lambda pid, text: spoken.append((pid, text)))
@@ -773,6 +784,26 @@ check("вчерашний курс спрошен за день до даты д
 check("и стал стрелкой: сегодня и вчера рядом",
       plugin._rates.get("USD") == (82.1234, 81.5)
       and plugin._rates.get("EUR") == (94.5, 95.0), f"| {plugin._rates}")
+
+# Privacy-first: whatever ships and goes to the network says what it sends,
+# on its card, before it is switched on.
+print()
+print("=== что плагин отправляет наружу — сказано до включения ===")
+from core.wire.server import _plugin_sends
+
+shipped = os.path.join(ROOT, "plugins")
+for folder in sorted(os.listdir(shipped)):
+    path = os.path.join(shipped, folder, "plugin.json")
+    if not os.path.isfile(path):
+        continue
+    declared = PluginManifest.from_dict(json.load(io.open(path, encoding="utf-8")))
+    if "network.external" in declared.permissions:
+        check(f"«{folder}» говорит, что уходит наружу",
+              len(declared.sends.strip()) > 20, f"| {declared.sends!r}")
+silent = PluginManifest.from_dict({"id": "x", "name": "X", "api_version": 4,
+                                   "permissions": ["network.external"]})
+check("молчащий о сети плагин всё равно помечен на карточке",
+      "интернет" in _plugin_sends(silent), f"| {_plugin_sends(silent)!r}")
 
 # 4.0b-K07: from an example to what ships.
 print()

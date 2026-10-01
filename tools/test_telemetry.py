@@ -127,6 +127,9 @@ for phrase in COMMANDS:
     engine.handle_command(phrase)
 engine.telemetry.tool("plugin.private_diary.write", False, "disk_full",
                       "because")
+# A tool name from a person's own command card (`4.0b-K01`): a Latin word
+# typed into a file, not a name of the program's. Counted as `other`.
+engine._tools.call_block("my_secret_project", {})
 report = engine.telemetry.report()
 text = json.dumps(report, ensure_ascii=False)
 check("отчёт есть", isinstance(report, dict))
@@ -143,6 +146,9 @@ check("и ни одного слова вне словаря",
       all(re.match(r"^[a-z][a-z0-9_.:]*$", word)
           for group in ("features", "tools", "errors", "reasons")
           for word in report[group]), f"| {text[:200]}")
+check("имя из карточки команды не уходит — только `other`",
+      "my_secret_project" not in text and report["tools"].get("other"),
+      f"| {report['tools']}")
 check("чужой плагин уходит безымянным",
       "private_diary" not in text and "disk_full" not in text
       and report["tools"].get("plugin") == 1, f"| {report['tools']}")

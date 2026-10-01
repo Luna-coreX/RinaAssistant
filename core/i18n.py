@@ -356,6 +356,7 @@ _EN = {
     'Сегодня {weekday}.': 'Today is {weekday}.',
     'Который час': 'What time is it',
     # The command editor's blocks (4.0b-K01): names, fields, choices.
+    'Выходит в интернет — что именно уходит, плагин не сообщил.': 'Goes to the internet — the plugin does not say what it sends.',
     'Не сказано, какую яркость поставить.': 'It wasn’t said what brightness to set.',
     'Яркость этого экрана программой не меняется: встроенного экрана нет, а монитор не принимает команд DDC/CI. Их иногда можно включить в меню самого монитора.': 'This screen’s brightness can’t be changed by a program: there is no built-in screen, and the monitor doesn’t take DDC/CI commands. They can sometimes be switched on in the monitor’s own menu.',
     'Не получилось поменять яркость.': 'Couldn’t change the brightness.',

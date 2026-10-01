@@ -3,9 +3,12 @@
   "name": "Погода",
   "version": "1.0.0",
   "author": "NeuroSync Foundry Team",
-  "description": "Погода сейчас и до вечера — плиткой на главном экране, по вопросу вслух и блоком в своих командах. Название города и его координаты уходят в Open-Meteo.",
+  "description": "Погода сейчас и до вечера — плиткой на главном экране, по вопросу вслух и блоком в своих командах.",
   "icon": "🌤",
   "entry": "WeatherPlugin",
   "api_version": 4,
-  "permissions": ["network.external"]
+  "permissions": [
+    "network.external"
+  ],
+  "sends": "Название города и его координаты уходят в Open-Meteo (open-meteo.com)."
 }

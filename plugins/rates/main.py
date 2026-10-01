@@ -30,10 +30,12 @@ said "a request to the central bank's website". Decided 2026-09-29: the
 bank only. Yesterday's value, which turns a number into a direction, is
 asked of the same endpoint for the day before the document's date.
 
-**Permission.** `network.external` stands in the manifest, and the
-person grants it before the first run; without it the core refuses to
-register the `rates` tool. The tile's own fetch is a different matter and
-worth being honest about: a plugin lives in a process of its own, and
+**Permission.** `network.external` stands in the manifest, and what
+leaves the machine is said on the plugin's card before it is switched on
+(`sends`); a tool asking for the network without it in the manifest is
+not registered by the core. Nobody is asked separately: switching the
+plugin on is the consent, which is why the card has to say it plainly.
+The tile's own fetch is a different matter and worth being honest about: a plugin lives in a process of its own, and
 that process can open a socket whatever the manifest says. The split
 isolates crashes, not capabilities — the gate is on the tools the core
 registers ([ADR 0010](../../docs/adr/0010-plugin-api.md)), and a plugin

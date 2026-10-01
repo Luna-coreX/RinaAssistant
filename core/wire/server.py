@@ -72,6 +72,24 @@ _VOICE_KEYS = ("stt_engine", "vosk_model", "whisper_model",
                "personality", "own_voice_model")
 
 
+def _plugin_sends(manifest) -> str:
+    """
+    What a plugin sends out of the machine, for its card.
+
+    The plugin's own sentence when it wrote one. A plugin that asks for
+    the network and says nothing about it still gets a line — that it goes
+    to the network — because silence there would read as "nothing leaves".
+    """
+    from core.i18n import t as tr
+
+    said = str(getattr(manifest, "sends", "") or "").strip()
+    if said:
+        return said
+    if "network.external" in (getattr(manifest, "permissions", ()) or ()):
+        return tr("Выходит в интернет — что именно уходит, плагин не сообщил.")
+    return ""
+
+
 class ProtocolServer:
     """The core as a correspondent: parses requests, sends events."""
 
@@ -1411,6 +1429,12 @@ class ProtocolServer:
             "version": manifest.version,
             "author": manifest.author,
             "description": manifest.description,
+            # What leaves the machine, said on a line of its own before the
+            # plugin is switched on — and, for a plugin that goes to the
+            # network without saying what, that it does (privacy-first:
+            # "everything that leaves is switched on explicitly and said
+            # plainly").
+            "sends": _plugin_sends(manifest),
             "icon": manifest.icon,
             "enabled": bool(loaded.enabled),
             "broken": bool(loaded.error),

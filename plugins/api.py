@@ -78,6 +78,14 @@ class PluginManifest:
     #: would mean two languages about one and the same thing. Not all of it
     #: is available: see ADR 0010.
     permissions: tuple = ()
+    #: What leaves the machine, and to whom, in one sentence for the person:
+    #: «Название города и его координаты уходят в Open-Meteo». Shown on the
+    #: plugin's card on a line of its own, before it is switched on. Every
+    #: plugin that ships with `network.external` must say it
+    #: (`tools/test_plugins.py`): a description cut off at the edge of the
+    #: card was where the weather plugin's said it, and that is not saying
+    #: it plainly.
+    sends: str = ""
 
     @staticmethod
     def from_dict(d: dict, path: str = "") -> "PluginManifest":
@@ -92,6 +100,7 @@ class PluginManifest:
             path=path,
             api_version=int(d.get("api_version", 1)),
             permissions=tuple(str(p) for p in (d.get("permissions") or ())),
+            sends=str(d.get("sends", "")),
         )
 
     def api_compatible(self) -> bool:

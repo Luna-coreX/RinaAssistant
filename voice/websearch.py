@@ -181,7 +181,10 @@ def results(query, limit=RESULTS):
 
         found = DDGS().text(query, region="ru-ru", max_results=int(limit))
     except Exception as trouble:                        # noqa: BLE001
-        log.warning("Поиск не удался: %s", trouble)
+        # The kind of failure, not its text: a library's message about an
+        # HTTP error tends to quote the address, and the address carries
+        # the query — the same reason its own logging is quietened above.
+        log.warning("Поиск не удался: %s", trouble.__class__.__name__)
         return []
 
     out = []

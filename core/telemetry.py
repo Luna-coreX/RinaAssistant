@@ -170,9 +170,17 @@ class Telemetry:
         """A tool was called. A plugin's is counted as `plugin`, unnamed."""
         if not self.enabled:
             return
+        from core.toolbox import ALL_TOOLS
+
         name = str(name or "")
         own = not name.startswith("plugin.")
-        word = _allowed(name) if own else "plugin"
+        # A name of the registry's or `other` — checked against the list,
+        # as intents are, not against the shape of a word. Until
+        # `4.0b-K01` only the program's own code named tools, and the
+        # shape was enough; a person's command card names one too now, and
+        # a Latin word typed into it would have left the machine as it was.
+        word = (_allowed(name, {t.name for t in ALL_TOOLS}) if own
+                else "plugin")
         with self._lock:
             self._add("tools", word)
             if not ok:
