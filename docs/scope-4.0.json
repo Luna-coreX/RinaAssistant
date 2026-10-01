@@ -481,9 +481,33 @@
   },
   "4.0-H10": {
     "done": false,
-    "milestone": "4.1+",
+    "milestone": "4.0-beta",
     "size": "M",
     "title": "Вызов объявленных инструментов"
+  },
+  "4.0-H11": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Хранилище секретов для плагинов"
+  },
+  "4.0-H12": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Плагин «Почта»"
+  },
+  "4.0-H13": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Плагин «Календарь»"
+  },
+  "4.0-H14": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Плагин «GitHub»"
   },
   "4.0-I01": {
     "done": true,
@@ -964,6 +988,48 @@
     "milestone": "4.0-beta",
     "size": "M",
     "title": "Персона на разных языках и имя собеседника"
+  },
+  "4.0b-K01": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Блоки конструктора — из реестра"
+  },
+  "4.0b-K02": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Шаг «Узнать» и подстановка значений"
+  },
+  "4.0b-K03": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Время и дата в ядре"
+  },
+  "4.0b-K04": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Яркость экрана"
+  },
+  "4.0b-K05": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Примеры плагинов — вне поставки"
+  },
+  "4.0b-K06": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Плагин «Погода»"
+  },
+  "4.0b-K07": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Плагин «Курс» — из примера в продукт"
   },
   "4.0b-V01": {
     "done": true,

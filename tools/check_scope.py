@@ -26,7 +26,7 @@ These require rewriting the snapshot deliberately:
 
     adding an item to a milestone, removing it from one
     renaming an item
-    moving it to another milestone (`[port]` ↔ `[stable]` ↔ `[4.1+]`)
+    moving it to another milestone (`[port]` ↔ `[beta]` ↔ `[stable]` ↔ `[4.1+]`)
     changing its size estimate
     **undoing what was done**: `ВЫПОЛНЕНО` back to open
 
@@ -60,7 +60,8 @@ SNAPSHOT = os.path.join(ROOT, "docs", "scope-4.0.json")
 #: short (`[stable]`) while the milestone has a full name — and without
 #: the mapping the item would settle under a key the summary does not
 #: have, that is, drop out of the count silently.
-BY_MARK = {"port": "4.0-port", "stable": "4.0-stable", "4.1+": "4.1+"}
+BY_MARK = {"port": "4.0-port", "beta": "4.0-beta", "stable": "4.0-stable",
+           "4.1+": "4.1+"}
 
 #: The order in which to show the milestones. An unfamiliar one is
 #: printed after them: a summary that keeps quiet about what was not
@@ -87,7 +88,7 @@ SIZE = re.compile(r"^\s*—\s*([SML])\s*(?:—|$)")
 
 #: Which milestone an item belongs to. With no mark, the one whose
 #: section it stands in.
-MARK = re.compile(r"\[(port|stable|4\.1\+)\]")
+MARK = re.compile(r"\[(port|beta|stable|4\.1\+)\]")
 
 
 def milestones(text):
