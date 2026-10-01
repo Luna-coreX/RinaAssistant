@@ -182,13 +182,18 @@ CREATE_REMINDER = Tool(
     summary="Поставить таймер, напоминание или будильник.",
     automation="action",
     title="Поставить напоминание",
-    asks=("kind", "seconds", "text"),
+    # Minutes rather than seconds in the editor: a person says "in ten
+    # minutes", and a field asking for 600 is a field asking them to do
+    # the program's arithmetic (`4.0b-K02`).
+    asks=("kind", "minutes", "text"),
     params=(
         Param("kind", "string", "Вид записи.",
               choices=("timer", "reminder", "alarm"),
               labels=("Таймер", "Напоминание", "Будильник")),
         Param("seconds", "integer", "Через сколько секунд сработает.",
               required=False, minimum=1, maximum=315360000),
+        Param("minutes", "integer", "Через сколько минут сработает.",
+              required=False, minimum=1, maximum=5256000),
         Param("at", "number", "Точный момент срабатывания, секунды с эпохи.",
               required=False),
         Param("text", "string", "О чём напомнить.", required=False),
@@ -387,6 +392,19 @@ CALCULATE = Tool(
     errors=("tool.invalid_arguments",),
 )
 
+USER_NAME = Tool(
+    name="user_name",
+    summary="Как человек просил к себе обращаться — имя из настроек.",
+    automation="query",
+    title="Имя из настроек",
+    params=(),
+    # Reads one setting the person typed in themselves, to be called by it.
+    permissions=set(),
+    idempotent=True,
+    returns="Имя; пусто, если в настройках его нет.",
+    errors=(),
+)
+
 TELL_TIME = Tool(
     name="tell_time",
     summary="Сказать время, дату или день недели.",
@@ -394,7 +412,7 @@ TELL_TIME = Tool(
     title="Время и дата",
     asks=("what",),
     params=(
-        Param("what", "string", "О чём спросили.", required=False,
+        Param("what", "string", "Что сказать.", required=False,
               choices=("time", "date", "weekday"), default="time",
               labels=("Время", "Дата", "День недели")),
     ),
@@ -403,7 +421,7 @@ TELL_TIME = Tool(
     # (`4.0b-K03`).
     permissions=set(),
     idempotent=True,
-    returns="Фраза и значения: время, число, месяц, день недели, дата ISO.",
+    returns="Фраза и само значение: время, дата или день недели.",
     errors=(),
 )
 
@@ -599,7 +617,7 @@ ALL_TOOLS = (
     LAST_SESSION, WORKED_ON, SET_FOCUS,
     RUN_USER_COMMAND, TRY_USER_COMMAND, EXPLAIN_LAST,
     DISPATCH_PLUGIN_COMMAND,
-    CALCULATE, TELL_TIME, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,
+    CALCULATE, TELL_TIME, USER_NAME, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,
 )
 
 

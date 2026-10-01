@@ -89,6 +89,8 @@ class ConvertPlugin(Plugin):
                 name="convert_units",
                 summary="Перевести величину из одних единиц в другие: "
                         "длину, массу, объём, скорость, температуру.",
+                reads=True,
+                title="Перевести единицы",
                 params=(
                     Param("what", "string",
                           "Что перевести, например «5 км в мили»",

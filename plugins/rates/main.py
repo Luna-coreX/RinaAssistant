@@ -116,6 +116,10 @@ class RatesPlugin(Plugin):
             PluginTool(
                 name="rates",
                 summary="Сказать курс доллара и евро по Центробанку.",
+                # Reads and answers (`4.0-H10`): said when a scenario runs
+                # it, and kept by the "find out" step.
+                reads=True,
+                title="Курс валют",
                 run=lambda args: self._aloud(),
                 permissions=("network.external",),
             ),

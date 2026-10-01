@@ -346,9 +346,19 @@ def _create_reminder(ctx, args):
     from voice import reminders
 
     seconds = args.get("seconds")
+    if not seconds and args.get("minutes"):
+        seconds = int(args["minutes"]) * 60
     at = args.get("at")
     text = args.get("text") or ""
     on = reminders.clean_trigger(args.get("on"))
+
+    # No moment at all used to mean "now": the voice always names one, and
+    # nothing else called this. A block in the editor can be saved with the
+    # field empty, and a reminder that fires the instant it is made is a
+    # reminder of nothing (`4.0b-K02`).
+    if not (seconds or at or on):
+        return ToolResult.failed(tr("Не сказано, когда напомнить."),
+                                 "tool.invalid_arguments")
 
     # A switched-off watch is a refusal, not silent agreement. Creating a
     # reminder that will never fire is worse than creating none: a person
@@ -450,21 +460,29 @@ def _start_sequence(ctx, command, scenario, silent=None):
     there is a voice to say it with. Returned as the tool's answer it would
     race the steps' own words, and «Доброе утро» could come out after
     «Сегодня четверг».
+
+    **An answer that uses found-out values is said last** (`4.0b-K02`).
+    «Доброе утро, {имя}» said first would be said before anybody found
+    out the name — and come out with the braces in it.
     """
     import threading
 
-    from voice.user_commands import execute, speaks
+    from voice.user_commands import execute, placeholders, speaks
 
     if silent is None:
         silent = tr("Выполняю последовательность.")
-    opening = command.get("response") or (
-        "" if speaks(command, scenario.get("block_effect")) else silent)
+    answer = command.get("response") or ""
+    closing = bool(answer) and bool(placeholders(answer))
+    opening = "" if closing else (answer or (
+        "" if speaks(command, scenario.get("block_effect")) else silent))
     say = scenario.get("say")
 
     def worker():
         if opening and say is not None:
             say(opening)
-        execute(command, ctx.host, ctx.emit, **scenario)
+        _ok, said = execute(command, ctx.host, ctx.emit, **scenario)
+        if closing and said and say is not None:
+            say(said)
 
     threading.Thread(target=worker, daemon=True).start()
     return ToolResult.done("" if say is not None else opening)
@@ -578,12 +596,11 @@ def _calculate(ctx, args):
 
 def _tell_time(ctx, args):
     """
-    The time, the date or the weekday — the sentence, and the values.
+    The time, the date or the weekday — the sentence, and the bare value.
 
-    The values travel with the sentence because the constructor's "find
-    out" step (`4.0b-K02`) puts them into its own sentences: «Сегодня
-    {weekday}» needs the word, not a phrase that already has «Сегодня»
-    in it.
+    The value is what the constructor's "find out" step keeps (`4.0b-K02`):
+    «Сегодня {день}» needs «четверг», not a sentence that already begins
+    with «Сегодня».
     """
     from datetime import datetime
 
@@ -592,8 +609,20 @@ def _tell_time(ctx, args):
     # One reading of the clock for both: two calls a minute boundary apart
     # would say one time and return another.
     now = datetime.now()
-    return ToolResult.done(clock.say(args.get("what", "time"), now),
-                           clock.values(now))
+    what = args.get("what", "time")
+    return ToolResult.done(clock.say(what, now), clock.value(what, now))
+
+
+def _user_name(ctx, args):
+    """The name the person asked to be called by, as they typed it."""
+    name = " ".join(str((ctx.settings.get("user_name", "") if ctx.settings
+                         else "") or "").split())
+    if not name:
+        # Done, not failed: an empty name is an answer, and a scenario that
+        # greets «Доброе утро, {имя}» should still run on a machine where
+        # nobody typed one in.
+        return ToolResult.done(tr("Имя в настройках не задано."), "")
+    return ToolResult.done(name, name)
 
 
 # The module rather than its pieces: the sayings belong beside the store
@@ -887,6 +916,7 @@ IMPLEMENTATIONS = {
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
     "tell_time": _tell_time,
+    "user_name": _user_name,
     "start_session": _start_session,
     "finish_session": _finish_session,
     "note_session": _note_session,
@@ -1078,6 +1108,11 @@ class ToolRunner:
         because the editor would not have offered it.
         """
         if self.block_effect(name):
+            return self.call(name, args or {}, source=source)
+        if name not in self._registry.names():
+            # Not there at all — a plugin switched off, say. `call` writes
+            # that down as what it is, `tool.unknown`, rather than as a
+            # refusal of something that exists.
             return self.call(name, args or {}, source=source)
         log.warning("Команда пыталась вызвать %s — это не блок", name)
         self._write(name, args, source, (), False, "permission.denied",

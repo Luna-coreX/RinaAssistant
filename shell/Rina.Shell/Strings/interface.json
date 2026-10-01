@@ -155,6 +155,12 @@
   "В команде есть необратимое действие — Рина спросит подтверждение.": {
     "English": "The command contains an irreversible action — Rina will ask to confirm."
   },
+  "В тексте есть {0}, но такое значение нигде не узнаётся. Добавьте шаг «Узнать» или «Запомнить значение» с этим именем.": {
+    "English": "The text has {0}, but no step finds such a value out. Add a “Find out” or “Remember a value” step with that name."
+  },
+  "В тексте шага «Озвучить» оно пишется так: {имя}.": {
+    "English": "In a “Say” step it is written like this: {name}."
+  },
   "Вернуть это будет нельзя.": {
     "English": "There will be no getting this back."
   },
@@ -971,6 +977,9 @@
     "Español": "Comportamiento",
     "Українська": "Поведінка"
   },
+  "Под каким именем запомнить": {
+    "English": "Name to keep it under"
+  },
   "Подробность журнала": {
     "Deutsch": "Protokolldetails",
     "English": "Log detail",
@@ -1397,6 +1406,9 @@
   "У Рины пока нет своего голоса — он появится в 4.0.0 Stable": {
     "English": "Rina has no voice of her own yet — it arrives in 4.0.0 Stable"
   },
+  "У шага «Узнать» нет имени — узнанное некуда положить.": {
+    "English": "A “Find out” step has no name — there is nowhere to keep what it finds."
+  },
   "УМЕЕТ СРАЗУ": {
     "English": "WORKS OUT OF THE BOX"
   },
@@ -1543,6 +1555,9 @@
   },
   "Что скачано и где лежит": {
     "English": "What is downloaded and where it lies"
+  },
+  "Что узнать": {
+    "English": "What to find out"
   },
   "Чтобы говорить": {
     "English": "To speak"
@@ -1699,6 +1714,9 @@
   },
   "например, Саша": {
     "English": "e.g. Alex"
+  },
+  "например, день": {
+    "English": "e.g., day"
   },
   "например, отвечай коротко и по делу": {
     "English": "for example, answer briefly and to the point"

@@ -221,6 +221,7 @@ public partial class CommandEditor : UserControl
         var answer = Response.Text.Trim();
         Summary.Text = S("{0} → {1}. Ответит: {2}.", said, happens,
                          answer.Length > 0 ? $"«{answer}»" : DefaultAnswer());
+        Warn();
     }
 
     /// <summary>What the command answers when the card says nothing.</summary>
@@ -268,20 +269,68 @@ public partial class CommandEditor : UserControl
     /// showed while that node happened to be selected would be a warning
     /// nobody sees.
     /// </remarks>
-    private void ShowWarning()
+    private void ShowWarning() => ShowSummary();
+
+    /// <summary>What the person should know before saving.</summary>
+    /// <remarks>
+    /// <para>
+    /// Recomputed with the summary, on every change, not only when a
+    /// dropdown moves: a value's name is typed, and a warning that waited
+    /// for a dropdown would arrive after the mistake was saved.
+    /// </para>
+    /// <para>
+    /// <b>A value nobody finds out is named here</b> (`4.0b-K02`). The core
+    /// leaves «{погода}» in the sentence as written rather than dropping
+    /// it, so the mistake is audible — but heard at seven in the morning,
+    /// not seen while the command is being written.
+    /// </para>
+    /// </remarks>
+    private void Warn()
     {
-        ShowSummary();
-        var destructive = Anywhere(_chain).Any(
-            step => step["type"]?.GetValue<string>() == "system"
-                    && _actions.Any(
-                        a => a.Destructive
-                             && a.Value == step["target"]?.GetValue<string>()));
-        Warning.Text = destructive
-            ? S("В команде есть необратимое действие — Рина спросит подтверждение.")
-            : "";
-        Warning.Visibility = destructive ? Visibility.Visible
-                                         : Visibility.Collapsed;
+        var lines = new List<string>();
+        var all = Anywhere(_chain).ToList();
+
+        if (all.Any(step => step["type"]?.GetValue<string>() == "system"
+                            && _actions.Any(
+                                a => a.Destructive
+                                     && a.Value == step["target"]?.GetValue<string>())))
+            lines.Add(S("В команде есть необратимое действие — Рина спросит подтверждение."));
+
+        var known = all
+            .Where(step => step["type"]?.GetValue<string>() is "set" or "get")
+            .Select(step => (step["name"]?.GetValue<string>() ?? "").Trim())
+            .Where(name => name.Length > 0)
+            .ToHashSet();
+        var texts = all
+            .Where(step => step["type"]?.GetValue<string>() == "speak")
+            .Select(step => step["target"]?.GetValue<string>() ?? "")
+            .Concat(all.Where(step => step["type"]?.GetValue<string>() == "set")
+                       .Select(step => step["value"]?.GetValue<string>() ?? ""))
+            .Append(Response.Text);
+        var unknown = texts
+            .SelectMany(text => Placeholder.Matches(text).Select(
+                m => m.Groups[1].Value.Trim()))
+            .Where(name => !known.Contains(name))
+            .Distinct()
+            .ToList();
+        if (unknown.Count > 0)
+            lines.Add(S("В тексте есть {0}, но такое значение нигде не узнаётся. Добавьте шаг «Узнать» или «Запомнить значение» с этим именем.",
+                        string.Join(", ", unknown.Select(n => "{" + n + "}"))));
+
+        if (all.Any(step => step["type"]?.GetValue<string>() == "get"
+                            && (step["name"]?.GetValue<string>() ?? "").Trim().Length == 0))
+            lines.Add(S("У шага «Узнать» нет имени — узнанное некуда положить."));
+
+        Warning.Text = string.Join("\n", lines);
+        Warning.Visibility = lines.Count > 0 ? Visibility.Visible
+                                             : Visibility.Collapsed;
     }
+
+    //: A value's place in a sentence — the core's own pattern
+    //: (`voice/user_commands.py::PLACEHOLDER`): no braces or line breaks
+    //: inside, at most 64 characters.
+    private static readonly System.Text.RegularExpressions.Regex Placeholder =
+        new(@"\{([^{}\n]{1,64})\}");
 
     /// <summary>Every step of the graph, at every depth.</summary>
     private static IEnumerable<JsonObject> Anywhere(JsonArray steps)
@@ -394,6 +443,9 @@ public partial class CommandEditor : UserControl
             Text = said,
             Style = (Style)FindResource("Text.Meta"),
             Margin = new Thickness(0, 8, 0, 4),
+            // Wrapped: a hint is a sentence, and the panel is narrow — cut at
+            // the edge it lost exactly the part that said how to write it.
+            TextWrapping = TextWrapping.Wrap,
         });
 
         void Field(string key, string hint)
@@ -534,6 +586,39 @@ public partial class CommandEditor : UserControl
                 BlockFields(step, made, Label);
                 break;
 
+            case "get":
+                // What to find out: only the blocks that read. Changing it
+                // starts the fields over — another block has other ones.
+                Label(S("Что узнать"));
+                var asking = new ComboBox { Style = (Style)FindResource("Choice") };
+                foreach (var block in Readers())
+                    asking.Items.Add(new ComboBoxItem
+                    {
+                        Content = block["title"]?.GetValue<string>() ?? "",
+                        Tag = block["name"]?.GetValue<string>() ?? "",
+                    });
+                asking.SelectedItem = asking.Items.OfType<ComboBoxItem>()
+                    .FirstOrDefault(i => (string?)i.Tag
+                                         == step["tool"]?.GetValue<string>());
+                asking.SelectionChanged += (_, _) =>
+                {
+                    var name = (asking.SelectedItem as ComboBoxItem)?.Tag as string;
+                    var block = Readers().FirstOrDefault(
+                        b => b["name"]?.GetValue<string>() == name);
+                    if (block is null) return;
+                    step["tool"] = name;
+                    step["args"] = NewBlock(block)["args"]!.DeepClone();
+                    ShowPicked();
+                    DrawSteps();
+                    ShowSummary();
+                };
+                made.Add(asking);
+                BlockFields(step, made, Label);
+                Label(S("Под каким именем запомнить"));
+                Field("name", S("например, день"));
+                Label(S("В тексте шага «Озвучить» оно пишется так: {имя}."));
+                break;
+
             default:
                 Label(kind switch
                 {
@@ -572,6 +657,10 @@ public partial class CommandEditor : UserControl
         }
         return made;
     }
+
+    /// <summary>The blocks that only read — what "find out" may ask.</summary>
+    private IEnumerable<JsonObject> Readers() =>
+        _blocks.Where(b => b["effect"]?.GetValue<string>() == "query");
 
     /// <summary>The block the step names, as the core described it.</summary>
     private JsonObject? BlockOf(JsonObject step)
@@ -735,6 +824,18 @@ public partial class CommandEditor : UserControl
         }
     }
 
+    /// <summary>A "find out" step in a few words: the name and its source.</summary>
+    private string FoundShort(JsonObject step)
+    {
+        var name = (step["name"]?.GetValue<string>() ?? "").Trim();
+        var source = BlockOf(step)?["title"]?.GetValue<string>()
+                     ?? S("недоступно");
+        var given = BlockShort(step);
+        if (given.Length > 0) source += $" ({given})";
+        return name.Length > 0 ? "{" + name + "} ← " + source
+                               : S("без имени") + " ← " + source;
+    }
+
     /// <summary>What a block step was given, in a few words.</summary>
     private string BlockShort(JsonObject step)
     {
@@ -823,7 +924,27 @@ public partial class CommandEditor : UserControl
         foreach (var (value, title, icon) in _stepKinds)
         {
             var item = new MenuItem { Header = icon + "  " + title };
-            if (value == "tool")
+            if (value == "get")
+            {
+                // "Find out" opens onto the blocks that read, the same way
+                // "Rina's ability" opens onto all of them.
+                foreach (var block in Readers())
+                {
+                    var one = new MenuItem
+                    {
+                        Header = block["title"]?.GetValue<string>() ?? "",
+                    };
+                    one.Click += (_, _) =>
+                    {
+                        var made = NewBlock(block);
+                        made["type"] = "get";
+                        Put(made);
+                    };
+                    item.Items.Add(one);
+                }
+                if (item.Items.Count == 0) continue;
+            }
+            else if (value == "tool")
             {
                 // Rina's abilities open as a submenu of their own names
                 // (`4.0b-K01`). One entry "Rina's ability" followed by a
@@ -939,6 +1060,8 @@ public partial class CommandEditor : UserControl
             var given = BlockShort(step);
             return given.Length > 0 ? $"{block} · {given}" : block;
         }
+        if (kind == "get")
+            return $"{title} · {FoundShort(step)}";
         return target.Length > 0 ? $"{title} · {target}" : title;
     }
 
@@ -1104,6 +1227,30 @@ public partial class CommandEditor : UserControl
 
     /// <summary>The one-sentence summary under the editor — for the check.</summary>
     public string SummaryForCheck => Summary.Text;
+
+    /// <summary>What the editor warns about — for the check.</summary>
+    public string WarningForCheck =>
+        Warning.Visibility == Visibility.Visible ? Warning.Text : "";
+
+    /// <summary>
+    /// Put a "find out" step in, the way its submenu does — for the check.
+    /// </summary>
+    public bool InsertFindForCheck(int at, string tool, string name,
+                                   string field = "", string value = "")
+    {
+        var block = Readers().FirstOrDefault(
+            b => b["name"]?.GetValue<string>() == tool);
+        if (block is null) return false;
+        var step = NewBlock(block);
+        step["type"] = "get";
+        step["name"] = name;
+        if (field.Length > 0 && step["args"] is JsonObject args)
+            args[field] = value;
+        _chain.Insert(Math.Clamp(at, 0, _chain.Count), step);
+        DrawSteps();
+        ShowSummary();
+        return true;
+    }
 
     /// <summary>Put a node inside another one — for the check.</summary>
     public bool NestStepForCheck(int outer, string branch, string kind,

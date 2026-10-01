@@ -347,9 +347,11 @@ finally:
 # A command of type "wait" would do nothing on purpose; one that is only a
 # repeat says nothing about what it repeats. The core states this, because
 # it is about what they mean.
+# "Find out" (`4.0b-K02`) joins them: a value found out and used nowhere
+# is a command that does nothing on purpose too.
 check("управление потоком объявлено шагами, а не командами",
       user_commands.STEP_ONLY == {"pause", "repeat", "while", "if",
-                                  "stop", "call", "set"},
+                                  "stop", "call", "set", "get"},
       f"| {sorted(user_commands.STEP_ONLY)}")
 check("и все они исполнимы",
       all(k in {t for t, *_ in user_commands.COMMAND_TYPES}

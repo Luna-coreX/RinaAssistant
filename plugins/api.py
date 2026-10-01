@@ -138,6 +138,15 @@ class PluginTool:
     permissions: tuple = ()
     #: Ask the person on every call.
     confirm_required: bool = False
+    #: The tool only reads and answers — the weather, a rate — and changes
+    #: nothing (`4.0-H10`). Such a tool's answer is said when a person's own
+    #: command runs it, and the "find out" step can keep it under a name.
+    #: Left False, the tool is an action: it runs, and the scenario does not
+    #: read out what it said.
+    reads: bool = False
+    #: The block's name in the command editor, two or three words.
+    #: `summary` is used when it is empty.
+    title: str = ""
 
 
 class PluginContext:

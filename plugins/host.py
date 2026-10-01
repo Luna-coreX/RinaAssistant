@@ -324,6 +324,10 @@ class Host:
                 "permissions": [str(p) for p in (one.permissions or ())],
                 "confirm_required": bool(one.confirm_required),
                 "params": [p.to_dict() for p in (one.params or ())],
+                # Read with getattr: a plugin written against the API
+                # before `4.0-H10` builds its tools without these fields.
+                "reads": bool(getattr(one, "reads", False)),
+                "title": str(getattr(one, "title", "") or ""),
             })
         return listed
 

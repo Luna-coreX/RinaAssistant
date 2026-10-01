@@ -509,7 +509,7 @@ class PluginManager:
         called it.
         """
         from core.permissions import plugin_allowed
-        from core.tools import Tool
+        from core.tools import Tool, plugin_block
 
         lp = self.plugins.get(plugin_id)
         if not lp or lp.instance is None:
@@ -537,12 +537,18 @@ class PluginManager:
                          f"{sorted(wanted - set(allowed_by_manifest))}")
                 continue
             try:
+                params = tuple(one.params or ())
                 tool = Tool(
                     name=self.tool_prefix(plugin_id) + str(one.name),
                     summary=str(one.summary),
-                    params=tuple(one.params or ()),
+                    params=params,
                     permissions=frozenset(wanted),
                     confirm_required=bool(one.confirm_required),
+                    **plugin_block(
+                        {"confirm_required": one.confirm_required,
+                         "reads": getattr(one, "reads", False),
+                         "title": getattr(one, "title", "")},
+                        params, str(one.summary)),
                 )
             except Exception:                            # noqa: BLE001
                 self.log(plugin_id,

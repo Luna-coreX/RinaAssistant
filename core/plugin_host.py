@@ -581,7 +581,7 @@ class HostedPlugins:
         A plugin may declare anything; what gets created is what is allowed.
         """
         from core.permissions import plugin_allowed
-        from core.tools import Param, Tool
+        from core.tools import Param, Tool, plugin_block
 
         hosted = self.plugins.get(plugin_id)
         if hosted is None or not hosted.enabled:
@@ -612,12 +612,14 @@ class HostedPlugins:
                           # place of an omitted optional argument.
                           default=p.get("default"))
                     for p in (one.get("params") or ()))
+                summary = str(one.get("summary", ""))
                 tool = Tool(
                     name=self.tool_prefix(plugin_id) + str(one.get("name", "")),
-                    summary=str(one.get("summary", "")),
+                    summary=summary,
                     params=params,
                     permissions=frozenset(wanted),
                     confirm_required=bool(one.get("confirm_required")),
+                    **plugin_block(one, params, summary),
                 )
             except Exception as exc:                     # noqa: BLE001
                 self._note(plugin_id, f"Инструмент отклонён: {exc}")

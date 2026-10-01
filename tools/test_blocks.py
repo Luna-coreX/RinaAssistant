@@ -126,6 +126,64 @@ check("молчаливая последовательность говорит 
 
 # ---------------------------------------------------------------------------
 print()
+print("=== «Узнать» и подстановка: одна реплика (4.0b-K02) ===")
+
+engine._settings.set("user_name", "Luna")
+run({"id": "k02_morning", "enabled": True, "type": "sequence",
+     "triggers": ["доброе утро одной фразой"], "response": "",
+     "steps": [
+         step("get", tool="user_name", args={}, name="имя"),
+         step("get", tool="tell_time", args={"what": "weekday"},
+              name="день недели"),
+         step("speak", target="Доброе утро, {имя}) Сегодня {день недели}. "
+                              "А теперь — кофе."),
+     ]})
+check("сценарий звучит одной репликой", len(said) == 1, f"| {said}")
+check("значения встали на свои места",
+      said[:1] and said[0].startswith("Доброе утро, Luna) Сегодня ")
+      and "{" not in said[0], f"| {said}")
+check("день — словом, а не фразой «Сегодня четверг.»",
+      said[:1] and "Сегодня Сегодня" not in said[0], f"| {said}")
+
+run({"id": "k02_closing", "enabled": True, "type": "sequence",
+     "triggers": ["ответ в конце"], "response": "Готово, {имя}.",
+     "steps": [step("get", tool="user_name", args={}, name="имя")]})
+check("ответ с подстановкой звучит в конце, когда значение уже узнано",
+      said == ["Готово, Luna."], f"| {said}")
+
+run({"id": "k02_unknown", "enabled": True, "type": "sequence",
+     "triggers": ["неизвестное"], "response": "",
+     "steps": [step("speak", target="Погода: {погода}.")]})
+check("неизвестное значение не пропадает молча",
+      said == ["Погода: {погода}."], f"| {said}")
+
+run({"id": "k02_action", "enabled": True, "type": "sequence",
+     "triggers": ["узнать действием"], "response": "",
+     "steps": [step("get", tool="add_todo", args={"text": "тайком"},
+                    name="x"),
+               step("speak", target="{x}")]})
+check("«Узнать» не вызывает действие",
+      not any(i["text"] == "тайком" for i in engine._todo.all()))
+
+engine._settings.set("user_name", "")
+named = engine._tools.call_block("user_name", {})
+check("без имени в настройках — пустое значение, а не сбой",
+      named.ok and named.value == "", f"| {named.value!r}")
+
+# ---------------------------------------------------------------------------
+print()
+print("=== напоминание из блока ===")
+made = engine._tools.call_block("create_reminder",
+                                {"kind": "timer", "minutes": 10})
+check("минуты — минуты", made.ok and "10 мин" in made.message,
+      f"| {made.message}")
+empty = engine._tools.call_block("create_reminder", {"kind": "timer"})
+check("без срока напоминание не ставится, а не срабатывает сразу",
+      not empty.ok, f"| {empty.message}")
+engine._tools.call("cancel_reminder", {})
+
+# ---------------------------------------------------------------------------
+print()
 print("=== что нельзя — нельзя, откуда бы ни пришла карточка ===")
 
 run({"id": "k01_forbidden", "enabled": True, "type": "sequence",

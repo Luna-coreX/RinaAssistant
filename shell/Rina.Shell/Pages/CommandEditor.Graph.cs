@@ -993,6 +993,8 @@ public partial class CommandEditor
             case "tool":
                 var given = BlockShort(step);
                 return given.Length > 0 ? given : S("без настроек");
+            case "get":
+                return FoundShort(step);
             default:
                 return target.Length > 0 ? target : S("не заполнено");
         }

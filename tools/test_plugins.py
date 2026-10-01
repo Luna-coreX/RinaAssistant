@@ -149,11 +149,48 @@ check("вызов записан в журнал",
       any("plugin.dice.roll" in str(row) for row in engine._tools.audit.recent(5)),
       "| по журналу должно быть видно, какой плагин это затеял")
 
+# 4.0-H10: a plugin's tool is a block of a person's own command. Through
+# the same registry, so the same gates — and the same journal.
+blocks = {t.name: t for t in engine._tools.blocks()}
+check("инструмент плагина стал блоком конструктора",
+      "plugin.dice.roll" in blocks, f"| {sorted(blocks)}")
+check("плагин сказал, что кубик только отвечает",
+      blocks.get("plugin.dice.roll") and
+      blocks["plugin.dice.roll"].automation == "query")
+check("и поле блока — аргумент плагина",
+      blocks.get("plugin.dice.roll") and
+      blocks["plugin.dice.roll"].asks == ("sides",))
+
+from voice.user_commands import execute
+
+heard = []
+ok, _said = execute(
+    {"type": "sequence", "steps": [
+        {"type": "get", "tool": "plugin.dice.roll", "args": {"sides": 6},
+         "name": "кубик"},
+        {"type": "speak", "target": "Кубик: {кубик}"}]},
+    say=heard.append, call_block=engine._tools.call_block,
+    block_effect=engine._tools.block_effect)
+check("своя команда вызывает инструмент плагина",
+      ok and heard and heard[0].startswith("Кубик: ")
+      and "{кубик}" not in heard[0], f"| {heard}")
+from_command = [r for r in engine._tools.audit.recent(5)
+                if r["tool"] == "plugin.dice.roll"]
+check("и вызов в журнале — от команды",
+      from_command and from_command[0]["source"] == "command",
+      f"| {[(r['tool'], r['source']) for r in from_command]}")
+
 manager.disable("dice")
 check("выключение сняло инструменты", not plugin_tools(), f"| {plugin_tools()}")
 gone = engine._tools.call("plugin.dice.roll", {})
 check("снятый инструмент неизвестен реестру",
       not gone.ok and gone.error_code == "tool.unknown", f"| {gone.error_code}")
+check("и блоком больше не предлагается",
+      "plugin.dice.roll" not in {t.name for t in engine._tools.blocks()})
+left = engine._tools.call_block("plugin.dice.roll", {"sides": 6})
+check("команда с блоком выключенного плагина получает отказ, а не сбой",
+      not left.ok and left.error_code == "tool.unknown",
+      f"| {left.error_code}")
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ OS's standard means.
 """
 
 import os
+import re
 import sys
 import uuid
 import shutil
@@ -65,6 +66,10 @@ COMMAND_TYPES = [
     ("stop",     "Остановить сценарий", "⏹"),
     ("call",     "Вызвать команду",  "📎"),
     ("set",      "Запомнить значение", "🏷"),
+    # Find something out and keep it under a name (`4.0b-K02`): the answer
+    # of a block that only reads — the day, the name, the weather from a
+    # plugin — for a "say" step to use as `{name}`.
+    ("get",      "Узнать",           "🔎"),
 ]
 
 #: What a condition can ask about.
@@ -106,7 +111,7 @@ CONDITIONS = [
 #: what these things mean, not about how to show them (ADR 0006). A shell
 #: deciding it for itself would be a second place where it is decided.
 STEP_ONLY = frozenset({"pause", "repeat", "while", "if", "stop", "call",
-                       "set"})
+                       "set", "get"})
 
 #: How many times a repeat may run, and how deep control flow may nest.
 #:
@@ -488,6 +493,80 @@ def _run_steps(steps, host, emit, depth, state):
     return ok
 
 
+#: A value's place in a sentence: `{день}`, `{имя}`. Spaces are allowed
+#: inside — a person names things in words — but not braces, so a stray
+#: `{` in ordinary text does not swallow the rest of the sentence.
+PLACEHOLDER = re.compile(r"\{([^{}\n]{1,%d})\}" % MAX_NAME)
+
+
+def placeholders(text):
+    """The names a text asks to have filled in, in order."""
+    return [m.group(1).strip() for m in PLACEHOLDER.finditer(str(text or ""))]
+
+
+def fill(text, state):
+    """
+    Put the values found out in this run into the text (`4.0b-K02`).
+
+    A name nobody set is left as it was written, braces and all, and said
+    so in the log. Dropping it would turn «Сегодня {день}» into «Сегодня»
+    — a sentence that sounds finished and means nothing — and the person
+    would never learn why. The editor warns about such names before the
+    command is saved; this is the run-time half of the same rule.
+    """
+    text = str(text or "")
+    known = (state or {}).get("vars") or {}
+    if "{" not in text:
+        return text
+
+    def one(match):
+        name = match.group(1).strip()
+        if name in known:
+            return str(known[name])
+        log.warning("В тексте команды значение {%s}, которого никто не узнал",
+                    name)
+        return match.group(0)
+
+    return PLACEHOLDER.sub(one, text)
+
+
+def _find_out(command, state):
+    """
+    "Find out": a block's answer kept under a name (`4.0b-K02`).
+
+    Only a block that reads. Anything else would make "find out" a second
+    door to an action — «узнать», which in fact writes a thing to do or
+    starts a session — and the name of the step would be a lie about what
+    it did.
+
+    What is kept is the block's own value when it has a plain one — the
+    word «четверг» rather than the sentence «Сегодня четверг.» — and its
+    answer otherwise. A plugin's tool answers with text, and that text is
+    the value.
+    """
+    name = str(command.get("name", ""))[:MAX_NAME].strip()
+    tool = str(command.get("tool", ""))
+    if not name or _effect(command, state) != "query":
+        log.warning("«Узнать» без имени или не из читающего блока: %s", tool)
+        return False
+    call = (state or {}).get("call_block")
+    if call is None:
+        return False
+    args = command.get("args")
+    try:
+        result = call(tool, dict(args) if isinstance(args, dict) else {})
+    except Exception:
+        log.exception("Блок %s упал", tool)
+        return False
+    if not result.ok:
+        return False
+    value = result.value
+    if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+        value = result.message or ""
+    state["vars"][name] = str(value)[:MAX_VALUE]
+    return True
+
+
 def _run_block(command, state):
     """
     One of Rina's own abilities, as a step (`4.0b-K01`). (ok, what it said)
@@ -514,7 +593,8 @@ def _run_block(command, state):
 
 def _effect(step, state):
     """What a block step does: "action", "query", or "" for anything else."""
-    if step.get("type") != "tool":
+    # A "find out" step names a block too, and asks the same question of it.
+    if step.get("type") not in ("tool", "get"):
         return ""
     effect = (state or {}).get("block_effect")
     try:
@@ -539,7 +619,9 @@ def speaks(command, block_effect=None):
         node = stack.pop()
         if not isinstance(node, dict):
             continue
-        if node.get("type") == "speak" or _effect(node, state) == "query":
+        if node.get("type") == "speak" or (
+                node.get("type") == "tool"
+                and _effect(node, state) == "query"):
             return True
         stack.extend(node.get("steps") or [])
         stack.extend(node.get("otherwise") or [])
@@ -752,8 +834,8 @@ def execute(command, host=None, emit=None, depth=0, state=None,
         except ScenarioStopped:
             log.info("Сценарий остановлен шагом «остановить»")
             _say_step(emit, state, "", "done")
-            return True, command.get("response", "") or _default_response(
-                command, True)
+            return True, fill(command.get("response", "")
+                              or _default_response(command, True), state)
     return _perform(command, host, emit, depth, state)
 
 
@@ -823,10 +905,12 @@ def _perform(command, host, emit, depth, state):
         # fields the conditions about a variable read. `target` is taken as
         # a fallback so a card written before this settled still works.
         name = str(command.get("name", ""))[:MAX_NAME].strip()
-        what = command.get("value") or target
+        what = fill(command.get("value") or target, state)
         if name:
             state["vars"][name] = str(what)[:MAX_VALUE]
         ok = bool(name)
+    elif ctype == "get":
+        ok = _find_out(command, state)
     elif ctype == "call":
         ok = _call_command(command, host, emit, depth, state)
     elif ctype == "while":
@@ -881,7 +965,10 @@ def _perform(command, host, emit, depth, state):
     if not response:
         # the default answer
         response = _default_response(command, ok)
-    return ok, response
+    # Values found out earlier in the run go into what is said
+    # (`4.0b-K02`) — into a "say" step's words and the command's answer
+    # alike, because both are things the person wrote to be heard.
+    return ok, fill(response, state)
 
 
 def _run_system_action(action, host, emit=None):

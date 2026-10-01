@@ -297,6 +297,16 @@ public static partial class Loc
                 {
                     ["English"] = "the release has no manifest.json",
                 },
+            ["В тексте есть {0}, но такое значение нигде не узнаётся. Добавьте шаг «Узнать» или «Запомнить значение» с этим именем."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The text has {0}, but no step finds such a value out. Add a “Find out” or “Remember a value” step with that name.",
+                },
+            ["В тексте шага «Озвучить» оно пишется так: {имя}."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "In a “Say” step it is written like this: {name}.",
+                },
             ["Вернуть это будет нельзя."] =
                 new Dictionary<string, string>
                 {
@@ -1320,6 +1330,11 @@ public static partial class Loc
                 {
                     ["English"] = "for example, “open mail”",
                 },
+            ["например, день"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "e.g., day",
+                },
             ["например, Макс"] =
                 new Dictionary<string, string>
                 {
@@ -1842,6 +1857,11 @@ public static partial class Loc
                     ["English"] = "Behavior",
                     ["Español"] = "Comportamiento",
                     ["Українська"] = "Поведінка",
+                },
+            ["Под каким именем запомнить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Name to keep it under",
                 },
             ["Подробность журнала"] =
                 new Dictionary<string, string>
@@ -2606,6 +2626,11 @@ public static partial class Loc
                 {
                     ["English"] = "Rina has no voice of her own yet — it arrives in 4.0.0 Stable",
                 },
+            ["У шага «Узнать» нет имени — узнанное некуда положить."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A “Find out” step has no name — there is nowhere to keep what it finds.",
+                },
             ["Убрать"] =
                 new Dictionary<string, string>
                 {
@@ -2907,6 +2932,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "What is downloaded and where it lies",
+                },
+            ["Что узнать"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What to find out",
                 },
             ["Чтобы говорить"] =
                 new Dictionary<string, string>

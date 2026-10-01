@@ -100,6 +100,16 @@ def values(now=None):
     }
 
 
+def value(what, now=None):
+    """The bare value one question asks for: «четверг», «9:05», «1 октября»."""
+    v = values(now)
+    if what == "date":
+        return f"{v['day']} {v['month']}"
+    if what == "weekday":
+        return v["weekday"]
+    return v["time"]
+
+
 def say(what, now=None):
     """The sentence for one question."""
     v = values(now)

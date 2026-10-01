@@ -33,6 +33,9 @@ class NotesPlugin(Plugin):
             PluginTool(
                 name="add",
                 summary="Записать заметку.",
+                # An action: it writes. Left as one, a scenario runs it
+                # without reading out «Записала».
+                title="Записать заметку",
                 params=(Param("text", "string", "Что записать."),),
                 run=lambda args: self._add(str(args.get("text", ""))),
             ),

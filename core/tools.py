@@ -214,6 +214,43 @@ class Tool:
         }
 
 
+#: What a person can type or pick in a block's field. An object or a list
+#: has no field one could fill in sensibly.
+SIMPLE_TYPES = frozenset({"string", "integer", "number", "boolean"})
+
+
+def plugin_block(declared, params, summary):
+    """
+    Whether a person's own command may use a plugin's tool (`4.0-H10`).
+
+    `declared` is what the plugin said about the tool, as a dict:
+    `confirm_required`, `reads`, `title`. The answer is the keyword
+    arguments of `Tool` that carry the decision.
+
+    Decided on the core's side, like everything else about what a plugin
+    may do: the plugin says only whether its tool reads and what to call
+    it. A tool that asks on every call is not a block — inside a scenario
+    there is nobody to ask — and neither is one with a required argument
+    nobody can type in, because every step built from it would fail. One
+    function for both ways a plugin is run, in its own process and in the
+    core's: two copies of a rule about permissions part company first.
+    """
+    if declared.get("confirm_required"):
+        return {"automation": "no", "automation_note":
+                "Просит подтверждения на каждый вызов; в сценарии "
+                "спросить некого."}
+    if any(p.required and p.default is None and p.type not in SIMPLE_TYPES
+           for p in params):
+        return {"automation": "no", "automation_note":
+                "Обязательный аргумент нельзя заполнить руками."}
+    title = (str(declared.get("title") or "").strip()
+             or str(summary or "").strip().rstrip("."))
+    return {"automation": "query" if declared.get("reads") else "action",
+            "title": title,
+            "asks": tuple(p.name for p in params
+                          if p.type in SIMPLE_TYPES)}
+
+
 # ---------------------------------------------------------------------------
 # Validation (4.0-C02)
 # ---------------------------------------------------------------------------

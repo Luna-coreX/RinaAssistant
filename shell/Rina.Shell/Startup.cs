@@ -996,11 +996,14 @@ public partial class App
                     built.InsertStepForCheck(3, "if");
                     built.NestStepForCheck(3, "steps", "speak", "добрый вечер");
                     built.NestStepForCheck(3, "otherwise", "speak", "доброе утро");
-                    // And one of Rina's own abilities, picked, so its
-                    // fields are in the picture (`4.0b-K01`).
-                    if (built.InsertBlockForCheck(4, "create_reminder",
-                                                  "text", "позвонить маме"))
-                        built.PickForCheck(4);
+                    // And one of Rina's own abilities (`4.0b-K01`), and a
+                    // value found out for a sentence (`4.0b-K02`) — picked,
+                    // so its fields are in the picture.
+                    built.InsertBlockForCheck(4, "create_reminder",
+                                              "text", "позвонить маме");
+                    if (built.InsertFindForCheck(5, "tell_time", "день",
+                                                 "what", "weekday"))
+                        built.PickForCheck(5);
                     await Task.Delay(500);
                 }
             }
@@ -6647,6 +6650,27 @@ public partial class App
             Check("и приходит со своими умолчаниями",
                   second?["args"]?["what"]?.GetValue<string>() == "time",
                   $"| {second?["args"]?.ToJsonString()}");
+
+            // --- "find out", and a value's name in a sentence (`4.0b-K02`) ---
+            editor!.ClearForCheck();
+            var found = editor!.InsertFindForCheck(0, "user_name", "имя");
+            editor!.InsertStepForCheck(1, "speak", "Доброе утро, {имя}");
+            var greet = editor!.CardForCheck();
+            var finding = greet["steps"]?.AsArray().ElementAtOrDefault(0)
+                as JsonObject;
+            Check("«Узнать» кладёт ответ блока под имя",
+                  found && finding?["type"]?.GetValue<string>() == "get"
+                  && finding?["tool"]?.GetValue<string>() == "user_name"
+                  && finding?["name"]?.GetValue<string>() == "имя",
+                  $"| {finding?.ToJsonString()}");
+            Check("узнанное имя не вызывает предупреждения",
+                  !editor!.WarningForCheck.Contains("{имя}"),
+                  $"| {editor!.WarningForCheck}");
+
+            editor!.InsertStepForCheck(2, "speak", "На улице {погода}");
+            Check("неизвестное значение видно до сохранения",
+                  editor!.WarningForCheck.Contains("{погода}"),
+                  $"| {editor!.WarningForCheck}");
 
 
             // --- dragging says it can be dragged (`4.0b-A09`) ---

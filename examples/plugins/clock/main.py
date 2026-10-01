@@ -19,11 +19,13 @@ class ClockPlugin(Plugin):
             PluginTool(
                 name="time",
                 summary="Сказать текущее время.",
+                reads=True,
                 run=lambda args: f"Сейчас {datetime.now():%H:%M}.",
             ),
             PluginTool(
                 name="date",
                 summary="Сказать сегодняшнюю дату.",
+                reads=True,
                 run=lambda args: f"Сегодня {datetime.now():%d.%m.%Y}.",
             ),
         ]

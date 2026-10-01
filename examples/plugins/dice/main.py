@@ -20,6 +20,8 @@ class DicePlugin(Plugin):
             PluginTool(
                 name="roll",
                 summary="Бросить кубик.",
+                # Changes nothing and answers: its answer is the point.
+                reads=True,
                 params=(Param("sides", "integer",
                               "Сколько граней; по умолчанию шесть.",
                               required=False, minimum=2, maximum=100),),
@@ -28,6 +30,7 @@ class DicePlugin(Plugin):
             PluginTool(
                 name="flip",
                 summary="Подбросить монетку.",
+                reads=True,
                 run=lambda args: random.choice(["Орёл!", "Решка!"]),
             ),
         ]
