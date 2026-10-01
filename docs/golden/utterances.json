@@ -110,6 +110,16 @@
     {"id": "builtin.caps.1", "say": "что ты умеешь", "expect": {"intent": "builtin.answer", "topic": "capabilities"}},
     {"id": "builtin.caps.2", "say": "твои возможности", "expect": {"intent": "builtin.answer", "topic": "capabilities"}},
 
+    {"id": "clock.time.1", "say": "который час", "expect": {"intent": "clock", "what": "time", "note": "4.0b-K03: до этого время знал только выключенный по умолчанию плагин-пример"}},
+    {"id": "clock.time.2", "say": "сколько сейчас времени", "expect": {"intent": "clock", "what": "time"}},
+    {"id": "clock.time.3", "say": "скажи пожалуйста который час", "expect": {"intent": "clock", "what": "time"}},
+    {"id": "clock.time.4", "say": "what time is it", "expect": {"intent": "clock", "what": "time"}},
+    {"id": "clock.date.1", "say": "какое сегодня число", "expect": {"intent": "clock", "what": "date"}},
+    {"id": "clock.date.2", "say": "какая сегодня дата", "expect": {"intent": "clock", "what": "date"}},
+    {"id": "clock.weekday.1", "say": "какой сегодня день недели", "expect": {"intent": "clock", "what": "weekday"}},
+    {"id": "clock.not_a_clock.1", "say": "сколько времени до отпуска", "expect": {"intent": "fallback.search", "note": "фраза говорит больше, чем вопрос о часах"}},
+    {"id": "clock.not_a_clock.2", "say": "который час в токио", "expect": {"intent": "fallback.search", "note": "часовых поясов часы не знают и не делают вид"}},
+
     {"id": "fallback.search.1", "say": "столица австралии", "expect": {"intent": "fallback.search"}},
     {"id": "fallback.search.2", "say": "расскажи анекдот", "expect": {"intent": "fallback.search"}},
     {"id": "fallback.search.3", "say": "почему небо голубое", "expect": {"intent": "fallback.search"}},

@@ -729,7 +729,14 @@ def _music(command, ctx):
 
 
 def _builtin(command, ctx):
-    from voice import calculator, commands, websearch
+    from voice import calculator, clock, commands, websearch
+
+    # The clock before the small talk, and so before the model: a model
+    # does not know what time it is on this machine, and «который час» is
+    # the one question it would answer confidently and wrong.
+    what = clock.classify(command)
+    if what:
+        return Intent("clock", {"what": what}, stage="builtin")
 
     found = calculator.classify(command)
     if found:

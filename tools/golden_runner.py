@@ -33,6 +33,7 @@ To run:
 import argparse
 import json
 import os
+import re
 import sys
 import time
 
@@ -428,6 +429,17 @@ def classify(obs, text=""):
     for exact, make in table:
         if response == exact:
             return make(response)
+
+    # The clock (`4.0b-K03`) is recognised by the shape of the whole
+    # answer rather than by a prefix: «Сейчас» and «Сегодня» begin other
+    # answers too, and a prefix would claim them.
+    from voice.clock import WEEKDAYS
+
+    if re.fullmatch(r"Сейчас \d{1,2}:\d{2}\.", response):
+        return intent("clock", what="time")
+    said = re.fullmatch(r"Сегодня (\d{1,2} \w+, )?(\w+)\.", response)
+    if said and said.group(2) in WEEKDAYS:
+        return intent("clock", what="date" if said.group(1) else "weekday")
 
     prefixes = [
         ("Получается ", lambda r: intent(

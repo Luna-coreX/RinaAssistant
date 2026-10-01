@@ -106,6 +106,7 @@ INTENTS = {
     # answers
     "calc":               "Арифметика. Аргументы: result",
     "calc.zero_division": "Деление на ноль",
+    "clock":              "Время, дата или день недели. Аргументы: what",
     "websearch":          "Явный поиск в интернете. Аргументы: query",
     "builtin.answer":     "Встроенный ответ. Аргументы: topic",
 

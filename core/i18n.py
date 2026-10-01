@@ -348,6 +348,21 @@ _EN = {
     'Если команда не найдена — открыть поиск в браузере. В режиме «всегда слушать» не срабатывает.': 'If no command matches, open a web search. Never triggers in always-listen mode.',
     'Посчитай 15 * 12': 'Calculate 15 * 12',
     'Считает выражение, проценты и доли': 'Evaluates expressions and percentages',
+    # The clock (4.0b-K03). The date is said in the order each language
+    # says it, which is why the whole sentence is translated rather than
+    # assembled from translated parts.
+    'Сейчас {time}.': 'It’s {time}.',
+    'Сегодня {day} {month}, {weekday}.': 'Today is {weekday}, {month} {day}.',
+    'Сегодня {weekday}.': 'Today is {weekday}.',
+    'Который час': 'What time is it',
+    'Называет время, дату и день недели': 'Tells the time, the date and the day of the week',
+    'января': 'January', 'февраля': 'February', 'марта': 'March',
+    'апреля': 'April', 'мая': 'May', 'июня': 'June', 'июля': 'July',
+    'августа': 'August', 'сентября': 'September', 'октября': 'October',
+    'ноября': 'November', 'декабря': 'December',
+    'понедельник': 'Monday', 'вторник': 'Tuesday', 'среда': 'Wednesday',
+    'четверг': 'Thursday', 'пятница': 'Friday', 'суббота': 'Saturday',
+    'воскресенье': 'Sunday',
     'Найди рецепт борща': 'Find a borscht recipe',
     'Ищет запрос в интернете': 'Searches the web',
     'Проверка голоса': 'Voice test',

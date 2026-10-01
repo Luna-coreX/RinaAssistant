@@ -343,6 +343,22 @@ CALCULATE = Tool(
     errors=("tool.invalid_arguments",),
 )
 
+TELL_TIME = Tool(
+    name="tell_time",
+    summary="Сказать время, дату или день недели.",
+    params=(
+        Param("what", "string", "О чём спросили.", required=False,
+              choices=("time", "date", "weekday"), default="time"),
+    ),
+    # Reads the system clock, which is no secret. It used to live in the
+    # "Часы" example plugin, and plugins are off on a fresh install
+    # (`4.0b-K03`).
+    permissions=set(),
+    idempotent=True,
+    returns="Фраза и значения: время, число, месяц, день недели, дата ISO.",
+    errors=(),
+)
+
 WEB_SEARCH = Tool(
     name="web_search",
     summary="Открыть поиск в браузере.",
@@ -502,7 +518,7 @@ ALL_TOOLS = (
     LAST_SESSION, WORKED_ON, SET_FOCUS,
     RUN_USER_COMMAND, TRY_USER_COMMAND, EXPLAIN_LAST,
     DISPATCH_PLUGIN_COMMAND,
-    CALCULATE, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,
+    CALCULATE, TELL_TIME, WEB_SEARCH, PLAY_MUSIC, ASK_MODEL,
 )
 
 

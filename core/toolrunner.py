@@ -534,6 +534,26 @@ def _calculate(ctx, args):
         result["result"])
 
 
+def _tell_time(ctx, args):
+    """
+    The time, the date or the weekday — the sentence, and the values.
+
+    The values travel with the sentence because the constructor's "find
+    out" step (`4.0b-K02`) puts them into its own sentences: «Сегодня
+    {weekday}» needs the word, not a phrase that already has «Сегодня»
+    in it.
+    """
+    from datetime import datetime
+
+    from voice import clock
+
+    # One reading of the clock for both: two calls a minute boundary apart
+    # would say one time and return another.
+    now = datetime.now()
+    return ToolResult.done(clock.say(args.get("what", "time"), now),
+                           clock.values(now))
+
+
 # The module rather than its pieces: the sayings belong beside the store
 # that knows what a session is, for the same reason `_list_todo` reaches
 # for `voice.todo`.
@@ -824,6 +844,7 @@ IMPLEMENTATIONS = {
     "explain_last": _explain_last,
     "dispatch_plugin_command": _dispatch_plugin_command,
     "calculate": _calculate,
+    "tell_time": _tell_time,
     "start_session": _start_session,
     "finish_session": _finish_session,
     "note_session": _note_session,

@@ -26,7 +26,7 @@ from core.i18n import t as tr
 #: itself a call, and without this the answer to a second "why" would be
 #: "because you asked why" — an explanation of the explaining.
 QUIET = frozenset({
-    "explain_last", "list_apps", "list_reminders", "list_todo",
+    "explain_last", "list_apps", "list_reminders", "list_todo", "tell_time",
 })
 
 
