@@ -760,8 +760,10 @@ urllib.request.urlopen = fake_open
 try:
     plugin = rates.RatesPlugin.__new__(rates.RatesPlugin)
     plugin._rates, plugin._asked_at, plugin._asking, plugin._trouble = {}, 0.0, False, ""
+    plugin._dated = None
     plugin.log = lambda *a, **k: None
     plugin._fetch()
+    fragment = plugin._said()
 finally:
     urllib.request.urlopen = real_open
 hosts = sorted({url.split("/")[2] for url in dialled})
@@ -771,6 +773,55 @@ check("вчерашний курс спрошен за день до даты д
 check("и стал стрелкой: сегодня и вчера рядом",
       plugin._rates.get("USD") == (82.1234, 81.5)
       and plugin._rates.get("EUR") == (94.5, 95.0), f"| {plugin._rates}")
+
+# 4.0b-K07: from an example to what ships.
+print()
+print("=== «Курс» как продукт (4.0b-K07) ===")
+check("ответ блока встаёт во фразу",
+      fragment == "доллар 82,12 рубля, евро 94,50 рубля", f"| {fragment!r}")
+check("плитка называет дату курса", plugin._caption() ==
+      "Центробанк, курс на 30 сентября", f"| {plugin._caption()}")
+declared = plugin.tools()[0]
+check("инструмент — читающий блок «Курс валют»",
+      declared.reads and declared.title == "Курс валют")
+
+
+def no_network(request, timeout=None):
+    raise OSError("нет сети")
+
+
+urllib.request.urlopen = no_network
+try:
+    plugin._asked_at -= rates.FRESH_FOR + 60
+    stale = plugin._said()
+    check("без сети — последний курс, с датой, на которую он",
+          stale == "доллар 82,12 рубля, евро 94,50 рубля (курс на 30 сентября)",
+          f"| {stale!r}")
+    check("и плитка говорит, что связи нет",
+          plugin._caption().endswith("— нет связи"), f"| {plugin._caption()}")
+
+    from plugins.api import ToolFailed
+
+    empty = rates.RatesPlugin.__new__(rates.RatesPlugin)
+    empty._rates, empty._asked_at, empty._asking, empty._trouble = {}, 0.0, False, ""
+    empty._dated = None
+    empty.log = lambda *a, **k: None
+    try:
+        empty._said()
+        check("без сети и без курса — отказ словами, а не «успех»", False)
+    except ToolFailed as refusal:
+        check("без сети и без курса — отказ словами, а не «успех»",
+              "нет связи" in str(refusal), f"| {refusal}")
+finally:
+    urllib.request.urlopen = real_open
+manifest = json.load(io.open(os.path.join(plugins_dir(), "rates", "plugin.json"),
+                             encoding="utf-8"))
+source_text = io.open(os.path.join(plugins_dir(), "rates", "main.py"),
+                      encoding="utf-8").read()
+check("описание плагина больше не называет его примером",
+      "пример" not in manifest["description"].lower()
+      and "simpler of the two examples" not in source_text,
+      f"| {manifest['description']}")
 
 print()
 print("ИТОГО ошибок:", fails)

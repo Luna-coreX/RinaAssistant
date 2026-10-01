@@ -1,17 +1,25 @@
 """
-The rate of the dollar and the euro, as a tile on the home screen.
+The dollar and the euro by the Central Bank (`4.0b-K07`).
 
-A plugin that only **shows**. It is the simpler of the two examples and
-exists to answer one question: what does a plugin have to do to put
-something on the home screen, and what must it not do there.
+A tile on the home screen, an answer aloud, and a block for a person's own
+commands. It began as one of the examples of the plugin API and ships now,
+so it answers the way a product has to: the block's answer stands inside a
+sentence a person wrote — «Курс: {курс}» → «Курс: доллар 82,12 рубля, евро
+94,50 рубля» — and an answer it cannot vouch for says so.
 
 **It must not go to the network from `home`.** The tile is drawn every
 time a person lands on the home screen, and a request from the drawing
 path means a request per glance and a screen that waits for somebody
 else's server before it appears. So the rate is fetched on a schedule of
-its own and the tile answers from memory — with a caption saying how old
-the answer is, because a number without a date is a number nobody can
-judge.
+its own and the tile answers from memory — with the date the rate is
+for, because a number without a date is a number nobody can judge.
+
+**Without a network, the last rate known is given with its date**, and
+the tile says the connection is gone. Before `4.0b-K07` a question aloud
+whose fetch failed answered with the old rate as though it were new; and
+with nothing known at all it "succeeded" with the words «Не смогла узнать
+курс», which the "find out" step would have put into a greeting. Now that
+is a refusal (`ToolFailed`).
 
 **Where the numbers come from: the Central Bank itself, and nobody
 else.** It publishes them once a working day at
@@ -24,14 +32,13 @@ asked of the same endpoint for the day before the document's date.
 
 **Permission.** `network.external` stands in the manifest, and the
 person grants it before the first run; without it the core refuses to
-register the `rates` tool, so Rina cannot be asked for the rate out
-loud. The tile's own fetch is a different matter and worth being
-honest about: a plugin lives in a process of its own, and that process
-can open a socket whatever the manifest says. The split isolates
-crashes, not capabilities — the gate is on the tools the core
-registers ([ADR 0010](../../docs/adr/0010-plugin-api.md)), and a
-plugin that declared nothing and went to the network anyway would be
-lying to the person rather than to the machine.
+register the `rates` tool. The tile's own fetch is a different matter and
+worth being honest about: a plugin lives in a process of its own, and
+that process can open a socket whatever the manifest says. The split
+isolates crashes, not capabilities — the gate is on the tools the core
+registers ([ADR 0010](../../docs/adr/0010-plugin-api.md)), and a plugin
+that declared nothing and went to the network anyway would be lying to
+the person rather than to the machine.
 """
 import re
 import threading
@@ -39,7 +46,7 @@ import time
 import urllib.request
 from datetime import date, timedelta
 
-from plugins.api import Plugin, PluginTool
+from plugins.api import Plugin, PluginTool, ToolFailed
 from plugins.page_spec import Card, Note, Row, Text
 
 #: Where the numbers come from.
@@ -62,15 +69,31 @@ SHOWN = ("USD", "EUR")
 
 SIGNS = {"USD": "$", "EUR": "€"}
 
+#: How each is named aloud.
+NAMES = {"USD": "доллар", "EUR": "евро"}
+
+#: Months as a date is said: «на 1 октября».
+MONTHS = ("января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+          "августа", "сентября", "октября", "ноября", "декабря")
+
+#: The questions the plugin takes. Whole words, and both kinds needed — a
+#: rate and a currency — so «курс лечения» and «какой курс выбрать» are
+#: left to whoever understands them.
+CURRENCY_WORDS = ("доллар", "евро", "валют", "рубл", "$", "€")
+
 
 class RatesPlugin(Plugin):
     """The dollar and the euro, in roubles."""
 
-    #: What was last fetched: {"USD": (value, previous)}, and when.
-    _rates: dict = {}
-    _asked_at: float = 0.0
-    _asking: bool = False
-    _trouble: str = ""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        #: What was last fetched: {"USD": (value, previous)}, the date the
+        #: bank set it for, and when it was asked.
+        self._rates = {}
+        self._dated = None
+        self._asked_at = 0.0
+        self._asking = False
+        self._trouble = ""
 
     def on_enable(self):
         """
@@ -107,20 +130,28 @@ class RatesPlugin(Plugin):
             lines.append(Row([Text(f"{SIGNS.get(code, code)} {money(value)} ₽"),
                               Note(step(value, previous))]))
 
-        lines.append(Note(self._said_when()))
+        lines.append(Note(self._caption()))
         return [Card(lines, title="Курс")]
 
-    # --- and the same thing out loud -------------------------------------
+    def _caption(self):
+        said = "Центробанк"
+        if self._dated is not None:
+            said += f", курс на {spoken_date(self._dated)}"
+        if self._trouble and not self._fresh():
+            said += " — нет связи"
+        return said
+
+    # --- aloud, and as a block -------------------------------------------
     def tools(self):
         return [
             PluginTool(
                 name="rates",
-                summary="Сказать курс доллара и евро по Центробанку.",
+                summary="Курс доллара и евро по Центробанку.",
                 # Reads and answers (`4.0-H10`): said when a scenario runs
                 # it, and kept by the "find out" step.
                 reads=True,
                 title="Курс валют",
-                run=lambda args: self._aloud(),
+                run=lambda args: self._said(),
                 permissions=("network.external",),
             ),
         ]
@@ -129,30 +160,32 @@ class RatesPlugin(Plugin):
         low = text.lower()
         if "курс" not in low:
             return False
-        if not any(word in low
-                   for word in ("доллар", "евро", "валют", "рубл", "$", "€")):
+        if not any(word in low for word in CURRENCY_WORDS):
             return False
-        self.respond(self._aloud())
+        try:
+            self.respond(f"По Центробанку {self._said()}.")
+        except ToolFailed as refusal:
+            self.respond(str(refusal))
         return True
 
-    def _aloud(self):
+    def _said(self):
         """
-        Out loud the rate is fetched **now**, and waited for.
+        The rate, fetched now if what is kept is old.
 
-        The opposite rule to the tile's, and for the opposite reason: a
-        person who asked is standing there waiting for an answer, and
-        yesterday's number given without being asked for yesterday's is
-        a wrong answer. A tile is a glance; a question is a question.
+        Out loud the rate is asked **now** and waited for — the opposite of
+        the tile's rule, because a person who asked is standing there. When
+        the asking fails, the last rate known is given with the date it is
+        for; with nothing known, the answer is a refusal in words.
         """
         if not self._fresh():
             self._fetch()
         if not self._rates:
-            return self._trouble or "Не смогла узнать курс."
-        said = ", ".join(
-            f"{name}: {money(self._rates[code][0])} рубля"
-            for code, name in (("USD", "доллар"), ("EUR", "евро"))
-            if code in self._rates)
-        return f"По Центробанку {said}."
+            raise ToolFailed(self._trouble or "Курс узнать не вышло.")
+        said = ", ".join(f"{NAMES[code]} {money(self._rates[code][0])} рубля"
+                         for code in SHOWN if code in self._rates)
+        if not self._fresh() and self._dated is not None:
+            said += f" (курс на {spoken_date(self._dated)})"
+        return said
 
     # --- the fetching -----------------------------------------------------
     def _fresh(self):
@@ -181,6 +214,7 @@ class RatesPlugin(Plugin):
                         previous = {}
                 self._rates = {code: (value, previous.get(code, 0.0))
                                for code, value in today.items()}
+                self._dated = dated
                 self._asked_at = time.time()
                 self._trouble = ""
             else:
@@ -214,13 +248,10 @@ class RatesPlugin(Plugin):
             page = answer.read().decode("windows-1251", "replace")
         return parse_bank(page)
 
-    def _said_when(self):
-        if not self._asked_at:
-            return ""
-        ago = int(time.time() - self._asked_at)
-        if ago < 90:
-            return "Центробанк, только что"
-        return f"Центробанк, {ago // 60} мин назад"
+
+def spoken_date(day):
+    """«1 октября» — the way the date of a rate is said."""
+    return f"{day.day} {MONTHS[day.month - 1]}"
 
 
 def parse_bank(page):
