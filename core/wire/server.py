@@ -1810,7 +1810,8 @@ class ProtocolServer:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("reason", ""))
 
-    def do_system(self, action: str) -> tuple[bool, str]:
+    def do_system(self, action: str, level: int | None = None
+                  ) -> tuple[bool, str]:
         """
         Ask the shell to perform a system action.
 
@@ -1818,8 +1819,13 @@ class ProtocolServer:
         and the shell answers with a fact. So what goes out is a pair
         "it worked, the detail" rather than a ready-made sentence.
         """
+        payload = {"action": action}
+        # The brightness's level (`4.0b-K04`): an optional field, so a
+        # shell that predates it simply never sees one.
+        if level is not None:
+            payload["level"] = int(level)
         try:
-            answer = self.ask_shell_sync("system.do", {"action": action})
+            answer = self.ask_shell_sync("system.do", payload)
         except ProtocolFault as exc:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("detail", ""))

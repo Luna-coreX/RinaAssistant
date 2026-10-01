@@ -64,7 +64,11 @@ public static class Machine
         "volume_up", "volume_down", "volume_mute",
         "media_next", "media_prev", "media_play_pause",
         "lock", "sleep", "shutdown", "restart", "screenshot",
+        "brightness_set", "brightness_up", "brightness_down",
     ];
+
+    /// <summary>How far "brighter" and "darker" go in one step.</summary>
+    public const int BrightnessStep = 10;
 
     /// <summary>
     /// Do the named thing. Returns whether it worked, and a detail.
@@ -73,12 +77,26 @@ public static class Machine
     /// An unknown name is not an exception but "no such action": the core
     /// may be newer than the shell, and falling over for that is not on.
     /// </remarks>
-    public static (bool Ok, string Detail) Do(string action)
+    /// <param name="action">A name from <see cref="Actions"/>.</param>
+    /// <param name="level">
+    /// For <c>brightness_set</c>, the level from 0 to 100 (<c>4.0b-K04</c>).
+    /// A number rather than a free string, so the closed list stays closed:
+    /// "set the brightness" still cannot be aimed at anything else.
+    /// </param>
+    public static (bool Ok, string Detail) Do(string action, int? level = null)
     {
         try
         {
             switch (action)
             {
+                case "brightness_set":
+                    return level is { } wanted ? Brightness.Set(wanted)
+                        : (false, "no level");
+                case "brightness_up":
+                    return Brightness.Step(+BrightnessStep);
+                case "brightness_down":
+                    return Brightness.Step(-BrightnessStep);
+
                 case "volume_up": Tap(VkVolumeUp); return (true, "");
                 case "volume_down": Tap(VkVolumeDown); return (true, "");
                 case "volume_mute": Tap(VkVolumeMute); return (true, "");

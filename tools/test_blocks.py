@@ -184,6 +184,41 @@ engine._tools.call("cancel_reminder", {})
 
 # ---------------------------------------------------------------------------
 print()
+print("=== яркость (4.0b-K04) ===")
+asked_shell = []
+
+
+def shell_with(answer):
+    """A shell that records what it was asked and answers as told."""
+    def do(action, **extra):
+        asked_shell.append((action, extra))
+        return answer
+    return do
+
+
+engine.system_out = shell_with((True, "45"))
+done = engine._tools.call_block("set_brightness", {"how": "set", "level": 45})
+check("уровень уходит оболочке числом рядом с действием",
+      done.ok and asked_shell[-1] == ("brightness_set", {"level": 45}),
+      f"| {asked_shell[-1:]}")
+check("и сказан словами", done.message == "Яркость 45%.", f"| {done.message}")
+
+engine._tools.call_block("set_brightness", {"how": "down"})
+check("«темнее» — шаг, без уровня",
+      asked_shell[-1] == ("brightness_down", {}), f"| {asked_shell[-1:]}")
+
+engine.system_out = shell_with((False, "unsupported"))
+refused = engine._tools.call_block("set_brightness", {"how": "up"})
+check("экран, который не слушается, назван, а не «готово»",
+      not refused.ok and "DDC/CI" in refused.message, f"| {refused.message}")
+
+missing = engine._tools.call_block("set_brightness", {"how": "set"})
+check("«поставить на уровень» без уровня — отказ",
+      not missing.ok and missing.error_code == "tool.invalid_arguments")
+engine.system_out = None
+
+# ---------------------------------------------------------------------------
+print()
 print("=== что нельзя — нельзя, откуда бы ни пришла карточка ===")
 
 run({"id": "k01_forbidden", "enabled": True, "type": "sequence",

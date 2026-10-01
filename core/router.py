@@ -182,8 +182,11 @@ def route(text, ctx=None):
     # a launch by grammar and not by meaning, and "включи музыку
     # погромче" is about the volume. Both are settled by order rather
     # than by a cleverer parse.
+    # `_brightness` before `_system`: the system phrases are matched with a
+    # fuzzy fallback, and «убавь яркость» is close enough to «убавь
+    # громкость» to be taken for it (`4.0b-K04`).
     for stage in (_answer_to_question, _why, _session, _todo, _reminder,
-                  _system,
+                  _brightness, _system,
                   _teach, _music, _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
@@ -461,6 +464,20 @@ def _when_app(candidate, ctx):
         size += 1
 
     return entry, " ".join(words[size:]), [entry], " ".join(words[:size])
+
+
+def _brightness(command, ctx):
+    """The screen's brightness (`4.0b-K04`): set, brighter, darker."""
+    from voice import brightness
+
+    found = brightness.classify(command)
+    if not found:
+        return None
+    how, level = found
+    args = {"how": how}
+    if level is not None:
+        args["level"] = level
+    return Intent("system.brightness", args, stage="system")
 
 
 def _system(command, ctx):

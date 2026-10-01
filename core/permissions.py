@@ -45,6 +45,12 @@ PERMISSIONS = {p.name: p for p in (
     Permission(
         "system.lock", "Блокировка экрана", False,
         "Блокировать рабочий стол по команде."),
+    # Its own permission rather than `system.media` (`4.0b-K04`): the
+    # screen is not the player, and a catalogue that filed one under the
+    # other would be answering "what can it do" with a near miss.
+    Permission(
+        "system.display", "Яркость экрана", False,
+        "Делать экран ярче или темнее по команде."),
     Permission(
         "system.power", "Выключение компьютера", True,
         "Выключать, перезагружать и усыплять компьютер. "

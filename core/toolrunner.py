@@ -340,6 +340,52 @@ def _take_screenshot(ctx, args):
     return _run_system(ctx, "screenshot")
 
 
+def _set_brightness(ctx, args):
+    """
+    The screen's brightness — by the shell's hands, like every system action.
+
+    A level travels as a number beside the action's name, not inside it:
+    the shell's list of actions stays closed (`Platform/Machine.cs`), and
+    "set the brightness" cannot be aimed at anything else.
+
+    **A screen nobody can drive is named as such** (`4.0b-K04`). On a
+    desktop the brightness lives in the monitor, which takes commands over
+    DDC/CI only if it supports them and has them switched on; a command
+    that "worked" while nothing changed on the desk would be a lie.
+    """
+    how = args["how"]
+    level = args.get("level")
+    if how == "set" and level is None:
+        return ToolResult.failed(tr("Не сказано, какую яркость поставить."),
+                                 "tool.invalid_arguments")
+
+    do = getattr(ctx, "system_out", None)
+    if do is None:
+        ok, detail = False, NO_SHELL
+    elif how == "set":
+        ok, detail = do("brightness_set", level=int(level))
+    else:
+        ok, detail = do("brightness_" + how)
+
+    if not ok and detail == NO_SHELL:
+        return ToolResult.failed(
+            tr("Системные действия делает оболочка, а связи с ней нет."),
+            "internal")
+    if not ok and detail == "unsupported":
+        return ToolResult.failed(
+            tr("Яркость этого экрана программой не меняется: встроенного "
+               "экрана нет, а монитор не принимает команд DDC/CI. Их иногда "
+               "можно включить в меню самого монитора."), "internal")
+    if not ok:
+        return ToolResult.failed(tr("Не получилось поменять яркость."),
+                                 "internal")
+    if how == "set":
+        return ToolResult.done(tr("Яркость {level}%.", level=int(level)),
+                               int(level))
+    return ToolResult.done(tr("Сделала ярче.") if how == "up"
+                           else tr("Сделала темнее."))
+
+
 def _create_reminder(ctx, args):
     import time
 
@@ -907,6 +953,7 @@ IMPLEMENTATIONS = {
     "lock_screen": _lock_screen,
     "power_action": _power_action,
     "take_screenshot": _take_screenshot,
+    "set_brightness": _set_brightness,
     "create_reminder": _create_reminder,
     "list_reminders": _list_reminders,
     "cancel_reminder": _cancel_reminder,

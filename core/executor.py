@@ -337,6 +337,12 @@ class Executor:
     def _do_calc_zero_division(self, intent, source):
         return self._ok(tr("На ноль делить нельзя."))
 
+    def _do_system_brightness(self, intent, source):
+        args = {"how": intent.arg("how")}
+        if intent.arg("level") is not None:
+            args["level"] = intent.arg("level")
+        return self._run("set_brightness", args, source=source)
+
     def _do_clock(self, intent, source):
         return self._run("tell_time", {"what": intent.arg("what") or "time"},
                          source=source)

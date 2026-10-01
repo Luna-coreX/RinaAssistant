@@ -214,8 +214,11 @@ class ReferenceCore:
                     return dict(back.payload)
         return {}
 
-    def _ask_shell_do(self, action):
-        answer = self._round_trip("system.do", {"action": action})
+    def _ask_shell_do(self, action, level=None):
+        payload = {"action": action}
+        if level is not None:
+            payload["level"] = level
+        answer = self._round_trip("system.do", payload)
         return bool(answer.get("ok")), str(answer.get("detail", ""))
 
     def _ask_shell_launch(self, launch, kind="file"):

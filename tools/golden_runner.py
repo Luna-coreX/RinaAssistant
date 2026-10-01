@@ -81,6 +81,8 @@ class Observed:
         self.said = []
         self.launched = []
         self.actions = []
+        # The level a brightness action carried, if any (`4.0b-K04`).
+        self.level = None
         self.reminders = []
         self.events = []
         self.pending = None
@@ -191,8 +193,9 @@ class InProcessDriver(Driver):
         # calls the `system_control.RUNNERS` functions at all. We record the
         # request and answer "it worked": the suite checks that the core
         # **decided** correctly, not that Windows can turn the volume up.
-        def as_shell_do(action):
+        def as_shell_do(action, level=None):
             obs.actions.append(action)
+            obs.level = level
             return True, ""
 
         def as_shell_launch(launch, kind="file"):
@@ -376,6 +379,13 @@ def classify(obs, text=""):
         if item.get("on"):
             args["on"] = item["on"].get("app")
         return intent("reminder.create", **args)
+    if obs.actions and obs.actions[-1].startswith("brightness_"):
+        # The screen's brightness travels as its own action with a level
+        # beside it (`4.0b-K04`); seen as that, not as a system action.
+        args = {"how": obs.actions[-1][len("brightness_"):]}
+        if obs.level is not None:
+            args["level"] = obs.level
+        return intent("system.brightness", **args)
     if obs.actions:
         return intent("system.action", action=obs.actions[-1])
 

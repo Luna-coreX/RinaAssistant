@@ -92,6 +92,7 @@ INTENTS = {
 
     # the system
     "system.action":      "Выполнить системное действие. Аргументы: action",
+    "system.brightness":  "Яркость экрана. Аргументы: how, level",
     "system.confirm":     "Опасное действие, нужно подтверждение. Аргументы: action",
     "command.confirm":    "Пользовательская команда опасна, нужно подтверждение",
 

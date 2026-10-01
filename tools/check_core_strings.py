@@ -36,7 +36,23 @@ SKIP = {".git", "venv", "__pycache__", "archive", ".claude", "dist",
         "build", "shell", "node_modules", "tools"}
 
 #: `tr` is what every module imports `core.i18n.t` as.
-CALL = re.compile(r'\btr\(\s*(?:f)?["\']([^"\']*)["\']')
+CALL = re.compile(r'\btr\(\s*((?:f?"[^"\n]*"\s*|f?\'[^\'\n]*\'\s*)+)')
+
+#: One literal of a run of adjacent ones.
+PIECE = re.compile(r'f?"([^"\n]*)"|f?\'([^\'\n]*)\'')
+
+
+def joined(run: str) -> str:
+    """
+    Adjacent literals as Python joins them: the whole string `tr` receives.
+
+    Only the first piece used to be read. A sentence written over two lines
+    — `tr("Не могу: я не слежу … открыты. " "Это включается …")` — was
+    checked by its first half, the table was keyed by that half to pass,
+    and at run time `tr` was handed the whole sentence and found nothing:
+    the English never applied, and the check was green (`4.0b-K04`).
+    """
+    return "".join(a or b for a, b in PIECE.findall(run))
 RUS = re.compile(r"[А-Яа-яЁё]")
 
 def said(literal: str) -> str:
@@ -90,7 +106,7 @@ def main() -> int:
             # backslash and an n. Compared unescaped, six plugin
             # messages looked untranslated while their translations sat
             # in the table under a key nobody would ever ask for.
-            key = said(found.group(1))
+            key = said(joined(found.group(1)))
             if not RUS.search(key):
                 continue
             asked.add(key)

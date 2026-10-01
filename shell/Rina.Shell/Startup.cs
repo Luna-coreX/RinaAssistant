@@ -6323,6 +6323,37 @@ public partial class App
               Platform.Machine.Irreversible.Contains("shutdown")
               && !Platform.Machine.Irreversible.Contains("volume_up"));
 
+        // --- the brightness (`4.0b-K04`) ---
+        //
+        // Only asked, never set: a check that dimmed the developer's
+        // screen in the middle of the day would be run once. What is
+        // checked is that both ways in answer without throwing, and that
+        // a screen nobody can drive is said to be one rather than
+        // reported as done.
+        var level = Platform.Brightness.Current();
+        Check("яркость спрашивается без сбоя",
+              level is null or (>= 0 and <= 100),
+              level is null ? "| ни встроенного экрана, ни монитора с DDC/CI"
+                            : $"| сейчас {level}%");
+        Check("и редактор получает тот же ответ",
+              Platform.Brightness.Available() == level is not null);
+        Check("уровень без числа — отказ, а не догадка",
+              Platform.Machine.Do("brightness_set") is { Ok: false });
+        if (level is null)
+            Check("без экрана, который слушается, — отказ назван",
+                  Platform.Machine.Do("brightness_up") is
+                      { Ok: false, Detail: Platform.Brightness.Unsupported });
+        else
+        {
+            // Set to the level it already has: the whole way to the screen
+            // and back, with nothing on the desk changing.
+            var kept = Platform.Machine.Do("brightness_set", level);
+            var after = Platform.Brightness.Current();
+            Check("установка доходит до экрана",
+                  kept.Ok && after is { } now && Math.Abs(now - level.Value) <= 2,
+                  $"| {kept.Detail}, было {level}, стало {after}");
+        }
+
         // --- the journal (G12) ---
         // What used to be checked here was behaviour but not writing. And
         // writing did not work at all: the journal was opened without
@@ -6671,6 +6702,17 @@ public partial class App
             Check("неизвестное значение видно до сохранения",
                   editor!.WarningForCheck.Contains("{погода}"),
                   $"| {editor!.WarningForCheck}");
+
+            // --- the brightness, said before saving (`4.0b-K04`) ---
+            // Whichever this machine is: the warning is there exactly when
+            // the screen will not take the command.
+            editor!.ClearForCheck();
+            editor!.InsertBlockForCheck(0, "set_brightness", "level", "45");
+            var drivable = Platform.Brightness.Available();
+            Check("про яркость предупреждают ровно тогда, когда экран её не принимает",
+                  editor!.WarningForCheck.Contains("Яркость этого экрана")
+                      == !drivable,
+                  $"| экран {(drivable ? "слушается" : "не слушается")}");
 
 
             // --- dragging says it can be dragged (`4.0b-A09`) ---

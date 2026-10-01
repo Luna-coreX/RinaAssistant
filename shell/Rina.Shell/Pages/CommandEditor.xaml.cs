@@ -321,6 +321,13 @@ public partial class CommandEditor : UserControl
                             && (step["name"]?.GetValue<string>() ?? "").Trim().Length == 0))
             lines.Add(S("У шага «Узнать» нет имени — узнанное некуда положить."));
 
+        // A brightness step on a machine whose screen does not take the
+        // command (`4.0b-K04`). Asked of the screen itself, and only when
+        // such a step is there: the probe costs a round to every monitor.
+        if (all.Any(step => step["tool"]?.GetValue<string>() == "set_brightness")
+            && !Platform.Brightness.Available())
+            lines.Add(S("Яркость этого экрана программой не меняется — шаг с яркостью не сработает. У монитора это иногда включается в его меню (DDC/CI)."));
+
         Warning.Text = string.Join("\n", lines);
         Warning.Visibility = lines.Count > 0 ? Visibility.Visible
                                              : Visibility.Collapsed;

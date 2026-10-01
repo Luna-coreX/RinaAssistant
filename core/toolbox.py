@@ -174,6 +174,26 @@ TAKE_SCREENSHOT = Tool(
 )
 
 
+SET_BRIGHTNESS = Tool(
+    name="set_brightness",
+    summary="Сделать экран ярче, темнее или поставить яркость на уровень.",
+    automation="action",
+    title="Яркость экрана",
+    asks=("how", "level"),
+    params=(
+        Param("how", "string", "Что сделать.",
+              choices=("set", "up", "down"),
+              labels=("Поставить на уровень", "Ярче", "Темнее")),
+        Param("level", "integer", "Уровень яркости, процентов.",
+              required=False, minimum=0, maximum=100),
+    ),
+    # Its own permission (`4.0b-K04`): the screen is not the player.
+    permissions={"system.display"},
+    idempotent=False,           # "brighter" twice is two steps
+    returns="Короткое подтверждение; уровень, если его называли.",
+    errors=("tool.invalid_arguments", "internal"),
+)
+
 # ---------------------------------------------------------------------------
 # Reminders
 # ---------------------------------------------------------------------------
@@ -610,6 +630,7 @@ SET_FOCUS = Tool(
 ALL_TOOLS = (
     LAUNCH_APP, LIST_APPS, TEACH_ALIAS, FORGET_ALIAS,
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
+    SET_BRIGHTNESS,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     ADD_TODO, LIST_TODO, CLOSE_TODO,
     START_SESSION, FINISH_SESSION, NOTE_SESSION, FOLDER_SESSION,

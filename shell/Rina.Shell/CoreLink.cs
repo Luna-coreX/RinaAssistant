@@ -533,7 +533,12 @@ public sealed class CoreLink : IAsyncDisposable
         if (request.Method == "system.do")
         {
             var action = request.Payload["action"]?.GetValue<string>() ?? "";
-            var (ok, detail) = Platform.Machine.Do(action);
+            // An optional level, for the brightness (`4.0b-K04`). Read as a
+            // number or not at all: anything else is no level.
+            int? level = request.Payload["level"] is JsonValue given
+                         && given.TryGetValue<int>(out var number)
+                ? number : null;
+            var (ok, detail) = Platform.Machine.Do(action, level);
             Platform.Journal.Action(action, ok);
             await connection.ReplyAsync(request, new JsonObject
             {

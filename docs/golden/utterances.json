@@ -119,6 +119,13 @@
     {"id": "clock.weekday.1", "say": "какой сегодня день недели", "expect": {"intent": "clock", "what": "weekday"}},
     {"id": "clock.not_a_clock.1", "say": "сколько времени до отпуска", "expect": {"intent": "fallback.search", "note": "фраза говорит больше, чем вопрос о часах"}},
     {"id": "clock.not_a_clock.2", "say": "который час в токио", "expect": {"intent": "fallback.search", "note": "часовых поясов часы не знают и не делают вид"}},
+    {"id": "brightness.set.1", "say": "яркость на 45", "expect": {"intent": "system.brightness", "how": "set", "level": 45, "note": "4.0b-K04"}},
+    {"id": "brightness.set.2", "say": "поставь яркость 70 процентов", "expect": {"intent": "system.brightness", "how": "set", "level": 70}},
+    {"id": "brightness.set.max", "say": "яркость на максимум", "expect": {"intent": "system.brightness", "how": "set", "level": 100}},
+    {"id": "brightness.up", "say": "сделай ярче", "expect": {"intent": "system.brightness", "how": "up"}},
+    {"id": "brightness.down", "say": "убавь яркость", "expect": {"intent": "system.brightness", "how": "down", "note": "не громкость: яркость разбирается раньше нечёткого сопоставления"}},
+    {"id": "brightness.bare", "say": "темнее", "expect": {"intent": "system.brightness", "how": "down"}},
+    {"id": "brightness.not_the_theme", "say": "сделай тему темнее", "expect": {"intent": "fallback.search", "note": "тема окна — не яркость экрана"}},
 
     {"id": "fallback.search.1", "say": "столица австралии", "expect": {"intent": "fallback.search"}},
     {"id": "fallback.search.2", "say": "расскажи анекдот", "expect": {"intent": "fallback.search"}},

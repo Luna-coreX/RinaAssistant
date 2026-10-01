@@ -201,9 +201,11 @@ class RinaEngine:
                 # `NO_SHELL` is a code rather than a phrase: the registry
                 # branches on it, and prose would have to be matched by
                 # substring — which breaks on the first translation.
-                system_out=lambda action: (self.system_out(action)
-                                           if self.system_out else
-                                           (False, NO_SHELL)),
+                # Extra fields — the brightness's level (`4.0b-K04`) —
+                # pass through as they are.
+                system_out=lambda action, **extra: (
+                    self.system_out(action, **extra) if self.system_out
+                    else (False, NO_SHELL)),
                 open_url=lambda url: (self.browser_out(url)
                                      if self.browser_out else
                                      (False, NO_SHELL)),

@@ -3064,5 +3064,10 @@ public static partial class Loc
                 {
                     ["English"] = "Amber",
                 },
+            ["Яркость этого экрана программой не меняется — шаг с яркостью не сработает. У монитора это иногда включается в его меню (DDC/CI)."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "This screen’s brightness can’t be changed by a program — the brightness step won’t work. On a monitor it can sometimes be switched on in its own menu (DDC/CI).",
+                },
         };
 }
