@@ -466,7 +466,9 @@ public partial class CommandEditor : UserControl
             box.TextChanged += (_, _) =>
             {
                 step[key] = box.Text;
-                DrawSteps();
+                // The canvas only: rebuilding the inspector here would throw
+                // away the very box being typed into (`DrawBoard`).
+                DrawBoard();
                 ShowSummary();
             };
             made.Add(box);
@@ -527,7 +529,7 @@ public partial class CommandEditor : UserControl
                 {
                     step["count"] = int.TryParse(times.Text, out var n)
                         ? Math.Clamp(n, 0, _maxRepeat) : 1;
-                    DrawSteps();
+                    DrawBoard();
                     ShowSummary();
                 };
                 made.Add(times);
@@ -725,9 +727,12 @@ public partial class CommandEditor : UserControl
             step["args"] = args;
         }
 
+        // The canvas only, for the same reason as a plain field: a block's
+        // text box is typed into, and redrawing the inspector would replace
+        // it under the person's fingers.
         void Changed()
         {
-            DrawSteps();
+            DrawBoard();
             ShowSummary();
         }
 
@@ -1269,6 +1274,32 @@ public partial class CommandEditor : UserControl
 
     /// <summary>The one-sentence summary under the editor — for the check.</summary>
     public string SummaryForCheck => Summary.Text;
+
+    /// <summary>
+    /// Type into the inspector's first field a character at a time — for
+    /// the check.
+    /// </summary>
+    /// <remarks>
+    /// Answers whether the box typed into is still the box on the panel
+    /// after every character. It was not: each keystroke rebuilt the
+    /// inspector, the box was replaced, and focus went with it — one letter
+    /// per click (2026-10-02).
+    /// </remarks>
+    public async Task<(bool Kept, JsonObject? Step)> TypeForCheck(string text)
+    {
+        var box = Picked.Children.OfType<TextBox>().FirstOrDefault();
+        if (box is null) return (false, null);
+        box.Focus();
+        var kept = true;
+        foreach (var letter in text)
+        {
+            box.SelectionStart = box.Text.Length;
+            box.SelectedText = letter.ToString();
+            await Task.Delay(15);
+            kept &= Picked.Children.Contains(box);
+        }
+        return (kept, _picked);
+    }
 
     /// <summary>What the editor warns about — for the check.</summary>
     public string WarningForCheck =>

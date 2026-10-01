@@ -6689,6 +6689,31 @@ public partial class App
                   editor!.BlocksOffered >= 10,
                   $"| блоков {editor!.BlocksOffered}");
 
+            // --- typing into a field keeps the field (2026-10-02) ---
+            //
+            // Reported by a person: "one character, then the field loses
+            // focus". Every keystroke rebuilt the inspector and replaced the
+            // box. Typed here a character at a time, into a plain step's
+            // field and into a block's.
+            editor!.ClearForCheck();
+            editor!.InsertStepForCheck(0, "speak", "");
+            editor!.PickForCheck(0);
+            var typed = await editor!.TypeForCheck("Доброе утро");
+            Check("ввод в поле шага не теряет поле после первой буквы",
+                  typed.Kept,
+                  typed.Kept ? "" : "| поле пересоздавалось на каждой букве");
+            Check("и написанное целиком дошло до шага",
+                  typed.Step?["target"]?.GetValue<string>() == "Доброе утро",
+                  $"| {typed.Step?["target"]}");
+            editor!.InsertBlockForCheck(1, "add_todo");
+            editor!.PickForCheck(1);
+            var inBlock = await editor!.TypeForCheck("купить хлеб");
+            Check("и в поле блока тоже",
+                  inBlock.Kept
+                  && inBlock.Step?["args"]?["text"]?.GetValue<string>()
+                      == "купить хлеб",
+                  $"| {inBlock.Step?["args"]?.ToJsonString()}");
+
             // Through the menu, as a person reaches them. The submenu could
             // not open at all once — reported by a person: "the new blocks
             // cannot be clicked".

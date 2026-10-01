@@ -83,6 +83,23 @@ public partial class CommandEditor
     /// <summary>Lay the graph out and draw it.</summary>
     private void DrawSteps()
     {
+        DrawBoard();
+        ShowPicked();
+    }
+
+    /// <summary>
+    /// The canvas alone — for what a person types into the inspector.
+    /// </summary>
+    /// <remarks>
+    /// The inspector is not rebuilt here, and that is the point. A field
+    /// redrew everything on every keystroke, the inspector included, so
+    /// the box being typed into was thrown away after its first character
+    /// and focus went with it: one letter per click (reported by a person,
+    /// 2026-10-02). The node on the canvas still follows the text; the
+    /// field stays the one the person is in.
+    /// </remarks>
+    private void DrawBoard()
+    {
         Board.Children.Clear();
         // **Reset, and it was not.** `_widest` is the rightmost column
         // the layout reached, and it was only ever raised — so a graph
@@ -118,7 +135,6 @@ public partial class CommandEditor
         Rule();
         Centre();
         Paint();
-        ShowPicked();
     }
 
     private double _widest;
