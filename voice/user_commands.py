@@ -1020,16 +1020,19 @@ def _default_response(command, ok):
     ctype = command.get("type")
     if not ok:
         return tr("Не получилось выполнить команду.")
+    # In one of several ways each time (`core/sayings.py`).
+    from core.sayings import say
+
     if ctype == "app":
-        return tr("Запускаю программу.")
+        return say("command.app")
     if ctype == "folder":
-        return tr("Открываю папку.")
+        return say("command.folder")
     if ctype == "website":
-        return tr("Открываю сайт.")
+        return say("command.website")
     if ctype == "speak":
         return command.get("target", "")
     if ctype == "system":
-        return tr("Готово.")
+        return say("command.done")
     if ctype == "sequence":
         return tr("Выполняю последовательность.")
-    return tr("Готово.")
+    return say("command.done")

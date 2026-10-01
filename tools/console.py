@@ -16,6 +16,15 @@ put into effect.
 import os
 import sys
 
+# Every check hears the plain variant of each saying (`core/sayings.py`):
+# a recorded utterance or an exact assertion is about what Rina decided,
+# not which of her words she happened to pick, and a check that is green
+# under one pick and red under another is the same untrustworthy check as
+# one that depends on the code page. Set on import, so the child processes
+# a check starts — the core, a plugin — inherit it; `test_sayings.py`
+# switches it off to check the variety itself.
+os.environ.setdefault("RINA_PLAIN_SPEECH", "1")
+
 
 def use_utf8() -> None:
     """Our own output — in UTF-8, whatever is set in the console."""

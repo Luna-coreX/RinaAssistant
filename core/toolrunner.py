@@ -40,6 +40,7 @@ from core.logging_setup import (get_logger, safe, security_log,
 from core.permissions import PERMISSIONS
 from core.tools import ToolError, UnknownTool
 from core.toolbox import default_registry
+from core.sayings import SAYINGS, say
 
 
 log = get_logger("tools")
@@ -310,6 +311,11 @@ def _run_system(ctx, action_id):
                                  "internal")
     if action_id == "screenshot" and detail:
         return ToolResult.done(tr("Снимок сохранён: ") + detail)
+    # The commonest ones in one of several ways (`core/sayings.py`); the
+    # rest — lock, power — as they were: a sentence about shutting the
+    # computer down is not the place for variety.
+    if f"system.{action_id}" in SAYINGS:
+        return ToolResult.done(say(f"system.{action_id}"))
     return ToolResult.done(tr(system_control.DONE_MESSAGES.get(action_id)
                               or "Готово."))
 
@@ -380,10 +386,10 @@ def _set_brightness(ctx, args):
         return ToolResult.failed(tr("Не получилось поменять яркость."),
                                  "internal")
     if how == "set":
-        return ToolResult.done(tr("Яркость {level}%.", level=int(level)),
+        return ToolResult.done(say("brightness.level", level=int(level)),
                                int(level))
-    return ToolResult.done(tr("Сделала ярче.") if how == "up"
-                           else tr("Сделала темнее."))
+    return ToolResult.done(say("brightness.up") if how == "up"
+                           else say("brightness.down"))
 
 
 def _create_reminder(ctx, args):
@@ -433,15 +439,13 @@ def _create_reminder(ctx, args):
     if seconds:
         left = reminders.humanize_left(seconds)
         if text:
-            return ToolResult.done(
-                tr("Напомню через {left}: {text}.", left=left, text=text))
-        return ToolResult.done(tr("Засекла {left}.", left=left))
+            return ToolResult.done(say("reminder.in", left=left, text=text))
+        return ToolResult.done(say("timer.set", left=left))
 
     when = reminders.when_text(fire_at)
     if text:
-        return ToolResult.done(
-            tr("Напомню в {time}: {text}.", time=when, text=text))
-    return ToolResult.done(tr("Разбужу в {time}.", time=when))
+        return ToolResult.done(say("reminder.at", time=when, text=text))
+    return ToolResult.done(say("alarm.at", time=when))
 
 
 def _list_reminders(ctx, args):
@@ -449,7 +453,7 @@ def _list_reminders(ctx, args):
 
     items = sorted(ctx.reminders.active(), key=lambda r: r.get("fire_at", 0))
     if not items:
-        return ToolResult.done(tr("Ничего не запланировано."), [])
+        return ToolResult.done(say("reminders.none"), [])
     message = tr("Запланировано: ") + "; ".join(
         reminders.describe(i) for i in items[:5])
     return ToolResult.done(message, items)
@@ -462,8 +466,8 @@ def _cancel_reminder(ctx, args):
     else:
         removed = ctx.reminders.clear_active()
     if not removed:
-        return ToolResult.done(tr("Нечего отменять."), 0)
-    return ToolResult.done(tr("Отменила: {count}.", count=removed), removed)
+        return ToolResult.done(say("reminders.nothing"), 0)
+    return ToolResult.done(say("reminders.cancelled", count=removed), removed)
 
 
 def _scenario(ctx):
@@ -635,9 +639,8 @@ def _calculate(ctx, args):
     name, result = found
     if name == "calc.zero_division":
         return ToolResult.done(tr("На ноль делить нельзя."))
-    return ToolResult.done(
-        tr("Получается {result}.", result=result["result"]),
-        result["result"])
+    return ToolResult.done(say("calc", result=result["result"]),
+                           result["result"])
 
 
 def _tell_time(ctx, args):
@@ -792,7 +795,7 @@ def _add_todo(ctx, args):
     if item is None:
         return ToolResult.failed(tr("Не поняла, что записать."),
                                  "tool.invalid_arguments")
-    return ToolResult.done(tr("Записала: {text}.", text=item["text"]),
+    return ToolResult.done(say("todo.added", text=item["text"]),
                            value=item)
 
 
@@ -830,7 +833,7 @@ def _close_todo(ctx, args):
     named = next((i["text"] for i in ctx.todo.all() if i["id"] == todo_id), "")
     if not ctx.todo.close(todo_id):
         return ToolResult.failed(tr("Такого дела нет."), "internal")
-    return ToolResult.done(tr("Готово: {text}.", text=named))
+    return ToolResult.done(say("todo.closed", text=named))
 
 
 def _play_music(ctx, args):

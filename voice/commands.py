@@ -17,6 +17,7 @@ import subprocess
 import sys
 
 from core.i18n import t as tr
+from core.sayings import say
 from core.logging_setup import get_logger
 from voice.textmatch import whole_word
 
@@ -173,10 +174,12 @@ def handle_builtin_command(text):
 # does not pretend to be a conversation that is not there yet.
 ANSWERS = {
     "name": lambda: tr("Меня зовут Рина, я твой голосовой ассистент."),
-    "thanks": lambda: tr("Всегда рада помочь."),
-    "hello": lambda: tr("Привет. Слушаю."),
-    "bye": lambda: tr("До встречи."),
-    "how_are_you": lambda: tr("У меня всё ровно. Чем помочь?"),
+    # In one of several ways each time (`core/sayings.py`): the same
+    # greeting word for word on the tenth day is a table answering.
+    "thanks": lambda: say("answer.thanks"),
+    "hello": lambda: say("answer.hello"),
+    "bye": lambda: say("answer.bye"),
+    "how_are_you": lambda: say("answer.how_are_you"),
     "capabilities": lambda: tr(
         "Я могу запускать приложения, считать, искать в интернете и "
         "выполнять команды плагинов. Попробуй сказать: запусти браузер."),

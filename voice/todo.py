@@ -24,6 +24,7 @@ import time
 import uuid
 
 from core.i18n import t as tr
+from core.sayings import say
 from voice.textmatch import normalize
 
 
@@ -238,12 +239,12 @@ class TodoStore:
 
 def say_list(items):
     """The list in words — for speaking aloud."""
+    # In one of several ways each time (`core/sayings.py`).
     if not items:
-        return tr("Дел нет.")
+        return say("todo.none")
     if len(items) == 1:
-        return tr("Одно дело: {text}.", text=items[0]["text"])
+        return say("todo.one", text=items[0]["text"])
     listed = ", ".join(item["text"] for item in items[:5])
     if len(items) > 5:
-        return tr("Дел {count}, первые пять: {listed}.",
-                  count=len(items), listed=listed)
-    return tr("Дел {count}: {listed}.", count=len(items), listed=listed)
+        return say("todo.many_first", count=len(items), listed=listed)
+    return say("todo.many", count=len(items), listed=listed)

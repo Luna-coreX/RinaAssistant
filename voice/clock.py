@@ -16,6 +16,8 @@ import re
 from datetime import datetime
 
 from core.i18n import t as tr
+# `say` is this module's own function below; the catalogue's is `saying`.
+from core.sayings import say as saying
 
 
 #: Month names in the genitive, as a date is said: «1 октября».
@@ -114,7 +116,7 @@ def say(what, now=None):
     """The sentence for one question."""
     v = values(now)
     if what == "date":
-        return tr("Сегодня {day} {month}, {weekday}.", **v)
+        return saying("clock.date", **v)
     if what == "weekday":
-        return tr("Сегодня {weekday}.", **v)
-    return tr("Сейчас {time}.", **v)
+        return saying("clock.weekday", **v)
+    return saying("clock.time", **v)

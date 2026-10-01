@@ -22,6 +22,7 @@ the text of Rina's answers is assembled in the core, not in the shell.
 
 from core.i18n import t as tr
 from core.intent import Result
+from core.sayings import say
 from core.logging_setup import get_logger, safe
 
 
@@ -331,8 +332,7 @@ class Executor:
 
     # ---------- answers ----------
     def _do_calc(self, intent, source):
-        return self._ok(tr("Получается {result}.",
-                           result=intent.arg("result")))
+        return self._ok(say("calc", result=intent.arg("result")))
 
     def _do_calc_zero_division(self, intent, source):
         return self._ok(tr("На ноль делить нельзя."))
@@ -379,10 +379,10 @@ class Executor:
                          source=source)
 
     def _do_cancelled(self, intent, source):
-        return self._ok(tr("Хорошо, отменяю."))
+        return self._ok(say("cancelled"))
 
     def _do_ask_wake(self, intent, source):
-        return self._ok(tr("Да? Слушаю."))
+        return self._ok(say("wake"))
 
     def _do_silence(self, intent, source):
         return Result.success()

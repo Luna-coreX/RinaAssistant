@@ -137,6 +137,7 @@ def main() -> int:
     # table appears.
     from core import llm, models
     from core.toolbox import default_registry
+    from core import sayings
     from voice import hotkey_actions, system_control, user_commands
 
     tables = {
@@ -147,6 +148,11 @@ def main() -> int:
         "COMMAND_TYPES": [title for _v, title, _i
                           in user_commands.COMMAND_TYPES],
         "CONDITIONS": [title for _v, title in user_commands.CONDITIONS],
+        # Every way of saying each thing (`core/sayings.py`): a variant
+        # without English would come out Russian in an English window on
+        # one answer in three, which is harder to notice than always.
+        "SAYINGS": [variant for variants in sayings.SAYINGS.values()
+                    for variant in variants],
         # The editor's blocks (`4.0b-K01`): the name, and every field and
         # choice a person sees on one.
         "BLOCKS": [word for tool in default_registry().all()

@@ -13,6 +13,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
+# The plain variant of every saying, as for every check (`tools/console.py`):
+# the shell's checks start this core directly, not through a Python check.
+os.environ.setdefault("RINA_PLAIN_SPEECH", "1")
+
 from sandbox import isolate_plugins, neutralise
 neutralise()
 # The shell's checks open a plugin's own page, and since `4.0b-K05` the

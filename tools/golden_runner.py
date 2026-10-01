@@ -40,6 +40,9 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+# Plain speech — the first variant of every saying — as for every check:
+# what is recorded here is what Rina decided, not which words she picked.
+import console  # noqa: E402,F401
 
 # The data directory goes into a temporary folder, and that has to be done
 # before the first store is created. The substitutions below cover what is
