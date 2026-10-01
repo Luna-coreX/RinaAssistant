@@ -38,6 +38,9 @@ public partial class App
     private string? _shotPath;
     //: Whether a screenshot of the commands page should open the editor.
     private bool _shotEditor;
+    //: Seconds to wait on the section before the picture (`--wait`): a
+    //: plugin's tile is "looking…" until its first fetch lands.
+    private double _shotWait;
     private double _shotScroll;
     private string _shotSection = "settings";
 
@@ -159,6 +162,8 @@ public partial class App
                 ? down : 0;
             _shotSection = Value(args, "--section") ?? "settings";
             _shotEditor = args.Contains("--editor");
+            _shotWait = double.TryParse(Value(args, "--wait"), out var pause)
+                ? pause : 0;
             // Without a window WPF shuts down as soon as OnStartup returns
             // control: by default an application lives while at least one
             // window lives. The self-check has no reason to show a window,
@@ -942,7 +947,7 @@ public partial class App
         if (_shotPath is { } shot)
         {
             window.ShowSectionFor(_shotSection);
-            await Task.Delay(800);
+            await Task.Delay(800 + (int)(_shotWait * 1000));
             // The figure is drawn by its own tick, and the picture used to
             // be taken before the first one: the home screen without the
             // thing the home screen is for.
@@ -4197,6 +4202,51 @@ public partial class App
         await Until(() => list.StruckForCheck(wrote), 6);
         Check("сделанное зачёркнуто", list.StruckForCheck(wrote),
               list.StruckForCheck(wrote) ? "" : "| линии на строке нет");
+
+        // --- the pictures of a plugin's figure (`4.0b-K06`) ---
+        //
+        // Every name the schema lists is drawn; `tools/test_plugins.py`
+        // holds the other half, that the two lists are the same list. A
+        // sheet of all of them is saved when `RINA_ICON_SHEET` names a file:
+        // line drawings written as numbers are only right once looked at.
+        var undrawn = Pages.StatIcons.Names
+            .Where(name => Pages.StatIcons.For(name, 44, window) is null)
+            .ToList();
+        Check("у каждого значка из схемы есть рисунок", undrawn.Count == 0,
+              $"| {string.Join(", ", undrawn)}");
+        if (Environment.GetEnvironmentVariable("RINA_ICON_SHEET") is { Length: > 0 } sheet)
+        {
+            var wall = new System.Windows.Controls.WrapPanel { Width = 760, Margin = new Thickness(24) };
+            foreach (var name in Pages.StatIcons.Names)
+            {
+                var cell = new System.Windows.Controls.StackPanel { Width = 120, Margin = new Thickness(8) };
+                cell.Children.Add(Pages.StatIcons.For(name, 64, window)!);
+                cell.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = name,
+                    Foreground = (Brush)window.FindResource("C.InkSoft"),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 6, 0, 0),
+                });
+                wall.Children.Add(cell);
+            }
+            var board = new System.Windows.Controls.Border
+            {
+                Background = (Brush)window.FindResource("C.Glass.Raised"),
+                Child = wall,
+            };
+            board.Measure(new Size(808, double.PositiveInfinity));
+            board.Arrange(new Rect(board.DesiredSize));
+            board.UpdateLayout();
+            var bitmap = new System.Windows.Media.Imaging.RenderTargetBitmap(
+                (int)board.ActualWidth, (int)board.ActualHeight, 96, 96,
+                PixelFormats.Pbgra32);
+            bitmap.Render(board);
+            var png = new System.Windows.Media.Imaging.PngBitmapEncoder();
+            png.Frames.Add(System.Windows.Media.Imaging.BitmapFrame.Create(bitmap));
+            using var file = File.Create(sheet);
+            png.Save(file);
+        }
 
         // A screenshot with the list open, if asked for. The ordinary shot
         // of this screen shows the button and nothing the button opens, and

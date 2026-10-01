@@ -63,7 +63,14 @@ CONTAINERS = ("card", "group", "row")
 
 #: Every kind in the dictionary — to check against the renderer (`4.0-H02`).
 KINDS = ("title", "text", "note", "items", "button", "input", "table",
-         "progress", "badge", "divider") + CONTAINERS
+         "progress", "badge", "divider", "stat") + CONTAINERS
+
+#: What a `Stat` may be pictured with (`4.0b-K06`). Names of meaning, not
+#: of pictures: the shell draws them in its own ink, so a plugin's figure
+#: looks like the rest of the window and no plugin ships images. An
+#: unknown name draws no picture rather than a broken one.
+ICONS = ("clear", "clear_night", "partly", "partly_night", "cloudy", "fog",
+         "drizzle", "rain", "snow", "storm", "dollar", "euro")
 
 
 @dataclass
@@ -166,6 +173,20 @@ def Progress(value, text=""):
 def Badge(text, variant="normal"):
     """A small state label: normal | good | warn | danger."""
     return Element(kind="badge", text=str(text), variant=variant)
+
+
+def Stat(value, caption="", icon=""):
+    """
+    A figure read at a glance: «+18°», under it «Ясно», a picture beside it.
+
+    For the home screen first of all, where a tile is looked at rather than
+    read (asked for by a person, 2026-10-02: one line of text there was
+    "sad"). `icon` is a name from `ICONS`; how big the figure is and what
+    the picture looks like is the shell's to decide.
+    """
+    return Element(kind="stat", text=str(value),
+                   items=[str(caption)] if caption else None,
+                   variant=icon if icon in ICONS else "normal")
 
 
 # ---------------------------------------------------------------------------

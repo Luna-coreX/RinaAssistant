@@ -104,6 +104,13 @@ check("глубина ограничена", MAX_DEPTH > 0 and MAX_DEPTH <= 8,
 renderer = io.open("shell/Rina.Shell/Pages/PluginView.xaml.cs",
                    encoding="utf-8").read()
 unknown = [kind for kind in KINDS if f'case "{kind}"' not in renderer]
+from plugins.page_spec import ICONS
+
+icon_source = io.open(os.path.join(ROOT, "shell", "Rina.Shell", "Pages",
+                                   "StatIcons.cs"), encoding="utf-8").read()
+undrawn = [name for name in ICONS if f'["{name}"]' not in icon_source]
+check("каждый значок из схемы оболочка умеет рисовать",
+      not undrawn, f"| нет рисунка: {undrawn}")
 check("рендерер знает каждый вид словаря", not unknown, f"| {unknown}")
 check("и глубина у него та же",
       f"MaxDepth = {MAX_DEPTH}" in renderer,
@@ -811,9 +818,21 @@ print()
 print("=== «Курс» как продукт (4.0b-K07) ===")
 check("ответ блока встаёт во фразу",
       fragment == "доллар 82,12 рубля, евро 94,50 рубля", f"| {fragment!r}")
-home = [e.text for e in plugin.home()]
-check("на главном — одна строка, чисто доллары и евро",
-      home == ["$ 82,12 ₽   € 94,50 ₽"], f"| {home}")
+def figures(elements):
+    """The figures on a home tile, anywhere inside it."""
+    out, stack = [], list(elements)
+    while stack:
+        e = stack.pop(0)
+        if e.kind == "stat":
+            out.append((e.text, (e.items or [""])[0], e.variant))
+        stack.extend(e.children or [])
+    return out
+
+
+home = figures(plugin.home())
+check("на главном — два показателя: доллар и евро",
+      home == [("82,12 ₽", "доллар", "dollar"), ("94,50 ₽", "евро", "euro")],
+      f"| {home}")
 declared = plugin.tools()[0]
 check("инструмент — читающий блок «Курс валют»",
       declared.reads and declared.title == "Курс валют")
@@ -832,9 +851,10 @@ try:
           f"| {stale!r}")
     # A fetch "under way" so the glance below does not start a real one.
     plugin._asking = True
-    home = [e.text for e in plugin.home()]
-    check("и строка на главном называет дату старого курса",
-          home == ["$ 82,12 ₽   € 94,50 ₽ (на 30 сентября)"], f"| {home}")
+    home = figures(plugin.home())
+    check("и показатель называет дату старого курса",
+          home[:1] == [("82,12 ₽", "доллар · на 30 сентября", "dollar")],
+          f"| {home}")
 
     from plugins.api import ToolFailed
 

@@ -23,6 +23,25 @@ SKY = {
     95: "гроза", 96: "гроза с градом", 99: "гроза с градом",
 }
 
+#: The home screen's picture for a WMO code (`plugins/page_spec.py::ICONS`).
+PICTURES = {0: "clear", 1: "partly", 2: "partly", 3: "cloudy",
+            45: "fog", 48: "fog",
+            51: "drizzle", 53: "drizzle", 55: "drizzle", 56: "drizzle",
+            57: "drizzle",
+            61: "rain", 63: "rain", 65: "rain", 66: "rain", 67: "rain",
+            80: "rain", 81: "rain", 82: "rain",
+            71: "snow", 73: "snow", 75: "snow", 77: "snow", 85: "snow",
+            86: "snow", 95: "storm", 96: "storm", 99: "storm"}
+
+
+def icon(current):
+    """The picture for the weather now — the moon instead of the sun at night."""
+    name = PICTURES.get(current.get("weather_code"), "cloudy")
+    if current.get("is_day") == 0 and name in ("clear", "partly"):
+        name += "_night"
+    return name
+
+
 #: The codes that fall as snow rather than rain.
 SNOW = frozenset({71, 73, 75, 77, 85, 86})
 

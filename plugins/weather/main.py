@@ -21,7 +21,7 @@ import threading
 import time
 
 from plugins.api import Plugin, PluginTool, ToolFailed
-from plugins.page_spec import Card, Input, Note, Text
+from plugins.page_spec import Card, Input, Note, Stat, Text
 from plugins.weather import source, words
 
 #: How long the weather is worth showing without asking again.
@@ -79,26 +79,30 @@ class WeatherPlugin(Plugin):
     # --- the tile and the page -----------------------------------------------
     def home(self):
         """
-        One line on the home screen: «Хабаровск +6° морось».
+        A figure on the home screen: the sky's picture, «+18°», «Ясно».
 
-        Plain text, no card and no captions — asked for by a person: the
-        home screen is a glance, and the details, the city field and the
-        source live on the plugin's own tab. One thing stays even here:
-        data the plugin could not refresh says the time it is for, because
-        an old reading shown as a current one is the one thing a glance
-        must not be given.
+        Asked for by a person (2026-10-02), with a picture of how it should
+        look: a glance, not a report — no city field, no outlook, no source
+        caption; those live on the plugin's own tab. One thing stays even
+        here: data the plugin could not refresh says the time it is for,
+        because an old reading shown as a current one is the one thing a
+        glance must not be given.
         """
         place = self._place()
         if place is None:
             return [Note("Погода: город задаётся на вкладке «Погода».")]
         self._refresh_if_stale()
         if self._data is None:
-            return [Text(f"{place['name']} — "
-                         f"{(self._trouble or 'смотрю погоду…').lower()}")]
-        line = f"{place['name']} {self._now_short()}"
+            return [Note(self._trouble or "Смотрю погоду…")]
+        current = self._data.get("current") or {}
+        temperature = current.get("temperature_2m")
+        figure = (f"{round(temperature):+d}°".replace("+0", "0")
+                  if temperature is not None else "—")
+        caption = words.SKY.get(current.get("weather_code"), "")
+        caption = caption[:1].upper() + caption[1:]
         if not self._fresh() and self._trouble:
-            line += f" (на {words.as_of(self._data)})"
-        return [Text(line)]
+            caption += f" · на {words.as_of(self._data)}"
+        return [Card([Stat(figure, caption, words.icon(current))])]
 
     def _now_short(self):
         """«+6° морось» — the temperature and the sky, nothing else."""

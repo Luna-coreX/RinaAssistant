@@ -65,7 +65,8 @@ def forecast(place):
     """Now and the rest of today, hour by hour, in the place's own time."""
     return _get(FORECAST, {
         "latitude": place["latitude"], "longitude": place["longitude"],
-        "current": "temperature_2m,weather_code",
+        # `is_day` picks the sun or the moon for the home screen's picture.
+        "current": "temperature_2m,weather_code,is_day",
         "hourly": "precipitation_probability,weather_code",
         "timezone": place.get("timezone") or "auto",
         "forecast_days": 1,

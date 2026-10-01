@@ -203,6 +203,44 @@ public partial class PluginView : UserControl
                 }
                 return row;
 
+            // A figure read at a glance (`4.0b-K06`): the picture, the value
+            // large, what it is small underneath. The plugin names the
+            // picture; drawing it is ours (`StatIcons`).
+            case "stat":
+                var figure = new Grid { Margin = new Thickness(0, 2, 0, 2) };
+                figure.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                figure.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                var picture = StatIcons.For(
+                    element["variant"]?.GetValue<string>() ?? "", 44, this);
+                if (picture is not null)
+                {
+                    picture.Margin = new Thickness(0, 0, 14, 0);
+                    picture.VerticalAlignment = VerticalAlignment.Center;
+                    figure.Children.Add(picture);
+                }
+                var said = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                said.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    Style = (Style)FindResource("Text.Body"),
+                    FontSize = 30,
+                    FontWeight = FontWeights.SemiBold,
+                    LineHeight = 34,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                });
+                var caption = element["items"]?.AsArray()
+                    .Select(i => i?.GetValue<string>() ?? "").FirstOrDefault() ?? "";
+                if (caption.Length > 0)
+                    said.Children.Add(new TextBlock
+                    {
+                        Text = caption,
+                        Style = (Style)FindResource("Text.Meta"),
+                        Foreground = (System.Windows.Media.Brush)FindResource("C.InkSoft"),
+                    });
+                Grid.SetColumn(said, 1);
+                figure.Children.Add(said);
+                return figure;
+
             case "title":
                 return new TextBlock
                 {

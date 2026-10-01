@@ -49,7 +49,7 @@ import urllib.request
 from datetime import date
 
 from plugins.api import Plugin, PluginTool, ToolFailed
-from plugins.page_spec import Text
+from plugins.page_spec import Card, Note, Row, Stat
 
 #: Where the numbers come from.
 SOURCE = "https://www.cbr.ru/scripts/XML_daily.asp"
@@ -69,7 +69,8 @@ FRESH_FOR = 900.0
 #: currencies on it is a table, and there is a page for a table.
 SHOWN = ("USD", "EUR")
 
-SIGNS = {"USD": "$", "EUR": "€"}
+#: The home screen's picture for each (`plugins/page_spec.py::ICONS`).
+ICONS = {"USD": "dollar", "EUR": "euro"}
 
 #: How each is named aloud.
 NAMES = {"USD": "доллар", "EUR": "евро"}
@@ -111,24 +112,29 @@ class RatesPlugin(Plugin):
     # --- the tile -------------------------------------------------------
     def home(self):
         """
-        One line: «$ 83,56 ₽   € 94,88 ₽», and never a request.
+        Two figures on the home screen: «$ 83,56 ₽» and «€ 94,88 ₽».
 
-        Plain text, no card, no arrows, no caption — asked for by a person:
-        the home screen is a glance. Before the first answer it says it is
-        looking rather than being absent, and a rate it could not refresh
-        says the date it is for: an old rate shown as today's is the one
-        thing a glance must not be given.
+        Asked for by a person (2026-10-02): a glance, as the weather has —
+        the sign, the rate large, the currency's name small. Before the
+        first answer it says it is looking rather than being absent, and a
+        rate it could not refresh says the date it is for.
         """
         self._refresh_if_stale()
 
         if not self._rates:
-            return [Text("Курс: " + (self._trouble or "смотрю…").lower())]
+            return [Note(self._trouble or "Смотрю курс…")]
 
-        line = "   ".join(f"{SIGNS.get(code, code)} {money(self._rates[code])} ₽"
-                           for code in SHOWN if code in self._rates)
-        if self._trouble and not self._fresh() and self._dated is not None:
-            line += f" (на {spoken_date(self._dated)})"
-        return [Text(line)]
+        figures = []
+        for code in SHOWN:
+            if code not in self._rates:
+                continue
+            caption = NAMES[code]
+            if (not figures and self._trouble and not self._fresh()
+                    and self._dated is not None):
+                caption += f" · на {spoken_date(self._dated)}"
+            figures.append(Stat(f"{money(self._rates[code])} ₽", caption,
+                                ICONS[code]))
+        return [Card([Row(figures)])]
 
     # --- aloud, and as a block -------------------------------------------
     def tools(self):

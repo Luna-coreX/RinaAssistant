@@ -50,6 +50,7 @@ API v2 из 3.0.0.
 | `progress` | `value` (0..1), `text` | полоса выполнения |
 | `badge` | `text`, `variant` (`normal`/`good`/`warn`/`danger`) | метка состояния |
 | `divider` | — | разделитель |
+| `stat` | `text` (значение), `items[0]` (подпись), `variant` (значок: `clear`, `clear_night`, `partly`, `partly_night`, `cloudy`, `fog`, `drizzle`, `rain`, `snow`, `storm`, `dollar`, `euro`) | показатель для взгляда: значок, крупное значение, подпись — прежде всего для плитки главного экрана; значок рисует оболочка |
 
 ### Контейнеры (новое в версии 2)
 

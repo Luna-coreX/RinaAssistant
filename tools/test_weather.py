@@ -55,6 +55,18 @@ def day(now, chances, codes=None, temperature=7.0, code=3):
                        "weather_code": codes or [3] * 24}}
 
 
+
+def figures(elements):
+    """The figures on a home tile, anywhere inside it: (value, caption, picture)."""
+    out = []
+    stack = list(elements)
+    while stack:
+        e = stack.pop(0)
+        if e.kind == "stat":
+            out.append((e.text, (e.items or [""])[0], e.variant))
+        stack.extend(e.children or [])
+    return out
+
 # ---------------------------------------------------------------------------
 print("=== числа по-русски ===")
 for value, said in ((1, "1 градус"), (2, "2 градуса"), (5, "5 градусов"),
@@ -92,6 +104,10 @@ snow = day("08:00", [5] * 10 + [80] * 14, codes=[3] * 10 + [73] * 14,
            temperature=-2)
 check("снег называется снегом",
       words.outlook(snow) == "к 10:00 обещают снег", f"| {words.outlook(snow)}")
+check("ночью ясное небо — луна, а не солнце",
+      words.icon({"weather_code": 0, "is_day": 0}) == "clear_night"
+      and words.icon({"weather_code": 0, "is_day": 1}) == "clear"
+      and words.icon({"weather_code": 63}) == "rain")
 check("и мороз — с «минус»",
       words.now_said(snow).startswith("минус 2 градуса"), f"| {words.now_said(snow)}")
 
@@ -257,9 +273,8 @@ check("свежие данные не запрашиваются снова",
       len(asked) == before, f"| {asked[before:]}")
 
 home = plugin.home()
-check("на главном — одна строка: город, температура, небо",
-      [(e.kind, e.text) for e in home] == [("text", "Казань +7° пасмурно")],
-      f"| {[(e.kind, e.text) for e in home]}")
+check("на главном — виджет: облако, «+7°», «Пасмурно»",
+      figures(home) == [("+7°", "Пасмурно", "cloudy")], f"| {figures(home)}")
 check("источник назван на вкладке (CC BY 4.0)",
       any("Open-Meteo" in str(e.text) for card in plugin.page()
           for e in card.children))
@@ -272,9 +287,9 @@ check("без сети — последнее известное, с време�
       said.startswith("7 градусов") and "по данным на 6:30" in said, f"| {said}")
 # A fetch "under way", so the glance does not start one of its own.
 plugin._asking = True
-line = [e.text for e in plugin.home()]
-check("и строка на главном называет время старых данных",
-      line == ["Казань +7° пасмурно (на 6:30)"], f"| {line}")
+line = figures(plugin.home())
+check("и виджет называет время старых данных",
+      line == [("+7°", "Пасмурно · на 6:30", "cloudy")], f"| {line}")
 plugin._asking = False
 
 empty = weather_main.WeatherPlugin(Ctx())
