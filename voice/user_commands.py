@@ -544,7 +544,8 @@ def _find_out(command, state):
     What is kept is the block's own value when it has a plain one — the
     word «четверг» rather than the sentence «Сегодня четверг.» — and its
     answer otherwise. A plugin's tool answers with text, and that text is
-    the value.
+    the value — or with `{"say", "value"}`, and then the value is the part
+    meant to stand inside a person's sentence, not the lively one said aloud.
     """
     name = str(command.get("name", ""))[:MAX_NAME].strip()
     tool = str(command.get("tool", ""))

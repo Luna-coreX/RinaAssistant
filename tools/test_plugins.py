@@ -425,6 +425,39 @@ finally:
     shutil.rmtree(refusing, ignore_errors=True)
     hosted.discover()
 
+# Two forms of one answer cross the process boundary apart (`4.0b-K06`):
+# the lively sentence is what is said, and the "find out" step keeps the
+# fragment — «На улице {погода}» would not hold «Сейчас +6, морось. Зонт
+# пригодится.»
+twofold = os.path.join(plugins_dir(), "проверка_двух_форм")
+try:
+    os.makedirs(twofold, exist_ok=True)
+    io.open(os.path.join(twofold, "plugin.json"), "w",
+            encoding="utf-8").write(json.dumps(
+                {"id": "две_формы", "name": "Две формы", "api_version": 4},
+                ensure_ascii=False))
+    io.open(os.path.join(twofold, "main.py"), "w", encoding="utf-8").write(
+        "from plugins.api import Plugin, PluginTool\n\n\n"
+        "class Twofold(Plugin):\n"
+        "    def tools(self):\n"
+        "        return [PluginTool(name='ask', summary='Спросить.', reads=True,\n"
+        "            run=lambda args: {'say': 'Сейчас шесть, морось. Зонт пригодится.',\n"
+        "                              'value': '6 градусов, морось'})]\n")
+    hosted.discover()
+    check("плагин с двумя формами ответа поднят", hosted.enable("проверка_двух_форм"))
+    made = dict((t.name, r) for t, r in hosted.declared_tools("проверка_двух_форм"))
+    run = made.get("plugin.проверка_двух_форм.ask")
+    both = run(None, {}) if run else None
+    check("вслух — живая фраза, в «Узнать» — фрагмент",
+          both is not None and both.ok
+          and both.message == "Сейчас шесть, морось. Зонт пригодится."
+          and both.value == "6 градусов, морось",
+          f"| {both and (both.message, both.value)}")
+finally:
+    hosted.disable("проверка_двух_форм", persist=False)
+    shutil.rmtree(twofold, ignore_errors=True)
+    hosted.discover()
+
 # An example with a module of its own loads outside the program's
 # `plugins/` too. It failed exactly there once the examples moved
 # (`4.0b-K05`): «No module named 'plugins.convert'».
@@ -817,7 +850,18 @@ check("молчащий о сети плагин всё равно помече�
 print()
 print("=== «Курс» как продукт (4.0b-K07) ===")
 check("ответ блока встаёт во фразу",
-      fragment == "доллар 82,12 рубля, евро 94,50 рубля", f"| {fragment!r}")
+      fragment["value"] == "доллар 82,12 рубля, евро 94,50 рубля", f"| {fragment!r}")
+check("а вслух — целая фраза",
+      fragment["say"] == "По Центробанку доллар 82,12 рубля, евро 94,50 рубля.",
+      f"| {fragment!r}")
+os.environ["RINA_PLAIN_SPEECH"] = "0"
+try:
+    heard = [plugin._said()["say"] for _ in range(20)]
+finally:
+    os.environ["RINA_PLAIN_SPEECH"] = "1"
+check("вслух — разными словами, не одно и то же дважды подряд, с обоими курсами",
+      len(set(heard)) >= 3 and all(a != b for a, b in zip(heard, heard[1:]))
+      and all("82,12" in h and "94,50" in h for h in heard), f"| {sorted(set(heard))}")
 def figures(elements):
     """The figures on a home tile, anywhere inside it."""
     out, stack = [], list(elements)
@@ -847,7 +891,8 @@ try:
     plugin._asked_at -= rates.FRESH_FOR + 60
     stale = plugin._said()
     check("без сети — последний курс, с датой, на которую он",
-          stale == "доллар 82,12 рубля, евро 94,50 рубля (курс на 30 сентября)",
+          stale["value"] == "доллар 82,12 рубля, евро 94,50 рубля (курс на 30 сентября)"
+          and "курс на 30 сентября" in stale["say"],
           f"| {stale!r}")
     # A fetch "under way" so the glance below does not start a real one.
     plugin._asking = True

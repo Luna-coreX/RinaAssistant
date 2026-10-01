@@ -166,18 +166,18 @@ class WeatherPlugin(Plugin):
     def on_command(self, text):
         if not words.asks(text):
             return False
-        place = self._place()
         try:
             said = self._said()
         except ToolFailed as refusal:
             self.respond(str(refusal))
             return True
-        self.respond(f"{place['name']}: {said}.")
+        self.respond(said["say"])
         return True
 
     def _said(self):
         """
-        The weather, fetched now if what is kept is old.
+        The weather, fetched now if what is kept is old, in both forms: the
+        sentence said aloud and the value the "find out" step keeps.
 
         Without a network the answer is still the last one known, with the
         time it is for: «…, по данным на 6:30». Without anything known, a
@@ -191,10 +191,14 @@ class WeatherPlugin(Plugin):
             self._fetch()
         if self._data is None:
             raise ToolFailed(self._trouble or "Погоду узнать не вышло.")
-        said = words.now_said(self._data)
+        say, value = words.aloud(self._data), words.now_said(self._data)
         if not self._fresh():
-            said += f" (по данным на {words.as_of(self._data)})"
-        return said
+            at = words.as_of(self._data)
+            value += f" (по данным на {at})"
+            say += " " + words.pick(
+                f"Правда, это данные на {at} — свежее узнать не вышло.",
+                f"Только это по данным на {at}: свежих пока нет.")
+        return {"say": say, "value": value}
 
     # --- the fetching ---------------------------------------------------------
     def _fresh(self):

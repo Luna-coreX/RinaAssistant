@@ -48,7 +48,7 @@ import time
 import urllib.request
 from datetime import date
 
-from plugins.api import Plugin, PluginTool, ToolFailed
+from plugins.api import Plugin, PluginTool, ToolFailed, vary
 from plugins.page_spec import Card, Note, Row, Stat
 
 #: Where the numbers come from.
@@ -158,14 +158,15 @@ class RatesPlugin(Plugin):
         if not any(word in low for word in CURRENCY_WORDS):
             return False
         try:
-            self.respond(f"По Центробанку {self._said()}.")
+            self.respond(self._said()["say"])
         except ToolFailed as refusal:
             self.respond(str(refusal))
         return True
 
     def _said(self):
         """
-        The rate, fetched now if what is kept is old.
+        The rate, fetched now if what is kept is old, in both forms: the
+        sentence said aloud and the value the "find out" step keeps.
 
         Out loud the rate is asked **now** and waited for — the opposite of
         the tile's rule, because a person who asked is standing there. When
@@ -176,11 +177,24 @@ class RatesPlugin(Plugin):
             self._fetch()
         if not self._rates:
             raise ToolFailed(self._trouble or "Курс узнать не вышло.")
-        said = ", ".join(f"{NAMES[code]} {money(self._rates[code])} рубля"
-                         for code in SHOWN if code in self._rates)
+        usd, eur = (self._rates.get(code) for code in SHOWN)
+        if usd is None or eur is None:
+            value = ", ".join(f"{NAMES[code]} {money(self._rates[code])} рубля"
+                              for code in SHOWN if code in self._rates)
+            say = f"По Центробанку {value}."
+        else:
+            usd, eur = money(usd), money(eur)
+            value = vary(f"доллар {usd} рубля, евро {eur} рубля",
+                         f"доллар по {usd}, евро по {eur}")
+            say = vary(f"По Центробанку доллар {usd} рубля, евро {eur} рубля.",
+                       f"Доллар сегодня {usd}, евро — {eur} рубля.",
+                       f"Центробанк даёт {usd} за доллар и {eur} за евро.")
         if not self._fresh() and self._dated is not None:
-            said += f" (курс на {spoken_date(self._dated)})"
-        return said
+            day = spoken_date(self._dated)
+            value += f" (курс на {day})"
+            say += " " + vary(f"Это курс на {day} — свежий узнать не вышло.",
+                              f"Правда, курс на {day}: обновить не получилось.")
+        return {"say": say, "value": value}
 
     # --- the fetching -----------------------------------------------------
     def _fresh(self):

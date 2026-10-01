@@ -6,8 +6,12 @@ The source is substituted: what Open-Meteo answers is written here in the
 shape it was seen to answer on 2026-10-01, and the plugin is driven the way
 the core drives it. Checked:
 
-- the answer is a fragment that stands inside a sentence a person wrote,
-  with Russian numbers agreeing — «1 градус», «2 градуса», «5 градусов»;
+- the answer comes in two forms: a sentence said aloud, with a word of
+  advice when the day calls for one, and a fragment that stands inside a
+  sentence a person wrote — with Russian numbers agreeing, «1 градус»,
+  «2 градуса», «5 градусов»;
+- both come in several variants, never the same one twice in a row, and
+  the checks hear the first, plain one (`RINA_PLAIN_SPEECH`);
 - "until the evening" is counted on the city's own clock, and the
   thresholds keep «обещают» for what the forecast actually promises;
 - without a network the last answer is given **with the time it is for**,
@@ -110,6 +114,59 @@ check("ночью ясное небо — луна, а не солнце",
       and words.icon({"weather_code": 63}) == "rain")
 check("и мороз — с «минус»",
       words.now_said(snow).startswith("минус 2 градуса"), f"| {words.now_said(snow)}")
+
+# ---------------------------------------------------------------------------
+print()
+print("=== вслух — живее, и с советом ===")
+check("вслух — целая фраза",
+      words.aloud(dry) == "Сейчас 7 градусов, пасмурно. Дождя до вечера не обещают.",
+      f"| {words.aloud(dry)}")
+going = day("09:10", [90] * 24, code=63)
+check("дождь уже идёт — не «скоро обещают», а «до вечера не утихнет»",
+      words.outlook(going) == "до вечера не утихнет", f"| {words.outlook(going)}")
+easing = day("09:10", [90] * 14 + [10] * 10, code=63)
+check("а если стихнет — когда",
+      words.outlook(easing) == "к 14:00 должно стихнуть", f"| {words.outlook(easing)}")
+stopping = day("09:10", [90] * 10 + [5] * 14, code=61)
+check("идёт, но дальше сухо — «дальше до вечера дождя не обещают»",
+      words.outlook(stopping) == "дальше до вечера дождя не обещают",
+      f"| {words.outlook(stopping)}")
+for label, data, tip in (
+        ("дождь — про зонт", wet, "Зонт пригодится."),
+        ("«возможен» — зонт на всякий случай", maybe,
+         "Зонт на всякий случай не помешает."),
+        ("снег — про дороги", snow, "На дорогах может быть скользко."),
+        ("мороз — одеться теплее", day("08:00", [5] * 24, temperature=-14),
+         "Одевайся теплее."),
+        ("жара — вода", day("13:00", [5] * 24, temperature=31, code=0),
+         "Не забудь воду."),
+        ("обычный сухой день — без советов", dry, "")):
+    check(label, words.advice(data) == tip, f"| {words.advice(data)!r}")
+check("совет — в конце фразы вслух",
+      words.aloud(wet).endswith(" Зонт пригодится."), f"| {words.aloud(wet)}")
+bands = {t: words.feel(t) for t in (-25, -10, -3, 0, 5, 10, 18, 25, 32)}
+check("у каждой температуры своё «ощущение»",
+      len(set(bands.values())) >= 7 and all(bands.values()), f"| {bands}")
+
+os.environ["RINA_PLAIN_SPEECH"] = "0"
+try:
+    heard_aloud = [words.aloud(wet) for _ in range(40)]
+    heard_value = [words.now_said(wet) for _ in range(40)]
+finally:
+    os.environ["RINA_PLAIN_SPEECH"] = "1"
+check("вслух — разными словами, но не одно и то же дважды подряд",
+      len(set(heard_aloud)) >= 4
+      and all(a != b for a, b in zip(heard_aloud, heard_aloud[1:])),
+      f"| {len(set(heard_aloud))} вариантов")
+check("и в каждом варианте — градусы, небо и прогноз",
+      all("7 градусов" in a and "пасмурно" in a.lower() and "15" in a
+          for a in heard_aloud),
+      f"| {[a for a in heard_aloud if '7 градусов' not in a][:1]}")
+check("значение для «Узнать» — тоже в нескольких формах и с теми же фактами",
+      len(set(heard_value)) >= 3
+      and all("7 градусов" in v and "пасмурно" in v and "15" in v
+              for v in heard_value),
+      f"| {sorted(set(heard_value))[:3]}")
 
 # ---------------------------------------------------------------------------
 print()
@@ -264,8 +321,12 @@ deadline = time.time() + 5
 while plugin._data is None and time.time() < deadline:
     time.sleep(0.05)
 said = tool.run({})
-check("ответ блока — фрагмент для фразы",
-      said == "7 градусов, пасмурно, дождя до вечера не обещают", f"| {said}")
+check("ответ блока — фрагмент для «Узнать»",
+      said["value"] == "7 градусов, пасмурно, дождя до вечера не обещают",
+      f"| {said}")
+check("и фраза вслух",
+      said["say"] == "Сейчас 7 градусов, пасмурно. Дождя до вечера не обещают.",
+      f"| {said}")
 
 before = len(asked)
 tool.run({})
@@ -284,7 +345,9 @@ online["up"] = False
 plugin._asked_at -= weather_main.FRESH_FOR + 60
 said = tool.run({})
 check("без сети — последнее известное, с временем, на которое оно",
-      said.startswith("7 градусов") and "по данным на 6:30" in said, f"| {said}")
+      said["value"].startswith("7 градусов")
+      and "по данным на 6:30" in said["value"]
+      and "данные на 6:30" in said["say"], f"| {said}")
 # A fetch "under way", so the glance does not start one of its own.
 plugin._asking = True
 line = figures(plugin.home())
@@ -306,7 +369,8 @@ heard = Ctx()
 aloud = weather_main.WeatherPlugin(heard)
 aloud.ctx.set_setting("place", ctx.get_setting("place"))
 check("вопрос вслух взят", aloud.on_command("какая погода"))
-check("и ответ назвал город", heard.said[:1] and heard.said[0].startswith("Казань: 7 градусов"),
+check("и ответ — фраза вслух",
+      heard.said == ["Сейчас 7 градусов, пасмурно. Дождя до вечера не обещают."],
       f"| {heard.said}")
 check("чужая фраза не взята", not aloud.on_command("поищи погоду в москве"))
 

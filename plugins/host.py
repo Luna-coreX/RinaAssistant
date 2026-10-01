@@ -346,6 +346,12 @@ class Host:
                 # traceback: the core then says the plugin's sentence
                 # instead of "the plugin did not answer".
                 return {"ok": False, "error": str(refusal)}
+            # Two forms of one answer (`4.0b-K06`): what is said aloud, and
+            # the value the "find out" step keeps. A plain string is both.
+            if isinstance(answer, dict):
+                said = str(answer.get("say") or answer.get("value") or "")
+                return {"ok": True, "say": said,
+                        "value": str(answer.get("value") or said)}
             return {"ok": True, "value": answer if answer is None
                     else str(answer)}
         return {"ok": False, "error": f"нет инструмента: {name}"}

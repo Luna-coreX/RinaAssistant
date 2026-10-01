@@ -2,12 +2,16 @@
 The weather in words (`4.0b-K06`).
 
 Pure functions over what the source returned, so they can be checked
-without a network. The answer is written to stand **inside** a sentence a
-person wrote: «На улице {погода}» → «На улице 12 градусов, пасмурно, дождя
-до вечера не обещают». That is the plugin's main use in a command, and an
-answer that began «Погода в Казани:» would not fit anywhere but alone.
+without a network. Two forms of one answer: `aloud` is what Rina says —
+«На улице прохладно: 6 градусов, морось. Часам к 15 обещают дождь. Зонт
+пригодится.» — and `now_said` is the value the "find out" step keeps, which
+stands **inside** a sentence a person wrote: «На улице {погода}». Both come
+in several variants, so the same weather is not said word for word every
+morning.
 """
 import re
+
+from plugins.api import vary as pick
 
 #: What the sky is doing, by the WMO code Open-Meteo reports.
 SKY = {
@@ -98,16 +102,21 @@ def _hour(stamp):
         return -1
 
 
-def outlook(data):
+def _state(data):
     """
-    Will it rain (or snow) before the evening, said the way a person says it.
+    What the rest of the day holds: (kind, hour, noun, missing, until).
 
-    Counted on the place's own clock — the forecast comes in the city's
-    local time — so a person in another time zone hears about that city's
-    evening, not their own. Late in the day "the evening" is over and the
-    horizon becomes the night.
+    `kind` is "dry", "likely" or "possible"; "stopping" — it is raining (or
+    snowing) now and nothing more is expected; "going on" — it is falling
+    now and the forecast says it will go on, where «скоро обещают дождь»
+    would promise what is already outside the window; `hour` is then when
+    it should stop, or None for not before the evening. Counted on the place's
+    own clock — the forecast comes in the city's local time — so a person
+    in another time zone hears about that city's evening, not their own.
+    Late in the day "the evening" is over and the horizon becomes the night.
     """
-    now = (data.get("current") or {}).get("time", "")
+    current = data.get("current") or {}
+    now = current.get("time", "")
     today, hour = str(now)[:10], _hour(now)
     hourly = data.get("hourly") or {}
     times = hourly.get("time") or []
@@ -120,37 +129,147 @@ def outlook(data):
               for i, t in enumerate(times)
               if str(t)[:10] == today and hour <= _hour(t) <= end]
 
-    snowy = any(code in SNOW for _h, _p, code in window) \
-        or (data.get("current") or {}).get("weather_code") in SNOW
+    snowy = (any(code in SNOW for _h, _p, code in window)
+             or current.get("weather_code") in SNOW)
     noun, missing = ("снег", "снега") if snowy else ("дождь", "дождя")
 
     known = [(h, p) for h, p, _c in window if p is not None]
+    falling = (current.get("weather_code") or 0) >= 51
+    later = [p for h, p in known if h > hour]
+    if falling and later and max(later) < POSSIBLE:
+        return "stopping", hour, noun, missing, until
     if not known or max(p for _h, p in known) < POSSIBLE:
-        return f"{missing} {until} не обещают"
+        return "dry", hour, noun, missing, until
     likely = next((h for h, p in known if p >= LIKELY), None)
+    if likely is not None and likely <= hour and falling:
+        stop = next((h for h, p in known if h > hour and p < POSSIBLE), None)
+        return "going on", stop, noun, missing, until
     if likely is not None:
-        return (f"скоро обещают {noun}" if likely <= hour
-                else f"к {likely}:00 обещают {noun}")
+        return "likely", (None if likely <= hour else likely), noun, missing, until
     possible = next(h for h, p in known if p >= POSSIBLE)
-    return (f"возможен {noun}" if possible <= hour
-            else f"к {possible}:00 возможен {noun}")
+    return "possible", (None if possible <= hour else possible), noun, missing, until
+
+
+def outlook(data):
+    """Will it rain (or snow) before the evening, said the way a person says it."""
+    kind, at, noun, missing, until = _state(data)
+    # What is falling now is already named by the sky («дождь, 6 градусов»),
+    # so these do not name it again: «стихнет», not «дождь закончится».
+    if kind == "stopping":
+        return pick(f"дальше {until} {missing} не обещают",
+                    "скоро должно стихнуть")
+    if kind == "going on":
+        if at is None:
+            return pick(f"{until} не утихнет", f"и так {until}")
+        return pick(f"к {at}:00 должно стихнуть",
+                    f"стихнуть должно часам к {at}")
+    if kind == "dry":
+        return pick(f"{missing} {until} не обещают",
+                    f"{until} обойдётся без {missing}",
+                    f"{until} {missing} не ждут")
+    if kind == "likely":
+        if at is None:
+            return pick(f"скоро обещают {noun}", f"вот-вот пойдёт {noun}")
+        return pick(f"к {at}:00 обещают {noun}",
+                    f"часам к {at} обещают {noun}",
+                    f"ближе к {at}:00 пойдёт {noun}")
+    if at is None:
+        return pick(f"возможен {noun}", f"может пойти {noun}")
+    return pick(f"к {at}:00 возможен {noun}",
+                f"к {at}:00 может пойти {noun}",
+                f"после {at}:00 не исключён {noun}")
+
+
+def feel(value):
+    """How the temperature feels, in a word or two."""
+    n = int(round(float(value)))
+    if n <= -20:
+        return pick("сильный мороз", "лютый мороз")
+    if n <= -5:
+        return pick("мороз", "морозно")
+    if n <= -2:
+        return pick("небольшой мороз", "морозец")
+    if n <= 7:
+        return pick("холодно", "зябко")
+    if n <= 14:
+        return pick("прохладно", "свежо")
+    if n <= 21:
+        return pick("тепло", "приятно")
+    if n <= 27:
+        return pick("тепло", "по-летнему тепло")
+    return pick("жарко", "настоящая жара")
+
+
+def advice(data):
+    """A word of advice when the day calls for one — or nothing."""
+    current = data.get("current") or {}
+    kind, _at, noun, _missing, _until = _state(data)
+    wet = kind in ("likely", "going on", "stopping") or (
+        (current.get("weather_code") or 0) >= 51 and kind != "dry")
+    if wet and noun == "дождь":
+        return pick("Зонт пригодится.", "Лучше взять зонт.",
+                    "Без зонта лучше не выходить.")
+    if wet:
+        return pick("На дорогах может быть скользко.", "Одевайся теплее.")
+    if kind == "possible" and noun == "дождь":
+        return pick("Зонт на всякий случай не помешает.",
+                    "Можно захватить зонт — на всякий случай.")
+    temperature = current.get("temperature_2m")
+    if temperature is None:
+        return ""
+    if temperature <= -10:
+        return pick("Одевайся теплее.", "Оденься потеплее.")
+    if temperature >= 28:
+        return pick("Не забудь воду.", "Лучше держаться в тени.")
+    return ""
+
+
+def _capital(text):
+    return text[:1].upper() + text[1:]
 
 
 def now_said(data):
     """
-    The answer that goes into a sentence: temperature, sky, the outlook.
-
-    «12 градусов, пасмурно, дождя до вечера не обещают».
+    The value the "find out" step keeps: it stands inside a sentence a
+    person wrote — «На улице {погода}» → «На улице 12 градусов, пасмурно,
+    дождя до вечера не обещают».
     """
     current = data.get("current") or {}
-    parts = []
-    if current.get("temperature_2m") is not None:
-        parts.append(degrees(current["temperature_2m"]))
-    sky = SKY.get(current.get("weather_code"))
-    if sky:
-        parts.append(sky)
-    parts.append(outlook(data))
-    return ", ".join(parts)
+    sky = SKY.get(current.get("weather_code"), "")
+    temperature = current.get("temperature_2m")
+    if temperature is None:
+        return ", ".join(part for part in (sky, outlook(data)) if part)
+    deg = degrees(temperature)
+    form = pick("plain", "and", "feel")
+    if form == "and" and sky:
+        return f"{deg} и {sky}, {outlook(data)}"
+    if form == "feel" and sky:
+        return f"{feel(temperature)}, {deg}, {sky}; {outlook(data)}"
+    return ", ".join(part for part in (deg, sky, outlook(data)) if part)
+
+
+def aloud(data):
+    """
+    The weather said aloud, the way a person says it — in one of several
+    ways, with a word of advice when the day calls for one.
+
+    «На улице прохладно: 6 градусов, морось. Часам к 15 обещают дождь.
+    Зонт пригодится.»
+    """
+    current = data.get("current") or {}
+    sky = SKY.get(current.get("weather_code"), "")
+    temperature = current.get("temperature_2m")
+    ahead = _capital(outlook(data)) + "."
+    tip = advice(data)
+    if temperature is None or not sky:
+        head = _capital(now_said(data)) + "."
+        return " ".join(part for part in (head, tip) if part)
+    deg = degrees(temperature)
+    head = pick(f"Сейчас {deg}, {sky}.",
+                f"На улице {feel(temperature)}: {deg}, {sky}.",
+                f"{_capital(sky)}, {deg} — {feel(temperature)}.",
+                f"За окном {sky}, {deg}.")
+    return " ".join(part for part in (head, ahead, tip) if part)
 
 
 def as_of(data):

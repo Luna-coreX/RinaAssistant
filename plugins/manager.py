@@ -585,6 +585,11 @@ class PluginManager:
                     tr("Плагин не справился."), "internal")
             if isinstance(answer, ToolResult):
                 return answer
+            # Two forms of one answer, as through the process boundary
+            # (`plugins/host.py`): the sentence aloud and the kept value.
+            if isinstance(answer, dict):
+                value = str(answer.get("value") or answer.get("say") or "")
+                return ToolResult.done(str(answer.get("say") or value), value)
             return ToolResult.done(str(answer) if answer is not None else "")
 
         return run

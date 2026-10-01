@@ -643,7 +643,10 @@ class HostedPlugins:
                 return ToolResult.failed(
                     str(answer.get("error") or "Плагин не справился."),
                     "internal")
-            return ToolResult.done(str(answer.get("value") or ""))
+            value = str(answer.get("value") or "")
+            # The sentence said aloud, when the plugin gave one apart from
+            # the value (`4.0b-K06`); otherwise the value is both.
+            return ToolResult.done(str(answer.get("say") or value), value)
 
         return run
 

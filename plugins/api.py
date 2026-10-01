@@ -37,6 +37,9 @@ Through self.ctx the application's services are available:
   - get_setting/set_setting        — its own settings (kept in the config)
   - notify(title, message)         — a notification (the tray)
 
+And from this module itself: `ToolFailed` — a tool's refusal in words, and
+`vary(*variants)` — one of several ways to say a thing.
+
 What is **gone**: `create_page()` and `open_window()`. A ready-made widget
 tied the core to a particular shell — that was a direct blocker of the
 process split. A version 1-3 plugin does not load, and the person is told
@@ -46,6 +49,9 @@ Compatibility: the manifest states "api_version". The current one is
 API_VERSION.
 """
 
+import os
+import random
+import threading
 from dataclasses import dataclass, field
 
 
@@ -136,6 +142,12 @@ class PluginTool:
 
     `run(args)` is called by the core, not by the plugin: a plugin does not
     decide when its tool works — it declared what it can do and waits.
+
+    It answers with a string, or with two forms of one answer:
+    `{"say": "Сейчас +6 и морось — зонт пригодится.", "value": "6 градусов,
+    морось"}`. `say` is what is said aloud; `value` is what the "find out"
+    step keeps for a person's own sentence («На улице {погода}»), which a
+    lively sentence of its own would not fit into.
     """
 
     name: str
@@ -169,6 +181,31 @@ class ToolFailed(Exception):
     Before this a plugin had no way to say "I can't, because…" — only to
     succeed or to break.
     """
+
+
+#: The variant said last for each set of variants (`vary`).
+_said_last = {}
+_said_lock = threading.Lock()
+
+
+def vary(*variants):
+    """
+    One of several ways to say a thing — never the one said last time.
+
+    `vary("Курс сегодня такой:", "По Центробанку:")`. The same sentence
+    word for word every morning sounds like a table being read out (asked
+    for by a person, 2026-10-02); the core's own phrases work the same way
+    (`core/sayings.py`). Put the plainest variant first: with
+    `RINA_PLAIN_SPEECH=1` — what Rina's checks set, so that an expected
+    answer stays one answer — the first one is always chosen.
+    """
+    if len(variants) == 1 or os.environ.get("RINA_PLAIN_SPEECH") == "1":
+        return variants[0]
+    with _said_lock:
+        last = _said_last.get(variants)
+        chosen = random.choice([v for v in variants if v != last])
+        _said_last[variants] = chosen
+    return chosen
 
 
 class PluginContext:
