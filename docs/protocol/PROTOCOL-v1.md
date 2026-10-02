@@ -142,6 +142,7 @@
 | `reminders` | ядро | `reminders.list`, `reminders.cancel` |
 | `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
 | `system.context` | оболочка | `system.context` |
+| `windows` | оболочка | `windows.do` |
 | `privacy` | ядро | `privacy.inventory`, `privacy.forget`, `privacy.export` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.try`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
@@ -226,6 +227,9 @@
 | `plugin.not_found` | protocol | нет | плагина с таким номером нет: список устарел или его удалили |
 | `app.not_found` | user | нет | программа не найдена в индексе |
 | `app.launch_failed` | system | да | запуск сорвался |
+| `window.not_found` | user | нет | у названной программы нет открытых окон, или впереди нет окна |
+| `window.ambiguous` | user | нет | открыто несколько подходящих программ; нужно назвать точнее |
+| `window.refused` | system | нет | окно не приняло команду: программа запущена от администратора |
 | `stt.unavailable` | system | нет | распознавания нет |
 | `stt.failed` | system | да | распознать не удалось |
 | `tts.unavailable` | system | нет | синтеза нет |
@@ -354,6 +358,7 @@
 | `apps.index` | индекс программ живёт в оболочке, решение о запуске — в ядре (`4.0-G06`) |
 | `apps.launch` | запуск процесса — работа системного слоя оболочки |
 | `system.do` | громкость, медиа, питание, снимок экрана (`4.0-G01`..`G03`), яркость экрана (`4.0b-K04`: `brightness_set` с необязательным полем `level` 0–100, `brightness_up`, `brightness_down`; экран, который не принимает команду, — ответ `unsupported`) |
+| `windows.do` | окна других программ (`4.0b-K08`). Запрос: `action` (`close`, `minimize`, `expand`, `maximize`, `restore`), `which` (`active` — окно впереди, а если впереди сама Рина — окно под ней; `all` — все окна, кроме Рины; `app` — названная программа: `apps` — кандидаты из индекса `{name, launch, kind}`, `names` — имя в написаниях индекса). Ответ — факт, слова говорит ядро: `ok`, `reason` (`no_window`, `not_running`, `ambiguous`, `refused`, `unknown`, `internal`), `program`, `programs` (при `ambiguous`), `done`, `left` — окна, что через две секунды всё ещё на экране (программа о чём-то спрашивает), `still_running` — окна ушли, а процесс остался (свернулся в трей), `refused` — окна программ с правами администратора, не принявшие команду. Окно закрывается своей системной командой `SC_CLOSE`, как крестиком; процесс не завершается никогда. Заголовки окон не читаются и не передаются (`T-19`) |
 | `permission.request` | см. §11 |
 | `stream.open` / `stream.close` | поток речи из ядра (§8) |
 

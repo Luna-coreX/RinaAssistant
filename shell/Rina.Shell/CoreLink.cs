@@ -548,6 +548,41 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
+        // Other programs' windows (`4.0b-K08`). The core names the program
+        // and says what happened; the shell finds the windows, touches them
+        // and answers with what became of them.
+        if (request.Method == "windows.do")
+        {
+            var action = request.Payload["action"]?.GetValue<string>() ?? "";
+            var which = request.Payload["which"]?.GetValue<string>() ?? "";
+            var apps = (request.Payload["apps"] as JsonArray ?? [])
+                .OfType<JsonObject>()
+                .Select(a => new Platform.AppWindows.Candidate(
+                    a["name"]?.GetValue<string>() ?? "",
+                    a["launch"]?.GetValue<string>() ?? "",
+                    a["kind"]?.GetValue<string>() ?? "file"))
+                .ToList();
+            var names = (request.Payload["names"] as JsonArray ?? [])
+                .Select(n => n?.GetValue<string>() ?? "")
+                .Where(n => n.Length > 0).ToList();
+            var outcome = await Platform.AppWindows.DoAsync(
+                action, new Platform.AppWindows.Target(which, apps, names));
+            Platform.Journal.Action($"windows.{action}.{which}", outcome.Ok);
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = outcome.Ok,
+                ["reason"] = outcome.Reason,
+                ["program"] = outcome.Program,
+                ["programs"] = new JsonArray((outcome.Programs ?? [])
+                    .Select(p => (JsonNode)p!).ToArray()),
+                ["done"] = outcome.Done,
+                ["left"] = outcome.Left,
+                ["still_running"] = outcome.StillRunning,
+                ["refused"] = outcome.Refused,
+            });
+            return;
+        }
+
         // What is going on outside the command (`4.0b-A09`). Asked by the
         // core when a scenario's condition needs it; answered here because
         // the machine is the shell's (ADR 0009). Nothing is written down on

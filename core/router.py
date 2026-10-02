@@ -185,8 +185,12 @@ def route(text, ctx=None):
     # `_brightness` before `_system`: the system phrases are matched with a
     # fuzzy fallback, and «убавь яркость» is close enough to «убавь
     # громкость» to be taken for it (`4.0b-K04`).
+    # `_windows` after `_session` and `_todo`, which own «закрой сессию» and
+    # «закрой дело», and before `_system` for the same reason as the
+    # brightness: its fuzzy matching should not get to see «сверни окна»
+    # (`4.0b-K08`).
     for stage in (_answer_to_question, _why, _session, _todo, _reminder,
-                  _brightness, _system,
+                  _brightness, _windows, _system,
                   _teach, _music, _launch, _builtin, _tail):
         intent = stage(command, ctx)
         if intent is not None:
@@ -478,6 +482,27 @@ def _brightness(command, ctx):
     if level is not None:
         args["level"] = level
     return Intent("system.brightness", args, stage="system")
+
+
+def _windows(command, ctx):
+    """Other programs' windows (`4.0b-K08`): one, the one in front, or all."""
+    from voice import windows
+
+    found = windows.classify(command)
+    if not found:
+        return None
+    action, which = found
+    if which == "all":
+        if action == "close":
+            # Every window at once is confirmed, as power is: one misheard
+            # «сверни» must not end a build in a console window.
+            return Intent("system.confirm", {"action": "windows_close_all"},
+                          stage="windows")
+        return Intent("windows.all", {"action": action}, stage="windows")
+    args = {"action": action}
+    if which != "active":
+        args["app"] = which
+    return Intent("windows.control", args, stage="windows")
 
 
 def _system(command, ctx):

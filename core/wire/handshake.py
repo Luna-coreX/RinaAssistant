@@ -113,6 +113,12 @@ _CAPABILITY_LIST = (
                "индекс программ и запуск живут в оболочке (4.0-G06)"),
     Capability("system", Side.SHELL, ("system.do",),
                "громкость, медиа, питание, снимок экрана (4.0-G01..G03)"),
+    # A capability of its own rather than more names in `system.do`: the
+    # answer is not "it worked, a detail" but which program, how many
+    # windows and what became of them (`4.0b-K08`).
+    Capability("windows", Side.SHELL, ("windows.do",),
+               "окна других программ: закрыть, свернуть, развернуть "
+               "(4.0b-K08)"),
     # --- declared by the core ---
     Capability("stt", Side.CORE,
                ("speech.listen_once", "speech.set_always_listen"),

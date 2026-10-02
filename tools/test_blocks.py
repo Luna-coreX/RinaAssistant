@@ -219,6 +219,70 @@ engine.system_out = None
 
 # ---------------------------------------------------------------------------
 print()
+print("=== окна программ (4.0b-K08) ===")
+asked_windows = []
+
+
+def windows_with(answer):
+    """A shell that records what was asked of the windows and answers."""
+    def do(action, target):
+        asked_windows.append((action, dict(target)))
+        return dict(answer)
+    return do
+
+
+engine.windows_out = windows_with({"ok": True, "program": "Discord", "done": 1})
+done = engine._tools.call_block("window_control",
+                                {"action": "minimize", "app": "дискорд"})
+action, target = asked_windows[-1] if asked_windows else ("", {})
+check("блок «Окно программы» доходит до оболочки через реестр",
+      done.ok and action == "minimize" and target.get("which") == "app"
+      and "дискорд" in target.get("names", []), f"| {asked_windows[-1:]}")
+check("и ответ — про названную программу", done.message == "Свернула Discord.",
+      f"| {done.message}")
+
+engine._tools.call_block("window_control", {"action": "close"})
+check("без программы — окно, которое впереди",
+      asked_windows[-1] == ("close", {"which": "active"}), f"| {asked_windows[-1:]}")
+
+refused = engine._tools.call_block("close_all_windows", {})
+check("«закрыть все окна» блоком не вызвать — только видом, который "
+      "подтверждает команду", not refused.ok
+      and refused.error_code == "permission.denied", f"| {refused.error_code}")
+
+closing = step("system", target="sys_windows_close_all")
+check("команда с «закрыть все окна» требует подтверждения целиком",
+      user_commands.command_needs_confirm(
+          {"type": "sequence", "steps": [closing]}))
+
+asked_windows.clear()
+engine.windows_out = windows_with({"ok": True, "done": 4})
+run({"id": "cmd_win", "type": "sequence", "triggers": ["перерыв"],
+     "steps": [step("system", target="sys_windows_minimize_all"),
+               step("speak", target="Перерыв.")]})
+check("шаг «Свернуть все окна» в команде доходит до оболочки",
+      asked_windows == [("minimize", {"which": "all"})], f"| {asked_windows}")
+engine.windows_out = None
+
+# The condition «если впереди программа» goes to the shell through the
+# engine. It did not, before 4.0b-K08: the server set `engine.machine_out`
+# and nothing carried it to the tools, so in the running program such a
+# branch was never taken — and `test_steps` handed `machine` straight to
+# the step, past the engine, which is why nobody saw it.
+print()
+print("=== условия про компьютер доходят до оболочки ===")
+engine.machine_out = lambda question, about="": (
+    "C:/Apps/Chrome/chrome.exe" if question == "foreground" else "")
+run({"id": "cmd_front", "type": "if", "triggers": ["что впереди"],
+     "condition": "app_active", "value": "chrome",
+     "steps": [step("speak", target="Впереди хром.")],
+     "otherwise": [step("speak", target="Хрома нет.")]})
+check("«если впереди Chrome» спрашивает оболочку через движок",
+      "Впереди хром." in said, f"| {said}")
+engine.machine_out = None
+
+# ---------------------------------------------------------------------------
+print()
 print("=== что нельзя — нельзя, откуда бы ни пришла карточка ===")
 
 run({"id": "k01_forbidden", "enabled": True, "type": "sequence",

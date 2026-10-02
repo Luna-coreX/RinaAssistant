@@ -128,6 +128,9 @@ class Executor:
         "shutdown": ("power_action", {"action": "shutdown"}),
         "restart": ("power_action", {"action": "restart"}),
         "sleep": ("power_action", {"action": "sleep"}),
+        # Confirmed like power (`4.0b-K08`); the other window actions have
+        # intents of their own below.
+        "windows_close_all": ("close_all_windows", {}),
     }
 
     def _do_system_action(self, intent, source):
@@ -342,6 +345,16 @@ class Executor:
         if intent.arg("level") is not None:
             args["level"] = intent.arg("level")
         return self._run("set_brightness", args, source=source)
+
+    def _do_windows_control(self, intent, source):
+        args = {"action": intent.arg("action")}
+        if intent.arg("app"):
+            args["app"] = intent.arg("app")
+        return self._run("window_control", args, source=source)
+
+    def _do_windows_all(self, intent, source):
+        return self._run("all_windows", {"action": intent.arg("action")},
+                         source=source)
 
     def _do_clock(self, intent, source):
         return self._run("tell_time", {"what": intent.arg("what") or "time"},

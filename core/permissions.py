@@ -51,6 +51,15 @@ PERMISSIONS = {p.name: p for p in (
     Permission(
         "system.display", "Яркость экрана", False,
         "Делать экран ярче или темнее по команде."),
+    # Other programs' windows (`4.0b-K08`). Not dangerous: a window is
+    # closed the way its own close button closes it, so a program with
+    # unsaved work asks about it itself. Closing all of them at once is
+    # confirmed anyway — by its tool, not by this permission.
+    Permission(
+        "system.windows", "Окна программ", False,
+        "Сворачивать, разворачивать и закрывать окна программ по команде. "
+        "Окно закрывается так же, как крестиком: о несохранённом программа "
+        "спросит сама."),
     Permission(
         "system.power", "Выключение компьютера", True,
         "Выключать, перезагружать и усыплять компьютер. "

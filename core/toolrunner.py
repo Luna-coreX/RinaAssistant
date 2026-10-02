@@ -131,6 +131,12 @@ class ToolContext:
     #: tools would drift from the first.
     registry: Any = None
 
+    #: Who closes, minimises and expands other programs' windows
+    #: (`4.0b-K08`). The shell (ADR 0009): `(action, target) -> dict`, the
+    #: answer a fact — which program, how many windows, what became of
+    #: them — and the words the core's.
+    windows_out: Callable = None
+
 
 class ToolResult:
     """What a tool returned."""
@@ -392,6 +398,235 @@ def _set_brightness(ctx, args):
                            else say("brightness.down"))
 
 
+# ---------------------------------------------------------------------------
+# Other programs' windows (`4.0b-K08`)
+# ---------------------------------------------------------------------------
+#: The names that mean Rina herself. Her own window is not one of the
+#: programs' windows: the shell leaves it out of every search, and what is
+#: asked of it goes the way her own window has always been driven.
+_HERSELF = frozenset({"рина", "рину", "рины", "рине", "себя", "rina",
+                      "yourself"})
+
+#: A browser's tab is not a window. Without this «закрой вкладку» would go
+#: looking for a program called «вкладку» and report it was not open.
+_TABS = frozenset({"вкладку", "вкладки", "вкладка", "вкладок", "tab", "tabs"})
+
+def _windows_ask(ctx, action, target):
+    """
+    Ask the shell to do something to windows: (answer, refusal or None).
+
+    The answer is a fact (ADR 0009) — `ok`, a reason code, the program, how
+    many windows were done and how many are left — and the words are made
+    here.
+    """
+    do = getattr(ctx, "windows_out", None)
+    if do is None:
+        answer = {"ok": False, "reason": NO_SHELL}
+    else:
+        try:
+            answer = dict(do(action, target) or {})
+        except Exception:
+            log.exception("Оболочка не ответила про окна")
+            answer = {"ok": False, "reason": "internal"}
+    if answer.get("reason") == NO_SHELL:
+        return answer, ToolResult.failed(
+            tr("Окнами управляет оболочка, а связи с ней нет."), "internal")
+    return answer, None
+
+
+def _window_targets(ctx, app):
+    """
+    What the shell matches running windows against, for a name said aloud.
+
+    The same index and the same learned words as launching — «закрой код»
+    means what «открой код» opened. But the candidates go to the shell
+    whole rather than as one decision: which of several programs is
+    running is something only the machine knows, and «закрой студию» with
+    only VS Code open is not ambiguous at all. The spoken name goes along
+    in the index's spellings (`query_variants`) for a program the index
+    does not have.
+    """
+    from voice import app_index, app_launcher
+
+    settings = getattr(ctx, "settings", None)
+    aliases = (settings.get("app_aliases", {}) or {}) if settings else {}
+    found, names = [], []
+    for spelling in _spellings(app):
+        learned = app_launcher.alias_lookup(spelling, aliases)
+        if learned is not None:
+            found.append(learned)
+        found += app_index.find(spelling, limit=5, entries=_index(ctx))
+        names += [n for n in app_index.query_variants(spelling)
+                  if n not in names]
+        if found:
+            break
+
+    apps, seen = [], set()
+    for entry in found:
+        key = (str(entry.launch).lower(), entry.kind)
+        if key in seen:
+            continue
+        seen.add(key)
+        apps.append({"name": entry.name, "launch": entry.launch,
+                     "kind": entry.kind})
+    return {"which": "app", "apps": apps, "names": names}
+
+
+def _spellings(app):
+    """
+    The name as said, then without its case ending.
+
+    After «окно» a program's name comes in the genitive — «закрой окно
+    хрома», «сверни окно телеграма» — and the index knows «хром» and
+    «телеграм». One ending off the last word is tried after the name as it
+    was said, never before it: «Steam» must not be looked for as «Stea».
+    """
+    spellings = [app]
+    words = app.split()
+    if words and len(words[-1]) > 3 and words[-1][-1] in "аяуюыие":
+        spellings.append(" ".join(words[:-1] + [words[-1][:-1]]))
+    return spellings
+
+
+def _window_control(ctx, args):
+    """
+    Close, minimise or expand one program's windows, or the one in front.
+
+    **Closed as by the close button** (the shell sends the window's own
+    «close» command): a program with unsaved work asks about it, and one
+    that lives in the tray goes there — which is said, because «закрыла
+    Discord» while Discord is still running would not be true.
+
+    **The one in front** is the window the person is working in. When that
+    is Rina herself — they typed the command into her — it is the window
+    right under her.
+    """
+    from core.protocol import Events
+    from voice.textmatch import normalize
+
+    action = args["action"]
+    app = str(args.get("app") or "").strip()
+    said = normalize(app)
+
+    if said in _TABS:
+        return ToolResult.failed(
+            tr("Вкладками управляет сам браузер — мне доступны только окна "
+               "целиком."), "window.not_found")
+    if said in _HERSELF:
+        if action == "close":
+            return ToolResult.failed(
+                tr("Себя я так не закрываю — для этого есть «Выйти» в меню "
+                   "значка у часов."), "window.refused")
+        emit = getattr(ctx, "emit", None)
+        if emit is not None:
+            emit(Events.WINDOW_ACTION,
+                 action="minimize" if action == "minimize" else "show")
+        return ToolResult.done(tr("Сворачиваюсь.") if action == "minimize"
+                               else tr("Я тут."))
+
+    target = _window_targets(ctx, app) if app else {"which": "active"}
+    answer, refusal = _windows_ask(ctx, action, target)
+    if refusal is not None:
+        return refusal
+
+    reason = str(answer.get("reason", ""))
+    program = str(answer.get("program") or "").strip()
+    if not answer.get("ok"):
+        if reason == "no_window":
+            return ToolResult.failed(tr("Сейчас впереди нет окна."),
+                                     "window.not_found")
+        if reason == "not_running":
+            return ToolResult.failed(
+                tr("Не нашла открытых окон «{name}».", name=app),
+                "window.not_found")
+        if reason == "ambiguous":
+            names = ", ".join(str(n) for n in answer.get("programs") or [])
+            return ToolResult.failed(
+                tr("Открыто несколько подходящих: {names}. Назови точнее.",
+                   names=names), "window.ambiguous")
+        if reason == "refused":
+            return ToolResult.failed(
+                tr("Окно {app} работает с правами администратора, и мне оно "
+                   "не подчиняется.", app=program or app), "window.refused")
+        return ToolResult.failed(tr("Не получилось — окно не ответило."),
+                                 "internal")
+
+    named = program or app or tr("окно")
+    if action == "close" and int(answer.get("left") or 0) > 0:
+        # Still on the screen after a moment: the program is asking —
+        # about unsaved changes, as a rule. That is its right, and the
+        # person is pointed at it rather than told it was closed.
+        return ToolResult.done(
+            tr("{app} что-то спрашивает перед закрытием — посмотри на "
+               "экран.", app=named), named)
+    if action == "close" and answer.get("still_running"):
+        return ToolResult.done(
+            tr("Закрыла окно {app}, а сама программа осталась работать в "
+               "трее — так она устроена.", app=named), named)
+    # Each key written out rather than looked up in a table: the catalogue's
+    # check finds the sayings in use by reading the calls (`test_sayings`).
+    if action == "close":
+        return ToolResult.done(say("windows.closed", app=named), named)
+    if action == "minimize":
+        return ToolResult.done(say("windows.minimized", app=named), named)
+    if action == "maximize":
+        return ToolResult.done(say("windows.maximized", app=named), named)
+    return ToolResult.done(say("windows.expanded", app=named), named)
+
+
+def _all_windows(ctx, args):
+    """Minimise every window, or bring the minimised ones back."""
+    action = args["action"]
+    answer, refusal = _windows_ask(ctx, action, {"which": "all"})
+    if refusal is not None:
+        return refusal
+    if not answer.get("ok"):
+        return ToolResult.failed(tr("Не получилось — окна не ответили."),
+                                 "internal")
+    done = int(answer.get("done") or 0)
+    if done == 0:
+        return ToolResult.done(tr("Открытых окон нет.") if action == "minimize"
+                               else tr("Свёрнутых окон нет."), 0)
+    if action == "minimize":
+        return ToolResult.done(say("windows.all_minimized"), done)
+    return ToolResult.done(say("windows.all_restored"), done)
+
+
+def _close_all_windows(ctx, args):
+    """
+    Close every program's window but Rina's — confirmed before it gets here.
+
+    What is still on the screen a moment later is asking something, and it
+    is counted and said: «закрыла окна: 7» while two of them wait for an
+    answer about unsaved work would send the person away from them.
+    """
+    security_log().warning("Закрываются все окна")
+    answer, refusal = _windows_ask(ctx, "close", {"which": "all"})
+    if refusal is not None:
+        return refusal
+    if not answer.get("ok"):
+        return ToolResult.failed(tr("Не получилось — окна не ответили."),
+                                 "internal")
+    done = int(answer.get("done") or 0)
+    left = int(answer.get("left") or 0)
+    refused = int(answer.get("refused") or 0)
+    if done == 0 and left == 0 and refused == 0:
+        return ToolResult.done(tr("Открытых окон нет."), 0)
+    said = [say("windows.all_closed", count=done)] if done else []
+    if left == 1:
+        said.append(tr("Одно окно что-то спрашивает перед закрытием — "
+                       "посмотри на экран."))
+    elif left > 1:
+        said.append(tr("Ещё спрашивают перед закрытием: {count} — посмотри "
+                       "на экран.", count=left))
+    if refused:
+        # Not asking — refusing: a program running as administrator does
+        # not take the command from one that is not.
+        said.append(tr("Окна программ с правами администратора остались: "
+                       "{count} — мне они не подчиняются.", count=refused))
+    return ToolResult.done(" ".join(said), done)
+
+
 def _create_reminder(ctx, args):
     import time
 
@@ -489,7 +724,8 @@ def _scenario(ctx):
     return {"lookup": find, "machine": getattr(ctx, "machine_out", None),
             "say": getattr(ctx, "say", None),
             "call_block": getattr(ctx, "call_block", None),
-            "block_effect": getattr(ctx, "block_effect", None)}
+            "block_effect": getattr(ctx, "block_effect", None),
+            "windows": getattr(ctx, "windows_out", None)}
 
 
 def _start_sequence(ctx, command, scenario, silent=None):
@@ -957,6 +1193,9 @@ IMPLEMENTATIONS = {
     "power_action": _power_action,
     "take_screenshot": _take_screenshot,
     "set_brightness": _set_brightness,
+    "window_control": _window_control,
+    "all_windows": _all_windows,
+    "close_all_windows": _close_all_windows,
     "create_reminder": _create_reminder,
     "list_reminders": _list_reminders,
     "cancel_reminder": _cancel_reminder,

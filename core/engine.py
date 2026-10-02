@@ -108,6 +108,11 @@ class RinaEngine:
 
         #: Who creates the process. The shell too (4.0-G05).
         self.launch_out = None
+        #: Who closes, minimises and expands other programs' windows
+        #: (`4.0b-K08`). The shell; set by the server side.
+        self.windows_out = None
+        #: Who answers a scenario's question about the computer (`4.0b-A09`).
+        self.machine_out = None
         #: Who to tell about a question that was asked (4.0-F11). Set by the
         #: server side: only the shell can ask a person.
         self.on_question = None
@@ -212,6 +217,21 @@ class RinaEngine:
                 launch_app=lambda launch, kind: (
                     self.launch_out(launch, kind) if self.launch_out
                     else (False, NO_SHELL)),
+                # Other programs' windows (`4.0b-K08`), the shell's like the
+                # rest of the machine.
+                windows_out=lambda action, target: (
+                    self.windows_out(action, target) if self.windows_out
+                    else {"ok": False, "reason": NO_SHELL}),
+                # What a scenario's condition asks about the computer
+                # (`4.0b-A09`). The server set `engine.machine_out` from the
+                # start, but nothing carried it into the tools, so in the
+                # running program «если впереди Chrome» was always false:
+                # the checks handed `machine` straight to the step's state
+                # and never went this way. Found 2026-10-02 while wiring the
+                # windows in beside it.
+                machine_out=lambda question, about="": (
+                    self.machine_out(question, about) if self.machine_out
+                    else ""),
                 # The same list as the router's: see `_apps`.
                 apps=self._apps,
                 # For "Why?" (`4.0b-B04`). Through lambdas because the

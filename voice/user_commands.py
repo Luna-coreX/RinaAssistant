@@ -162,6 +162,9 @@ SYSTEM_ACTIONS = [
     ("sys_media_next",       "Следующий трек"),
     ("sys_media_prev",       "Предыдущий трек"),
     ("sys_screenshot",       "Сделать скриншот"),
+    ("sys_windows_minimize_all", "Свернуть все окна"),
+    ("sys_windows_restore_all",  "Вернуть свёрнутые окна"),
+    ("sys_windows_close_all",    "Закрыть все окна"),
     ("sys_lock",             "Заблокировать компьютер"),
     ("sys_sleep",            "Спящий режим"),
     ("sys_restart",          "Перезагрузить компьютер"),
@@ -170,7 +173,10 @@ SYSTEM_ACTIONS = [
 
 # Actions that must not be performed without confirmation: a recognition
 # error or an accidentally matching phrase must not shut the computer down.
-DESTRUCTIVE_ACTIONS = {"sys_shutdown", "sys_restart", "sys_sleep", "quit"}
+DESTRUCTIVE_ACTIONS = {"sys_shutdown", "sys_restart", "sys_sleep", "quit",
+                       # A console window closed takes its process down
+                       # without a question (`4.0b-K08`).
+                       "sys_windows_close_all"}
 
 
 def action_label(action_id):
@@ -388,7 +394,7 @@ def _open_path(path):
 
 
 def _fresh_state(lookup=None, machine=None, trace=False, say=None,
-                 call_block=None, block_effect=None):
+                 call_block=None, block_effect=None, windows=None):
     """
     What a scenario carries with it for the length of one run.
 
@@ -405,10 +411,13 @@ def _fresh_state(lookup=None, machine=None, trace=False, say=None,
     `say`, `call_block` and `block_effect` are the scenario's voice and its
     way to Rina's own abilities (`4.0b-K01`), handed in for the same
     reason: the voice is the core's, and the blocks are the registry's.
+    `windows` reaches every program's windows at once (`4.0b-K08`) — the
+    system action «закрыть все окна», which the command confirmed as a
+    whole and which therefore does not go through a block.
     """
     return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine,
             "say": say, "call_block": call_block,
-            "block_effect": block_effect,
+            "block_effect": block_effect, "windows": windows,
             # Where in the tree we are, as a prefix: "2.steps." while
             # inside the third node's body.
             "at": "",
@@ -801,7 +810,7 @@ def _condition_holds(kind, value, name="", state=None):
 
 def execute(command, host=None, emit=None, depth=0, state=None,
             lookup=None, machine=None, trace=False, say=None,
-            call_block=None, block_effect=None):
+            call_block=None, block_effect=None, windows=None):
     """
     Performs a command. host is an object with methods for system actions
     (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
@@ -817,7 +826,7 @@ def execute(command, host=None, emit=None, depth=0, state=None,
     outermost = state is None
     if outermost:
         state = _fresh_state(lookup, machine, trace, say, call_block,
-                             block_effect)
+                             block_effect, windows)
 
     # The stop signal is caught **here**, at the outermost call, and
     # nowhere else. Caught deeper it would stop a branch rather than the
@@ -879,7 +888,7 @@ def _perform(command, host, emit, depth, state):
         if not response:
             response = target
     elif ctype == "system":
-        ok = _run_system_action(target, host, emit)
+        ok = _run_system_action(target, host, emit, state)
     elif ctype == "tool":
         ok, said = _run_block(command, state)
         # The block's own answer, unless the card says what to answer: the
@@ -975,7 +984,26 @@ def _perform(command, host, emit, depth, state):
     return ok, fill(response, state)
 
 
-def _run_system_action(action, host, emit=None):
+#: Every program's windows at once (`4.0b-K08`) — the shell's work, asked
+#: through the scenario rather than done here: the core has no hands on
+#: other programs' windows (ADR 0009).
+_ALL_WINDOWS = {"sys_windows_minimize_all": "minimize",
+                "sys_windows_restore_all": "restore",
+                "sys_windows_close_all": "close"}
+
+
+def _run_system_action(action, host, emit=None, state=None):
+    if action in _ALL_WINDOWS:
+        ask = (state or {}).get("windows")
+        if ask is None:
+            return False
+        try:
+            answer = ask(_ALL_WINDOWS[action], {"which": "all"}) or {}
+        except Exception:
+            log.exception("Оболочка не ответила про окна")
+            return False
+        return bool(answer.get("ok"))
+
     # actions on the computer (volume, media, locking) — they need no host
     if str(action).startswith("sys_"):
         from voice import system_control

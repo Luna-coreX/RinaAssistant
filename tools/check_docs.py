@@ -296,9 +296,11 @@ from voice.user_commands import COMMAND_TYPES, STEP_ONLY, SYSTEM_ACTIONS
 #: writes them. A page that said "16 actions" would read like a table.
 WORDS = {
     2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six", 7: "Seven",
-    11: "Eleven", 16: "Sixteen", 17: "seventeen", 22: "twenty-two",
+    11: "Eleven", 16: "Sixteen", 17: "seventeen", 19: "Nineteen",
+    22: "twenty-two",
     23: "twenty-three",
     24: "twenty-four", 25: "twenty-five", 26: "twenty-six",
+    27: "twenty-seven",
 }
 
 check(f"отделок в README столько же, сколько в системе ({finishes})",

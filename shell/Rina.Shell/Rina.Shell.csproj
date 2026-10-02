@@ -2,12 +2,14 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <UseWPF>true</UseWPF>
-    <!-- System.Drawing для значка в трее: он рисуется, а не
-         берётся из файла в четырёх размерах. -->
     <UseWindowsForms>false</UseWindowsForms>
     <RootNamespace>Rina.Shell</RootNamespace>
     <AssemblyName>Rina.Shell</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Сфера Рины (`4.0b-D06`): значок файла, ярлыков, панели задач и
+         окон — WPF берёт значок окна из самого .exe, если окну свой не
+         задан. Собирается `tools/make_icon.py` из `assets/brand/logo.webp`. -->
+    <ApplicationIcon>..\..\assets\brand\rina.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\Rina.Protocol\Rina.Protocol.csproj" />
@@ -55,6 +57,11 @@
               Link="Fonts\Geologica-SemiBold.ttf" />
     <Resource Include="..\..\assets\fonts\Geologica\Geologica-Bold.ttf"
               Link="Fonts\Geologica-Bold.ttf" />
+  </ItemGroup>
+  <!-- Тот же значок для трея: его размер зависит от масштаба экрана, и
+       подходящий кадр выбирается из файла, а не рисуется. -->
+  <ItemGroup>
+    <Resource Include="..\..\assets\brand\rina.ico" Link="Assets\rina.ico" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="H.NotifyIcon.Wpf" Version="2.3.0" />

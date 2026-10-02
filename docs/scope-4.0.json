@@ -905,6 +905,12 @@
     "size": "M",
     "title": "Необязательная телеметрия"
   },
+  "4.0b-D06": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "S",
+    "title": "Значок программы"
+  },
   "4.0b-E01": {
     "done": true,
     "milestone": "4.0-beta",
@@ -1030,6 +1036,12 @@
     "milestone": "4.0-beta",
     "size": "S",
     "title": "Плагин «Курс» — из примера в продукт"
+  },
+  "4.0b-K08": {
+    "done": true,
+    "milestone": "4.0-beta",
+    "size": "M",
+    "title": "Окна программ: закрыть, свернуть, развернуть"
   },
   "4.0b-V01": {
     "done": true,

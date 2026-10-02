@@ -252,6 +252,21 @@ public partial class App
             return;
         }
 
+        // Other programs' windows (`4.0b-K08`), on a window of the check's
+        // own: a second process of this shell opens it, and the check
+        // closes it the way Rina closes Discord.
+        if (args.Contains("--check-windows-target"))
+        {
+            ShowWindowsTarget();
+            return;
+        }
+        if (args.Contains("--check-windows"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckWindowsAsync(), "windows");
+            return;
+        }
+
         if (args.Contains("--check-fonts"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -4893,6 +4908,164 @@ public partial class App
     /// measuring: written, read back, refused when it is nonsense, and
     /// never allowed off the edge of the screen it will open on.
     /// </remarks>
+    /// <summary>
+    /// The window <c>--check-windows</c> acts on: plain, off the screen,
+    /// and gone with its process when closed.
+    /// </summary>
+    /// <remarks>
+    /// In the taskbar on purpose: a window kept out of it is owned by a
+    /// hidden one, and owned windows are not windows a person names. Its
+    /// largest size is its own, so expanding it never covers the screen.
+    /// </remarks>
+    private void ShowWindowsTarget()
+    {
+        // Out with the window, explicitly: the shell keeps windows of its
+        // own the person never sees, and "the last window closed" would
+        // wait for them.
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+        var target = new Window
+        {
+            Title = "Проверка окон Рины",
+            Width = 240, Height = 140, MaxWidth = 240, MaxHeight = 140,
+            Left = -4000, Top = -4000,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowActivated = false,
+            ShowInTaskbar = true,
+        };
+        target.Closed += (_, _) => Shutdown();
+        target.Show();
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsIconic(IntPtr window);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr window);
+
+    /// <summary>
+    /// Close, minimise and expand a program's windows — on a program of
+    /// the check's own (<c>4.0b-K08</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Only a window this check opened is touched.</b> The target is
+    /// named by its executable's path and a name nothing else carries, so
+    /// a person's own Rina, running from wherever it was installed, is not
+    /// matched; the window in front and «all windows» are not exercised
+    /// here at all — those are the person's windows. They are checked in
+    /// the core against a shell that records what it is asked
+    /// (<c>tools/test_windows.py</c>).
+    /// </para>
+    /// <para>
+    /// <b>The checking process's own window must stay as it was</b>: it
+    /// runs the same executable as the target, so a search by path alone
+    /// would take Rina's window along with Discord's.
+    /// </para>
+    /// </remarks>
+    private async Task CheckWindowsAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== окна других программ (4.0b-K08) ===");
+        var exe = Environment.ProcessPath ?? "";
+        var helper = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo(exe, "--check-windows-target")
+            {
+                UseShellExecute = false,
+            });
+        if (helper is null)
+        {
+            Check("подставное окно открылось", false);
+            Finish();
+            return;
+        }
+
+        var handle = IntPtr.Zero;
+        await Until(() =>
+        {
+            helper.Refresh();
+            handle = helper.MainWindowHandle;
+            return handle != IntPtr.Zero;
+        }, 10);
+        Check("подставное окно открылось", handle != IntPtr.Zero);
+
+        // A window of this process, which must come out untouched.
+        var own = new Window
+        {
+            Title = "Окно самой Рины",
+            Width = 200, Height = 120, Left = -4000, Top = -3000,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            ShowActivated = false,
+        };
+        own.Show();
+        var ownHandle = new System.Windows.Interop.WindowInteropHelper(own).Handle;
+
+        var target = new Platform.AppWindows.Target("app",
+            [new Platform.AppWindows.Candidate("Проверка окон Рины", exe, "file")], []);
+
+        var minimised = await Platform.AppWindows.DoAsync("minimize", target);
+        await Until(() => IsIconic(handle), 3);
+        Check("свёрнуто окно названной программы",
+              minimised.Ok && minimised.Done == 1 && IsIconic(handle),
+              $"| {minimised}");
+        Check("и названа она именем из индекса",
+              minimised.Program == "Проверка окон Рины", $"| {minimised.Program}");
+        Check("окно самой Рины не тронуто — хотя файл тот же",
+              !IsIconic(ownHandle));
+
+        var back = await Platform.AppWindows.DoAsync("expand", target);
+        await Until(() => !IsIconic(handle), 3);
+        Check("«развернуть» свёрнутое возвращает его на место",
+              back.Ok && !IsIconic(handle), $"| {back}");
+
+        var nowhere = await Platform.AppWindows.DoAsync("close",
+            new Platform.AppWindows.Target("app",
+                [new Platform.AppWindows.Candidate("Нет такой программы",
+                    @"C:\Нет\такой\программы.exe", "file")], []));
+        Check("незапущенная программа — «не открыта», а не чужое окно",
+              !nowhere.Ok && nowhere.Reason == "not_running", $"| {nowhere}");
+
+        var closed = await Platform.AppWindows.DoAsync("close", target);
+        Check("закрыто как крестиком: окна нет, процесса тоже",
+              closed.Ok && closed.Done == 1 && closed.Left == 0
+              && !closed.StillRunning && !IsWindow(handle), $"| {closed}");
+        Check("и процесс завершился сам", helper.WaitForExit(5000));
+
+        own.Close();
+        if (!helper.HasExited) helper.Kill();
+        Finish();
+
+        void Finish()
+        {
+            Console.WriteLine();
+            Console.WriteLine($"Ошибок: {fails}");
+            Environment.ExitCode = fails == 0 ? 0 : 1;
+            Shutdown();
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll",
+        CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern uint ExtractIconEx(string file, int index,
+                                             IntPtr[]? large, IntPtr[]? small,
+                                             uint count);
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern IntPtr SendMessage(IntPtr window, uint message,
+                                             IntPtr wParam, IntPtr lParam);
+
+    private const uint WmGetIcon = 0x007F;
+    private const int IconBig = 1;
+
     private async Task CheckWindowAsync()
     {
         Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
@@ -4956,6 +5129,36 @@ public partial class App
         Check("и меньше разумного не сжимается",
               window.MinWidth >= 640 && window.MinHeight >= 480,
               $"| не меньше {window.MinWidth:0}x{window.MinHeight:0}");
+
+        // Rina's sphere as the program's icon (`4.0b-D06`). Asked of the
+        // file Windows shows and of the window the taskbar shows, not of
+        // the project file: an icon named in the build and missing from
+        // the executable would pass a reading of the build.
+        Console.WriteLine();
+        Console.WriteLine("=== значок программы ===");
+        var exe = Environment.ProcessPath ?? "";
+        Check("в исполняемом файле есть значок",
+              exe.Length > 0 && ExtractIconEx(exe, -1, null, null, 0) > 0,
+              $"| {Path.GetFileName(exe)}");
+        var sizes = new List<int>();
+        try
+        {
+            var resource = GetResourceStream(Tray.IconUri);
+            if (resource is not null)
+            {
+                using var stream = resource.Stream;
+                var decoder = BitmapDecoder.Create(
+                    stream, BitmapCreateOptions.None, BitmapCacheOption.OnLoad);
+                sizes = decoder.Frames.Select(f => f.PixelWidth).ToList();
+            }
+        }
+        catch { /* no frames is the failure below */ }
+        Check("значок для трея — от 16 до 256 точек",
+              sizes.Contains(16) && sizes.Contains(32) && sizes.Contains(256),
+              $"| {string.Join(", ", sizes)}");
+        var handle = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        Check("окно показывает значок программы, а не пустой",
+              SendMessage(handle, WmGetIcon, (IntPtr)IconBig, IntPtr.Zero) != IntPtr.Zero);
         window.Close();
 
         Kept.Window(was);

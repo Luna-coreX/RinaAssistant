@@ -84,7 +84,7 @@ This is not a rearrangement of folders. It is what makes the rest possible:
 - a plugin that hangs no longer takes Rina with it: each lives in its own process;
 - the interface was **designed anew** rather than ported, because the shell is new code regardless.
 
-The move itself added nothing and lost nothing: the port was bound to keep every behaviour of 3.1.0 and asked for nothing more, and that behaviour is pinned by 150 recorded utterances and seven recorded sessions. New things came with the beta, on that ground: work sessions, reminders tied to a program, learning from corrections, a focus mode, a to-do list, a visual command builder, a new home tab and a first-run setup.
+The move itself added nothing and lost nothing: the port was bound to keep every behaviour of 3.1.0 and asked for nothing more, and that behaviour is pinned by 161 recorded utterances and seven recorded sessions. New things came with the beta, on that ground: work sessions, reminders tied to a program, learning from corrections, a focus mode, a to-do list, a visual command builder, a new home tab and a first-run setup.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -136,8 +136,10 @@ Timers, alarms and reminders in plain language — "поставь таймер 
 
 ### System control
 
-Sixteen actions: volume up/down/mute, media next/previous/play-pause, lock,
-screenshot, sleep, restart, shutdown, and the ones that move Rina's own window. Destructive ones always ask first, and the question shows **what will happen** rather than the action's name — a single misheard phrase can never power off the machine.
+Nineteen actions: volume up/down/mute, media next/previous/play-pause, lock,
+screenshot, sleep, restart, shutdown, minimise, restore or close every window, and the ones that move Rina's own window. Destructive ones always ask first, and the question shows **what will happen** rather than the action's name — a single misheard phrase can never power off the machine.
+
+Other programs' windows by name or the one in front: "закрой Discord", "сверни телеграм", "разверни хром на весь экран", or just "закрой". A window is closed the way its own close button closes it, so a program with unsaved work asks about it itself, and one that lives in the tray is said to have gone there. Closing every window at once asks first.
 
 ### Answers
 
@@ -245,11 +247,11 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 85 checks, about six minutes
+python tools/regress.py          # 87 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 
-Behaviour is pinned by a golden set of 150 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
+Behaviour is pinned by a golden set of 161 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
 
 How to debug two processes at once — [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
 
@@ -302,7 +304,7 @@ Full plan: [`docs/ROADMAP.md`](docs/ROADMAP.md).
 
 ## Security
 
-What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-six threats, and for each of them the **residual risk**
+What we defend against, from whom, and with what — [`docs/security/THREAT-MODEL.md`](docs/security/THREAT-MODEL.md). Six surfaces, twenty-seven threats, and for each of them the **residual risk**
 written down, because a defence without one has stopped being thought about.
 The sweep that walks that document rather than a list somebody maintains is
 `tools/test_security.py`.

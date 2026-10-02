@@ -57,6 +57,9 @@ PrivilegesRequiredOverridesAllowed=dialog
 LicenseFile=..\LICENSE
 UninstallDisplayName={#AppName}
 UninstallDisplayIcon={app}\{#AppExe}
+; Сфера Рины (4.0b-D06) — тот же файл, что у программы: скачанный
+; установщик и то, что он ставит, выглядят одним и тем же.
+SetupIconFile=..\assets\brand\rina.ico
 
 [Languages]
 Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"

@@ -120,6 +120,14 @@ CATALOGUE: dict[str, ErrorSpec] = {s.code: s for s in (
     _spec("app.launch_failed", "system", True,
           "запуск сорвался; со второй попытки бывает иначе"),
 
+    # --- other programs' windows (4.0b-K08) ------------------------------------
+    _spec("window.not_found", "user", False,
+          "у названной программы нет открытых окон, или впереди нет окна"),
+    _spec("window.ambiguous", "user", False,
+          "открыто несколько подходящих программ; нужно назвать точнее"),
+    _spec("window.refused", "system", False,
+          "окно не приняло команду: программа запущена от администратора"),
+
     # --- speech and the model ----------------------------------------------------
     _spec("stt.unavailable", "system", False,
           "распознавания нет: модель не установлена или не загрузилась"),

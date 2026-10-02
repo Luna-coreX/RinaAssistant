@@ -73,6 +73,22 @@ SAYINGS = {
     "brightness.down": ("Сделала темнее.", "Убавила яркость.", "Темнее."),
     "brightness.level": ("Яркость {level}%.", "Поставила яркость {level}%.",
                          "Готово, яркость {level}%."),
+    # Other programs' windows (`4.0b-K08`). `{app}` is a program's name, so
+    # nothing here agrees with it in gender: «Discord закрыт» and «Почта
+    # закрыта» cannot share one sentence.
+    "windows.closed": ("Закрыла {app}.", "Готово, закрыла {app}.",
+                       "Всё, {app} закрыла."),
+    "windows.minimized": ("Свернула {app}.", "Готово, свернула {app}.",
+                          "Убрала {app} вниз."),
+    "windows.expanded": ("Развернула {app}.", "Готово, развернула {app}.",
+                         "Вернула {app} на экран."),
+    "windows.maximized": ("Развернула {app} на весь экран.",
+                          "{app} теперь на весь экран."),
+    "windows.all_minimized": ("Свернула все окна.", "Готово, все окна внизу.",
+                              "Свернула всё — рабочий стол перед тобой."),
+    "windows.all_restored": ("Вернула свёрнутые окна.", "Окна снова на экране.",
+                             "Готово, вернула окна."),
+    "windows.all_closed": ("Закрыла окна: {count}.", "Готово, закрыла окна: {count}."),
 
     # --- answers ---
     "calc": ("Получается {result}.", "Будет {result}.", "Выходит {result}."),

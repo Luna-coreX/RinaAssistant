@@ -158,6 +158,8 @@ public static class Methods
     public const string WindowFocus = "window.focus";
     /// <summary>Возможность: actuation.</summary>
     public const string WindowList = "window.list";
+    /// <summary>Возможность: windows.</summary>
+    public const string WindowsDo = "windows.do";
 
     /// <summary>Какая возможность отпирает метод; null — базовый.</summary>
     public static readonly IReadOnlyDictionary<string, string?> Capability =
@@ -231,6 +233,7 @@ public static class Methods
             ["todo.remove"] = "todo",
             ["window.focus"] = "actuation",
             ["window.list"] = "actuation",
+            ["windows.do"] = "windows",
         };
 }
 
@@ -384,6 +387,12 @@ public static class ErrorCodes
     public const string TransferWrongKind = "transfer.wrong_kind";
     /// <summary>system, неповторяемая.</summary>
     public const string TtsUnavailable = "tts.unavailable";
+    /// <summary>user, неповторяемая.</summary>
+    public const string WindowAmbiguous = "window.ambiguous";
+    /// <summary>user, неповторяемая.</summary>
+    public const string WindowNotFound = "window.not_found";
+    /// <summary>system, неповторяемая.</summary>
+    public const string WindowRefused = "window.refused";
 
     /// <summary>Категория и повторяемость принадлежат коду, а не месту вызова.</summary>
     public static readonly IReadOnlyDictionary<string, ErrorSpec> Catalogue =
@@ -419,6 +428,9 @@ public static class ErrorCodes
             ["transfer.unreadable"] = new(ErrorCategory.User, false),
             ["transfer.wrong_kind"] = new(ErrorCategory.User, false),
             ["tts.unavailable"] = new(ErrorCategory.System, false),
+            ["window.ambiguous"] = new(ErrorCategory.User, false),
+            ["window.not_found"] = new(ErrorCategory.User, false),
+            ["window.refused"] = new(ErrorCategory.System, false),
         };
 }
 
@@ -465,6 +477,8 @@ public static class Capabilities
     public const string Tts = "tts";
     /// <summary>Объявляет shell.</summary>
     public const string WindowActions = "window.actions";
+    /// <summary>Объявляет shell.</summary>
+    public const string Windows = "windows";
 
     /// <summary>Что объявляет оболочка в рукопожатии.</summary>
     public static readonly string[] Shell =
@@ -476,6 +490,7 @@ public static class Capabilities
         "system",
         "system.context",
         "window.actions",
+        "windows",
     ];
 }
 

@@ -195,6 +195,66 @@ SET_BRIGHTNESS = Tool(
 )
 
 # ---------------------------------------------------------------------------
+# Other programs' windows (`4.0b-K08`)
+# ---------------------------------------------------------------------------
+WINDOW_CONTROL = Tool(
+    name="window_control",
+    summary="Закрыть, свернуть или развернуть окно программы — названной "
+            "или той, что сейчас впереди.",
+    automation="action",
+    title="Окно программы",
+    asks=("action", "app"),
+    params=(
+        Param("action", "string", "Что сделать.",
+              choices=("close", "minimize", "expand", "maximize"),
+              labels=("Закрыть", "Свернуть", "Развернуть", "На весь экран")),
+        Param("app", "string",
+              "Какая программа (пусто — окно, которое сейчас впереди).",
+              required=False),
+    ),
+    permissions={"system.windows"},
+    # Closing what is closed finds nothing the second time and says so;
+    # minimising twice is minimising once. Neither repeats an effect.
+    idempotent=True,
+    returns="Что сделано и с какой программой.",
+    errors=("window.not_found", "window.ambiguous", "window.refused",
+            "internal"),
+)
+
+ALL_WINDOWS = Tool(
+    name="all_windows",
+    summary="Свернуть все окна или вернуть свёрнутые.",
+    automation="kind:system",
+    params=(
+        Param("action", "string", "Что сделать со всеми окнами.",
+              choices=("minimize", "restore")),
+    ),
+    permissions={"system.windows"},
+    idempotent=True,
+    returns="Сколько окон затронуто.",
+    errors=("internal",),
+)
+
+CLOSE_ALL_WINDOWS = Tool(
+    name="close_all_windows",
+    summary="Закрыть все окна программ, кроме самой Рины.",
+    # Offered by the system-action kind, which confirms the whole command:
+    # a block may not ask on every call, and this one has to ask.
+    automation="kind:system",
+    params=(),
+    permissions={"system.windows"},
+    # Asked every time, as power is. Each window closes as by its close
+    # button, so unsaved documents are asked about — but a console window
+    # takes the process inside it down without a word, and one misheard
+    # «сверни все окна» must not end a build.
+    confirm_required=True,
+    idempotent=False,
+    returns="Сколько окон закрыто и сколько ещё спрашивают.",
+    errors=("confirmation.required", "confirmation.invalid", "internal"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Reminders
 # ---------------------------------------------------------------------------
 CREATE_REMINDER = Tool(
@@ -631,6 +691,7 @@ ALL_TOOLS = (
     LAUNCH_APP, LIST_APPS, TEACH_ALIAS, FORGET_ALIAS,
     SET_VOLUME, MEDIA_CONTROL, LOCK_SCREEN, POWER_ACTION, TAKE_SCREENSHOT,
     SET_BRIGHTNESS,
+    WINDOW_CONTROL, ALL_WINDOWS, CLOSE_ALL_WINDOWS,
     CREATE_REMINDER, LIST_REMINDERS, CANCEL_REMINDER,
     ADD_TODO, LIST_TODO, CLOSE_TODO,
     START_SESSION, FINISH_SESSION, NOTE_SESSION, FOLDER_SESSION,

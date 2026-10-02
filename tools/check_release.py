@@ -105,9 +105,28 @@ check("плагины сборки — ровно плагины поставк�
 # The shell is published as a separate step: the build can be run without
 # it (`--skip-shell`), so its absence is not a failure but something said
 # out loud.
+def icons_in(path):
+    """
+    How many icons a file carries, read from the file itself.
+
+    Not through the shell's icon cache: Explorer remembers a path's icon,
+    and a build without one would be shown the previous build's.
+    """
+    import ctypes
+
+    try:
+        return int(ctypes.windll.shell32.ExtractIconExW(
+            str(path), -1, None, None, 0))
+    except (AttributeError, OSError):
+        return -1
+
+
 shell = os.path.join(where, "Rina.Shell.exe")
 if os.path.isfile(shell):
     check("оболочка на месте", True, f"| {os.path.getsize(shell) // 1024} КБ")
+    # Rina's sphere (`4.0b-D06`): the file, its shortcuts, the taskbar.
+    check("у оболочки значок Рины, а не пустой", icons_in(shell) > 0,
+          f"| значков: {icons_in(shell)}")
 else:
     print("     оболочка не публиковалась (--skip-shell) — проверяем ядро")
 
@@ -313,6 +332,8 @@ else:
         # would pass on an empty stub.
         check("и весит как выпуск, а не как заглушка", weight > 50,
               f"| {weight:.0f} МБ")
+        check("и у него тот же значок", icons_in(wanted) > 0,
+              f"| значков: {icons_in(wanted)}")
 
 # ---------------------------------------------------------------------------
 # The whole way round: install, run, uninstall

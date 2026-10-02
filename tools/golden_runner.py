@@ -88,10 +88,14 @@ class Observed:
         self.level = None
         self.reminders = []
         self.events = []
+        # What was asked of other programs' windows (`4.0b-K08`):
+        # (action, target) pairs as they went to the shell.
+        self.windows = []
         self.pending = None
 
     def clear(self):
-        for name in ("said", "launched", "actions", "reminders", "events"):
+        for name in ("said", "launched", "actions", "reminders", "events",
+                     "windows"):
             getattr(self, name).clear()
         self.pending = None
 
@@ -207,8 +211,13 @@ class InProcessDriver(Driver):
             obs.launched.append(entry.name if entry else launch)
             return True, ""
 
+        def as_shell_windows(action, target):
+            obs.windows.append((action, dict(target)))
+            return {"ok": True, "program": "", "done": 1}
+
         engine.system_out = as_shell_do
         engine.launch_out = as_shell_launch
+        engine.windows_out = as_shell_windows
         real_say = engine.say
         engine.say = lambda text, sound="response": (
             obs.said.append(text), real_say(text, sound=sound))[0]
@@ -391,6 +400,20 @@ def classify(obs, text=""):
         return intent("system.brightness", **args)
     if obs.actions:
         return intent("system.action", action=obs.actions[-1])
+    if obs.windows:
+        # Seen as what went to the shell (`4.0b-K08`). Every window closed
+        # at once is the confirmed system action it was asked as; the
+        # program is the name as said — the first spelling the core sent.
+        action, target = obs.windows[-1]
+        which = target.get("which")
+        if which == "all":
+            if action == "close":
+                return intent("system.action", action="windows_close_all")
+            return intent("windows.all", action=action)
+        args = {"action": action}
+        if which == "app" and target.get("names"):
+            args["app"] = target["names"][0]
+        return intent("windows.control", **args)
 
     if obs.pending:
         kind = obs.pending.get("kind")

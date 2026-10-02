@@ -184,6 +184,9 @@ class ProtocolServer:
         # (ADR 0009); the core asks when a condition needs it and keeps
         # nothing (`T-19`).
         engine.machine_out = self.ask_machine
+        # Other programs' windows (`4.0b-K08`): found and touched by the
+        # shell, decided and spoken about by the core.
+        engine.windows_out = self.do_windows
         # Anything dangerous is confirmed with a window, not with words alone (4.0-F11).
         engine.on_question = self._on_question
 
@@ -1853,6 +1856,25 @@ class ProtocolServer:
         except ProtocolFault as exc:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("detail", ""))
+
+    def do_windows(self, action: str, target: dict) -> dict:
+        """
+        Ask the shell to close, minimise or expand windows (`4.0b-K08`).
+
+        The answer is the shell's fact as it came — `ok`, a reason code, the
+        program, how many windows were done and how many are left — and the
+        core makes the sentence. A shell that does not answer has not done
+        anything, which is what `ok: False` says.
+        """
+        payload = {"action": action, **dict(target or {})}
+        try:
+            # The shell waits up to two seconds after closing to see which
+            # windows are still there (a program asking about unsaved
+            # work); the default ten leave room for that.
+            answer = self.ask_shell_sync("windows.do", payload)
+        except ProtocolFault as exc:
+            return {"ok": False, "reason": "internal", "detail": str(exc)}
+        return dict(answer)
 
     def ask_machine(self, question: str, about: str = "") -> str:
         """

@@ -144,6 +144,12 @@
     "window.actions": {
       "methods": [],
       "side": "shell"
+    },
+    "windows": {
+      "methods": [
+        "windows.do"
+      ],
+      "side": "shell"
     }
   },
   "errors": {
@@ -264,6 +270,18 @@
       "retryable": false
     },
     "tts.unavailable": {
+      "category": "system",
+      "retryable": false
+    },
+    "window.ambiguous": {
+      "category": "user",
+      "retryable": false
+    },
+    "window.not_found": {
+      "category": "user",
+      "retryable": false
+    },
+    "window.refused": {
       "category": "system",
       "retryable": false
     }
@@ -575,7 +593,8 @@
     "todo.list": "todo",
     "todo.remove": "todo",
     "window.focus": "actuation",
-    "window.list": "actuation"
+    "window.list": "actuation",
+    "windows.do": "windows"
   },
   "protocol_version": 1,
   "scopes": [

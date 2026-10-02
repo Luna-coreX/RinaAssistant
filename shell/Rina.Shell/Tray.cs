@@ -27,11 +27,12 @@ namespace Rina.Shell;
 /// chosen by the person, and by default it is the same as in 3.1.0.
 /// </para>
 /// <para>
-/// <b>The icon is drawn, not taken from a file.</b> A resource icon would
-/// have to be kept in four sizes for different screen densities, whereas
-/// what is needed here is one mark: a dot in the accent colour on dark.
-/// The single brand mark lives in the foot of the column (<c>4.0-R09</c>),
-/// and dragging it into the tray would mean having a second one.
+/// <b>The icon is Rina's sphere</b> (<c>4.0b-D06</c>), the same file as
+/// the program's own icon, so the tray, the taskbar and the shortcut show
+/// one mark. It used to be an accent dot drawn here, to avoid keeping a
+/// file in several sizes; the file now exists for the program anyway, and
+/// a frame of the size the screen's scaling asks for is taken from it. The
+/// dot stays as the fallback for a resource that cannot be read.
 /// </para>
 /// </remarks>
 public sealed class Tray : IDisposable
@@ -58,7 +59,7 @@ public sealed class Tray : IDisposable
     public Tray(Window window, string title = "Rina Assistant")
     {
         _window = window;
-        _drawn = Draw();
+        _drawn = Load() ?? Draw();
         _icon = new TrayIconWithContextMenu
         {
             Icon = _drawn.Handle,
@@ -88,8 +89,39 @@ public sealed class Tray : IDisposable
         Created = _icon.MessageWindow.IsCreated;
     }
 
+    /// <summary>The program's icon file, as the shell's resource.</summary>
+    public static readonly Uri IconUri = new("pack://application:,,,/Assets/rina.ico");
+
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int index);
+
+    /// <summary>The width of a small icon at the screen's scaling.</summary>
+    private const int SmallIconWidth = 49;
+
     /// <summary>
-    /// The icon: an accent dot on dark.
+    /// The sphere, in the frame the tray wants: 16 px at 100 %, 20 at
+    /// 125 %, 24 at 150 %, 32 at 200 %. Null when the resource cannot be
+    /// read — then the dot is drawn.
+    /// </summary>
+    private static Icon? Load()
+    {
+        try
+        {
+            var side = GetSystemMetrics(SmallIconWidth);
+            if (side <= 0) side = 16;
+            var resource = Application.GetResourceStream(IconUri);
+            if (resource is null) return null;
+            using var stream = resource.Stream;
+            return new Icon(stream, new System.Drawing.Size(side, side));
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The fallback icon: an accent dot on dark.
     /// </summary>
     /// <remarks>
     /// The colour is taken from the resources — the same tokens as
