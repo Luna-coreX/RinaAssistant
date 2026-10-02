@@ -84,7 +84,7 @@ This is not a rearrangement of folders. It is what makes the rest possible:
 - a plugin that hangs no longer takes Rina with it: each lives in its own process;
 - the interface was **designed anew** rather than ported, because the shell is new code regardless.
 
-The move itself added nothing and lost nothing: the port was bound to keep every behaviour of 3.1.0 and asked for nothing more, and that behaviour is pinned by 161 recorded utterances and seven recorded sessions. New things came with the beta, on that ground: work sessions, reminders tied to a program, learning from corrections, a focus mode, a to-do list, a visual command builder, a new home tab and a first-run setup.
+The move itself added nothing and lost nothing: the port was bound to keep every behaviour of 3.1.0 and asked for nothing more, and that behaviour is pinned by 164 recorded utterances and seven recorded sessions. New things came with the beta, on that ground: work sessions, reminders tied to a program, learning from corrections, a focus mode, a to-do list, a visual command builder, a new home tab and a first-run setup.
 
 See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
@@ -145,7 +145,7 @@ Other programs' windows by name or the one in front: "закрой Discord", "с
 
 - **Arithmetic** is evaluated from a parsed expression tree, never with `eval`.
 - **Unrecognised phrases** fall back to a web search.
-- **Optional local model.** With Ollama installed, anything unparsed can be answered by a model on your own computer. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local.
+- **Optional local model.** With Ollama installed, anything unparsed can be answered by a model on your own computer. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local — or if the chosen model is one Ollama runs in its cloud rather than on this computer. A model that does not answer is left alone for a while instead of being waited for on every phrase, and small talk — a greeting, a thank-you — Rina answers herself.
 
 ### Plugins
 
@@ -247,11 +247,11 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 87 checks, about six minutes
+python tools/regress.py          # 88 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 
-Behaviour is pinned by a golden set of 161 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
+Behaviour is pinned by a golden set of 164 utterances and seven recorded sessions; the protocol by a conformance suite that lets both sides see only bytes; the design by comparing the drawn window with the tokens.
 
 How to debug two processes at once — [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
 

@@ -5,9 +5,13 @@ This is the pipeline's last step: if a phrase was parsed by no handler, then
 instead of "Sorry, I did not understand" a language model may answer it.
 
 Privacy: the request goes ONLY to the address in the llm_url setting
-(localhost by default). The model runs on the user's computer, nothing is
-sent outside — which is exactly why a local Ollama was chosen rather than a
-cloud service.
+(localhost by default). A model Ollama runs on this computer sends nothing
+outside — which is exactly why a local Ollama was chosen rather than a
+cloud service. **But Ollama also serves models from its own cloud**
+(`gemma4:31b-cloud`): asked at localhost, it forwards the conversation to
+ollama.com. Such a model is treated like a remote address — the setting
+warns when it is chosen, and every request is written to the security
+journal (`cloud_host`).
 
 It adds no dependencies: Ollama answers over HTTP, and urllib is enough.
 """
@@ -130,6 +134,15 @@ class LLMError(Exception):
     """The model is unavailable or answered with an error."""
 
 
+class LLMUnreachable(LLMError):
+    """
+    The model did not answer at all: no connection, a timeout, a gateway
+    error. Unlike an empty answer, this one says nothing about the
+    question and everything about the server — and is worth remembering
+    (`_rest`).
+    """
+
+
 def _settings():
     from core.settings_store import settings
     return settings
@@ -189,19 +202,24 @@ def _request(path, payload=None, timeout=8):
             raw = resp.read(MAX_RESPONSE_BYTES)
             return json.loads(raw.decode("utf-8", errors="replace"))
     except urllib.error.URLError as e:
-        raise LLMError(tr("Ollama не отвечает: ") + str(getattr(e, "reason", e)))
-    except (ValueError, OSError, http.client.HTTPException) as e:
+        raise LLMUnreachable(tr("Ollama не отвечает: ")
+                             + str(getattr(e, "reason", e)))
+    except (OSError, http.client.HTTPException) as e:
         # HTTPException (a truncated response, broken chunking, too long a
         # header line) does not inherit from OSError and used to fly out
         # past us: the "Check the connection" button stayed in the checking
         # state forever
+        raise LLMUnreachable(tr("Ошибка обращения к модели: ") + str(e))
+    except ValueError as e:
+        # It answered, with something that is not JSON: a server that is
+        # there, saying the wrong thing.
         raise LLMError(tr("Ошибка обращения к модели: ") + str(e))
 
 
 # ---------------------------------------------------------------------------
 # The server's state
 # ---------------------------------------------------------------------------
-_status_cache = {"ts": 0.0, "models": None, "error": ""}
+_status_cache = {"ts": 0.0, "models": None, "error": "", "remote": {}}
 STATUS_TTL = 10          # seconds: do not pester the server over every trifle
 
 
@@ -217,9 +235,15 @@ def models(force=False):
 
     try:
         data = _request("/api/tags", timeout=5)
-        found = [str(m.get("name", "")) for m in (data.get("models") or [])]
+        listed = data.get("models") or []
+        found = [str(m.get("name", "")) for m in listed]
         found = [m for m in found if m]
-        _status_cache.update({"ts": now, "models": found, "error": ""})
+        # Where each model really runs: Ollama marks the ones it serves
+        # from its cloud with `remote_host` (see `cloud_host`).
+        remote = {str(m.get("name", "")): str(m.get("remote_host") or "")
+                  for m in listed if m.get("remote_host")}
+        _status_cache.update({"ts": now, "models": found, "error": "",
+                              "remote": remote})
         return list(found)
     except LLMError as e:
         _status_cache.update({"ts": now, "models": [], "error": str(e)})
@@ -235,6 +259,43 @@ def status():
     if error:
         return False, error
     return False, tr("Ollama отвечает, но моделей нет — установите модель")
+
+
+def cloud_host(model=None):
+    """
+    Where a model really runs when that is not this computer, or "".
+
+    Ollama serves some models from its cloud under ordinary names —
+    `gemma4:31b-cloud` — and answers for them at localhost. Its own list
+    says so (`remote_host`); when the list has not been read, the name
+    does: every such model's tag ends in `cloud`. Found 2026-10-03 on the
+    developer's own machine, where the setting said localhost and every
+    question, with the conversation before it, went to ollama.com.
+    """
+    import urllib.parse
+
+    name = str(model if model is not None else current_model()).strip()
+    host = (_status_cache.get("remote") or {}).get(name, "")
+    if host:
+        return urllib.parse.urlsplit(host).hostname or host
+    if re.search(r"(?:^|[:\-])cloud$", name.lower()):
+        return "ollama.com"
+    return ""
+
+
+#: The pause after the model failed to answer: which server and model, how
+#: many failures in a row, and until when it is left alone.
+_rest = {"key": None, "failures": 0, "until": 0.0}
+
+#: How long it is left alone, by failures in a row: a minute, three, ten.
+REST = (60, 180, 600)
+
+
+def resting():
+    """Seconds left of the pause for the current server and model, or 0."""
+    if _rest["key"] != (base_url(), current_model()):
+        return 0
+    return max(0, int(_rest["until"] - time.time()))
 
 
 def current_model():
@@ -421,6 +482,25 @@ def ask(question, history=None):
 
     wants_web = bool(_settings().get("llm_web", False))
 
+    # **A model that did not answer is not asked again at once**
+    # (2026-10-03). Each question used to wait out the whole timeout —
+    # thirty seconds of silence for «Спасибо», then again for «Рина» —
+    # because nothing remembered the last attempt. Now a failure to
+    # connect leaves the model alone for a minute, then three, then ten,
+    # and the question is answered without it at once. Another server or
+    # another model is another key: a person who switches models is not
+    # made to wait out the old one's pause.
+    model = current_model()
+    key = (base_url(), model)
+    if _rest["key"] == key and time.time() < _rest["until"]:
+        raise LLMUnreachable(tr("Модель недавно не ответила — пока не жду её."))
+
+    host = cloud_host(model)
+    if host:
+        from core.logging_setup import security_log
+        security_log().warning("Вопрос уходит облачной модели %s на %s",
+                               model, host)
+
     def once(extra=""):
         told = persona()
         if extra:
@@ -429,13 +509,22 @@ def ask(question, history=None):
         messages += _context_messages(history)
         messages.append({"role": "user", "content": question})
         data = _request("/api/chat", payload={
-            "model": current_model(),
+            "model": model,
             "messages": messages,
             "stream": False,
         }, timeout=max(5, min(timeout, 300)))
         return ((data.get("message") or {}).get("content") or "").strip()
 
-    answer = once(may_search() if wants_web else "")
+    try:
+        answer = once(may_search() if wants_web else "")
+    except LLMUnreachable:
+        failures = _rest["failures"] + 1 if _rest["key"] == key else 1
+        pause = REST[min(failures, len(REST)) - 1]
+        _rest.update(key=key, failures=failures, until=time.time() + pause)
+        log.info("Модель не отвечает — следующая попытка не раньше чем "
+                 "через %d с", pause)
+        raise
+    _rest.update(key=None, failures=0, until=0.0)
 
     # **The model decides, and it gets one search — not a conversation.**
     #

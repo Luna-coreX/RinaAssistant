@@ -161,17 +161,38 @@ def _absolute_time(text):
     return stamp
 
 
+#: A unit of a duration, as `_duration_seconds` reads it.
+_UNIT = r"(?:секунд\w*|минут\w*|час\w*|сек|мин)"
+_AMOUNT = r"(?:\d+(?:[.,]\d+)?|[а-яё]+)"
+
+#: A time in the forms the parsers above understand: «через 15 минут»,
+#: «через час», «через 1 час 30 минут», «через полчаса», «в 15:00»,
+#: «на 8 утра», with «завтра» or «сегодня» on either side.
+_WHEN = (r"(?:(?:завтра|сегодня)\s+)?"
+         r"(?:через\s+(?:полчаса|полтора\s+часа|"
+         rf"(?:{_AMOUNT}\s*)?{_UNIT}(?:\s+(?:и\s+)?{_AMOUNT}\s*{_UNIT})*)"
+         r"|(?:в|на)\s+\d{1,2}(?:[:.\s]\d{2})?"
+         r"(?:\s+(?:утра|дня|вечера|ночи))?)"
+         r"(?:\s+(?:завтра|сегодня))?")
+
+
 def _reminder_text(text):
-    """What exactly to remind about: the tail of the phrase after the time."""
+    """
+    What exactly to remind about: the phrase without the asking and the time.
+
+    The time is cut off **at either end**. Only the front was, so
+    «напомни позвонить маме через 5 минут» fired with the words «позвонить
+    маме через 5 минут» — the time read back to the person as part of the
+    errand. Not from the middle: «напомни позвонить через час маме» is
+    rare, and a pattern loose enough to find a time anywhere would start
+    eating the errand («купить 2 часа»).
+    """
     cleaned = re.sub(r"^.*?(напомни(?:ть)?|напоминание)\s*", "", text)
-    # we cut off the time: "через 15 минут", "через час", "завтра в 9", "в 15:00"
-    cleaned = re.sub(
-        r"^(?:завтра|сегодня)?\s*"
-        r"(через\s+.*?(?:секунд\w*|минут\w*|час\w*|полчаса)"
-        r"|(?:в|на)\s+\d{1,2}(?:[:.\s]\d{2})?)\s*", "", cleaned)
+    cleaned = re.sub(r"^" + _WHEN + r"\s*", "", cleaned)
+    cleaned = re.sub(r"\s*" + _WHEN + r"$", "", cleaned)
     cleaned = re.sub(r"^(что|чтобы|о том|про то)\s+", "", cleaned)
     cleaned = re.sub(r"\b(завтра|утра|вечера|ночи)\b", "", cleaned)
-    return cleaned.strip(" ,.—-")
+    return " ".join(cleaned.split()).strip(" ,.—-")
 
 
 def asked_for_one(text) -> bool:

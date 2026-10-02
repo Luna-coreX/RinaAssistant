@@ -436,6 +436,10 @@ _EN = {
     'Ярче': 'Brighter',
     'Темнее': 'Darker',
     'Яркость на 50': 'Brightness to 50',
+    # The model that does not answer (2026-10-03)
+    'Модель не отвечает — поищу «{query}» в интернете.': 'The model isn’t answering — I’ll search the web for “{query}”.',
+    'Модель сейчас не отвечает — без неё на это ответить не могу.': 'The model isn’t answering right now — I can’t answer that without it.',
+    'Модель недавно не ответила — пока не жду её.': 'The model didn’t answer a moment ago — not waiting on it for now.',
     # Other programs' windows (4.0b-K08)
     'Окнами управляет оболочка, а связи с ней нет.': 'Windows are handled by the shell, and there is no connection to it.',
     'Вкладками управляет сам браузер — мне доступны только окна целиком.': 'Tabs belong to the browser itself — I can only handle whole windows.',

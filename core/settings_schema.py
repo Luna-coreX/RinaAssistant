@@ -118,7 +118,10 @@ CONSTRAINTS: dict[str, Constraint] = {
     # The language model: three fields are meaningless while it is off.
     "llm_url": Constraint(depends_on="llm_enabled",
                           warn_code="llm.remote_address"),
-    "llm_model": Constraint(depends_on="llm_enabled"),
+    # A model Ollama serves from its cloud leaves the machine as surely as
+    # a remote address does (2026-10-03), so it is warned about the same.
+    "llm_model": Constraint(depends_on="llm_enabled",
+                            warn_code="llm.remote_address"),
     "llm_web": Constraint(depends_on="llm_enabled"),
     "llm_persona": Constraint(depends_on="llm_enabled"),
     # Who answers. Not under the model's switch: the personality changes
@@ -436,5 +439,13 @@ def validate(key: str, value: Any, settings=None) -> tuple[bool, str, str]:
             return True, "llm.remote_address", (
                 "Адрес не локальный: тексты разговоров будут уходить "
                 f"на {host}.")
+    if key == "llm_model" and isinstance(value, str) and value:
+        from core import llm
+
+        host = llm.cloud_host(value)
+        if host:
+            return True, "llm.remote_address", (
+                "Модель работает в облаке Ollama, а не на этом компьютере: "
+                f"тексты разговоров будут уходить на {host}.")
 
     return True, "", ""

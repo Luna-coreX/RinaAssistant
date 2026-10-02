@@ -38,7 +38,7 @@ Read a neighbouring file before writing a new one. A few things are consistent t
 There is a suite. Run it:
 
 ```bash
-python tools/regress.py          # 87 checks, about six minutes
+python tools/regress.py          # 88 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 

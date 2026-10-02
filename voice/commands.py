@@ -218,6 +218,38 @@ def match_answer(low):
     return None
 
 
+#: Words that go with small talk and change nothing in it: «спасибо
+#: большое», «ну привет», «как твои дела», «спасибо за помощь».
+SMALL_TALK_FILLER = frozenset({
+    "большое", "огромное", "тебе", "тебя", "вам", "очень", "ну", "а", "и",
+    "ещё", "еще", "у", "твои", "твоя", "за", "помощь", "всё", "все", "так",
+    "рина", "дорогая", "пожалуйста", "very", "much", "you", "so", "for",
+    "the", "help", "rina", "oh",
+})
+
+
+def only_small_talk(text):
+    """
+    Is the whole phrase one piece of small talk — nothing asked besides.
+
+    «Спасибо большое» is; «спасибо, а какая столица Австралии» is not —
+    the thanks is a courtesy in front of a question, and the question is
+    what wants answering.
+    """
+    from voice.textmatch import normalize
+
+    def bare(phrase):
+        # Both sides lose the same words: «как тебя зовут» has «тебя» in
+        # the table too.
+        return " ".join(w for w in normalize(phrase).split()
+                        if w not in SMALL_TALK_FILLER)
+
+    said = bare(text)
+    return bool(said) and any(said == bare(phrase)
+                              for phrases in ANSWER_PHRASES.values()
+                              for phrase in phrases)
+
+
 def known_commands():
     """For showing in the UI (the "Commands" tab)."""
     cmds = [

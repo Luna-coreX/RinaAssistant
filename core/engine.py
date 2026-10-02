@@ -1477,12 +1477,17 @@ class RinaEngine:
             if result.ok and result.message:
                 self.say(result.message)
                 return
-            # the model did not answer — we behave as if it were not there
-            self._fallback_reply(command, source)
+            # The model did not answer — we behave as if it were not
+            # there, and say why: «Извини, я не поняла команду» after
+            # thirty seconds of waiting blamed the person's words for a
+            # server that was not answering.
+            self._fallback_reply(
+                command, source,
+                model_down=result.error_code == "llm.unavailable")
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _fallback_reply(self, command, source):
+    def _fallback_reply(self, command, source, model_down=False):
         """
         The fallback — a search on the internet.
 
@@ -1491,6 +1496,9 @@ class RinaEngine:
         opened on them. Asked of `_unbidden`, which is the same fact the
         router is given — and asked of it rather than of the mode,
         because a typed line is nobody's chance speech.
+
+        `model_down`: the model was asked and did not answer. Said as
+        such — what failed is the model, not the phrase.
         """
         allowed = (self._settings.get("web_search_fallback", True)
                    and not self._unbidden(source))
@@ -1500,10 +1508,18 @@ class RinaEngine:
             if result.ok:
                 # The wording differs from an explicit search: the person
                 # did not ask to search, and it is more honest to say so.
-                self.say(tr("Не нашла такой команды — поищу «{query}» "
-                            "в интернете.", query=command))
+                if model_down:
+                    self.say(tr("Модель не отвечает — поищу «{query}» "
+                                "в интернете.", query=command))
+                else:
+                    self.say(tr("Не нашла такой команды — поищу «{query}» "
+                                "в интернете.", query=command))
                 return
 
+        if model_down:
+            self.say(tr("Модель сейчас не отвечает — без неё на это "
+                        "ответить не могу."), sound="error")
+            return
         self.say(tr("Извини, я не поняла команду."), sound="error")
 
     # ------------------------------------------------------------------

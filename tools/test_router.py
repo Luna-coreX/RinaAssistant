@@ -480,19 +480,42 @@ finally:
     _store.settings.set("llm_enabled", _was)
 
 print()
-print("=== светская беседа уходит модели, когда она есть ===")
-# Six canned lines are the same six lines for the life of the program,
-# and a person hears the table on the third day. Handed to the model —
-# but only when there is one, otherwise «привет» would stop working on
-# a machine with nothing configured, and the recorded set would stop
-# measuring what it measures.
-for phrase in ("как дела", "привет", "спасибо", "как тебя зовут"):
+print("=== светская беседа — своим ответом, и при модели ===")
+# It went to the model whenever there was one, so that six canned lines
+# would not sound like a table. Since 2026-10-02 her own answers vary
+# (`core/sayings.py`), and on 2026-10-03 «Спасибо» waited thirty seconds
+# for a model that had lost its connection. Small talk that is only
+# small talk is hers now; a phrase with a request in it is still the
+# model's, or the request would be lost behind «Привет. Слушаю.».
+for phrase in ("как дела", "привет", "спасибо", "как тебя зовут",
+               "спасибо большое", "ну привет", "как дела у тебя"):
     check(f"«{phrase}» без модели отвечает сама",
           route(phrase, ctx).name == "builtin.answer",
           f"| {route(phrase, ctx).name}")
-    check(f"«{phrase}» с моделью уходит ей",
+    check(f"«{phrase}» и с моделью отвечает сама",
+          route(phrase, llm).name == "builtin.answer",
+          f"| {route(phrase, llm).name}")
+for phrase in ("привет, расскажи анекдот",
+               "спасибо, а какая столица австралии"):
+    check(f"«{phrase}» с моделью — ей: в фразе есть просьба",
           route(phrase, llm).name == "llm.answer",
           f"| {route(phrase, llm).name}")
+
+print()
+print("=== имя в начале набранной фразы — не часть команды ===")
+# Typed, or said in an open conversation, the name is not required and
+# was not cut: «Рина, который час» went to a web search and «Рина» alone
+# to the model, which waited thirty seconds for it (2026-10-03).
+named = RouterContext(apps=APPS, wake_words=("Рина", "Rina"), llm_enabled=True)
+for phrase, wanted in (("Рина", "ask.wake"), ("Рина!", "ask.wake"),
+                       ("рина", "ask.wake"), ("Рина, который час", "clock"),
+                       ("Рина, спасибо", "builtin.answer"),
+                       ("Рина, посчитай 2*3", "calc")):
+    check(f"«{phrase}» — {wanted}", route(phrase, named).name == wanted,
+          f"| {route(phrase, named).name}")
+check("только имя целиком: «Ринат, привет» — не обращение к Рине",
+      route("Ринат, привет", named).name == "llm.answer",
+      f"| {route('Ринат, привет', named).name}")
 
 # What she must not invent. A model asked "what can you do" answers for
 # assistants in general; here the list is exact and is the product's

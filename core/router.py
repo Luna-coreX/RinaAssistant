@@ -202,14 +202,39 @@ def route(text, ctx=None):
 # ---------------------------------------------------------------------------
 def _strip_wake(text, ctx):
     """The command without the wake word. None means there was no activation."""
+    words = [w for w in (ctx.wake_words or ()) if w]
     if not ctx.require_wake:
-        return text.strip()
+        return _without_name(text, words)
     from voice.wake import strip_wake
 
-    words = [w for w in (ctx.wake_words or ()) if w]
     if not words:
         return text.strip()
     return strip_wake(text, list(words))
+
+
+def _without_name(text, words):
+    """
+    The phrase without the name in front, when the name was not required.
+
+    Typed, or said while a conversation is open, the name is still how a
+    person begins: «Рина, который час». Left in, it was part of the
+    command — nothing knew «рина который час», and the phrase went to a
+    web search; «Рина» on its own went to the model and waited thirty
+    seconds for an answer to her own name (2026-10-03). Without it, the
+    name alone is an empty command, which is «Да? Слушаю.».
+
+    **Only in front, and only the name exactly.** Inside a sentence it is a
+    word of the sentence, and the fuzzy match the microphone needs would
+    eat words that merely sound like it. Cut from the text as typed, not
+    from its tokens, so «Рина, посчитай 2*3» keeps its sign.
+    """
+    for wake in sorted(words, key=len, reverse=True):
+        name = r"\s+".join(re.escape(part) for part in wake.split())
+        found = re.match(r"\s*" + name + r"(?!\w)[\s,.!?:;…—-]*", text,
+                         re.IGNORECASE)
+        if found:
+            return text[found.end():].strip()
+    return text.strip()
 
 
 def _said(command, words):
@@ -791,27 +816,28 @@ def _builtin(command, ctx):
 
     topic = commands.match_answer(command.lower().strip())
     if topic:
-        # Small talk goes to the model when there is one.
+        # **Small talk that is only small talk Rina answers herself,
+        # model or no model** (2026-10-03).
         #
-        # «Как дела» answered from a table of six lines is the same six
-        # lines for the rest of the program's life, and a person hears
-        # the table on the third day. This is the one part of what Rina
-        # says that has no right answer to be got wrong, so it is the
-        # one part worth handing to something that can vary.
+        # It used to go to the model whenever there was one: «как дела»
+        # from a table of six lines was the same six lines for the life
+        # of the program. Two things changed that. Her own answers now
+        # come in several variants and never twice in a row
+        # (`core/sayings.py`), so the table no longer sounds like one.
+        # And the price showed: «Спасибо» waited thirty seconds for a
+        # cloud model that had lost its connection, then went to a web
+        # search — for a thank-you.
         #
-        # **Except what she must not invent.** `capabilities` is an
-        # enumeration of what this program actually does; a model
-        # asked "what can you do" will answer for assistants in
-        # general, and on a product whose whole claim is an exact list
-        # that is not a livelier answer but a false one.
-        #
-        # **And only when a model is there.** Without one the table
-        # answers as before — that is what keeps «привет» working on a
-        # machine with nothing configured, and what keeps the recorded
-        # set (`docs/golden/utterances.json`) measuring the same thing
-        # it measured: the runner has no model, so it still sees
-        # `builtin.answer`.
-        if topic != "capabilities" and ctx.llm_enabled:
+        # **A phrase with more in it still goes to the model.** The
+        # table finds its words anywhere in a phrase, and «привет,
+        # расскажи анекдот» answered «Привет. Слушаю.» would lose the
+        # request. So with a model, only a phrase that is nothing but
+        # the greeting, the thanks or the question about her name is
+        # answered here. `capabilities` is always answered here: an
+        # exact list of what this program does, which a model would
+        # answer for assistants in general.
+        if (ctx.llm_enabled and topic != "capabilities"
+                and not commands.only_small_talk(command)):
             return None
         return Intent("builtin.answer", {"topic": topic}, stage="builtin")
 
