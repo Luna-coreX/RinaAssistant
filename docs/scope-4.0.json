@@ -995,6 +995,12 @@
     "size": "M",
     "title": "Персона на разных языках и имя собеседника"
   },
+  "4.0b-E15": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "LM Studio и OpenRouter"
+  },
   "4.0b-K01": {
     "done": true,
     "milestone": "4.0-beta",
@@ -1102,6 +1108,12 @@
     "milestone": "4.0-beta",
     "size": "M",
     "title": "Проверки шли не тем питоном, что ядро"
+  },
+  "4.0b-V10": {
+    "done": false,
+    "milestone": "4.0-beta",
+    "size": "L",
+    "title": "Рина слышит себя из динамиков"
   },
   "V-01": {
     "done": true,
