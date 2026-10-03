@@ -855,13 +855,16 @@ class PiperSynthesiser:
     def __init__(self, model_path: str):
         self.model_path = model_path
         self._voice = None
-        self._error = ""
+        #: Why there is no voice, in words — read by the server under the
+        #: same name as `EngineSynthesiser`'s. It was `_error`, which
+        #: nothing read, so a missing model came out as «синтез недоступен».
+        self.last_error = ""
 
     def available(self) -> bool:
         if self._voice is not None:
             return True
         if not self.model_path:
-            self._error = "модель Piper не выбрана"
+            self.last_error = "модель Piper не выбрана"
             return False
         try:
             from piper import PiperVoice
@@ -869,7 +872,7 @@ class PiperSynthesiser:
             self._voice = PiperVoice.load(self.model_path)
             return True
         except Exception as exc:                        # noqa: BLE001
-            self._error = str(exc)
+            self.last_error = str(exc)
             return False
 
     @property
@@ -888,12 +891,51 @@ class PiperSynthesiser:
         return int(getattr(self._voice.config, "sample_rate", RATE))
 
     def synthesize(self, text: str, voice: str = "", rate: int = 100) -> bytes:
+        """
+        The utterance as 16-bit mono PCM at `sample_rate`.
+
+        **Both of Piper's interfaces.** `piper-tts` 1.2 had
+        `synthesize_stream_raw`, which yielded raw bytes; 1.3 rewrote the
+        library and `synthesize` now yields `AudioChunk`s, one per
+        sentence, with the bytes in `audio_int16_bytes`. The setup wizard
+        installs whatever version is current, so only the old call broke
+        the first time a person tried a voice they had trained
+        (2026-10-03): «PiperVoice has no attribute synthesize_stream_raw».
+        `voice/tts.py` had met the same change in 3.1.0 and asks which one
+        it has; this does the same.
+
+        **The speed is the person's.** `rate` is the `speed` setting, 100 —
+        as the model was trained. Piper speaks slower with a larger
+        `length_scale`, so the model's own one is divided by the speed. The
+        old interface is left at the model's pace, as before.
+        """
         if not self.available():
             return b""
-        chunks = bytearray()
-        for piece in self._voice.synthesize_stream_raw(text):
-            chunks.extend(piece)
-        return bytes(chunks)
+        try:
+            if hasattr(self._voice, "synthesize_stream_raw"):
+                return b"".join(self._voice.synthesize_stream_raw(text))
+            return b"".join(chunk.audio_int16_bytes for chunk in
+                            self._voice.synthesize(text, self._pace(rate)))
+        except Exception as exc:                        # noqa: BLE001
+            # A voice that fails on one phrase says so in words, like a
+            # voice that would not load, rather than taking the reply down.
+            self.last_error = str(exc)
+            return b""
+
+    def _pace(self, rate: int):
+        """Piper's settings for this speed, or None for the model's own."""
+        try:
+            speed = max(50, min(200, int(rate or 100)))
+        except (TypeError, ValueError):
+            speed = 100
+        if speed == 100:
+            return None
+        try:
+            from piper import SynthesisConfig
+        except ImportError:
+            return None
+        own = getattr(self._voice.config, "length_scale", None) or 1.0
+        return SynthesisConfig(length_scale=float(own) * 100.0 / speed)
 
 
 def pcm_from_file(path: str) -> tuple[bytes, int]:

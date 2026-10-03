@@ -1109,6 +1109,88 @@ check("прокси передаётся движку явно",
       source.count("proxy=") >= 2,
       "| Communicate без proxy= снова спросит окружение")
 
+# ---------------------------------------------------------------------------
+print()
+print("=== Piper: обе версии библиотеки (2026-10-03) ===")
+# `piper-tts` 1.3 rewrote the library: `synthesize_stream_raw` is gone, and
+# `synthesize` yields chunks with the bytes in `audio_int16_bytes`. The
+# wizard installs the current version, so the first voice a person had
+# trained broke on «PiperVoice has no attribute synthesize_stream_raw».
+# Substituted voices of both shapes; the real model is not the point.
+
+
+class Config:
+    sample_rate = 22050
+    length_scale = 1.2
+
+
+class NewVoice:
+    """piper-tts 1.3+: chunks per sentence, a config for the pace."""
+
+    config = Config()
+
+    def __init__(self):
+        self.paces = []
+
+    def synthesize(self, text, syn_config=None):
+        self.paces.append(syn_config)
+
+        class Chunk:
+            def __init__(self, data):
+                self.audio_int16_bytes = data
+        return iter([Chunk(b"\x01\x00" * 3), Chunk(b"\x02\x00" * 2)])
+
+
+class OldVoice:
+    """piper-tts 1.2: raw bytes."""
+
+    config = Config()
+
+    def synthesize_stream_raw(self, text):
+        return iter([b"\x01\x00" * 3, b"\x02\x00" * 2])
+
+
+class BrokenVoice:
+    config = Config()
+
+    def synthesize(self, text, syn_config=None):
+        raise RuntimeError("модель сломана")
+
+
+piper_voice = speech.PiperSynthesiser("voice.onnx")
+for label, voice in (("новая библиотека", NewVoice()),
+                     ("старая библиотека", OldVoice())):
+    piper_voice._voice = voice
+    pcm = piper_voice.synthesize("Привет.")
+    check(f"{label}: звук собран целиком", pcm == b"\x01\x00" * 3 + b"\x02\x00" * 2,
+          f"| {len(pcm)} байт")
+
+newer = NewVoice()
+piper_voice._voice = newer
+piper_voice.synthesize("Привет.", rate=100)
+check("обычная скорость — темп самой модели", newer.paces[-1] is None,
+      f"| {newer.paces[-1]}")
+try:
+    import piper  # noqa: F401
+    has_piper = True
+except ImportError:
+    has_piper = False
+if has_piper:
+    piper_voice.synthesize("Привет.", rate=150)
+    pace = newer.paces[-1]
+    check("быстрее — длительность звуков короче во столько же раз",
+          pace is not None and abs(pace.length_scale - 1.2 / 1.5) < 1e-6,
+          f"| {getattr(pace, 'length_scale', None)}")
+
+piper_voice._voice = BrokenVoice()
+check("сбой синтеза — пустой звук и причина словами, а не падение ответа",
+      piper_voice.synthesize("Привет.") == b"" and "сломана" in piper_voice.last_error,
+      f"| {piper_voice.last_error!r}")
+missing = speech.PiperSynthesiser("")
+check("без модели причина названа там, где её читает сервер",
+      not missing.available() and missing.last_error == "модель Piper не выбрана",
+      f"| {missing.last_error!r}")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
