@@ -491,6 +491,15 @@ class RinaEngine:
                  "вкл" if self._always_listen else "выкл",
                  "идёт" if self._busy else "нет")
 
+    def listening_once(self):
+        """
+        Is a one-off listen on a hotkey under way (`4.0b-V10`).
+
+        The microphone is then open because the person asked for it, and
+        what it hears is theirs even if she is still talking.
+        """
+        return bool(self._busy)
+
     def talking(self, now=None):
         """Is a conversation open right now."""
         now = time.monotonic() if now is None else now

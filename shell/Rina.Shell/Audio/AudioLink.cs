@@ -84,6 +84,11 @@ public sealed class AudioLink : IDisposable
         _microphone = microphone;
         _speaker = speaker;
 
+        // Her voice out of the microphone (`4.0b-V10`): the speaker hands
+        // over what it plays, the microphone subtracts it.
+        _microphone.Canceller = _echo;
+        _speaker.Played += _echo.Played;
+
         _microphone.Captured += OnCaptured;
         _microphone.Level += level => Level?.Invoke(level);
         _connection.EventReceived += OnEvent;
@@ -98,6 +103,14 @@ public sealed class AudioLink : IDisposable
     /// resolved here, and "default" is not a name but a mark meaning "not
     /// chosen".
     /// </remarks>
+    private readonly EchoCanceller _echo = new();
+
+    /// <summary>The echo canceller, for the diagnostics and the checks.</summary>
+    public EchoCanceller Echo => _echo;
+
+    /// <summary>Whether her voice is taken out of the microphone.</summary>
+    public void UseEchoCancellation(bool wanted) => _echo.Enabled = wanted;
+
     public void UseDevices(string input, string output)
     {
         _inputDevice = input is "default" or "" ? 0 : Microphone.IndexOf(input);
@@ -314,8 +327,10 @@ public sealed class AudioLink : IDisposable
         _reading?.Cancel();
         _connection.EventReceived -= OnEvent;
         _microphone.Captured -= OnCaptured;
+        _speaker.Played -= _echo.Played;
         _microphone.Dispose();
         _speaker.Dispose();
+        _echo.Dispose();
         _reading?.Dispose();
     }
 }

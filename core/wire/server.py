@@ -1670,7 +1670,9 @@ class ProtocolServer:
                 self.heard["phrases"] += 1
                 log.info("Договорено при закрытии потока: %.1f с звука",
                          len(tail) / (16000 * 2))
-                self._queue_phrase(tail)
+                began = time.monotonic() - len(tail) / (speech.RATE
+                                                        * speech.SAMPLE_BYTES)
+                self._queue_phrase(tail, over_her=self.voice_heard_at(began))
         return {"closed": state is not None,
                 "bytes": (state or {}).get("bytes", 0)}
 
@@ -2033,6 +2035,21 @@ class ProtocolServer:
     #: away rather than spoken over them.
     _cut_in = False
 
+    #: Until when her voice is coming out of the speakers, by the clock of
+    #: `time.monotonic` (`4.0b-V10`). Counted here rather than asked of the
+    #: shell: what was sent and when is known exactly, the shell plays it in
+    #: real time, and the credit it returns keeps the core no more than a
+    #: couple of seconds ahead of the speaker.
+    _voice_until = 0.0
+
+    #: How long after the shell has the first sound before it plays it: its
+    #: queue waits for a few tenths of a second of sound before starting.
+    PLAY_LEAD = 0.5
+
+    #: How long her voice still hangs in the room after the last sound —
+    #: the device's buffer and the room's echo.
+    ECHO_TAIL = 0.8
+
     #: Whether there is speech of hers in flight right now. Without it
     #: every phrase with her name in it — that is, most of them in
     #: "always listening" — would announce an interruption of nothing:
@@ -2183,9 +2200,14 @@ class ProtocolServer:
         for phrase in phrases:
             self.heard["phrases"] += 1
             log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
+            # When the phrase began, from its length: the sound arrives as
+            # it is recorded, so its end is about now (`4.0b-V10`).
+            began = time.monotonic() - len(phrase) / (speech.RATE
+                                                      * speech.SAMPLE_BYTES)
             # Already fed, piece by piece — so what goes into the queue
             # is the order to finish, not the sound a second time.
-            self._queue_phrase(None if self._streaming() else phrase)
+            self._queue_phrase(None if self._streaming() else phrase,
+                               over_her=self.voice_heard_at(began))
 
     def _say_what_is_heard(self) -> None:
         """One line per change of what the microphone is doing."""
@@ -2240,23 +2262,25 @@ class ProtocolServer:
                 log.warning("Распознавание не поспевает: фраза брошена целиком")
             self._stt_wake.notify_all()
 
-    def _queue_phrase(self, phrase: "bytes | None") -> None:
+    def _queue_phrase(self, phrase: "bytes | None",
+                      over_her: bool = False) -> None:
         """
         Put a finished phrase in the queue; see `_phrases` for why there is one.
 
         `None` means the sound has already been fed piece by piece and
-        what is wanted now is the words.
+        what is wanted now is the words. `over_her` — the phrase began
+        while her voice was coming out of the speakers (`4.0b-V10`).
         """
         waiting = self._stt_queue()
         with self._stt_wake:
-            waiting.append(("phrase", phrase))
+            waiting.append(("phrase", phrase, over_her))
             # Only phrases carrying sound are counted against the bound:
             # one that has already been fed piece by piece is a marker
             # weighing nothing, and its backlog is the pieces, which have
             # a bound of their own.
             while True:
-                heavy = [i for i, (kind, said) in enumerate(waiting)
-                         if kind == "phrase" and said is not None]
+                heavy = [i for i, item in enumerate(waiting)
+                         if item[0] == "phrase" and item[1] is not None]
                 if len(heavy) <= self.PHRASE_QUEUE:
                     break
                 gone = waiting[heavy[0]][1]
@@ -2280,7 +2304,8 @@ class ProtocolServer:
             with self._stt_wake:
                 while not waiting:
                     self._stt_wake.wait()
-                kind, payload = waiting.popleft()
+                item = waiting.popleft()
+            kind, payload = item[0], item[1]
             try:
                 if kind == "part":
                     if payload is None:
@@ -2288,14 +2313,15 @@ class ProtocolServer:
                     else:
                         self.recogniser.feed(payload)
                 else:
-                    self._recognise(payload)
+                    self._recognise(payload,
+                                    over_her=len(item) > 2 and item[2])
             except Exception:                           # noqa: BLE001
                 # The thread is the only one there is: letting it die would
                 # mean silence for the rest of the session, and silence is
                 # how this whole chain fails invisibly.
                 log.exception("Распознавание сорвалось")
 
-    def _recognise(self, phrase: bytes) -> None:
+    def _recognise(self, phrase: bytes, over_her: bool = False) -> None:
         with trace_scope():
             if not self.recogniser.available():
                 # Silence will not do here: the person will decide they
@@ -2342,6 +2368,30 @@ class ProtocolServer:
                           safe(outcome.text))
                 return
 
+            from voice import wake as wake_mod
+
+            hushed = wake_mod.hush_asked(outcome.text)
+            named = bool(wake_mod.find_wake(
+                outcome.text, wake_mod.get_wake_words(self._settings() or {}))[0])
+
+            # **Said over her, it is her — unless it is her name or
+            # «стоп»** (`4.0b-V10`). Through speakers her voice comes back
+            # into the microphone, and comes back misheard: the check
+            # above compares words, and a phrase recognised askew no
+            # longer matches what she said. It then went on as a command
+            # of the person's, and she answered her own words. A phrase
+            # that began while her voice was in the room is let through
+            # only if it is one of the two things that cut in. Not when a
+            # person pressed the key to speak: then the microphone is
+            # open because they asked for it, and what they say is theirs.
+            listening_once = getattr(self.engine, "listening_once", None)
+            if (over_her and not (hushed or named)
+                    and not (listening_once and listening_once())):
+                log.info("Сказано поверх её речи и без имени — скорее "
+                         "всего, это её же голос, не в счёт: %s",
+                         safe(outcome.text))
+                return
+
             self.heard["texts"] += 1
             log.info("Распознано: %s", safe(outcome.text))
 
@@ -2351,11 +2401,6 @@ class ProtocolServer:
             # in the shell's queue, and a second of talking over somebody
             # who has just interrupted is the whole of what interrupting
             # is against.
-            from voice import wake as wake_mod
-
-            hushed = wake_mod.hush_asked(outcome.text)
-            named = bool(wake_mod.find_wake(
-                outcome.text, wake_mod.get_wake_words(self._settings() or {}))[0])
             if hushed or named:
                 self.hush()
             if (named or not self.engine.is_always_listen()) and not hushed:
@@ -2516,6 +2561,8 @@ class ProtocolServer:
                     break
         log.info("Перебили — замолкаю")
         self.send(Envelope.event("speech.stop", {}, id=self.ids.next()))
+        # What was queued is not going to play.
+        self._voice_until = min(self._voice_until, time.monotonic())
 
     def _speak(self, text: str) -> None:
         """
@@ -2811,6 +2858,16 @@ class ProtocolServer:
                             self.SPEECH_WAIT, len(pcm) - offset, len(pcm))
                 return
             self.channels.data.send(self.data.send(self._speech_stream, piece))
+            # The piece plays after whatever is ahead of it, and not before
+            # the shell's queue starts playing at all (`PLAY_LEAD`).
+            now = time.monotonic()
+            self._voice_until = (max(self._voice_until, now + self.PLAY_LEAD)
+                                 + len(piece) / (speech.SAMPLE_BYTES
+                                                 * max(sample_rate, 1)))
+
+    def voice_heard_at(self, moment: float) -> bool:
+        """Was her voice coming out of the speakers at this moment."""
+        return moment < self._voice_until + self.ECHO_TAIL
 
     # -- the break ---------------------------------------------------------------
 

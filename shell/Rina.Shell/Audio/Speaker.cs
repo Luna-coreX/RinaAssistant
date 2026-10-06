@@ -35,6 +35,14 @@ public sealed class Speaker : IDisposable
     /// <summary>Rina is speaking. While she is, the microphone does not hear itself.</summary>
     public event Action<bool>? Speaking;
 
+    /// <summary>
+    /// What the device has just read to play: 16-bit mono PCM at the rate
+    /// given (<c>4.0b-V10</c>). The far end the echo canceller subtracts —
+    /// taken here, at the device, because this is the sound that actually
+    /// goes out, silence included.
+    /// </summary>
+    public event Action<byte[], int>? Played;
+
     public bool IsSpeaking { get; private set; }
 
     /// <summary>How many bytes are lying unplayed.</summary>
@@ -235,7 +243,7 @@ public sealed class Speaker : IDisposable
             DeviceNumber = WaveOut.DeviceCount > 0
                 ? Math.Clamp(Device, 0, WaveOut.DeviceCount - 1) : 0,
         };
-        _device.Init(_buffer);
+        _device.Init(new Tap(_buffer, this));
     }
 
     /// <summary>
@@ -415,6 +423,20 @@ public sealed class Speaker : IDisposable
         if (IsSpeaking == value) return;
         IsSpeaking = value;
         Speaking?.Invoke(value);
+    }
+
+    /// <summary>Passes the sound through and tells who listens what it was.</summary>
+    private sealed class Tap(IWaveProvider source, Speaker owner) : IWaveProvider
+    {
+        public WaveFormat WaveFormat => source.WaveFormat;
+
+        public int Read(byte[] buffer, int offset, int count)
+        {
+            var read = source.Read(buffer, offset, count);
+            if (read > 0 && owner.Played is { } played)
+                played(buffer.AsSpan(offset, read).ToArray(), WaveFormat.SampleRate);
+            return read;
+        }
     }
 
     public void Dispose()

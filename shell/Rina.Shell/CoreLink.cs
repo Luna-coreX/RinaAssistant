@@ -196,13 +196,28 @@ public sealed class CoreLink : IAsyncDisposable
         }
     }
 
-    /// <summary>The devices the person chose — from the core's settings.</summary>
-    private async Task ApplyAudioSettingsAsync()
+    /// <summary>The settings the sound follows: which devices, and the echo.</summary>
+    public static readonly HashSet<string> AudioKeys =
+        ["input_device", "output_device", "echo_cancellation"];
+
+    /// <summary>
+    /// The devices the person chose, and whether her voice is taken out of
+    /// the microphone — from the core's settings.
+    /// </summary>
+    /// <remarks>
+    /// Asked at every new link and again whenever one of
+    /// <see cref="AudioKeys"/> is saved: a switch that waited for the next
+    /// link would look like a switch that does nothing.
+    /// </remarks>
+    public async Task ApplyAudioSettingsAsync()
     {
-        var values = await GetAsync("input_device", "output_device");
+        var values = await GetAsync("input_device", "output_device",
+                                    "echo_cancellation");
         if (values is null || _voice is null) return;
         _voice.UseDevices(values["input_device"]?.GetValue<string>() ?? "default",
                           values["output_device"]?.GetValue<string>() ?? "default");
+        _voice.UseEchoCancellation(
+            values["echo_cancellation"]?.GetValue<bool>() ?? true);
     }
 
     public CoreState State => _boss.State;

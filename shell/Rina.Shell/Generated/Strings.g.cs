@@ -1863,6 +1863,11 @@ public static partial class Loc
                 {
                     ["English"] = "Name to keep it under",
                 },
+            ["Подавлять эхо"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Cancel echo",
+                },
             ["Подробность журнала"] =
                 new Dictionary<string, string>
                 {
@@ -2197,6 +2202,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults.",
+                },
+            ["Рина не слышит свой голос из динамиков. В наушниках не нужно"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Rina does not hear her own voice from the speakers. Not needed with headphones",
                 },
             ["Рина скажет это вместо «Готово»"] =
                 new Dictionary<string, string>

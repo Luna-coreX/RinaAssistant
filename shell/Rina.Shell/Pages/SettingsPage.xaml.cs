@@ -2207,6 +2207,8 @@ public partial class SettingsPage : UserControl
         if (accepted)
         {
             _values[key] = value;
+            if (_link is not null && CoreLink.AudioKeys.Contains(key))
+                _ = _link.ApplyAudioSettingsAsync();
             if (_open is { } shown && shown.Sheet.Keys.Contains(key))
                 Refill(shown.Sheet, shown.Window);
             if (key == "finish" && _link is not null)

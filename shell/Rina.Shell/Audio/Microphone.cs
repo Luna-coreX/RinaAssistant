@@ -43,6 +43,12 @@ public sealed class Microphone : IDisposable
     /// <summary>Level 0..1 — for the instrument strip.</summary>
     public event Action<float>? Level;
 
+    /// <summary>
+    /// Her voice taken out of what is heard (<c>4.0b-V10</c>); null — the
+    /// sound as it comes.
+    /// </summary>
+    public EchoCanceller? Canceller { get; set; }
+
     /// <summary>Capture is running.</summary>
     public bool Running { get; private set; }
 
@@ -129,6 +135,9 @@ public sealed class Microphone : IDisposable
     private void OnData(object? sender, WaveInEventArgs e)
     {
         var chunk = e.Buffer.AsSpan(0, e.BytesRecorded).ToArray();
+        // Before the level as well as before the core: the figure and the
+        // strip should not move to her own voice either.
+        if (Canceller is { } canceller) chunk = canceller.Process(chunk);
         Level?.Invoke(LevelOf(chunk));
         Captured?.Invoke(chunk);
     }

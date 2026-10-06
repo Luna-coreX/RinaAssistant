@@ -57,6 +57,8 @@ GROUPS = {
         "stt_engine": "disabled",
         "input_device": "default",
         "output_device": "default",
+        # Her voice taken out of the microphone by the shell (`4.0b-V10`).
+        "echo_cancellation": True,
         "vosk_model": "",
         "whisper_model": "base",
         "piper_model": "",

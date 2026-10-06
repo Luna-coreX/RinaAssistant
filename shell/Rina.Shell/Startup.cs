@@ -255,6 +255,19 @@ public partial class App
         // Other programs' windows (`4.0b-K08`), on a window of the check's
         // own: a second process of this shell opens it, and the check
         // closes it the way Rina closes Discord.
+        if (args.Contains("--check-echolive"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckEchoLiveAsync(), "echolive");
+            return;
+        }
+        if (args.Contains("--check-echo"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckEchoAsync(), "echo");
+            return;
+        }
+
         if (args.Contains("--check-windows-target"))
         {
             ShowWindowsTarget();
@@ -4908,6 +4921,269 @@ public partial class App
     /// measuring: written, read back, refused when it is nonsense, and
     /// never allowed off the edge of the screen it will open on.
     /// </remarks>
+    /// <summary>
+    /// Her voice taken out of the microphone (<c>4.0b-V10</c>), on sound
+    /// made up here — no speaker plays, no microphone listens.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The far end is a voice-like sound at 24 kHz, Edge's rate; the
+    /// microphone hears it 120 ms later, at half the level, with a little
+    /// room noise under it. The far end is handed over a chunk ahead of
+    /// the microphone, as the speaker's device reads it ahead in life.
+    /// </para>
+    /// <para>
+    /// What is measured is what matters: how much of her voice is left
+    /// once the canceller has settled, and that a person speaking over
+    /// her is not taken out with it.
+    /// </para>
+    /// </remarks>
+    private async Task CheckEchoAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== её голос вычитается из микрофона (4.0b-V10) ===");
+        const int farRate = 24000, chunk = Audio.EchoCanceller.Rate / 10;
+        const double seconds = 8.0;
+        var random = new Random(20261006);
+
+        // Voice-like: a few harmonics of a wandering pitch, opened and
+        // closed in syllables, over a breath of noise.
+        short[] Voice(int rate, double pitch, int seed)
+        {
+            var noise = new Random(seed);
+            var n = (int)(rate * seconds);
+            var outSamples = new short[n];
+            var phase = 0.0;
+            for (var i = 0; i < n; i++)
+            {
+                var t = (double)i / rate;
+                var f = pitch * (1 + 0.15 * Math.Sin(2 * Math.PI * 0.7 * t + seed));
+                phase += 2 * Math.PI * f / rate;
+                var syllable = Math.Max(0, Math.Sin(2 * Math.PI * 3.1 * t + seed));
+                var sample = 0.0;
+                for (var h = 1; h <= 6; h++) sample += Math.Sin(h * phase) / h;
+                sample = sample * syllable + 0.1 * (noise.NextDouble() - 0.5);
+                outSamples[i] = (short)(sample * 7000);
+            }
+            return outSamples;
+        }
+
+        byte[] Bytes(short[] samples, int from, int count)
+        {
+            var data = new byte[count * 2];
+            for (var i = 0; i < count && from + i < samples.Length; i++)
+            {
+                var value = samples[from + i];
+                data[2 * i] = (byte)value;
+                data[2 * i + 1] = (byte)(value >> 8);
+            }
+            return data;
+        }
+
+        double Energy(IEnumerable<short> samples)
+        {
+            double sum = 0; var count = 0;
+            foreach (var s in samples) { sum += (double)s * s; count++; }
+            return count == 0 ? 0 : sum / count;
+        }
+
+        var far = Voice(farRate, 180, 1);
+        var farHere = Audio.EchoCanceller.Resample(Bytes(far, 0, far.Length), farRate);
+        var near = Voice(Audio.EchoCanceller.Rate, 120, 7);
+        var delay = Audio.EchoCanceller.Rate * 120 / 1000;
+        var total = (int)(Audio.EchoCanceller.Rate * seconds);
+
+        // The person speaks over her between the sixth and the seventh second.
+        bool Talking(int at) => at >= Audio.EchoCanceller.Rate * 6
+                                && at < Audio.EchoCanceller.Rate * 7;
+
+        var mic = new short[total];
+        for (var i = 0; i < total; i++)
+        {
+            var echo = i >= delay && i - delay < farHere.Length ? farHere[i - delay] / 2 : 0;
+            var speaking = Talking(i) ? near[i] : 0;
+            mic[i] = (short)Math.Clamp(echo + speaking + random.Next(-60, 60),
+                                       short.MinValue, short.MaxValue);
+        }
+
+        using var canceller = new Audio.EchoCanceller();
+        var cleaned = new List<short>(total);
+        var farChunk = farRate / 10;
+        var fed = 0;
+        void FeedFar()
+        {
+            canceller.Played(Bytes(far, fed * farChunk, farChunk), farRate);
+            fed++;
+        }
+
+        FeedFar();                                  // the device reads ahead
+        await Task.Run(() =>
+        {
+            for (var at = 0; at + chunk <= total; at += chunk)
+            {
+                FeedFar();
+                var outBytes = canceller.Process(Bytes(mic, at, chunk));
+                for (var i = 0; i + 1 < outBytes.Length; i += 2)
+                    cleaned.Add((short)(outBytes[i] | (outBytes[i + 1] << 8)));
+            }
+        });
+
+        Check("подавитель эха Windows поднялся", canceller.Failure.Length == 0,
+              $"| {canceller.Failure}");
+        Check("и вернул звук целиком", Math.Abs(cleaned.Count - total) <= chunk,
+              $"| {cleaned.Count} из {total}");
+
+        int Second(double s) => (int)(s * Audio.EchoCanceller.Rate);
+        var heardEcho = Energy(mic.Skip(Second(3)).Take(Second(3)));
+        var leftEcho = Energy(cleaned.Skip(Second(3)).Take(Second(3)));
+        var erle = 10 * Math.Log10(heardEcho / Math.Max(leftEcho, 1));
+        Check("сойдясь, эхо гасится не меньше чем на 15 дБ", erle >= 15,
+              $"| {erle:0.0} дБ");
+
+        var person = Energy(near.Skip(Second(6)).Take(Second(1)));
+        var kept = Energy(cleaned.Skip(Second(6)).Take(Second(1)));
+        var keptDb = 10 * Math.Log10(kept / Math.Max(person, 1));
+        Check("голос человека поверх неё остаётся", keptDb >= -10,
+              $"| {keptDb:0.0} дБ от сказанного");
+
+        // The control: the same microphone without her voice handed over.
+        // What is taken out has to be taken out because it is hers — a
+        // canceller that quietened any voice would pass the check above
+        // and silence the person in life.
+        using var blind = new Audio.EchoCanceller();
+        var unaided = new List<short>(total);
+        await Task.Run(() =>
+        {
+            for (var at = 0; at + chunk <= total; at += chunk)
+            {
+                var outBytes = blind.Process(Bytes(mic, at, chunk));
+                for (var i = 0; i + 1 < outBytes.Length; i += 2)
+                    unaided.Add((short)(outBytes[i] | (outBytes[i + 1] << 8)));
+            }
+        });
+        var blindDb = 10 * Math.Log10(heardEcho
+            / Math.Max(Energy(unaided.Skip(Second(3)).Take(Second(3))), 1));
+        Check("без образца её голоса тот же звук не гасится — вычитается именно она",
+              blindDb < 6, $"| {blindDb:0.0} дБ");
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
+    /// <summary>
+    /// The same in the room: the default speaker plays, the default
+    /// microphone listens (<c>4.0b-V10</c>). Touches the machine — it is
+    /// heard — so it is not in the ordinary regression.
+    /// </summary>
+    /// <remarks>
+    /// Four seconds of a voice-like sound, twice: once with her voice taken
+    /// out, once without. With headphones, or the speaker turned down,
+    /// there is no echo to take out, and that is said rather than counted
+    /// as a failure.
+    /// </remarks>
+    private async Task CheckEchoLiveAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== эхо в комнате: колонки и микрофон (4.0b-V10) ===");
+        const int rate = 24000;
+        var voice = new byte[rate * 4 * 2];
+        var phase = 0.0;
+        for (var i = 0; i < rate * 4; i++)
+        {
+            var t = (double)i / rate;
+            phase += 2 * Math.PI * 180 * (1 + 0.15 * Math.Sin(2 * Math.PI * 0.7 * t)) / rate;
+            var syllable = Math.Max(0, Math.Sin(2 * Math.PI * 3.1 * t));
+            var sample = 0.0;
+            for (var h = 1; h <= 6; h++) sample += Math.Sin(h * phase) / h;
+            var value = (short)(sample * syllable * 6000);
+            voice[2 * i] = (byte)value;
+            voice[2 * i + 1] = (byte)(value >> 8);
+        }
+
+        async Task<(double Room, double During)> Listen(bool cancel)
+        {
+            using var speaker = new Audio.Speaker(rate);
+            using var microphone = new Audio.Microphone();
+            using var echo = new Audio.EchoCanceller { Enabled = cancel };
+            microphone.Canceller = echo;
+            speaker.Played += echo.Played;
+            var heard = new List<(DateTime At, double Level)>();
+            microphone.Captured += chunk =>
+            {
+                double sum = 0;
+                for (var i = 0; i + 1 < chunk.Length; i += 2)
+                {
+                    var v = (short)(chunk[i] | (chunk[i + 1] << 8));
+                    sum += (double)v * v;
+                }
+                lock (heard) heard.Add((DateTime.UtcNow, sum / Math.Max(chunk.Length / 2, 1)));
+            };
+            microphone.Start();
+            await Task.Delay(1000);
+            var began = DateTime.UtcNow;
+            speaker.Enqueue(voice);
+            speaker.Drain();
+            await Until(() => !speaker.IsSpeaking, 8);
+            var ended = DateTime.UtcNow;
+            await Task.Delay(300);
+            microphone.Stop();
+            speaker.Played -= echo.Played;
+            lock (heard)
+            {
+                // The room before, and the second half of the playing: by
+                // then the canceller has settled.
+                var room = heard.Where(h => h.At < began).Select(h => h.Level).DefaultIfEmpty(1).Average();
+                var middle = began + (ended - began) / 2;
+                var during = heard.Where(h => h.At > middle && h.At < ended)
+                                  .Select(h => h.Level).DefaultIfEmpty(1).Average();
+                return (Math.Max(room, 1), Math.Max(during, 1));
+            }
+        }
+
+        var (roomRaw, raw) = await Listen(cancel: false);
+        var (_, cleaned) = await Listen(cancel: true);
+        var echoDb = 10 * Math.Log10(raw / roomRaw);
+        if (echoDb < 6)
+        {
+            Console.WriteLine($"     эха почти не слышно ({echoDb:0.0} дБ над комнатой, "
+                              + $"с подавлением {10 * Math.Log10(cleaned / roomRaw):0.0} дБ) — "
+                              + "наушники или тихие колонки; мерить нечего");
+        }
+        else
+        {
+            var taken = 10 * Math.Log10(raw / cleaned);
+            Check("её голос в микрофоне гасится не меньше чем на 10 дБ", taken >= 10,
+                  $"| эхо {echoDb:0.0} дБ над комнатой, погашено {taken:0.0} дБ");
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+    }
+
     /// <summary>
     /// The window <c>--check-windows</c> acts on: plain, off the screen,
     /// and gone with its process when closed.

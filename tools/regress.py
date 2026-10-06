@@ -141,7 +141,9 @@ TOUCHES_MACHINE = {"--check-voice", "--check-hover", "--check-tray",
                    "--check-audio", "--check-system",
                    # Asks Windows what is playing on this machine right now,
                    # and part of what it checks depends on the answer.
-                   "--check-media"}
+                   "--check-media",
+                   # Plays through the speakers and listens to the room.
+                   "--check-echolive"}
 
 
 #: The interpreter the **core** runs on — and therefore the one its

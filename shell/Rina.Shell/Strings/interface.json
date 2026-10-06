@@ -980,6 +980,9 @@
   "Под каким именем запомнить": {
     "English": "Name to keep it under"
   },
+  "Подавлять эхо": {
+    "English": "Cancel echo"
+  },
   "Подробность журнала": {
     "Deutsch": "Protokolldetails",
     "English": "Log detail",
@@ -1159,6 +1162,9 @@
   },
   "Рина забудет всё, что здесь показано: записей {0}. Настройки вернутся к значениям по умолчанию.": {
     "English": "Rina will forget everything shown here: {0} entries. Settings will go back to their defaults."
+  },
+  "Рина не слышит свой голос из динамиков. В наушниках не нужно": {
+    "English": "Rina does not hear her own voice from the speakers. Not needed with headphones"
   },
   "Рина скажет это вместо «Готово»": {
     "English": "Rina will say this instead of “Done”"

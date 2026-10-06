@@ -899,6 +899,69 @@ finally:
     asyncio.run_coroutine_threadsafe(runner.cleanup(), loop).result(10)
 
 print()
+print("=== сказанное поверх её речи — её же голос (4.0b-V10) ===")
+# Through speakers her voice comes back into the microphone misheard, the
+# word comparison above no longer matches it, and she answered her own
+# words. A phrase that began while her voice was in the room counts only
+# if it is her name or «стоп».
+echo = listening("какая сегодня погода", said_before=["Сегодня тепло и ясно."])
+echo._recognise(b"\x00\x00", over_her=True)
+check("поверх речи и без имени — не в счёт, даже расслышанное мимо",
+      echo.routed == [] and echo.announced == [], f"| {echo.routed}")
+called = listening("рина сколько времени", said_before=["Сегодня тепло."])
+called._recognise(b"\x00\x00", over_her=True)
+check("а имя поверх речи — перебивает и доходит до разбора",
+      "speech.stop" in called.sent and called.routed == ["рина сколько времени"],
+      f"| {called.sent}, {called.routed}")
+halted = listening("стоп", said_before=["Сегодня тепло."])
+halted._recognise(b"\x00\x00", over_her=True)
+check("и «стоп» поверх речи — тоже", "speech.stop" in halted.sent,
+      f"| {halted.sent}")
+pressed = listening("какая сегодня погода", said_before=["Сегодня тепло."])
+pressed.engine.listening_once = staticmethod(lambda: True)
+pressed._recognise(b"\x00\x00", over_her=True)
+check("но если человек сам нажал клавишу, сказанное — его",
+      pressed.routed == ["какая сегодня погода"], f"| {pressed.routed}")
+after = listening("какая сегодня погода", said_before=["Сегодня тепло."])
+after._recognise(b"\x00\x00", over_her=False)
+check("а после её речи — обычная команда", after.routed == ["какая сегодня погода"],
+      f"| {after.routed}")
+
+# How long her voice is in the room, counted by what is sent: the shell
+# plays in real time and its credit keeps the core a little ahead.
+out = ProtocolServer.__new__(ProtocolServer)
+out._voice_until = 0.0
+out._cut_in = False
+out._speech_stream = 21
+out._speech_rate = 16000
+out._room_for = lambda size: True
+
+
+class Wire:
+    sent = 0
+
+    def send(self, frame):
+        Wire.sent += 1
+
+
+class Data:
+    @staticmethod
+    def send(stream, piece):
+        return piece
+
+
+out.channels = type("Channels", (), {"data": Wire()})()
+out.data = Data()
+before = _time.monotonic()
+out._push_speech_now(b"\x00\x00" * 16000 * 2, 16000)        # two seconds
+check("две секунды речи звучат около двух с половиной секунд от начала",
+      2.3 <= out._voice_until - before <= 2.8,
+      f"| {out._voice_until - before:.2f} с")
+check("и пока звучат, фраза — поверх неё",
+      out.voice_heard_at(before + 1.0) and out.voice_heard_at(before + 3.0))
+check("а после хвоста комнаты — нет", not out.voice_heard_at(before + 4.0))
+
+print()
 print("=== перебитое не договаривается ===")
 # Stopping the sending leaves up to a second of sound already in the
 # shell's queue; stopping the playing leaves the rest of the reply still
