@@ -294,7 +294,7 @@ public partial class CommandEditor : UserControl
                             && _actions.Any(
                                 a => a.Destructive
                                      && a.Value == step["target"]?.GetValue<string>())))
-            lines.Add(S("В команде есть необратимое действие — Рина спросит подтверждение."));
+            lines.Add(S("В команде есть необратимое действие — перед запуском Рина спросит подтверждение, а при пробе пропустит этот шаг."));
 
         var known = all
             .Where(step => step["type"]?.GetValue<string>() is "set" or "get")

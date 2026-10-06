@@ -2099,7 +2099,9 @@ class ProtocolServer:
 
             preview = system_control.confirm_question(action)
         else:
-            preview = "Выполнить сохранённую команду?"
+            describe = getattr(self.engine, "command_confirm_text", None)
+            preview = (describe(command_id) if callable(describe)
+                       else "Выполнить сохранённую команду?")
 
         self.ask_shell("permission.request", {
             "request_id": question.confirmation_id or "",

@@ -774,24 +774,47 @@ def _start_sequence(ctx, command, scenario, silent=None):
     return ToolResult.done("" if say is not None else opening)
 
 
+def _find_user_command(ctx, command_id):
+    if ctx.commands is None:
+        return None
+    for candidate in ctx.commands.all():
+        if str(candidate.get("id")) == str(command_id):
+            return candidate
+    return None
+
+
+def _user_command_is_irreversible(ctx, args):
+    """Does running this command need the person's yes (H-1)."""
+    from voice.user_commands import command_needs_confirm
+
+    command = _find_user_command(ctx, args.get("command_id"))
+    return command is not None and command_needs_confirm(
+        command, lambda wanted: _find_user_command(ctx, wanted))
+
+
+#: Tools whose need for a confirmation depends on what they are given.
+#: `run_user_command` runs whatever the person's card says, and a card
+#: with "shut down" in it is `power_action` by another road: the same
+#: ledger, the same one-time consent bound to these arguments.
+CONFIRM_IF = {"run_user_command": _user_command_is_irreversible}
+
+
 def _run_user_command(ctx, args):
     from voice.user_commands import execute
 
     command_id = args["command_id"]
-    command = None
-    for candidate in ctx.commands.all():
-        if candidate.get("id") == command_id:
-            command = candidate
-            break
+    command = _find_user_command(ctx, command_id)
     if command is None:
         return ToolResult.failed(tr("Не получилось выполнить команду."),
                                  "internal")
 
     ctx.commands.bump_stat(command_id)
+    # Only the registry sets this, after redeeming a confirmation.
+    scenario = dict(_scenario(ctx), confirmed=bool(args.get("_confirmed")))
     if command.get("type") == "sequence":
-        return _start_sequence(ctx, command, _scenario(ctx))
+        return _start_sequence(ctx, command, scenario)
 
-    ok, response = execute(command, ctx.host, ctx.emit, **_scenario(ctx))
+    ok, response = execute(command, ctx.host, ctx.emit, **scenario)
     return (ToolResult.done(response) if ok
             else ToolResult.failed(response, "internal"))
 
@@ -1347,7 +1370,9 @@ class ToolRunner:
                         started, confirmation_id, trace_id)
             return ToolResult.failed(e.message, e.code)
 
-        if tool.confirm_required:
+        asks = tool.confirm_required or (
+            tool.name in CONFIRM_IF and CONFIRM_IF[tool.name](self._ctx, checked))
+        if asks:
             try:
                 confirmation = self._confirmations.redeem(
                     confirmation_id, tool.name, checked)
@@ -1375,7 +1400,11 @@ class ToolRunner:
                   source)
         try:
             run = self._added.get(tool.name) or IMPLEMENTATIONS[tool.name]
-            result = run(self._ctx, checked)
+            # A tool confirmed by its contents is told so — the run itself
+            # holds the second lock (`voice.user_commands._perform`).
+            given = dict(checked, _confirmed=True) if (
+                asks and not tool.confirm_required) else checked
+            result = run(self._ctx, given)
         except Exception as e:
             log.exception("Инструмент %s упал", tool.name)
             self._write(tool, checked, source, tool.permissions, False,
