@@ -145,7 +145,7 @@ Other programs' windows by name or the one in front: "закрой Discord", "с
 
 - **Arithmetic** is evaluated from a parsed expression tree, never with `eval`.
 - **Unrecognised phrases** fall back to a web search.
-- **Optional local model.** With Ollama installed, anything unparsed can be answered by a model on your own computer. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local — or if the chosen model is one Ollama runs in its cloud rather than on this computer. A model that does not answer is left alone for a while instead of being waited for on every phrase, and small talk — a greeting, a thank-you — Rina answers herself.
+- **Optional local model.** With Ollama, LM Studio or llama.cpp's `llama-server`, anything unparsed can be answered by a model on your own computer — or by OpenRouter in the cloud, if you choose it and give it a key, which is kept in the Windows Credential Manager rather than in the settings. Off by default; when on, requests go only to the address in settings, and the settings page tells you plainly if that address is not local — or if the chosen model is one Ollama runs in its cloud rather than on this computer. A model that does not answer is left alone for a while instead of being waited for on every phrase, and small talk — a greeting, a thank-you — Rina answers herself.
 
 ### Plugins
 

@@ -436,6 +436,11 @@ _EN = {
     'Ярче': 'Brighter',
     'Темнее': 'Darker',
     'Яркость на 50': 'Brightness to 50',
+    # Who serves the model (4.0b-E15)
+    'Сервер модели отказал в доступе — проверьте ключ в настройках.': 'The model’s server refused access — check the key in the settings.',
+    'Модель не отвечает: ': 'The model isn’t answering: ',
+    'Ключ OpenRouter не задан — впишите его в настройках модели.': 'No OpenRouter key is set — enter it in the model settings.',
+    'OpenRouter (облако)': 'OpenRouter (cloud)',
     # The model that does not answer (2026-10-03)
     'Модель не отвечает — поищу «{query}» в интернете.': 'The model isn’t answering — I’ll search the web for “{query}”.',
     'Модель сейчас не отвечает — без неё на это ответить не могу.': 'The model isn’t answering right now — I can’t answer that without it.',
@@ -784,7 +789,6 @@ _EN = {
     'Как модель должна себя вести. Пусто — вариант по умолчанию.': 'How the model should behave. Empty means the default.',
     'Ollama на связи, моделей: {count}': 'Ollama is reachable, models: {count}',
     'Ollama отвечает, но моделей нет — установите модель': 'Ollama responds but has no models — install one',
-    'Ollama не отвечает: ': 'Ollama is not responding: ',
     'Ошибка обращения к модели: ': 'Error contacting the model: ',
     'Модель вернула пустой ответ': 'The model returned an empty answer',
     'Пустой вопрос': 'Empty question',

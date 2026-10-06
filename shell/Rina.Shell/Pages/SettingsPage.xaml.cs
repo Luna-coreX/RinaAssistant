@@ -1451,6 +1451,9 @@ public partial class SettingsPage : UserControl
                 ? BuildChoice(key, known, value?.GetValue<string>() ?? "")
                 : Nothing();
 
+        if (spec["format"]?.GetValue<string>() == "password")
+            return BuildPassword(key, Show(value).Length > 0);
+
         if (spec["format"]?.GetValue<string>() is { } format)
             return BuildPath(key, format, Show(value));
 
@@ -1666,6 +1669,41 @@ public partial class SettingsPage : UserControl
     }
 
     /// <summary>A path: a field and "Browse…".</summary>
+    /// <summary>
+    /// A key or a password (<c>4.0-H11</c>): typed into a hidden field and
+    /// sent once; the core keeps it in the Credential Manager and the field
+    /// only ever learns whether one is kept.
+    /// </summary>
+    private FrameworkElement BuildPassword(string key, bool kept)
+    {
+        var box = new PasswordBox
+        {
+            Style = (Style)FindResource("FieldSecret"),
+            Width = ControlWidth,
+            Tag = "empty",
+        };
+        Styles.Ui.SetHint(box, kept
+            ? S("Ключ сохранён — впишите новый, чтобы заменить")
+            : SettingsLayout.HintInField(key));
+        box.PasswordChanged += (_, _) =>
+            box.Tag = box.Password.Length == 0 ? "empty" : null;
+        async Task KeepAsync()
+        {
+            var typed = box.Password;
+            if (typed.Length == 0) return;
+            box.Clear();
+            await SaveAsync(key, JsonValue.Create(typed));
+            // What is remembered here is that one is kept, not what it is.
+            _values[key] = JsonValue.Create("kept");
+        }
+        box.LostFocus += async (_, _) => await KeepAsync();
+        box.KeyDown += async (_, pressed) =>
+        {
+            if (pressed.Key == System.Windows.Input.Key.Return) await KeepAsync();
+        };
+        return box;
+    }
+
     private FrameworkElement BuildPath(string key, string format, string current)
     {
         // A grid, not a row: the field takes everything the button leaves,

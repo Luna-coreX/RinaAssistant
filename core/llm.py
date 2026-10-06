@@ -30,6 +30,32 @@ log = get_logger("llm")
 
 
 DEFAULT_URL = "http://localhost:11434"
+
+#: Who serves the model (`4.0b-E15`): which dialect it speaks and where it
+#: is unless the person says otherwise. Ollama has its own API; LM Studio,
+#: llama.cpp's `llama-server` and OpenRouter speak the OpenAI-compatible
+#: one, so three of the four are one client with three addresses.
+PROVIDERS = {
+    "ollama": ("ollama", "http://localhost:11434"),
+    "lmstudio": ("openai", "http://localhost:1234"),
+    "llamacpp": ("openai", "http://127.0.0.1:8080"),
+    "openrouter": ("openai", "https://openrouter.ai/api"),
+}
+
+#: What each is called in the settings.
+PROVIDER_TITLES = {
+    "ollama": "Ollama",
+    "lmstudio": "LM Studio",
+    "llamacpp": "llama.cpp (llama-server)",
+    "openrouter": "OpenRouter (облако)",
+}
+
+#: The secret the key to a model's service is kept under (`4.0-H11`) — in
+#: the Windows Credential Manager, never in the settings.
+KEY_NAME = "llm_key"
+
+#: Where secrets are kept; set by the server once the shell is there.
+secret_store = None
 DEFAULT_MODEL = "llama3.1:8b"
 DEFAULT_TIMEOUT = 30
 
@@ -163,11 +189,49 @@ def base_url():
     """
     import urllib.parse
 
-    url = str(_settings().get("llm_url", DEFAULT_URL) or DEFAULT_URL).strip()
+    own = PROVIDERS[provider()][1]
+    if provider() == "openrouter":
+        # One service, one address: a field that let it be changed would
+        # let the key go to wherever the field said.
+        return own
+    url = str(_settings().get("llm_url", "") or "").strip()
+    # The address left from another provider is not this one's: switching
+    # Ollama to LM Studio with the field untouched should reach LM Studio.
+    if not url or url.rstrip("/") in {d for _k, (_dl, d) in PROVIDERS.items()}:
+        return own
     parts = urllib.parse.urlsplit(url)
     if parts.scheme not in ("http", "https") or not parts.netloc:
-        return DEFAULT_URL
+        return own
     return url.rstrip("/")
+
+
+def provider():
+    """Who serves the model, from the settings (`4.0b-E15`)."""
+    name = str(_settings().get("llm_provider", "ollama") or "ollama")
+    return name if name in PROVIDERS else "ollama"
+
+
+def dialect():
+    """`ollama` or `openai` — what the server is spoken to in."""
+    return PROVIDERS[provider()][0]
+
+
+def api_key():
+    """
+    The key to the model's service, from the secret store — or "".
+
+    Read when a request goes, not kept here: a key held in the module
+    longer than the call that needs it is a key that can leak with it.
+    """
+    store = secret_store
+    if store is None or not store.available():
+        return ""
+    try:
+        from core.secrets import CORE
+
+        return store.get(CORE, KEY_NAME) or ""
+    except Exception:                                   # noqa: BLE001
+        return ""
 
 
 def is_local_url(url=None):
@@ -183,10 +247,17 @@ def is_enabled():
 
 
 def _request(path, payload=None, timeout=8):
-    """A request to Ollama. Returns the parsed JSON."""
+    """A request to the model's server. Returns the parsed JSON."""
     url = base_url() + path
     data = None
     headers = {}
+    # The key, when one is kept, for the OpenAI-compatible servers: required
+    # by OpenRouter, accepted by `llama-server --api-key`. Never to Ollama,
+    # which has no use for it.
+    if dialect() == "openai":
+        key = api_key()
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -201,8 +272,16 @@ def _request(path, payload=None, timeout=8):
             # we limit the read: the server at this address may be anything at all
             raw = resp.read(MAX_RESPONSE_BYTES)
             return json.loads(raw.decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            # It answered, and said no: a key, not the network. Not a pause
+            # either — waiting will not make a wrong key right.
+            raise LLMError(tr("Сервер модели отказал в доступе — проверьте "
+                              "ключ в настройках."))
+        raise LLMUnreachable(tr("Модель не отвечает: ")
+                             + str(getattr(e, "reason", e)))
     except urllib.error.URLError as e:
-        raise LLMUnreachable(tr("Ollama не отвечает: ")
+        raise LLMUnreachable(tr("Модель не отвечает: ")
                              + str(getattr(e, "reason", e)))
     except (OSError, http.client.HTTPException) as e:
         # HTTPException (a truncated response, broken chunking, too long a
@@ -234,8 +313,13 @@ def models(force=False):
         return list(_status_cache["models"])
 
     try:
-        data = _request("/api/tags", timeout=5)
-        listed = data.get("models") or []
+        if dialect() == "openai":
+            data = _request("/v1/models", timeout=5)
+            listed = [{"name": m.get("id", "")} for m in (data.get("data") or [])
+                      if isinstance(m, dict)]
+        else:
+            data = _request("/api/tags", timeout=5)
+            listed = data.get("models") or []
         found = [str(m.get("name", "")) for m in listed]
         found = [m for m in found if m]
         # Where each model really runs: Ollama marks the ones it serves
@@ -491,6 +575,9 @@ def ask(question, history=None):
     # another model is another key: a person who switches models is not
     # made to wait out the old one's pause.
     model = current_model()
+    if provider() == "openrouter" and not api_key():
+        raise LLMError(tr("Ключ OpenRouter не задан — впишите его в "
+                          "настройках модели."))
     key = (base_url(), model)
     if _rest["key"] == key and time.time() < _rest["until"]:
         raise LLMUnreachable(tr("Модель недавно не ответила — пока не жду её."))
@@ -508,11 +595,21 @@ def ask(question, history=None):
         messages = [{"role": "system", "content": told}]
         messages += _context_messages(history)
         messages.append({"role": "user", "content": question})
+        wait = max(5, min(timeout, 300))
+        if dialect() == "openai":
+            data = _request("/v1/chat/completions", payload={
+                "model": model,
+                "messages": messages,
+                "stream": False,
+            }, timeout=wait)
+            choices = data.get("choices") or [{}]
+            said = ((choices[0] or {}).get("message") or {}).get("content")
+            return (said or "").strip()
         data = _request("/api/chat", payload={
             "model": model,
             "messages": messages,
             "stream": False,
-        }, timeout=max(5, min(timeout, 300)))
+        }, timeout=wait)
         return ((data.get("message") or {}).get("content") or "").strip()
 
     try:

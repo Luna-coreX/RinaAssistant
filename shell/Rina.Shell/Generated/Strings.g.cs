@@ -79,6 +79,11 @@ public static partial class Loc
                 {
                     ["English"] = "http://localhost:11434",
                 },
+            ["Ollama, LM Studio и llama.cpp — на этом компьютере, OpenRouter — в облаке"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Ollama, LM Studio and llama.cpp run on this computer, OpenRouter in the cloud",
+                },
             ["Vosk"] =
                 new Dictionary<string, string>
                 {
@@ -668,6 +673,11 @@ public static partial class Loc
                     ["Español"] = "Duración de la grabación",
                     ["Українська"] = "Тривалість запису",
                 },
+            ["Для OpenRouter или llama-server с ключом. Хранится в диспетчере учётных данных Windows"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "For OpenRouter or a llama-server with a key. Kept in the Windows Credential Manager",
+                },
             ["Добавить"] =
                 new Dictionary<string, string>
                 {
@@ -1147,6 +1157,21 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "key {0} is unknown to the shell",
+                },
+            ["Ключ доступа"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Access key",
+                },
+            ["ключ не задан"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "no key set",
+                },
+            ["Ключ сохранён — впишите новый, чтобы заменить"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A key is kept — type a new one to replace it",
                 },
             ["команд {0}"] =
                 new Dictionary<string, string>
@@ -1950,6 +1975,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Installed: {0}. Turn it on to make it work.",
+                },
+            ["Поставщик модели"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Model provider",
                 },
             ["Потяните, чтобы переставить"] =
                 new Dictionary<string, string>

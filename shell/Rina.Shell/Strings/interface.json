@@ -32,6 +32,9 @@
   "Enter — отправить, Esc — скрыть": {
     "English": "Enter — send, Esc — hide"
   },
+  "Ollama, LM Studio и llama.cpp — на этом компьютере, OpenRouter — в облаке": {
+    "English": "Ollama, LM Studio and llama.cpp run on this computer, OpenRouter in the cloud"
+  },
   "Vosk": {
     "English": "Vosk"
   },
@@ -371,6 +374,9 @@
     "Español": "Duración de la grabación",
     "Українська": "Тривалість запису"
   },
+  "Для OpenRouter или llama-server с ключом. Хранится в диспетчере учётных данных Windows": {
+    "English": "For OpenRouter or a llama-server with a key. Kept in the Windows Credential Manager"
+  },
   "Добавить": {
     "English": "Add"
   },
@@ -637,6 +643,12 @@
   },
   "Какую программу открыть": {
     "English": "Which program to open"
+  },
+  "Ключ доступа": {
+    "English": "Access key"
+  },
+  "Ключ сохранён — впишите новый, чтобы заменить": {
+    "English": "A key is kept — type a new one to replace it"
   },
   "Команда сохранена.": {
     "English": "Command saved."
@@ -1030,6 +1042,9 @@
   },
   "Поставлен: {0}. Включите его, чтобы начал работать.": {
     "English": "Installed: {0}. Turn it on to make it work."
+  },
+  "Поставщик модели": {
+    "English": "Model provider"
   },
   "Потяните, чтобы переставить": {
     "English": "Drag to move it"
@@ -1690,6 +1705,9 @@
   },
   "ключ {0} оболочке незнаком": {
     "English": "key {0} is unknown to the shell"
+  },
+  "ключ не задан": {
+    "English": "no key set"
   },
   "команд {0}": {
     "English": "{0} commands"

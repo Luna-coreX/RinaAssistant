@@ -196,6 +196,10 @@ class ProtocolServer:
                                    self.ask_shell_sync(method, payload,
                                                        timeout=5.0))
         engine.secrets = self.secrets
+        # The model's key (`4.0b-E15`) is read where the request goes.
+        from core import llm as llm_mod
+
+        llm_mod.secret_store = self.secrets
         hosted = getattr(engine, "_plugins", None)
         if hosted is not None and hasattr(hosted, "secrets"):
             hosted.secrets = self.secrets
@@ -752,9 +756,44 @@ class ProtocolServer:
         # first_run are the state of the store, while theme and accent were
         # replaced by finishes (R08). The data is intact, the shell simply
         # no longer needs it.
-        return {"values": {k: store.get(k) for k in keys
-                           if not schema.get(k, {}).get("secret")
-                           and not schema.get(k, {}).get("obsolete")}}
+        values = {k: store.get(k) for k in keys
+                  if not schema.get(k, {}).get("secret")
+                  and not schema.get(k, {}).get("obsolete")}
+        # A `password` field reads as whether one is kept — "kept" or "" —
+        # never as the value (`4.0-H11`).
+        for key in values:
+            if schema.get(key, {}).get("format") == "password":
+                values[key] = "kept" if self._password_kept(key) else ""
+        return {"values": values}
+
+    def _password_kept(self, key: str) -> bool:
+        from core.secrets import CORE
+
+        store = self._secrets_here()
+        try:
+            return store is not None and store.get(CORE, key) is not None
+        except Exception:                               # noqa: BLE001
+            return False
+
+    def _keep_password(self, key: str, value) -> tuple[bool, str]:
+        """
+        A `password` field's value, into the Credential Manager rather than
+        the settings (`4.0-H11`). Empty — forget it. (kept, what to say).
+        """
+        from core.secrets import CORE
+
+        store = self._secrets_here()
+        if store is None:
+            return False, "Ключ сохранить негде: нет связи с оболочкой."
+        try:
+            if str(value or ""):
+                store.set(CORE, key, str(value))
+                return True, ("Ключ сохранён в диспетчере учётных данных "
+                              "Windows.")
+            store.delete(CORE, key)
+            return True, "Ключ забыт."
+        except Exception:                               # noqa: BLE001
+            return False, "Ключ сохранить не вышло."
 
     def _settings_set(self, message: Envelope) -> dict:
         """
@@ -773,8 +812,17 @@ class ProtocolServer:
         store = self._settings()
         verdicts: dict[str, dict] = {}
         accepted: dict[str, Any] = {}
+        described = settings_schema.describe(list(values))
         for key, value in values.items():
             ok, code, text = settings_schema.validate(key, value, store)
+            if ok and described.get(key, {}).get("format") == "password":
+                # Never written to the settings: the key goes to the
+                # Credential Manager, and the field stays "".
+                kept, text = self._keep_password(key, value)
+                verdicts[key] = {"accepted": kept,
+                                 "code": "" if kept else "settings.invalid_value",
+                                 "message": text}
+                continue
             verdicts[key] = {"accepted": ok, "code": code, "message": text}
             if ok:
                 accepted[key] = value

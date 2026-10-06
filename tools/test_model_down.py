@@ -20,6 +20,7 @@ Checked here, with the server substituted:
 To run:
     python tools/test_model_down.py
 """
+import json
 import logging
 import os
 import sys
@@ -156,6 +157,126 @@ try:
           not any("погоды" in line for line in written))
 finally:
     llm._request, llm._settings = was
+    llm._rest.update(key=None, failures=0, until=0.0)
+
+# ---------------------------------------------------------------------------
+print()
+print("=== поставщики: Ollama, LM Studio, llama.cpp, OpenRouter (4.0b-E15) ===")
+import urllib.error
+
+from core.secrets import CORE, SecretStore
+
+
+class Keys(dict):
+    def __call__(self, method, payload):
+        key = (payload.get("owner"), payload.get("name"))
+        if method == "secrets.get":
+            return {"found": key in self, "value": self.get(key, "")}
+        if method == "secrets.set":
+            self[key] = payload["value"]
+            return {"ok": True}
+        return {"deleted": int(self.pop(key, None) is not None)}
+
+
+chosen = {"llm_enabled": True, "llm_web": False, "llm_model": "qwen",
+          "llm_timeout": 30, "llm_url": ""}
+llm._settings = lambda: MemorySettings(chosen)
+for name, url in (("ollama", "http://localhost:11434"),
+                  ("lmstudio", "http://localhost:1234"),
+                  ("llamacpp", "http://127.0.0.1:8080"),
+                  ("openrouter", "https://openrouter.ai/api")):
+    chosen["llm_provider"] = name
+    check(f"{name}: адрес по умолчанию {url}", llm.base_url() == url,
+          f"| {llm.base_url()}")
+chosen["llm_provider"] = "lmstudio"
+chosen["llm_url"] = "http://localhost:11434"
+check("адрес, оставшийся от другого поставщика, — не его",
+      llm.base_url() == "http://localhost:1234", f"| {llm.base_url()}")
+chosen["llm_url"] = "http://192.168.1.5:1234"
+check("а свой адрес человека — его", llm.base_url() == "http://192.168.1.5:1234")
+chosen["llm_provider"], chosen["llm_url"] = "openrouter", "http://evil.example"
+check("у OpenRouter адрес один — ключ не уйдёт по чужому",
+      llm.base_url() == "https://openrouter.ai/api")
+chosen["llm_url"] = ""
+
+sent = []
+real_urlopen = llm.urllib.request.urlopen
+
+
+class Answer:
+    def __init__(self, body):
+        self.body = json.dumps(body).encode()
+
+    def read(self, limit=None):
+        return self.body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def server(request, timeout=None):
+    sent.append((request.full_url, dict(request.header_items()),
+                 json.loads(request.data) if request.data else None))
+    if request.full_url.endswith("/v1/models"):
+        return Answer({"data": [{"id": "qwen"}, {"id": "llama"}]})
+    if "evil" in request.full_url or request.get_header("Authorization") == "Bearer wrong":
+        raise urllib.error.HTTPError(request.full_url, 401, "Unauthorized", {}, None)
+    return Answer({"choices": [{"message": {"content": "Ответ OpenAI."}}]})
+
+
+keys = Keys()
+llm.secret_store = SecretStore(ask=keys)
+llm.urllib.request.urlopen = server
+try:
+    chosen["llm_provider"] = "lmstudio"
+    check("LM Studio отвечает на диалекте OpenAI", llm.ask("Привет") == "Ответ OpenAI.")
+    url, headers, body = sent[-1]
+    check("и спрошен /v1/chat/completions с моделью и репликами",
+          url == "http://localhost:1234/v1/chat/completions" and body["model"] == "qwen"
+          and body["messages"][-1] == {"role": "user", "content": "Привет"}, f"| {url}")
+    check("без ключа — без заголовка доступа", "Authorization" not in headers)
+    check("список моделей — с /v1/models", llm.models(force=True) == ["qwen", "llama"])
+
+    chosen["llm_provider"] = "openrouter"
+    try:
+        llm.ask("Привет")
+        check("OpenRouter без ключа — отказ словами, без запроса", False)
+    except llm.LLMError as refusal:
+        check("OpenRouter без ключа — отказ словами, без запроса",
+              "Ключ OpenRouter" in str(refusal) and not isinstance(
+                  refusal, llm.LLMUnreachable), f"| {refusal}")
+    keys[(CORE, llm.KEY_NAME)] = "sk-or-тайна"
+    sent.clear()
+    check("с ключом — отвечает", llm.ask("Привет") == "Ответ OpenAI.")
+    url, headers, _body = sent[-1]
+    check("ключ уходит заголовком, и только на openrouter.ai",
+          url.startswith("https://openrouter.ai/api/") and
+          headers.get("Authorization") == "Bearer sk-or-тайна", f"| {url}")
+    keys[(CORE, llm.KEY_NAME)] = "wrong"
+    try:
+        llm.ask("Привет")
+        check("неверный ключ — сказано про ключ, а не про сеть", False)
+    except llm.LLMError as refusal:
+        check("неверный ключ — сказано про ключ, а не про сеть",
+              "ключ" in str(refusal) and not isinstance(refusal, llm.LLMUnreachable)
+              and llm.resting() == 0, f"| {refusal}")
+
+    ok, code, said = validate("llm_provider", "openrouter")
+    check("выбор OpenRouter принят с предупреждением",
+          ok and code == "llm.remote_address" and "openrouter.ai" in said)
+    chosen["llm_provider"] = "ollama"
+    sent.clear()
+    keys[(CORE, llm.KEY_NAME)] = "sk-or-тайна"
+    llm._request("/api/tags")
+    check("Ollama ключ не получает никогда",
+          "Authorization" not in sent[-1][1], f"| {sent[-1][1]}")
+finally:
+    llm.urllib.request.urlopen = real_urlopen
+    llm.secret_store = None
+    llm._settings = was[1]
     llm._rest.update(key=None, failures=0, until=0.0)
 
 # ---------------------------------------------------------------------------

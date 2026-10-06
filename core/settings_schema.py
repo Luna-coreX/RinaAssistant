@@ -122,6 +122,13 @@ CONSTRAINTS: dict[str, Constraint] = {
     # a remote address does (2026-10-03), so it is warned about the same.
     "llm_model": Constraint(depends_on="llm_enabled",
                             warn_code="llm.remote_address"),
+    # Who serves the model (`4.0b-E15`); OpenRouter is a cloud, and choosing
+    # it is warned about as a remote address is.
+    "llm_provider": Constraint(depends_on="llm_enabled", dynamic=True,
+                               warn_code="llm.remote_address"),
+    # The key, typed into a field and kept in the Credential Manager: a
+    # `password` field is never written to the settings (`4.0-H11`).
+    "llm_key": Constraint(depends_on="llm_enabled", format="password"),
     "llm_web": Constraint(depends_on="llm_enabled"),
     "llm_persona": Constraint(depends_on="llm_enabled"),
     # Who answers. Not under the model's switch: the personality changes
@@ -288,6 +295,11 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
     if key == "tts_engine":
         return [{"value": i, "title": named(t), "available": bool(a)}
                 for i, t, a in tts.engine_choices()]
+    if key == "llm_provider":
+        from core import llm
+
+        return [{"value": name, "title": named(llm.PROVIDER_TITLES[name]),
+                 "available": True} for name in llm.PROVIDERS]
     if key == "stt_engine":
         # Only what the streaming path can actually build. The 3.1.0 list
         # offers engines that open their own microphone, and offering one of
@@ -439,6 +451,10 @@ def validate(key: str, value: Any, settings=None) -> tuple[bool, str, str]:
             return True, "llm.remote_address", (
                 "Адрес не локальный: тексты разговоров будут уходить "
                 f"на {host}.")
+    if key == "llm_provider" and value == "openrouter":
+        return True, "llm.remote_address", (
+            "OpenRouter — облачная служба: тексты разговоров будут уходить "
+            "на openrouter.ai.")
     if key == "llm_model" and isinstance(value, str) and value:
         from core import llm
 

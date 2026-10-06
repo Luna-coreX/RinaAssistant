@@ -190,10 +190,14 @@ public static class SettingsLayout
         [
             new("llm_enabled", Word("Отвечать моделью"),
                 Word("Отвечать языковой моделью, когда команда не распознана")),
+            new("llm_provider", Word("Поставщик модели"),
+                Word("Ollama, LM Studio и llama.cpp — на этом компьютере, OpenRouter — в облаке")),
             new("llm_url", Word("Адрес модели"),
                 Word("Адрес модели. Не локальный означает, что разговоры уйдут наружу")),
             new("llm_model", Word("Название модели"),
                 Word("Имя модели на этом сервере")),
+            new("llm_key", Word("Ключ доступа"),
+                Word("Для OpenRouter или llama-server с ключом. Хранится в диспетчере учётных данных Windows")),
             // Under the model's own switch, because it is the model
             // that searches: with «Отвечать моделью» off there is
             // nobody to want a search.
@@ -342,6 +346,7 @@ public static class SettingsLayout
     {
         "llm_url" => S("http://localhost:11434"),
         "llm_model" => S("например, llama3"),
+        "llm_key" => S("ключ не задан"),
         "llm_persona" => S("например, отвечай коротко и по делу"),
         "own_name" => S("например, Макс"),
         "own_voice_model" => S("файл .onnx"),

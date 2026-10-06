@@ -149,6 +149,47 @@ check("«забыть всё» — и все входы", shell.kept == {}, f"| 
 
 # ---------------------------------------------------------------------------
 print()
+print("=== ключ модели из настроек — в хранилище, не в файл (4.0b-E15) ===")
+from core.settings_schema import DEFAULTS
+from core.wire.server import ProtocolServer
+
+
+class Message:
+    def __init__(self, payload):
+        self.payload = payload
+
+
+class Session:
+    @staticmethod
+    def may_call(method):
+        return True
+
+
+box = ProtocolServer.__new__(ProtocolServer)
+stored = MemorySettings(dict(DEFAULTS))
+box._settings = lambda: stored
+box.secrets = SecretStore(ask=Shell())
+box.session = Session()
+verdict = box._settings_set(Message({"values": {"llm_key": SECRET}}))["verdicts"]["llm_key"]
+check("ключ принят", verdict["accepted"] and "диспетчер" in verdict["message"],
+      f"| {verdict}")
+check("в файле настроек его нет", stored.get("llm_key") == ""
+      and SECRET not in json.dumps(stored.get("llm_key")))
+check("а в хранилище — есть", box.secrets.get(CORE, "llm_key") == SECRET)
+got = box._settings_get(Message({"keys": ["llm_key", "llm_provider"]}))["values"]
+check("настройки отдают только «сохранён», а не ключ",
+      got.get("llm_key") == "kept" and SECRET not in json.dumps(got), f"| {got}")
+box._settings_set(Message({"values": {"llm_key": ""}}))
+check("пустое — ключ забыт", box.secrets.get(CORE, "llm_key") is None)
+check("и поле снова пустое",
+      box._settings_get(Message({"keys": ["llm_key"]}))["values"]["llm_key"] == "")
+box.session = None
+refused = box._settings_set(Message({"values": {"llm_key": SECRET}}))["verdicts"]["llm_key"]
+check("без оболочки ключ не принят и в файл не записан",
+      not refused["accepted"] and stored.get("llm_key") == "", f"| {refused}")
+
+# ---------------------------------------------------------------------------
+print()
 print("=== журнал не знает значений ===")
 written = []
 

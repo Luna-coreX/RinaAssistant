@@ -109,6 +109,11 @@ GROUPS = {
         "llm_web": False,
         "llm_url": "http://localhost:11434",
         "llm_model": "",
+        # Who serves the model (`4.0b-E15`), and the key to it — the key
+        # itself never here: the field always reads "", and what is typed
+        # goes to the Windows Credential Manager (`4.0-H11`).
+        "llm_provider": "ollama",
+        "llm_key": "",
         # Who answers (`4.0b-E14`): Rina, or a personality of the person's
         # own. It changes the wake words, the character and — when the own
         # one has a voice — the voice. The program is still called Rina.
