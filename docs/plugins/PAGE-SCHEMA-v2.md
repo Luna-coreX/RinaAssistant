@@ -46,6 +46,7 @@ API v2 из 3.0.0.
 | `items` | `items[]` | список строк |
 | `button` | `text`, `action`, `variant` (`normal`/`danger`) | кнопка; нажатие вызывает `on_action(action)` |
 | `input` | `action`, `text` (подсказка), `value`, `variant` (подпись кнопки) | поле ввода; вызывает `on_action(action, введённое)` |
+| `secret` | `action`, `text` (подсказка), `variant` (подпись кнопки) | поле для токена или пароля (`4.0-H11`): набранное скрыто, приходит в `on_action(action, введённое)` один раз; `value` нет — вернуть секрет на экран нельзя. Хранить — `ctx.set_secret`, не в настройках |
 | `table` | `items[][]`, `value[]` (заголовки) | таблица |
 | `progress` | `value` (0..1), `text` | полоса выполнения |
 | `badge` | `text`, `variant` (`normal`/`good`/`warn`/`danger`) | метка состояния |

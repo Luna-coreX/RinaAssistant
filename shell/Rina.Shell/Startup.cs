@@ -255,6 +255,13 @@ public partial class App
         // Other programs' windows (`4.0b-K08`), on a window of the check's
         // own: a second process of this shell opens it, and the check
         // closes it the way Rina closes Discord.
+        if (args.Contains("--check-secrets"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Watched(CheckSecretsAsync(), "secrets");
+            return;
+        }
+
         if (args.Contains("--check-echolive"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -5080,6 +5087,65 @@ public partial class App
         Console.WriteLine($"Ошибок: {fails}");
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
+    }
+
+    /// <summary>
+    /// Secrets in the Windows Credential Manager, for real (<c>4.0-H11</c>).
+    /// </summary>
+    /// <remarks>
+    /// Under an owner of the check's own, with a name nothing else uses,
+    /// and every entry removed at the end whatever happened: this is the
+    /// person's own credential store.
+    /// </remarks>
+    private Task CheckSecretsAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== секреты в диспетчере учётных данных (4.0-H11) ===");
+        var owner = $"check-{Guid.NewGuid():N}";
+        try
+        {
+            var (kept, why) = Platform.Secrets.Set(owner, "token", "секрет-123");
+            Check("секрет сохранён", kept, $"| {why}");
+            Check("и читается тем же значением",
+                  Platform.Secrets.Get(owner, "token") == "секрет-123");
+            Check("а неизвестный — null", Platform.Secrets.Get(owner, "нет") is null);
+            Platform.Secrets.Set(owner, "token", "новый");
+            Check("перезапись заменяет", Platform.Secrets.Get(owner, "token") == "новый");
+            Platform.Secrets.Set(owner, "второй", "2");
+            var names = Platform.Secrets.List().Where(one => one.Owner == owner)
+                .Select(one => one.Name).OrderBy(n => n, StringComparer.Ordinal).ToList();
+            Check("в списке — имена, оба", names.SequenceEqual(["token", "второй"]),
+                  $"| {string.Join(", ", names)}");
+            Check("слишком длинный не сохраняется — и сказано почему",
+                  Platform.Secrets.Set(owner, "длинный", new string('x', 3000))
+                      == (false, "too_long"));
+            Check("имя со слешем не принимается",
+                  Platform.Secrets.Set(owner, "a/b", "x") == (false, "bad_name"));
+            Check("удаление одного — один", Platform.Secrets.Delete(owner, "второй") == 1);
+            Check("удаление всех у владельца", Platform.Secrets.Delete(owner) == 1);
+            Check("и после него ничего не осталось",
+                  Platform.Secrets.List().All(one => one.Owner != owner));
+        }
+        finally
+        {
+            Platform.Secrets.Delete(owner);
+        }
+
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
+        return Task.CompletedTask;
     }
 
     /// <summary>

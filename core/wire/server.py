@@ -187,6 +187,18 @@ class ProtocolServer:
         # Other programs' windows (`4.0b-K08`): found and touched by the
         # shell, decided and spoken about by the core.
         engine.windows_out = self.do_windows
+        # Secrets (`4.0-H11`): kept by the shell in the Windows Credential
+        # Manager, asked for here by name. The core's own (a model
+        # service's key) and the plugins' go through this one store.
+        from core.secrets import SecretStore
+
+        self.secrets = SecretStore(ask=lambda method, payload:
+                                   self.ask_shell_sync(method, payload,
+                                                       timeout=5.0))
+        engine.secrets = self.secrets
+        hosted = getattr(engine, "_plugins", None)
+        if hosted is not None and hasattr(hosted, "secrets"):
+            hosted.secrets = self.secrets
         # Anything dangerous is confirmed with a window, not with words alone (4.0-F11).
         engine.on_question = self._on_question
 
@@ -1337,7 +1349,7 @@ class ProtocolServer:
         if settings is None:
             return {"groups": [], "gathered_at": privacy.gathered_at()}
         return {
-            "groups": privacy.inventory(settings),
+            "groups": privacy.inventory(settings, self._secrets_here()),
             "gathered_at": privacy.gathered_at(),
         }
 
@@ -1361,7 +1373,8 @@ class ProtocolServer:
             return {"forgotten": 0}
 
         if message.payload.get("everything"):
-            return {"forgotten": privacy.forget_everything(settings)}
+            return {"forgotten": privacy.forget_everything(
+                settings, self._secrets_here())}
 
         group = str(message.payload.get("group") or "")
         if not group:
@@ -1370,7 +1383,8 @@ class ProtocolServer:
         ids = message.payload.get("ids")
         if ids is not None and not isinstance(ids, list):
             return {"forgotten": 0}
-        return {"forgotten": privacy.forget(settings, group, ids)}
+        return {"forgotten": privacy.forget(settings, group, ids,
+                                            self._secrets_here())}
 
     def _privacy_export(self, message: Envelope) -> dict:
         """
@@ -1387,7 +1401,17 @@ class ProtocolServer:
         settings = self._settings()
         if settings is None:
             return {}
-        return privacy.export(settings)
+        return privacy.export(settings, self._secrets_here())
+
+    def _secrets_here(self):
+        """The secret store, when the shell said it keeps them."""
+        store = getattr(self, "secrets", None)
+        try:
+            if store is not None and self.session.may_call("secrets.list"):
+                return store
+        except Exception:                               # noqa: BLE001
+            pass
+        return None
 
     def _history_list(self, message: Envelope) -> dict:
         items = self._history().all()
@@ -1564,6 +1588,18 @@ class ProtocolServer:
             raise fault("plugin.not_found", str(exc)) from exc
         except Exception as exc:                     # noqa: BLE001
             raise fault("internal", str(exc)) from exc
+
+        # A plugin installed over another of the same id does not inherit
+        # its sign-ins (`4.0-H11`), any more than it inherits being switched
+        # on: a slipped-in archive with somebody else's id would otherwise
+        # read their mail token on its first run.
+        if replaced and self._secrets_here() is not None:
+            from core.secrets import plugin_owner
+
+            try:
+                self.secrets.delete(plugin_owner(plugin_id))
+            except Exception:                        # noqa: BLE001
+                log.warning("Секреты заменённого плагина не удалились")
 
         # The list is rebuilt at once: an installed plugin must appear in
         # the window without a restart.

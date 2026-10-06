@@ -87,6 +87,24 @@ class RemoteContext(PluginContext):
         self._host.notify_core("plugin.notify",
                                {"title": str(title), "message": str(message)})
 
+    # Secrets (`4.0-H11`): asked of the core, which keeps them with the
+    # shell. Nothing is cached here — a secret held in the plugin's memory
+    # longer than the call that needs it is a secret that can leak with it.
+    def get_secret(self, name):
+        answer = self._host.ask_core("plugin.secret.get", {"name": str(name)})
+        if not answer or not answer.get("ok") or not answer.get("found"):
+            return None
+        return str(answer.get("value", ""))
+
+    def set_secret(self, name, value):
+        answer = self._host.ask_core("plugin.secret.set",
+                                     {"name": str(name), "value": str(value)})
+        return bool(answer and answer.get("ok"))
+
+    def delete_secret(self, name):
+        answer = self._host.ask_core("plugin.secret.delete", {"name": str(name)})
+        return bool(answer and answer.get("ok") and answer.get("deleted"))
+
 
 class Host:
     """One plugin and the wire to the core."""

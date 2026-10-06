@@ -447,6 +447,40 @@ class PluginManager:
     def respond(self, plugin_id: str, text: str):
         self.response.emit(plugin_id, text)
 
+    #: Where secrets are kept (`4.0-H11`). In-process there is no shell,
+    #: and so, unless one is handed in, nowhere: a secret is refused rather
+    #: than written to a file in plain text.
+    secrets = None
+
+    def _secret_call(self, action, plugin_id, *args):
+        from core.secrets import plugin_owner
+
+        store = self.secrets
+        if store is None or not store.available():
+            return None
+        try:
+            return getattr(store, action)(plugin_owner(plugin_id), *args)
+        except Exception:                                # noqa: BLE001
+            return None
+
+    def get_plugin_secret(self, plugin_id, name):
+        return self._secret_call("get", plugin_id, name)
+
+    def set_plugin_secret(self, plugin_id, name, value):
+        from core.secrets import plugin_owner
+
+        store = self.secrets
+        if store is None or not store.available():
+            return False
+        try:
+            store.set(plugin_owner(plugin_id), name, value)
+            return True
+        except Exception:                                # noqa: BLE001
+            return False
+
+    def delete_plugin_secret(self, plugin_id, name):
+        return bool(self._secret_call("delete", plugin_id, name))
+
     def get_plugin_setting(self, plugin_id, key, default=None):
         store = settings.get("plugin_settings", {}) or {}
         return store.get(plugin_id, {}).get(key, default)

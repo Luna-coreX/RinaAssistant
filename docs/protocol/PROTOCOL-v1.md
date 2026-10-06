@@ -143,6 +143,7 @@
 | `plugins` | ядро | `plugins.list`, `plugins.set_enabled`, `plugins.page`, `plugins.home`, `plugins.action`, `plugins.install` |
 | `system.context` | оболочка | `system.context` |
 | `windows` | оболочка | `windows.do` |
+| `secrets` | оболочка | `secrets.get`, `secrets.set`, `secrets.delete`, `secrets.list` |
 | `privacy` | ядро | `privacy.inventory`, `privacy.forget`, `privacy.export` |
 | `commands` | ядро | `commands.list`, `commands.save`, `commands.try`, `commands.delete`, `commands.set_enabled`, `commands.export`, `commands.import` |
 | `todo` | ядро | `todo.list`, `todo.add`, `todo.close`, `todo.remove` |
@@ -359,6 +360,7 @@
 | `apps.launch` | запуск процесса — работа системного слоя оболочки |
 | `system.do` | громкость, медиа, питание, снимок экрана (`4.0-G01`..`G03`), яркость экрана (`4.0b-K04`: `brightness_set` с необязательным полем `level` 0–100, `brightness_up`, `brightness_down`; экран, который не принимает команду, — ответ `unsupported`) |
 | `windows.do` | окна других программ (`4.0b-K08`). Запрос: `action` (`close`, `minimize`, `expand`, `maximize`, `restore`), `which` (`active` — окно впереди, а если впереди сама Рина — окно под ней; `all` — все окна, кроме Рины; `app` — названная программа: `apps` — кандидаты из индекса `{name, launch, kind}`, `names` — имя в написаниях индекса). Ответ — факт, слова говорит ядро: `ok`, `reason` (`no_window`, `not_running`, `ambiguous`, `refused`, `unknown`, `internal`), `program`, `programs` (при `ambiguous`), `done`, `left` — окна, что через две секунды всё ещё на экране (программа о чём-то спрашивает), `still_running` — окна ушли, а процесс остался (свернулся в трей), `refused` — окна программ с правами администратора, не принявшие команду. Окно закрывается своей системной командой `SC_CLOSE`, как крестиком; процесс не завершается никогда. Заголовки окон не читаются и не передаются (`T-19`) |
+| `secrets.get` / `secrets.set` / `secrets.delete` / `secrets.list` | секреты в диспетчере учётных данных Windows (`4.0-H11`): токен плагина, ключ службы модели. Запрос — `owner` (`core` или `plugin:<id>`; ставит ядро, плагин его не задаёт) и `name`; `set` — ещё `value`. Ответы: `get` — `found`, `value`; `set` — `ok`, `reason` (`bad_name`, `too_long` — больше 2560 байт, `error_<код Win32>`); `delete` — `deleted`, без `name` — все секреты владельца; `list` — `items` из `owner` и `name`, **без значений**. Хранятся как `RinaAssistant/<owner>/<name>`, только на этой машине; значения не пишутся ни в один журнал |
 | `permission.request` | см. §11 |
 | `stream.open` / `stream.close` | поток речи из ядра (§8) |
 

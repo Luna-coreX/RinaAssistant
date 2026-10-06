@@ -106,6 +106,14 @@ public static class Methods
     public const string RemindersCreate = "reminders.create";
     /// <summary>Возможность: reminders.</summary>
     public const string RemindersList = "reminders.list";
+    /// <summary>Возможность: secrets.</summary>
+    public const string SecretsDelete = "secrets.delete";
+    /// <summary>Возможность: secrets.</summary>
+    public const string SecretsGet = "secrets.get";
+    /// <summary>Возможность: secrets.</summary>
+    public const string SecretsList = "secrets.list";
+    /// <summary>Возможность: secrets.</summary>
+    public const string SecretsSet = "secrets.set";
     /// <summary>Возможность: sessions.</summary>
     public const string SessionsFinish = "sessions.finish";
     /// <summary>Возможность: sessions.</summary>
@@ -207,6 +215,10 @@ public static class Methods
             ["reminders.cancel"] = "reminders",
             ["reminders.create"] = "reminders",
             ["reminders.list"] = "reminders",
+            ["secrets.delete"] = "secrets",
+            ["secrets.get"] = "secrets",
+            ["secrets.list"] = "secrets",
+            ["secrets.set"] = "secrets",
             ["sessions.finish"] = "sessions",
             ["sessions.list"] = "sessions",
             ["settings.describe"] = null,
@@ -461,6 +473,8 @@ public static class Capabilities
     public const string Privacy = "privacy";
     /// <summary>Объявляет core.</summary>
     public const string Reminders = "reminders";
+    /// <summary>Объявляет shell.</summary>
+    public const string Secrets = "secrets";
     /// <summary>Объявляет core.</summary>
     public const string Sessions = "sessions";
     /// <summary>Объявляет core.</summary>
@@ -487,6 +501,7 @@ public static class Capabilities
         "audio.input",
         "audio.output",
         "permissions",
+        "secrets",
         "system",
         "system.context",
         "window.actions",

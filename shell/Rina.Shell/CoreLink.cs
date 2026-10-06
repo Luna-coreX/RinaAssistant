@@ -563,6 +563,57 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
+        // Secrets (`4.0-H11`): kept in the Windows Credential Manager, which
+        // is the machine's and so the shell's. The owner comes from the
+        // core — `core` or `plugin:<id>` — and no value is ever written to
+        // the shell's log.
+        if (request.Method is "secrets.get" or "secrets.set"
+                              or "secrets.delete" or "secrets.list")
+        {
+            var owner = request.Payload["owner"]?.GetValue<string>() ?? "";
+            var name = request.Payload["name"]?.GetValue<string>() ?? "";
+            JsonObject answer;
+            switch (request.Method)
+            {
+                case "secrets.get":
+                {
+                    var value = Platform.Secrets.Get(owner, name);
+                    answer = new JsonObject
+                    {
+                        ["found"] = value is not null,
+                        ["value"] = value ?? "",
+                    };
+                    break;
+                }
+                case "secrets.set":
+                {
+                    var (kept, why) = Platform.Secrets.Set(
+                        owner, name, request.Payload["value"]?.GetValue<string>() ?? "");
+                    answer = new JsonObject { ["ok"] = kept, ["reason"] = why };
+                    break;
+                }
+                case "secrets.delete":
+                    answer = new JsonObject
+                    {
+                        ["deleted"] = Platform.Secrets.Delete(owner, name),
+                    };
+                    break;
+                default:
+                    answer = new JsonObject
+                    {
+                        ["items"] = new JsonArray(Platform.Secrets.List()
+                            .Select(kept => (JsonNode)new JsonObject
+                            {
+                                ["owner"] = kept.Owner,
+                                ["name"] = kept.Name,
+                            }).ToArray()),
+                    };
+                    break;
+            }
+            await connection.ReplyAsync(request, answer);
+            return;
+        }
+
         // Other programs' windows (`4.0b-K08`). The core names the program
         // and says what happened; the shell finds the windows, touches them
         // and answers with what became of them.

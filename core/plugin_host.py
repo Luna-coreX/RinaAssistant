@@ -678,6 +678,11 @@ class HostedPlugins:
         elif method == "plugin.setting.set":
             self._set_setting(plugin_id, str(message.payload.get("key")),
                               message.payload.get("value"))
+        elif method in ("plugin.secret.get", "plugin.secret.set",
+                        "plugin.secret.delete"):
+            self._answer(hosted, message,
+                         self._secret(plugin_id, method, message.payload))
+            return
         else:
             # A method we do not know is no reason to stay silent: the plugin is waiting.
             self._answer(hosted, message,
@@ -705,6 +710,39 @@ class HostedPlugins:
             del hosted.logs[:-100]
         log.info("[%s] %s", plugin_id, message)
         self.log_added.emit(plugin_id, message)
+
+    # -- the plugin's secrets (4.0-H11) ------------------------------------------
+    #: Where they are kept; set by the server once the shell is there.
+    secrets = None
+
+    def _secret(self, plugin_id, method, payload):
+        """
+        A plugin's own secret: read, kept or forgotten.
+
+        **The owner is this plugin, always.** It comes from which process
+        is asking, not from anything the plugin says — so a plugin names
+        what it keeps, and cannot name whose.
+        """
+        from core.secrets import SecretsUnavailable, plugin_owner
+
+        store = self.secrets
+        if store is None or not store.available():
+            return {"ok": False, "error": "unavailable"}
+        owner = plugin_owner(plugin_id)
+        name = str(payload.get("name") or "")
+        try:
+            if method == "plugin.secret.get":
+                value = store.get(owner, name)
+                return {"ok": True, "found": value is not None,
+                        "value": value or ""}
+            if method == "plugin.secret.set":
+                store.set(owner, name, str(payload.get("value") or ""))
+                return {"ok": True}
+            return {"ok": True, "deleted": store.delete(owner, name)}
+        except ValueError:
+            return {"ok": False, "error": "bad_name"}
+        except SecretsUnavailable as exc:
+            return {"ok": False, "error": str(exc) or "unavailable"}
 
     # -- the plugin's settings -----------------------------------------------
     def _bag(self):

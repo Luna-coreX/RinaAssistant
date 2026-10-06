@@ -458,6 +458,61 @@ finally:
     shutil.rmtree(twofold, ignore_errors=True)
     hosted.discover()
 
+# A secret crosses the process boundary under the plugin's own name
+# (`4.0-H11`): the plugin keeps a token and reads it back, the core files
+# it under `plugin:<id>`, and the plugin's settings stay without it.
+from core.secrets import SecretStore
+
+
+class CredentialShell(dict):
+    def __call__(self, method, payload):
+        key = (payload.get("owner"), payload.get("name"))
+        if method == "secrets.set":
+            self[key] = payload["value"]
+            return {"ok": True}
+        if method == "secrets.get":
+            return {"found": key in self, "value": self.get(key, "")}
+        if method == "secrets.delete":
+            return {"deleted": int(self.pop(key, None) is not None)}
+        return {"items": [{"owner": o, "name": n} for o, n in self]}
+
+
+vault = CredentialShell()
+hosted.secrets = SecretStore(ask=vault)
+keeper = os.path.join(plugins_dir(), "проверка_секрета")
+try:
+    os.makedirs(keeper, exist_ok=True)
+    io.open(os.path.join(keeper, "plugin.json"), "w",
+            encoding="utf-8").write(json.dumps(
+                {"id": "секрет", "name": "Секрет", "api_version": 4},
+                ensure_ascii=False))
+    io.open(os.path.join(keeper, "main.py"), "w", encoding="utf-8").write(
+        "from plugins.api import Plugin, PluginTool\n\n\n"
+        "class Keeper(Plugin):\n"
+        "    def tools(self):\n"
+        "        return [PluginTool(name='keep', summary='Сохранить.', reads=True,\n"
+        "            run=lambda args: (self.ctx.set_secret('token', 'ghp-тайна'),\n"
+        "                              self.ctx.get_secret('token') or 'пусто')[1])]\n")
+    hosted.discover()
+    check("плагин с секретом поднят", hosted.enable("проверка_секрета"))
+    made = dict((t.name, r) for t, r in hosted.declared_tools("проверка_секрета"))
+    run = made.get("plugin.проверка_секрета.keep")
+    answer = run(None, {}) if run else None
+    check("секрет сохранён и прочитан через границу процесса",
+          answer is not None and answer.ok and answer.value == "ghp-тайна",
+          f"| {answer and answer.value!r}")
+    check("и лежит под именем самого плагина",
+          vault.get(("plugin:проверка_секрета", "token")) == "ghp-тайна",
+          f"| {list(vault)}")
+    check("а в настройках плагина его нет",
+          "ghp-тайна" not in json.dumps(store.get("plugin_settings", {}),
+                                        ensure_ascii=False))
+finally:
+    hosted.disable("проверка_секрета", persist=False)
+    shutil.rmtree(keeper, ignore_errors=True)
+    hosted.secrets = None
+    hosted.discover()
+
 # An example with a module of its own loads outside the program's
 # `plugins/` too. It failed exactly there once the examples moved
 # (`4.0b-K05`): «No module named 'plugins.convert'».

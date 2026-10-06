@@ -531,6 +531,59 @@
   </Style>
 
   <!--
+    The same well for a secret (`4.0-H11`): a plugin's token, a key. A
+    `PasswordBox` has no `Text` to bind the hint to, so the field's owner
+    sets `Tag` to "empty" while nothing is typed, and the hint follows it.
+  -->
+  <Style x:Key="FieldSecret" TargetType="PasswordBox">
+    <Setter Property="Background" Value="{DynamicResource C.FaceSunk}" />
+    <Setter Property="Foreground" Value="{DynamicResource C.Ink}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource C.Ink}" />
+    <Setter Property="BorderThickness" Value="0" />
+    <Setter Property="Height" Value="{StaticResource Size.Control}" />
+    <Setter Property="Padding" Value="12,0" />
+    <Setter Property="VerticalContentAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+    <Setter Property="FontSize" Value="{StaticResource Type.Value.Size}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="PasswordBox">
+          <Border x:Name="Well" Background="{TemplateBinding Background}"
+                  CornerRadius="{StaticResource Radius.Max}">
+            <Grid>
+              <TextBlock x:Name="Hint" VerticalAlignment="Center"
+                         Margin="{Binding Padding,
+                                  RelativeSource={RelativeSource TemplatedParent},
+                                  Converter={StaticResource CaretGutter}}"
+                         IsHitTestVisible="False"
+                         Foreground="{DynamicResource C.InkFaint}"
+                         FontFamily="{StaticResource Font.Ui}"
+                         FontSize="{StaticResource Type.Value.Size}"
+                         TextTrimming="CharacterEllipsis"
+                         Text="{Binding Path=(ui:Ui.Hint),
+                                RelativeSource={RelativeSource TemplatedParent}}"
+                         Visibility="Collapsed" />
+              <ScrollViewer x:Name="PART_ContentHost"
+                            VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Tag" Value="empty">
+              <Setter TargetName="Hint" Property="Visibility" Value="Visible" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Well" Property="BorderBrush"
+                      Value="{DynamicResource C.Signal}" />
+              <Setter TargetName="Well" Property="BorderThickness" Value="2" />
+              <Setter Property="Padding" Value="10,0" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!--
     The dropdown.
 
     It had no style of its own, and WPF drew its own: a white field with a

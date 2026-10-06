@@ -36,6 +36,8 @@ Through self.ctx the application's services are available:
   - log(msg)                       — the plugin's log
   - get_setting/set_setting        — its own settings (kept in the config)
   - notify(title, message)         — a notification (the tray)
+  - get_secret/set_secret/delete_secret — a token or a password, kept in
+                                     the Windows Credential Manager (4.0-H11)
 
 And from this module itself: `ToolFailed` — a tool's refusal in words, and
 `vary(*variants)` — one of several ways to say a thing.
@@ -234,6 +236,28 @@ class PluginContext:
     def notify(self, title, message):
         """Show a notification (through the tray, if it is available)."""
         self._host.notify_from_plugin(self.manifest.id, title, message)
+
+    def get_secret(self, name: str):
+        """
+        A secret this plugin kept — a token, a password — or None.
+
+        **Secrets are not settings** (`4.0-H11`). Settings are plain text in
+        a file that goes into the privacy export; secrets are kept in the
+        Windows Credential Manager, are never shown or exported, and the
+        privacy page shows only that a sign-in is kept. A plugin can reach
+        its own and nobody else's: whose a secret is, the core decides.
+        `name` — letters, digits, `.`, `-`, `_`, up to 64.
+        """
+        return self._host.get_plugin_secret(self.manifest.id, str(name))
+
+    def set_secret(self, name: str, value: str) -> bool:
+        """Keep a secret. False when there is nowhere to keep it."""
+        return self._host.set_plugin_secret(self.manifest.id, str(name),
+                                            str(value))
+
+    def delete_secret(self, name: str) -> bool:
+        """Forget a secret. Whether there was one."""
+        return self._host.delete_plugin_secret(self.manifest.id, str(name))
 
 
 class Plugin:

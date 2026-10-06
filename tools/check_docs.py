@@ -300,7 +300,7 @@ WORDS = {
     22: "twenty-two",
     23: "twenty-three",
     24: "twenty-four", 25: "twenty-five", 26: "twenty-six",
-    27: "twenty-seven",
+    27: "twenty-seven", 28: "twenty-eight",
 }
 
 check(f"отделок в README столько же, сколько в системе ({finishes})",

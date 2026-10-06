@@ -93,6 +93,15 @@
       ],
       "side": "core"
     },
+    "secrets": {
+      "methods": [
+        "secrets.delete",
+        "secrets.get",
+        "secrets.list",
+        "secrets.set"
+      ],
+      "side": "shell"
+    },
     "sessions": {
       "methods": [
         "sessions.finish",
@@ -568,6 +577,10 @@
     "reminders.cancel": "reminders",
     "reminders.create": "reminders",
     "reminders.list": "reminders",
+    "secrets.delete": "secrets",
+    "secrets.get": "secrets",
+    "secrets.list": "secrets",
+    "secrets.set": "secrets",
     "sessions.finish": "sessions",
     "sessions.list": "sessions",
     "settings.describe": null,

@@ -1358,6 +1358,9 @@
     "Español": "Guardar historial",
     "Українська": "Зберігати історію"
   },
+  "Сохранённые входы": {
+    "English": "Saved sign-ins"
+  },
   "Список напоминаний живёт в ядре, а связи с ним сейчас нет.": {
     "English": "The reminder list lives in the core, and there’s no connection to it."
   },
@@ -1399,6 +1402,9 @@
   },
   "То, о чём вы просили напомнить.": {
     "English": "The things you asked to be reminded of."
+  },
+  "Токены и пароли Рины и плагинов. Лежат в диспетчере учётных данных Windows и здесь не показываются — только то, что они есть.": {
+    "English": "Tokens and passwords of Rina and her plugins. They are kept in the Windows Credential Manager and are not shown here — only that they exist."
   },
   "Только внутри открытой сессии и только при верхней настройке": {
     "English": "Only inside an open session, and only with the setting above"

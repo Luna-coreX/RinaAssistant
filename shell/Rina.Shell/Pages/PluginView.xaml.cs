@@ -359,6 +359,57 @@ public partial class PluginView : UserControl
                 field.Children.Add(send);
                 return field;
 
+            case "secret":
+            {
+                // A token or a password (`4.0-H11`). Never filled in from
+                // the page — a plugin cannot put a secret on the screen —
+                // and cleared as soon as it is sent: it goes to the plugin
+                // once, and the plugin keeps it in the Credential Manager.
+                var hidden = new PasswordBox
+                {
+                    Style = (Style)FindResource("FieldSecret"),
+                    MinWidth = 96,
+                    Tag = "empty",
+                };
+                Styles.Ui.SetHint(hidden, text);
+                hidden.PasswordChanged += (_, _) =>
+                    hidden.Tag = hidden.Password.Length == 0 ? "empty" : null;
+                var keep = new Button
+                {
+                    Style = (Style)FindResource("Btn"),
+                    Content = element["variant"]?.GetValue<string>() is
+                              { Length: > 0 } keepLabel ? keepLabel : S("Сохранить"),
+                    Margin = new Thickness(8, 0, 0, 0),
+                };
+                var secretAction = element["action"]?.GetValue<string>() ?? "";
+                async Task KeepAsync()
+                {
+                    var written = hidden.Password;
+                    if (written.Length == 0) return;
+                    hidden.Clear();
+                    await ActAsync(secretAction, written);
+                }
+                keep.Click += async (_, _) => await KeepAsync();
+                hidden.KeyDown += async (_, key) =>
+                {
+                    if (key.Key == System.Windows.Input.Key.Return)
+                        await KeepAsync();
+                };
+                var secretRow = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+                secretRow.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = new GridLength(1, GridUnitType.Star),
+                });
+                secretRow.ColumnDefinitions.Add(new ColumnDefinition
+                {
+                    Width = GridLength.Auto,
+                });
+                Grid.SetColumn(keep, 1);
+                secretRow.Children.Add(hidden);
+                secretRow.Children.Add(keep);
+                return secretRow;
+            }
+
             case "badge":
                 // A state label. The colour is the shell's decision here:
                 // the plugin said "warning", not "orange".

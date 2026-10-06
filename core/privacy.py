@@ -333,7 +333,40 @@ def _changed_settings(settings):
     return out
 
 
-def inventory(settings):
+def _secrets(store):
+    """
+    The sign-ins kept for Rina and her plugins (`4.0-H11`) — names, never
+    values.
+
+    They are not in the settings: the shell keeps them in the Windows
+    Credential Manager. Without a shell nobody can tell what is kept there,
+    and the group is left out rather than shown empty — an empty group would
+    say "nothing kept", which nobody knows.
+    """
+    if store is None or not store.available():
+        return None
+    try:
+        kept = store.names()
+    except Exception:                                   # noqa: BLE001
+        return None
+    items = []
+    for owner, name in kept:
+        whose = (owner[len("plugin:"):] if owner.startswith("plugin:")
+                 else "Рина")
+        items.append({
+            "id": _text(f"{owner}/{name}", 200),
+            "what": _text(f"{whose}: {name}", 200),
+            # The value never: the point of the store is that it is not
+            # shown, and this page is the one most likely to be read over a
+            # shoulder.
+            "detail": "",
+            "where": "Диспетчер учётных данных Windows",
+            "when": 0.0,
+        })
+    return items
+
+
+def inventory(settings, secrets=None):
     """
     Everything kept about a person, group by group.
 
@@ -347,6 +380,10 @@ def inventory(settings):
     for name, _keys, read in GROUPS:
         items = read(settings)
         groups.append({"id": name, "count": len(items), "items": items})
+
+    kept = _secrets(secrets)
+    if kept is not None:
+        groups.append({"id": "secrets", "count": len(kept), "items": kept})
 
     changed = _changed_settings(settings)
     groups.append({"id": "settings", "count": len(changed), "items": changed})
@@ -465,7 +502,7 @@ def _forget_telemetry(settings, wanted):
     return gone
 
 
-def forget(settings, group, ids=None):
+def forget(settings, group, ids=None, secrets=None):
     """
     Forget entries of one group, or the group entire.
 
@@ -486,6 +523,9 @@ def forget(settings, group, ids=None):
         # sent is not the same as switching it off, and a button that did
         # both would decide the second for the person.
         return _forget_telemetry(settings, wanted)
+
+    if group == "secrets":
+        return _forget_secrets(secrets, wanted)
 
     if group == "settings":
         if wanted is None:
@@ -525,12 +565,47 @@ def forget(settings, group, ids=None):
                 kept_settings.pop(name, None)
                 gone += 1
         settings.set("plugin_settings", kept_settings)
+        # And its sign-ins (`4.0-H11`), for the same reason: a forgotten
+        # plugin whose token stays in the Credential Manager is not
+        # forgotten.
+        prefix = "plugin:"
+        _forget_secrets(secrets, None if wanted is None else
+                        {f"{prefix}{one}/" for one in wanted}, owners=True)
 
     settings.save()
     return gone
 
 
-def forget_everything(settings):
+def _forget_secrets(store, wanted, owners=False):
+    """
+    Forget kept sign-ins: these `owner/name` entries, or all when `wanted`
+    is None. With `owners`, `wanted` holds `owner/` prefixes. How many went.
+    """
+    if store is None or not store.available():
+        return 0
+    try:
+        kept = store.names()
+    except Exception:                                   # noqa: BLE001
+        return 0
+    gone = 0
+    for owner, name in kept:
+        entry = f"{owner}/{name}"
+        if wanted is not None:
+            hit = (any(entry.startswith(one) for one in wanted) if owners
+                   else entry in wanted)
+            if not hit:
+                continue
+        elif owners:
+            if not owner.startswith("plugin:"):
+                continue
+        try:
+            gone += store.delete(owner, name)
+        except Exception:                               # noqa: BLE001
+            continue
+    return gone
+
+
+def forget_everything(settings, secrets=None):
     """
     Everything kept about a person, in one operation.
 
@@ -547,11 +622,12 @@ def forget_everything(settings):
     """
     gone = 0
     for group in [name for name, _keys, _read in GROUPS] + ["settings"]:
-        gone += forget(settings, group)
+        gone += forget(settings, group, secrets=secrets)
+    gone += _forget_secrets(secrets, None)
     return gone
 
 
-def export(settings):
+def export(settings, secrets=None):
     """
     Everything kept about a person, as the contents of a file (`4.0b-B03`).
 
@@ -572,7 +648,7 @@ def export(settings):
     from core import data_transfer
 
     return data_transfer.envelope(data_transfer.KIND_EVERYTHING, {
-        "groups": inventory(settings),
+        "groups": inventory(settings, secrets),
     })
 
 

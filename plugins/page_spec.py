@@ -62,8 +62,8 @@ MAX_DEPTH = 4
 CONTAINERS = ("card", "group", "row")
 
 #: Every kind in the dictionary — to check against the renderer (`4.0-H02`).
-KINDS = ("title", "text", "note", "items", "button", "input", "table",
-         "progress", "badge", "divider", "stat") + CONTAINERS
+KINDS = ("title", "text", "note", "items", "button", "input", "secret",
+         "table", "progress", "badge", "divider", "stat") + CONTAINERS
 
 #: What a `Stat` may be pictured with (`4.0b-K06`). Names of meaning, not
 #: of pictures: the shell draws them in its own ink, so a plugin's figure
@@ -149,6 +149,19 @@ def Input(action, placeholder="", value="", button=""):
     """
     return Element(kind="input", action=str(action), text=str(placeholder),
                    value=str(value), variant=str(button or ""))
+
+
+def Secret(action, placeholder="", button=""):
+    """
+    A field for a token or a password (`4.0-H11`). What is typed is hidden
+    on the screen and goes to plugin.on_action(action, the_typed_text) once;
+    keep it with `self.ctx.set_secret`, not in the settings.
+
+    There is no `value`: a plugin cannot put a secret back on the screen,
+    and a page that showed «вход сохранён» says so in a `Note` beside it.
+    """
+    return Element(kind="secret", action=str(action), text=str(placeholder),
+                   variant=str(button or ""))
 
 
 def Table(rows, headers=None):

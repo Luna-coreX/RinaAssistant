@@ -2533,6 +2533,11 @@ public static partial class Loc
                     ["Español"] = "Guardar historial",
                     ["Українська"] = "Зберігати історію",
                 },
+            ["Сохранённые входы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Saved sign-ins",
+                },
             ["Список напоминаний живёт в ядре, а связи с ним сейчас нет."] =
                 new Dictionary<string, string>
                 {
@@ -2615,6 +2620,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "then",
+                },
+            ["Токены и пароли Рины и плагинов. Лежат в диспетчере учётных данных Windows и здесь не показываются — только то, что они есть."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Tokens and passwords of Rina and her plugins. They are kept in the Windows Credential Manager and are not shown here — only that they exist.",
                 },
             ["Только внутри открытой сессии и только при верхней настройке"] =
                 new Dictionary<string, string>

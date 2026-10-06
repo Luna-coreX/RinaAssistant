@@ -116,6 +116,12 @@ _CAPABILITY_LIST = (
     # A capability of its own rather than more names in `system.do`: the
     # answer is not "it worked, a detail" but which program, how many
     # windows and what became of them (`4.0b-K08`).
+    # Secrets in the Windows Credential Manager (`4.0-H11`): a plugin's
+    # token, a key to a model's service. The shell keeps them; the core asks
+    # by name and gives the owner.
+    Capability("secrets", Side.SHELL,
+               ("secrets.get", "secrets.set", "secrets.delete", "secrets.list"),
+               "секреты в диспетчере учётных данных Windows (4.0-H11)"),
     Capability("windows", Side.SHELL, ("windows.do",),
                "окна других программ: закрыть, свернуть, развернуть "
                "(4.0b-K08)"),
