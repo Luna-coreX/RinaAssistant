@@ -59,6 +59,13 @@ class TransportClosed(Exception):
 class Transport:
     """One stream of bytes in both directions."""
 
+    #: Can another thread write while `recv` waits, and does `recv` come
+    #: back with silence rather than hang until bytes arrive. The server
+    #: hands requests to a worker thread only where both hold (see
+    #: `ProtocolServer._requests`): a reply written from the worker must not
+    #: wait for the reader, and the reader must notice that it is to stop.
+    concurrent = False
+
     def send(self, data: bytes) -> None:
         raise NotImplementedError
 
@@ -112,6 +119,8 @@ class InProcessTransport(Transport):
     it: a protocol that cannot be driven past the pipe depends on the pipe —
     it simply does not know that yet.
     """
+
+    concurrent = True
 
     def __init__(self):
         self._inbox: queue.Queue = queue.Queue()
@@ -207,6 +216,8 @@ class PipeClientTransport(Transport):
     few milliseconds; the alternative (overlapped I/O) demands `pywin32`,
     and its absence was half of ADR 0002's argument for this layout.
     """
+
+    concurrent = True
 
     #: How often to peek into the pipe when it is empty.
     POLL = 0.004

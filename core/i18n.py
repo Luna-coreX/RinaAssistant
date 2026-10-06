@@ -438,6 +438,8 @@ _EN = {
     'Яркость на 50': 'Brightness to 50',
     # Who serves the model (4.0b-E15)
     'Сервер модели отказал в доступе — проверьте ключ в настройках.': 'The model’s server refused access — check the key in the settings.',
+    'Сервер модели перенаправил запрос, а запрос с ключом перенаправлению не следует.': 'The model’s server redirected the request, and a request carrying the key does not follow redirects.',
+    'Ключ не отправлен: адрес модели не https и не этот компьютер, и ключ ушёл бы по сети открытым текстом.': 'The key was not sent: the model’s address is neither https nor this computer, so the key would have crossed the network in plain text.',
     'Модель не отвечает: ': 'The model isn’t answering: ',
     'Ключ OpenRouter не задан — впишите его в настройках модели.': 'No OpenRouter key is set — enter it in the model settings.',
     'OpenRouter (облако)': 'OpenRouter (cloud)',

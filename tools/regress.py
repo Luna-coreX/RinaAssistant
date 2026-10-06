@@ -384,7 +384,7 @@ def run(check, timeout):
     except subprocess.TimeoutExpired:
         profile.remove()
         return ("провал", time.monotonic() - started,
-                f"не уложилась в {timeout} с", [])
+                f"не уложилась в {timeout} с", [], [])
     written = profile.written()
     profile.remove()
 

@@ -230,6 +230,21 @@ class ProtocolServer:
 
         self._send_lock = threading.Lock()
         self._running = False
+
+        #: **The thread that reads the channel answers nothing itself.**
+        #: It decodes frames, settles replies to the core's own questions
+        #: and answers `ping`; every request from the shell goes, in order,
+        #: to `_requests`. A handler may need the shell — the secrets store,
+        #: the list of programs, a key read for a list of models — and the
+        #: shell's answer can only be read by the receiving thread. Handled
+        #: on that thread, such a handler waited five seconds for an answer
+        #: it was itself keeping out, and every time gave up: the model's
+        #: key never saved, and "forget everything" left the secrets
+        #: (audit 2026-10-07, H-3). One worker rather than a pool, because
+        #: order is part of the protocol: `settings.set` and the
+        #: `settings.get` after it must not change places.
+        self._receiver: threading.Thread | None = None
+        self._requests: queue.Queue | None = None
         self._on_stop = on_stop
         self.stopped_because = ""
         self._subscribe()
@@ -295,6 +310,18 @@ class ProtocolServer:
         threading.Thread(target=self._report_now_and_then,
                          name="rina-telemetry", daemon=True).start()
 
+        self._receiver = threading.current_thread()
+        worker = None
+        # Standard input is not such a transport: a write from another
+        # thread waits there for the blocked read, and `core.shutdown`
+        # answered by a worker would never wake it. That mode is for
+        # debugging by hand and has no shell to ask anyway — it keeps
+        # answering on the reading thread.
+        if getattr(self.channels.control, "concurrent", False):
+            self._requests = queue.Queue()
+            worker = threading.Thread(target=self._serve_requests,
+                                      name="rina-requests", daemon=True)
+            worker.start()
         try:
             while self._running:
                 try:
@@ -305,10 +332,41 @@ class ProtocolServer:
                     continue            # silence, not the end: see Transport.recv
                 self.liveness.note_traffic()
                 for message in self.decoder.feed(chunk):
-                    self.dispatch(message)
+                    self._route(message)
         finally:
+            # What was asked before the end is answered before the channel
+            # closes: a setting saved just before quitting is still saved.
+            if worker is not None:
+                self._requests.put(None)
+                worker.join(timeout=5.0)
             self.channels.close()
         return self.stopped_because or "остановлено"
+
+    #: Answered by the receiving thread itself: they carry no order and
+    #: wait for nobody, and liveness must not queue behind a slow handler.
+    INLINE = frozenset({"ping", "pong"})
+
+    def _route(self, message: Envelope) -> None:
+        """Settle a reply here, hand a request to the worker."""
+        if ((message.type in ("response", "error") and message.correlation_id)
+                or (message.method or "") in self.INLINE
+                or self._requests is None):
+            self.dispatch(message)
+        else:
+            self._requests.put(message)
+
+    def _serve_requests(self) -> None:
+        """Handle the shell's requests one by one, in the order they came."""
+        while True:
+            message = self._requests.get()
+            if message is None:
+                return
+            try:
+                self.dispatch(message)
+            except TransportClosed:
+                return              # the channel is gone; nobody to answer
+            except Exception as exc:                    # noqa: BLE001
+                self._log_broken(message.method or "", exc)
 
     def _report_now_and_then(self) -> None:
         """
@@ -766,16 +824,32 @@ class ProtocolServer:
                 values[key] = "kept" if self._password_kept(key) else ""
         return {"values": values}
 
+    @staticmethod
+    def _secret_for(key: str, provider: str | None = None) -> str:
+        """
+        The secret a `password` field is kept under.
+
+        The model's key under its provider's name (`llm.key_name`): the field
+        is one, the keys are as many as the services. `provider` — the one
+        arriving in the same parcel, when it does: "OpenRouter, and here is
+        its key" must not file the key under the provider being left.
+        """
+        from core import llm
+
+        return llm.key_name(provider) if key == llm.KEY_NAME else key
+
     def _password_kept(self, key: str) -> bool:
         from core.secrets import CORE
 
         store = self._secrets_here()
         try:
-            return store is not None and store.get(CORE, key) is not None
+            return (store is not None
+                    and store.get(CORE, self._secret_for(key)) is not None)
         except Exception:                               # noqa: BLE001
             return False
 
-    def _keep_password(self, key: str, value) -> tuple[bool, str]:
+    def _keep_password(self, key: str, value,
+                       provider: str | None = None) -> tuple[bool, str]:
         """
         A `password` field's value, into the Credential Manager rather than
         the settings (`4.0-H11`). Empty — forget it. (kept, what to say).
@@ -785,12 +859,13 @@ class ProtocolServer:
         store = self._secrets_here()
         if store is None:
             return False, "Ключ сохранить негде: нет связи с оболочкой."
+        name = self._secret_for(key, provider)
         try:
             if str(value or ""):
-                store.set(CORE, key, str(value))
+                store.set(CORE, name, str(value))
                 return True, ("Ключ сохранён в диспетчере учётных данных "
                               "Windows.")
-            store.delete(CORE, key)
+            store.delete(CORE, name)
             return True, "Ключ забыт."
         except Exception:                               # noqa: BLE001
             return False, "Ключ сохранить не вышло."
@@ -818,7 +893,8 @@ class ProtocolServer:
             if ok and described.get(key, {}).get("format") == "password":
                 # Never written to the settings: the key goes to the
                 # Credential Manager, and the field stays "".
-                kept, text = self._keep_password(key, value)
+                kept, text = self._keep_password(
+                    key, value, values.get("llm_provider"))
                 verdicts[key] = {"accepted": kept,
                                  "code": "" if kept else "settings.invalid_value",
                                  "message": text}
@@ -1840,6 +1916,14 @@ class ProtocolServer:
         blocking it would mean waiting for the answer with the very thread
         that will bring it.
         """
+        # Said aloud rather than discovered as a timeout: from the
+        # receiving thread the answer can never arrive (see `_requests`).
+        if threading.current_thread() is self._receiver:
+            log.error("Вопрос оболочке %s из потока приёма: ответ некому "
+                      "прочитать", method)
+            raise fault("internal", "Вопрос оболочке из потока приёма: "
+                                    "ответ некому прочитать.")
+
         done = threading.Event()
         got: dict = {}
 

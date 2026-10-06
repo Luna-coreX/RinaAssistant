@@ -28,9 +28,10 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from console import use_utf8
-from sandbox import neutralise
+from sandbox import isolate_storage, neutralise
 
 use_utf8()
+isolate_storage()
 neutralise()
 
 from core import privacy
@@ -175,18 +176,123 @@ check("ключ принят", verdict["accepted"] and "диспетчер" in v
       f"| {verdict}")
 check("в файле настроек его нет", stored.get("llm_key") == ""
       and SECRET not in json.dumps(stored.get("llm_key")))
-check("а в хранилище — есть", box.secrets.get(CORE, "llm_key") == SECRET)
+check("а в хранилище — есть", box.secrets.get(CORE, "llm_key.ollama") == SECRET)
 got = box._settings_get(Message({"keys": ["llm_key", "llm_provider"]}))["values"]
 check("настройки отдают только «сохранён», а не ключ",
       got.get("llm_key") == "kept" and SECRET not in json.dumps(got), f"| {got}")
 box._settings_set(Message({"values": {"llm_key": ""}}))
-check("пустое — ключ забыт", box.secrets.get(CORE, "llm_key") is None)
+check("пустое — ключ забыт", box.secrets.get(CORE, "llm_key.ollama") is None)
 check("и поле снова пустое",
       box._settings_get(Message({"keys": ["llm_key"]}))["values"]["llm_key"] == "")
 box.session = None
 refused = box._settings_set(Message({"values": {"llm_key": SECRET}}))["verdicts"]["llm_key"]
 check("без оболочки ключ не принят и в файл не записан",
       not refused["accepted"] and stored.get("llm_key") == "", f"| {refused}")
+
+# ---------------------------------------------------------------------------
+print()
+print("=== через настоящий канал: оболочка отвечает, ядро не ждёт ===")
+# Everything above hands the store a dictionary that answers at once, and
+# that is how a store that never worked passed (audit 2026-10-07, H-3):
+# asked from the thread that reads the channel, the shell's answer had
+# nobody to read it, and each call waited five seconds and gave up. Here
+# the server runs as it does in the program — `serve_forever` on a
+# transport — and a thread plays the shell.
+import threading
+import time
+
+from core.events import EventBus
+from core.engine import RinaEngine
+from core.wire.envelope import Envelope, FrameDecoder, IdGenerator, encode_frame
+from core.wire.transport import Channels, InProcessTransport
+
+
+class Anyone:
+    """The handshake is not what is checked here: every method is allowed."""
+
+    @staticmethod
+    def may_call(method):
+        return True
+
+    def check_incoming(self, method):
+        pass
+
+    def check_outgoing(self, method):
+        pass
+
+
+class LiveShell:
+    """The shell's end of the control channel: asks, and answers `secrets.*`."""
+
+    def __init__(self, transport):
+        self.transport = transport
+        self.store = Shell()
+        self.ids = IdGenerator("s-")
+        self.replies = {}
+        self.arrived = threading.Condition()
+        threading.Thread(target=self._read, daemon=True).start()
+
+    def _read(self):
+        decoder = FrameDecoder()
+        while True:
+            try:
+                chunk = self.transport.recv()
+            except Exception:                           # noqa: BLE001
+                return
+            for message in decoder.feed(chunk or b""):
+                if message.type == "request" and message.method.startswith("secrets."):
+                    answer = self.store(message.method, message.payload)
+                    self.transport.send(encode_frame(
+                        message.reply(answer, id=self.ids.next())))
+                elif message.correlation_id:
+                    with self.arrived:
+                        self.replies[message.correlation_id] = message
+                        self.arrived.notify_all()
+
+    def ask(self, method, payload, seconds=10.0):
+        request = Envelope.request(method, payload, id=self.ids.next(),
+                                   trace_id="t-secrets")
+        started = time.perf_counter()
+        self.transport.send(encode_frame(request))
+        with self.arrived:
+            self.arrived.wait_for(lambda: request.id in self.replies, seconds)
+        reply = self.replies.get(request.id)
+        return reply, time.perf_counter() - started
+
+
+shell_end, core_end = InProcessTransport.pair()
+live = ProtocolServer(RinaEngine(event_bus=EventBus()),
+                      Channels(core_end, None))
+live.session = Anyone()
+threading.Thread(target=live.serve_forever, daemon=True).start()
+shell = LiveShell(shell_end)
+
+reply, spent = shell.ask("settings.set", {"values": {"llm_key": SECRET}})
+verdict = (reply.payload.get("verdicts") or {}).get("llm_key", {}) if reply else {}
+check("ключ сохранён через канал, и сразу", verdict.get("accepted") and spent < 1.0,
+      f"| {spent:.2f} с, {verdict}")
+check("и лежит у оболочки, а не в файле",
+      shell.store.kept.get((CORE, "llm_key.ollama")) == SECRET)
+reply, spent = shell.ask("settings.get", {"keys": ["llm_key"]})
+check("настройки отвечают «сохранён» без ожидания",
+      reply and reply.payload["values"].get("llm_key") == "kept" and spent < 1.0,
+      f"| {spent:.2f} с")
+reply, spent = shell.ask("privacy.inventory", {})
+groups = {g["id"]: g for g in (reply.payload.get("groups") or [])} if reply else {}
+check("на странице приватности вход виден", groups.get("secrets", {}).get("count") == 1
+      and spent < 1.0, f"| {spent:.2f} с, {sorted(groups)}")
+reply, spent = shell.ask("privacy.forget", {"everything": True})
+check("«забыть всё» забывает и входы", shell.store.kept == {} and spent < 1.0,
+      f"| {spent:.2f} с, осталось {shell.store.kept}")
+
+# The mistake itself is now loud rather than a timeout.
+live._receiver = threading.current_thread()
+try:
+    live.ask_shell_sync("secrets.list", {}, timeout=5.0)
+    check("вопрос оболочке из потока приёма — ошибка, а не ожидание", False)
+except Exception as refusal:                            # noqa: BLE001
+    check("вопрос оболочке из потока приёма — ошибка, а не ожидание",
+          "поток" in str(refusal), f"| {refusal}")
 
 # ---------------------------------------------------------------------------
 print()
