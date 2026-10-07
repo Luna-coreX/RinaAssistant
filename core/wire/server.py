@@ -2236,6 +2236,16 @@ class ProtocolServer:
     #: the device's buffer and the room's echo.
     ECHO_TAIL = 0.8
 
+    #: How much of a person's voice over hers stops her at once, before the
+    #: words are known (`4.0b-V10`, 2026-10-07). Whisper gives the words two
+    #: or three seconds after the phrase ends; a short reply is over by
+    #: then, and «замолчи» arrived to find nothing left to stop. Half a
+    #: second of voice is a person talking, not a cough or a click.
+    BARGE_IN = 0.5
+
+    #: Whether this voice-over has already stopped her — once per phrase.
+    _barged = False
+
     #: Whether there is speech of hers in flight right now. Without it
     #: every phrase with her name in it — that is, most of them in
     #: "always listening" — would announce an interruption of nothing:
@@ -2365,6 +2375,7 @@ class ProtocolServer:
         self._say_what_is_heard()
 
         phrases = self.segmenter.feed(pcm)
+        self._barge_in()
 
         # **Listening as it goes, when the engine can** (`4.0b-E07`).
         # Handing over a finished phrase costs its whole recognition
@@ -2388,12 +2399,18 @@ class ProtocolServer:
             log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
             # When the phrase began, from its length: the sound arrives as
             # it is recorded, so its end is about now (`4.0b-V10`).
-            began = time.monotonic() - len(phrase) / (speech.RATE
-                                                      * speech.SAMPLE_BYTES)
+            # The speech itself, without the run-up before it and the
+            # silence that ended it: counted from the whole phrase, a
+            # person who started talking as she finished was 0.4 s "inside"
+            # her reply, and lost the phrase (2026-10-07).
+            now = time.monotonic()
+            length = len(phrase) / (speech.RATE * speech.SAMPLE_BYTES)
+            began = now - length + getattr(self.segmenter, "last_head", 0.0)
+            ended = now - getattr(self.segmenter, "last_tail", 0.0)
             # Already fed, piece by piece — so what goes into the queue
             # is the order to finish, not the sound a second time.
             self._queue_phrase(None if self._streaming() else phrase,
-                               over_her=self.voice_heard_at(began))
+                               over_her=self.spoken_over(began, ended))
 
     def _say_what_is_heard(self) -> None:
         """One line per change of what the microphone is doing."""
@@ -2571,7 +2588,12 @@ class ProtocolServer:
             # person pressed the key to speak: then the microphone is
             # open because they asked for it, and what they say is theirs.
             listening_once = getattr(self.engine, "listening_once", None)
-            if (over_her and not (hushed or named)
+            # With her voice taken out of the microphone, what is left over
+            # hers is a person talking over her — about anything, not only
+            # her name or «стоп» (2026-10-07: «нельзя прервать другой
+            # фразой»). The words matching her own were dropped above.
+            barging = over_her and self._echo_cancelled()
+            if (over_her and not (hushed or named or barging)
                     and not (listening_once and listening_once())):
                 log.info("Сказано поверх её речи и без имени — скорее "
                          "всего, это её же голос, не в счёт: %s",
@@ -2587,7 +2609,7 @@ class ProtocolServer:
             # in the shell's queue, and a second of talking over somebody
             # who has just interrupted is the whole of what interrupting
             # is against.
-            if hushed or named:
+            if hushed or named or barging:
                 self.hush()
             if (named or not self.engine.is_always_listen()) and not hushed:
                 self._warm_voice()
@@ -2735,7 +2757,10 @@ class ProtocolServer:
         interrupted hears the difference immediately.
         """
         if not (self._reply_running or self._talking_out
-                or (self._speech_queue and not self._speech_queue.empty())):
+                or (self._speech_queue and not self._speech_queue.empty())
+                # Sent and still playing: the last second of a reply is
+                # in the shell's queue after the core is done with it.
+                or time.monotonic() < self._voice_until):
             return          # there was nothing to interrupt
         self._cut_in = True
         waiting = self._speech_queue
@@ -3054,6 +3079,57 @@ class ProtocolServer:
     def voice_heard_at(self, moment: float) -> bool:
         """Was her voice coming out of the speakers at this moment."""
         return moment < self._voice_until + self.ECHO_TAIL
+
+    def spoken_over(self, began: float, ended: float) -> bool:
+        """
+        Was most of a phrase said while her voice was in the room.
+
+        Most of it, not its start: a person who begins as she ends speaks
+        a word into her last syllable and the rest into silence, and that
+        phrase is theirs. Her own voice coming back starts and ends inside
+        her reply.
+        """
+        until = self._voice_until + self.ECHO_TAIL
+        if ended <= began:
+            return began < until
+        inside = max(0.0, min(ended, until) - began)
+        return inside / (ended - began) >= 0.5
+
+    def _echo_cancelled(self) -> bool:
+        """
+        Whether the shell takes her voice out of the microphone.
+
+        With it on, a voice over hers is a person's: the voice that came
+        back is subtracted before anything is cut into phrases. With it off
+        and speakers in the room, it is very likely her own — the case
+        `4.0b-V10` was opened for.
+        """
+        store = self._settings() or {}
+        return bool(store.get("echo_cancellation", True))
+
+    def _barge_in(self) -> None:
+        """
+        Stop her the moment a person starts talking over her.
+
+        Only where her voice is taken out of the microphone: without that,
+        the voice over hers is mostly her own, and she would stop at the
+        sound of herself. What was said is decided afterwards, when the
+        words come — a person who talked over her about something else is
+        heard as a command.
+        """
+        segmenter = getattr(self, "segmenter", None)
+        if segmenter is None or not getattr(segmenter, "speaking", False):
+            self._barged = False
+            return
+        if self._barged or segmenter.speech_seconds < self.BARGE_IN:
+            return
+        if not (self._talking_out or time.monotonic() < self._voice_until):
+            return
+        if not self._echo_cancelled():
+            return
+        self._barged = True
+        log.info("Перебили голосом — замолкаю, слова разберу следом")
+        self.hush()
 
     # -- the break ---------------------------------------------------------------
 

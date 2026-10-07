@@ -679,7 +679,8 @@ class Ear:
         return speech.Heard(text=self.text)
 
 
-def listening(heard_text, said_before=(), wake=("рина",), talking=True):
+def listening(heard_text, said_before=(), wake=("рина",), talking=True,
+              cancelled=False):
     """
     A core that has just heard `heard_text` and lately said the rest.
 
@@ -693,7 +694,8 @@ def listening(heard_text, said_before=(), wake=("рина",), talking=True):
     box.recogniser = Ear(heard_text)
     box.heard = {"bytes": 0, "frames": 0, "loud_frames": 0, "phrases": 0,
                  "recognitions": 0, "texts": 0, "dropped": 0}
-    box._settings = lambda: MemorySettings({"wake_words": list(wake)})
+    box._settings = lambda: MemorySettings({"wake_words": list(wake),
+                                            "echo_cancellation": cancelled})
     box._lately_said = _collections.deque(said_before, maxlen=4)
     box._speech_queue = None
     box.ids = Ids()
@@ -902,8 +904,8 @@ print()
 print("=== сказанное поверх её речи — её же голос (4.0b-V10) ===")
 # Through speakers her voice comes back into the microphone misheard, the
 # word comparison above no longer matches it, and she answered her own
-# words. A phrase that began while her voice was in the room counts only
-# if it is her name or «стоп».
+# words. Without echo cancellation, a phrase said mostly over her voice
+# counts only if it is her name or «стоп».
 echo = listening("какая сегодня погода", said_before=["Сегодня тепло и ясно."])
 echo._recognise(b"\x00\x00", over_her=True)
 check("поверх речи и без имени — не в счёт, даже расслышанное мимо",
@@ -960,6 +962,58 @@ check("две секунды речи звучат около двух с пол
 check("и пока звучат, фраза — поверх неё",
       out.voice_heard_at(before + 1.0) and out.voice_heard_at(before + 3.0))
 check("а после хвоста комнаты — нет", not out.voice_heard_at(before + 4.0))
+
+# -- 2026-10-07, after the test on real speakers ---------------------------
+# «Рина больше не слышит себя, но её нельзя прервать — ни „замолчи", ни
+# другой фразой; и после речи слушает не сразу».
+end = out._voice_until + out.ECHO_TAIL
+check("фраза, начатая на её последнем слоге, — человека, а не её",
+      not out.spoken_over(end - 0.3, end + 1.2))
+check("фраза целиком внутри её речи — её",
+      out.spoken_over(before + 0.5, before + 1.8))
+
+print()
+print("=== с подавлением эха её можно перебить чем угодно ===")
+talk = listening("какая сегодня погода", said_before=["Сегодня тепло и ясно."],
+                 cancelled=True)
+talk._recognise(b"\x00\x00", over_her=True)
+check("фраза поверх речи — перебивает и доходит до разбора",
+      "speech.stop" in talk.sent and talk.routed == ["какая сегодня погода"],
+      f"| {talk.sent}, {talk.routed}")
+own = listening("сегодня тепло и ясно", said_before=["Сегодня тепло и ясно."],
+                cancelled=True)
+own._recognise(b"\x00\x00", over_her=True)
+check("но её собственные слова — по-прежнему не в счёт",
+      own.routed == [] and "speech.stop" not in own.sent, f"| {own.routed}")
+
+
+class Talking:
+    """A segmenter in the middle of a phrase."""
+
+    def __init__(self, seconds):
+        self.speaking = seconds > 0
+        self.speech_seconds = seconds
+
+
+def stopper(seconds, cancelled):
+    box = listening("", cancelled=cancelled)
+    box.segmenter = Talking(seconds)
+    box._voice_until = _time.monotonic() + 3.0
+    box.hushed = []
+    box.hush = lambda: box.hushed.append(True)
+    box._barge_in()
+    return box
+
+
+check("полсекунды голоса поверх неё — замолкает сразу, не дожидаясь слов",
+      stopper(0.6, cancelled=True).hushed == [True])
+check("кашель и щелчок — нет", stopper(0.2, cancelled=True).hushed == [])
+check("без подавления эха — нет: голос поверх скорее всего её собственный",
+      stopper(0.6, cancelled=False).hushed == [])
+once = stopper(0.6, cancelled=True)
+once._barge_in()
+check("и замолкает один раз на фразу, а не на каждом куске звука",
+      once.hushed == [True])
 
 print()
 print("=== перебитое не договаривается ===")

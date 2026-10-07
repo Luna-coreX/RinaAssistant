@@ -266,23 +266,27 @@ live = ProtocolServer(RinaEngine(event_bus=EventBus()),
 live.session = Anyone()
 threading.Thread(target=live.serve_forever, daemon=True).start()
 shell = LiveShell(shell_end)
+# Below the five seconds a question to the shell waits — the old failure
+# took exactly that, every time. Not a speed requirement: under the full
+# suite's load forgetting everything takes a few seconds of its own.
+QUICK = 4.0
 
 reply, spent = shell.ask("settings.set", {"values": {"llm_key": SECRET}})
 verdict = (reply.payload.get("verdicts") or {}).get("llm_key", {}) if reply else {}
-check("ключ сохранён через канал, и сразу", verdict.get("accepted") and spent < 1.0,
+check("ключ сохранён через канал, и сразу", verdict.get("accepted") and spent < QUICK,
       f"| {spent:.2f} с, {verdict}")
 check("и лежит у оболочки, а не в файле",
       shell.store.kept.get((CORE, "llm_key.ollama")) == SECRET)
 reply, spent = shell.ask("settings.get", {"keys": ["llm_key"]})
 check("настройки отвечают «сохранён» без ожидания",
-      reply and reply.payload["values"].get("llm_key") == "kept" and spent < 1.0,
+      reply and reply.payload["values"].get("llm_key") == "kept" and spent < QUICK,
       f"| {spent:.2f} с")
 reply, spent = shell.ask("privacy.inventory", {})
 groups = {g["id"]: g for g in (reply.payload.get("groups") or [])} if reply else {}
 check("на странице приватности вход виден", groups.get("secrets", {}).get("count") == 1
-      and spent < 1.0, f"| {spent:.2f} с, {sorted(groups)}")
+      and spent < QUICK, f"| {spent:.2f} с, {sorted(groups)}")
 reply, spent = shell.ask("privacy.forget", {"everything": True})
-check("«забыть всё» забывает и входы", shell.store.kept == {} and spent < 1.0,
+check("«забыть всё» забывает и входы", shell.store.kept == {} and spent < QUICK,
       f"| {spent:.2f} с, осталось {shell.store.kept}")
 
 # The mistake itself is now loud rather than a timeout.

@@ -140,6 +140,25 @@ class Segmenter:
         #: listening as it goes has already been fed it and has to be
         #: told to forget it.
         self.gave_up = False
+        #: Of the last finished phrase: the run-up of quiet in front of
+        #: the first word and the quiet after the last one, in seconds.
+        #: A phrase is run-up + speech + the silence that ended it, and
+        #: "when did the person start talking" is about the middle part
+        #: only — counted from the whole, it came 0.4 s early and fell
+        #: inside the end of her reply (`4.0b-V10`, 2026-10-07).
+        self.last_head = 0.0
+        self.last_tail = 0.0
+        self._head = 0.0
+
+    @property
+    def speaking(self) -> bool:
+        """A phrase is being said right now."""
+        return self._speaking
+
+    @property
+    def speech_seconds(self) -> float:
+        """How much loud sound the phrase being said has so far."""
+        return self._speech if self._speaking else 0.0
 
     @staticmethod
     def level(pcm: bytes) -> float:
@@ -174,6 +193,7 @@ class Segmenter:
 
         if loud:
             if not self._speaking:
+                self._head = self._lead_seconds
                 for earlier in self._lead:
                     self._buffer.extend(earlier)
                     took.extend(earlier)
@@ -222,6 +242,8 @@ class Segmenter:
         """End the phrase by force. `None` means there is nothing to listen to."""
         phrase = bytes(self._buffer)
         speech = self._speech
+        self.last_head, self.last_tail = self._head, self._quiet
+        self._head = 0.0
         self._buffer.clear()
         self._quiet = self._speech = 0.0
         self._speaking = False
