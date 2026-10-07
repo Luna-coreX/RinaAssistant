@@ -1063,6 +1063,15 @@ public sealed class CoreLink : IAsyncDisposable
     /// <summary>Where the core lies relative to the shell.</summary>
     public static CoreLaunch FindCore()
     {
+        // An installed copy: the core and the runtime lie beside the shell,
+        // and nothing above the program's folder is looked at (audit
+        // 2026-10-07, L-7) — a `rina_core.py` higher up is not ours.
+        var home = AppContext.BaseDirectory;
+        var shipped = Path.Combine(home, "runtime", "python", "python.exe");
+        if (File.Exists(shipped) && File.Exists(Path.Combine(home, "rina_core.py")))
+            return new CoreLaunch(shipped, Path.Combine(home, "rina_core.py"), home);
+
+        // From the source tree: the shell sits under bin\, the core at the root.
         var dir = AppContext.BaseDirectory;
         while (dir is not null && !File.Exists(Path.Combine(dir, "rina_core.py")))
             dir = Path.GetDirectoryName(dir);

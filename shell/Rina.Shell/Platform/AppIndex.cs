@@ -240,7 +240,12 @@ public static class AppIndex
             // wrapper for the sake of one call.
             var process = Process.Start(new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                // By its full path (audit 2026-10-07, L-7): named bare, it
+                // is looked for in the current directory first, and a file
+                // dropped there would be run in its place.
+                FileName = Path.Combine(Environment.SystemDirectory,
+                                        "WindowsPowerShell", "v1.0",
+                                        "powershell.exe"),
                 Arguments = "-NoProfile -NonInteractive -Command \"Get-StartApps | Where-Object AppID -like '*!*' | ForEach-Object { $_.Name + '|' + $_.AppID }\"",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,

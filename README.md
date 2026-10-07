@@ -9,7 +9,7 @@ A desktop voice assistant for Windows — launches your apps, keeps your timers,
 </h3>
 
 <p align="center">
-  <b>Version 4.0.0-port</b> · Windows · Python 3.10+ · .NET 9 · Apache-2.0
+  <b>Version 4.0.0-beta</b> · Windows · Python 3.12 · .NET 9 · Apache-2.0
 </p>
 
 ---

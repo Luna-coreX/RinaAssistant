@@ -137,34 +137,6 @@ def restart_pc():
         return False
 
 
-def grab_screen():
-    """
-    A screenshot. CALL ONLY FROM THE INTERFACE THREAD: capturing the screen
-    is a Qt operation, and from a background thread it gives an empty
-    picture or falls over.
-    """
-    try:
-        from PySide6.QtWidgets import QApplication
-        from PySide6.QtCore import QDateTime
-
-        app = QApplication.instance()
-        if app is None:
-            return None
-        screen = app.primaryScreen()
-        if screen is None:
-            return None
-        shot = screen.grabWindow(0)
-
-        pictures = os.path.join(os.path.expanduser("~"), "Pictures")
-        if not os.path.isdir(pictures):
-            pictures = os.path.expanduser("~")
-        stamp = QDateTime.currentDateTime().toString("yyyy-MM-dd_HH-mm-ss")
-        path = os.path.join(pictures, f"rina_{stamp}.png")
-        return path if shot.save(path, "PNG") else None
-    except Exception:
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Parsing commands
 # ---------------------------------------------------------------------------
