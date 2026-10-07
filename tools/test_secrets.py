@@ -244,6 +244,13 @@ class LiveShell:
                     answer = self.store(message.method, message.payload)
                     self.transport.send(encode_frame(
                         message.reply(answer, id=self.ids.next())))
+                elif message.type == "request" and message.method.startswith("kept."):
+                    # What the real shell keeps (`kept.*`): nothing, here.
+                    answer = ({"consents": [], "index": 0}
+                              if message.method == "kept.list"
+                              else {"forgotten": 0})
+                    self.transport.send(encode_frame(
+                        message.reply(answer, id=self.ids.next())))
                 elif message.correlation_id:
                     with self.arrived:
                         self.replies[message.correlation_id] = message

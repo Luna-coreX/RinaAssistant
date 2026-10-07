@@ -232,6 +232,60 @@ def _setup_security_handler(formatter, trace_filter=None):
         pass
 
 
+def journals() -> list[str]:
+    """Every journal file in the folder: the core's, the security journal, the shell's."""
+    try:
+        folder = logs_dir()
+        return sorted(name for name in os.listdir(folder)
+                      if os.path.isfile(os.path.join(folder, name)))
+    except OSError:
+        return []
+
+
+def forget_journals(names=None) -> int:
+    """
+    Erase journal files — these, or all. How many went.
+
+    The core holds its own two open, and on Windows a file held open
+    cannot be deleted: the streams are closed first, under the handlers'
+    locks so nothing is written halfway, and reopen by themselves on the
+    next line. The shell opens its journal for each line and closes it, so
+    its file can simply go.
+    """
+    folder = logs_dir()
+    wanted = None if names is None else {os.path.basename(n) for n in names}
+    handlers = [handler
+                for name in (LOGGER_NAME, SECURITY_LOGGER_NAME)
+                for handler in logging.getLogger(name).handlers
+                if isinstance(handler, logging.FileHandler)]
+    gone = 0
+    with _lock:
+        for handler in handlers:
+            handler.acquire()
+        try:
+            for handler in handlers:
+                if handler.stream is not None:
+                    try:
+                        handler.stream.close()
+                    except Exception:
+                        pass
+                    # `None` rather than closed: `FileHandler.emit` opens it
+                    # again on the next record.
+                    handler.stream = None
+            for name in journals():
+                if wanted is not None and name not in wanted:
+                    continue
+                try:
+                    os.remove(os.path.join(folder, name))
+                    gone += 1
+                except OSError:
+                    pass
+        finally:
+            for handler in handlers:
+                handler.release()
+    return gone
+
+
 def apply_settings() -> None:
     """Re-read the level from the settings — after they are loaded or changed."""
     level = current_level()

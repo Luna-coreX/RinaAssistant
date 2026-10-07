@@ -582,6 +582,8 @@ _EN = {
     '«{what}» без подтверждения не выполняю.': 'I won’t do “{what}” without a confirmation.',
     'Запускать и открывать может только оболочка, а связи с ней нет.': 'Only the shell can launch and open things, and there is no connection to it.',
     'Из этой папки программы не запускаю — например, из «Загрузок».': 'I don’t run programs from this folder — from Downloads, for example.',
+    'Вызовов за последние 30 дней: {n}': 'Calls over the last 30 days: {n}',
+    'Программ в списке: {n}': 'Programs in the list: {n}',
     'Программа не найдена': 'Program not found',
     'Не нашла «{name}»': 'Couldn’t find “{name}”',
     'Похоже, программа не установлена обычным способом. Укажите файл — я запомню и в следующий раз запущу сама.': 'It doesn’t look like this program was installed the usual way. Point me at the file — I’ll remember it and launch it myself next time.',

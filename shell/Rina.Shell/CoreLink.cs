@@ -677,6 +677,44 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
+        // What the shell keeps about a person, for the privacy page (audit
+        // 2026-10-07, H-4): consent to run the unsigned, and the program
+        // index. Told and forgotten here because both live in memory too.
+        if (request.Method == "kept.list")
+        {
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["consents"] = new JsonArray(Platform.Trust.All()
+                    .OrderBy(pair => pair.Value)
+                    .Select(pair => (JsonNode)new JsonObject
+                    {
+                        ["path"] = pair.Key,
+                        ["at"] = new DateTimeOffset(DateTime.SpecifyKind(
+                            pair.Value, DateTimeKind.Utc)).ToUnixTimeSeconds(),
+                    }).ToArray()),
+                ["index"] = Platform.AppIndex.Kept(),
+            });
+            return;
+        }
+
+        if (request.Method == "kept.forget")
+        {
+            var forgotten = 0;
+            if (request.Payload.ContainsKey("consents"))
+                forgotten += Platform.Trust.ForgetMany(
+                    (request.Payload["consents"] as JsonArray)?
+                        .Select(p => p?.GetValue<string>() ?? "")
+                        .Where(p => p.Length > 0).ToList());
+            if (request.Payload["index"] is JsonValue index
+                && index.TryGetValue<bool>(out var dropIndex) && dropIndex)
+                forgotten += Platform.AppIndex.Forget();
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["forgotten"] = forgotten,
+            });
+            return;
+        }
+
         // A web address, for a search, music, or a command's "website"
         // step (audit 2026-10-07, H-2). Only http and https: see Browser.
         if (request.Method == "browser.open")

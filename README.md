@@ -26,8 +26,9 @@ own: the online voices, the web search and the weather and exchange-rate
 plugins reach the network only once you switch them on, and each says what it
 sends. The beta has telemetry that is off until you switch it on: numbers once
 a day, never what you said, and gone in 4.0.0 Stable. There is a page inside the program
-that lists every single thing it has remembered about you, and a button to make
-it forget any of it.
+that lists everything it keeps about you — including its journals and the
+copies it made before updating its storage — and a button to make it forget
+any of it.
 
 <p align="center">
   <img src="docs/screens/home.png" width="760"><br>
@@ -247,7 +248,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 93 checks, about six minutes
+python tools/regress.py          # 94 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 

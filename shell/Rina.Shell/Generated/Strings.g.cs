@@ -751,6 +751,11 @@ public static partial class Loc
                 {
                     ["English"] = "Waiting: {0}",
                 },
+            ["Журнал вызовов"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Call journal",
+                },
             ["Журналы"] =
                 new Dictionary<string, string>
                 {
@@ -1870,6 +1875,11 @@ public static partial class Loc
                 {
                     ["English"] = "Plugins live in the core, and there’s no connection to it.",
                 },
+            ["По нему Рина находит программы. Забытый, он соберётся заново из того, что установлено."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "How Rina finds programs. Forgotten, it is built again from what is installed.",
+                },
             ["По этому слову Рина понимает, что обращаются к ней."] =
                 new Dictionary<string, string>
                 {
@@ -1955,6 +1965,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Show done",
+                },
+            ["Полные копии ваших данных, которые программа сделала перед обновлением формата хранения. После «забыть» вернуться к прежнему формату будет нельзя."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Full copies of your data the program made before updating its storage format. Once forgotten, going back to the earlier format is no longer possible.",
                 },
             ["Помочь бете"] =
                 new Dictionary<string, string>
@@ -2083,6 +2098,11 @@ public static partial class Loc
                 {
                     ["English"] = "Programs (*.exe;*.lnk)|*.exe;*.lnk|All files|*.*",
                 },
+            ["Программы без цифровой подписи, которым вы ответили «всегда разрешать»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Programs without a digital signature you answered “always allow” to.",
+                },
             ["Пройти настройку заново"] =
                 new Dictionary<string, string>
                 {
@@ -2198,6 +2218,11 @@ public static partial class Loc
                 {
                     ["English"] = "Model size: the bigger, the more accurate and the slower",
                 },
+            ["Разрешённые неподписанные программы"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Allowed unsigned programs",
+                },
             ["Распаковываю…"] =
                 new Dictionary<string, string>
                 {
@@ -2207,6 +2232,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Recognition",
+                },
+            ["Резервные копии"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Backups",
                 },
             ["Рина"] =
                 new Dictionary<string, string>
@@ -2582,6 +2612,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "The list of what is waiting.",
+                },
+            ["Список установленных программ"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Installed programs list",
                 },
             ["Спрашивает, когда ей не хватает знаний. Вопрос уходит в DuckDuckGo"] =
                 new Dictionary<string, string>
@@ -2967,6 +3002,16 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "what to say",
+                },
+            ["Что происходило в программе, по дням. В журнале безопасности — каждая запущенная программа с путём и временем и изменённые настройки; тексты сказанного — только если вы включили их запись."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What happened in the program, day by day. The security journal holds every program launched, with its path and time, and the settings changed; what you said is there only if you switched that on.",
+                },
+            ["Что Рина делала за последние 30 дней: какое действие, по чьей просьбе, чем кончилось. Свободный текст записан длиной, не словами. По нему она отвечает на «почему?»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "What Rina did over the last 30 days: which action, at whose request, how it ended. Free text is recorded as its length, not its words. It is what she answers “why?” from.",
                 },
             ["Что Рина знает обо мне"] =
                 new Dictionary<string, string>

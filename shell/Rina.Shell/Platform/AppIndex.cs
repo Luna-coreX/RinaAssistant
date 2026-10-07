@@ -425,6 +425,22 @@ public static class AppIndex
 
     private static List<AppEntry>? _memory;
 
+    /// <summary>How many programs the index holds, without building it.</summary>
+    public static int Kept() => _memory?.Count ?? Load()?.Count ?? 0;
+
+    /// <summary>
+    /// Drop the index, in memory and on disk — for the privacy page (H-4).
+    /// How many entries went. It is built again the next time it is asked
+    /// for, from what is installed then.
+    /// </summary>
+    public static int Forget()
+    {
+        var gone = Kept();
+        _memory = null;
+        try { File.Delete(CachePath); } catch { }
+        return gone;
+    }
+
     /// <summary>
     /// The index: from memory, from the file, or built afresh.
     /// </summary>

@@ -1915,5 +1915,32 @@
   },
   "ядро не отвечает": {
     "English": "the core isn’t responding"
+  },
+  "Что происходило в программе, по дням. В журнале безопасности — каждая запущенная программа с путём и временем и изменённые настройки; тексты сказанного — только если вы включили их запись.": {
+    "English": "What happened in the program, day by day. The security journal holds every program launched, with its path and time, and the settings changed; what you said is there only if you switched that on."
+  },
+  "Журнал вызовов": {
+    "English": "Call journal"
+  },
+  "Что Рина делала за последние 30 дней: какое действие, по чьей просьбе, чем кончилось. Свободный текст записан длиной, не словами. По нему она отвечает на «почему?».": {
+    "English": "What Rina did over the last 30 days: which action, at whose request, how it ended. Free text is recorded as its length, not its words. It is what she answers “why?” from."
+  },
+  "Резервные копии": {
+    "English": "Backups"
+  },
+  "Полные копии ваших данных, которые программа сделала перед обновлением формата хранения. После «забыть» вернуться к прежнему формату будет нельзя.": {
+    "English": "Full copies of your data the program made before updating its storage format. Once forgotten, going back to the earlier format is no longer possible."
+  },
+  "Разрешённые неподписанные программы": {
+    "English": "Allowed unsigned programs"
+  },
+  "Программы без цифровой подписи, которым вы ответили «всегда разрешать».": {
+    "English": "Programs without a digital signature you answered “always allow” to."
+  },
+  "Список установленных программ": {
+    "English": "Installed programs list"
+  },
+  "По нему Рина находит программы. Забытый, он соберётся заново из того, что установлено.": {
+    "English": "How Rina finds programs. Forgotten, it is built again from what is installed."
   }
 }

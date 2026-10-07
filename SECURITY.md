@@ -77,7 +77,12 @@ Windows searches the current directory when a program is named without a path. E
 A page in the application — Privacy → *What Rina knows about me* — lists every
 kind of thing stored locally: the words you taught her, the conversation, your
 reminders, things to do, your own commands, how often each has run, plugins,
-the folders you pointed at, and which settings you changed. Every entry can be
+the folders you pointed at, which settings you changed, saved sign-ins (that
+they exist, never the values), beta telemetry, and what lies beside the
+settings: the journals — the security journal records every program launched,
+with its path and time, and changed settings — the call journal, the copies the
+program made of your data before updating its storage format, the unsigned
+programs you allowed, and the list of installed programs. Every entry can be
 removed one at a time, a group at a time, a day at a time, or all at once; and
 all of it can be written out to a file, either as data or as text you can
 read.
@@ -86,6 +91,10 @@ The list is assembled by walking the store rather than from a list somebody
 maintains, so a kind of data added later appears on that page without anybody
 having to remember to add it. If you find something stored that the page does
 not show, that is a defect and worth reporting.
+
+One thing is deliberately not on it: the speech and recognition models you
+downloaded. They are files from their publishers, not anything about you, and
+they are removed by uninstalling or from the model settings.
 
 ### She can tell you why she did something
 

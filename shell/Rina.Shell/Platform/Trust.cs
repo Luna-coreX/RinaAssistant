@@ -72,6 +72,31 @@ public static class Trust
         }
     }
 
+    /// <summary>
+    /// Revoke these, or all of them — for the privacy page (audit
+    /// 2026-10-07, H-4). How many went.
+    /// </summary>
+    /// <remarks>
+    /// Here and not by deleting the file: the list lives in memory as well,
+    /// and the next "always" would write the old one straight back.
+    /// </remarks>
+    public static int ForgetMany(IEnumerable<string>? paths)
+    {
+        lock (Lock)
+        {
+            Load();
+            var before = _allowed!.Count;
+            if (paths is null)
+                _allowed.Clear();
+            else
+                foreach (var path in paths)
+                    _allowed.Remove(path.ToLowerInvariant());
+            var gone = before - _allowed.Count;
+            if (gone > 0) Save();
+            return gone;
+        }
+    }
+
     /// <summary>What is allowed — for showing in settings.</summary>
     public static IReadOnlyDictionary<string, DateTime> All()
     {
