@@ -1814,10 +1814,10 @@ public static partial class Loc
                 {
                     ["English"] = "Send the beta's anonymous statistics",
                 },
-            ["Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до суток."] =
+            ["Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до часа."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to a day.",
+                    ["English"] = "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to an hour.",
                 },
             ["Очистить"] =
                 new Dictionary<string, string>
