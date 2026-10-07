@@ -221,6 +221,37 @@ try:
 finally:
     websearch.can_read = was
 
+# ---------------------------------------------------------------------------
+print()
+print("=== поисковики — только те, что не строят профиль ===")
+# Decided 2026-10-07, after the audit: Google, Bing and Yandex off the list,
+# DuckDuckGo by default, Brave and others of its kind added.
+from core import settings_schema
+from core.settings_store import SettingsStore
+
+check("Google, Bing и Яндекса в списке нет",
+      not {"google", "bing", "yandex"} & set(websearch.ENGINES))
+check("по умолчанию DuckDuckGo", websearch.DEFAULT_ENGINE == "duckduckgo")
+from core.toolbox import WEB_SEARCH
+
+engine_param = next(p for p in WEB_SEARCH.params if p.name == "engine")
+check("список настроек, инструмента и поиска — один",
+      set(settings_schema.CONSTRAINTS["search_engine"].choices)
+      == set(websearch.ENGINES) == set(engine_param.choices))
+check("каждый адрес — https",
+      all(url.startswith("https://") for _l, url in websearch.ENGINES.values()))
+for old in ("google", "yandex", "bing"):
+    store = SettingsStore()
+    store._data["search_engine"] = old
+    moved = store._retire_search_engine()
+    check(f"сохранённый «{old}» при загрузке становится DuckDuckGo",
+          moved and store._data["search_engine"] == "duckduckgo")
+kept = SettingsStore()
+kept._data["search_engine"] = "brave"
+check("выбранный из нового списка не трогается",
+      not kept._retire_search_engine()
+      and kept._data["search_engine"] == "brave")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

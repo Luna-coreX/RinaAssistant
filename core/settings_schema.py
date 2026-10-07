@@ -112,8 +112,8 @@ CONSTRAINTS: dict[str, Constraint] = {
     # with a typo.
     "program_folders": Constraint(format="folder"),
     "piper_model": Constraint(format="file"),
-    "search_engine": Constraint(choices=("google", "yandex", "duckduckgo",
-                                         "bing")),
+    "search_engine": Constraint(choices=("duckduckgo", "brave", "startpage",
+                                         "mojeek", "qwant")),
 
     # The language model: three fields are meaningless while it is off.
     "llm_url": Constraint(depends_on="llm_enabled",
@@ -396,6 +396,12 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
                   "feminine": tr("В женском роде")}
         return [{"value": form, "title": titles[form], "available": True}
                 for form in ADDRESS]
+    if key == "search_engine":
+        # By the names the engines give themselves: they are not translated.
+        from voice.websearch import ENGINES
+
+        return [{"value": engine, "title": title, "available": True}
+                for engine, (title, _url) in ENGINES.items()]
     if key == "whisper_model":
         # Whisper's list of models is fixed and known without installing
         # anything: these are names, not files that were found.

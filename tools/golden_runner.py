@@ -153,7 +153,7 @@ class InProcessDriver(Driver):
             # subject of the check.
             "watch_apps": True,
             "custom_commands": [], "app_aliases": {}, "reminders": [],
-            "history": [], "ui_language": "Русский", "search_engine": "google",
+            "history": [], "ui_language": "Русский", "search_engine": "duckduckgo",
             "wake_words": ["Рина", "Rina"],
         })
         settings.save()
