@@ -101,6 +101,10 @@ class RinaEngine:
         #: Called to cut off speech in progress — see `_hush_previous`.
         self.hush_out = None
         self._apps_cache = None
+        self._apps_at = 0.0
+        self._apps_empty_at = None
+        self._apps_refreshing = False
+        self._apps_lock = threading.Lock()
         #: Who opens a page in a browser. The same place as the rest of what
         #: touches the machine; until it is set, the core opens it itself,
         #: as in 3.1.0.
@@ -929,12 +933,77 @@ class RinaEngine:
 
             return app_index.cached_index() or []
 
-        if self._apps_cache is None:
-            from voice.app_index import AppEntry
+        with self._apps_lock:
+            cached, at = self._apps_cache, self._apps_at
+            empty_at = self._apps_empty_at
+        now = time.monotonic()
+        if cached is not None:
+            if now - at > self.APPS_FRESH:
+                self._refresh_apps_later()
+            return cached
+        # Nothing yet, or the last answer was empty — a shell that timed out
+        # building its index, or failed. **Not kept** (audit 2026-10-07,
+        # M-4): kept, an empty list answered "not found" to every program
+        # for the rest of the session. Asked again, but not on every phrase:
+        # a shell still building would make each one wait for it.
+        if empty_at is not None and now - empty_at < self.APPS_RETRY:
+            return []
+        return self._load_apps(refresh=False)
 
-            self._apps_cache = [AppEntry.from_dict(item)
-                                for item in self.apps_source()]
-        return self._apps_cache
+    #: How long the list of programs is taken as it stands. After that it
+    #: is asked for again, rebuilt — a program installed since Rina started
+    #: is found — and in the background: the phrase in hand is answered from
+    #: the list there is, rather than wait seconds for a new one.
+    APPS_FRESH = 600.0
+    #: How soon an empty list is asked for again.
+    APPS_RETRY = 30.0
+
+    def _load_apps(self, refresh):
+        from voice.app_index import AppEntry
+
+        def ask():
+            if refresh:
+                try:
+                    return self.apps_source(refresh=True)
+                except TypeError:
+                    # A source that knows no `refresh` (the checks' stand-ins).
+                    pass
+            return self.apps_source()
+
+        try:
+            raw = ask()
+        except Exception:                               # noqa: BLE001
+            log.warning("Список программ не получен", exc_info=True)
+            raw = []
+        entries = [AppEntry.from_dict(item) for item in raw or []]
+        with self._apps_lock:
+            if entries:
+                self._apps_cache = entries
+                self._apps_at = time.monotonic()
+                self._apps_empty_at = None
+            elif self._apps_cache is None:
+                self._apps_empty_at = time.monotonic()
+            else:
+                # A rebuild that came back empty does not throw away a list
+                # that worked: try again after the usual wait.
+                self._apps_at = time.monotonic()
+        return entries or (self._apps_cache or [])
+
+    def _refresh_apps_later(self):
+        with self._apps_lock:
+            if self._apps_refreshing:
+                return
+            self._apps_refreshing = True
+
+        def rebuild():
+            try:
+                self._load_apps(refresh=True)
+            finally:
+                with self._apps_lock:
+                    self._apps_refreshing = False
+
+        threading.Thread(target=rebuild, name="rina-apps-refresh",
+                         daemon=True).start()
 
     #: The sources that arrive by ear.
     BY_EAR = ("voice", "always")
