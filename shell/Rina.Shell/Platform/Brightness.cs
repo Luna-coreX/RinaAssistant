@@ -45,15 +45,35 @@ public static class Brightness
         if (SetPanel(level)) reached++;
         reached += ForEachMonitor((handle, min, _, max) =>
             SetMonitorBrightness(handle, (uint)(min + (max - min) * level / 100)));
+        if (reached > 0) _lastSet = level;
         return reached > 0 ? (true, level.ToString()) : (false, Unsupported);
     }
 
     /// <summary>Brighter or darker by a step, from where it is now.</summary>
+    /// <remarks>
+    /// Where it is now is asked of the screen; if the screen will not say,
+    /// the level this program last set stands in for it. Found on a laptop
+    /// (2026-10-08): a level was set once, and every step after it answered
+    /// "this screen cannot be driven" — setting worked, reading did not.
+    /// </remarks>
     public static (bool Ok, string Detail) Step(int delta)
     {
-        var now = Current();
+        var now = Current() ?? _lastSet;
         if (now is null) return (false, Unsupported);
         return Set(Math.Clamp(now.Value + delta, 0, 100));
+    }
+
+    private static int? _lastSet;
+
+    /// <summary>What Windows said the last time a call failed — for the check.</summary>
+    public static string LastFault { get; private set; } = "";
+
+    private static void Fault(string where, Exception error)
+    {
+        LastFault = $"{where}: {error.GetType().Name} 0x{error.HResult:X8} {error.Message}".Trim();
+        // Said, not swallowed: "cannot be driven" with nothing behind it
+        // left a fault on a laptop with no way to tell what it was.
+        Journal.Fault("brightness", LastFault);
     }
 
     /// <summary>
@@ -99,13 +119,39 @@ public static class Brightness
     {
         try
         {
-            foreach (var item in Query("SELECT CurrentBrightness FROM WmiMonitorBrightness"))
-                return (int)(byte)item.CurrentBrightness;
+            // The active instance: a laptop can list more than one panel
+            // (a docked lid, a second adapter), and the first may be one
+            // that is not lit. Read through `Properties_` rather than as a
+            // dynamic member, and converted rather than cast: the value
+            // arrives as whatever variant type the provider chose.
+            int? first = null;
+            foreach (var item in Query("SELECT Active, CurrentBrightness FROM WmiMonitorBrightness"))
+            {
+                var value = Convert.ToInt32(
+                    (object)item.Properties_.Item("CurrentBrightness").Value);
+                bool active;
+                try { active = Convert.ToBoolean((object)item.Properties_.Item("Active").Value); }
+                catch { active = true; }
+                if (active) return value;
+                first ??= value;
+            }
+            return first;
         }
-        catch (COMException) { }
-        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException) { }
+        catch (Exception error) when (error is COMException
+                                      or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException
+                                      or InvalidCastException or FormatException
+                                      or InvalidComObjectException)
+        {
+            // On a desktop this is the ordinary "not supported"; said in
+            // the journal only where there is something to be learned.
+            if (error is not COMException { HResult: WbemNotSupported })
+                Fault("read", error);
+        }
         return null;
     }
+
+    /// <summary>WBEM_E_NOT_SUPPORTED: no panel here — a desktop.</summary>
+    private const int WbemNotSupported = unchecked((int)0x8004100C);
 
     private static bool SetPanel(int level)
     {
@@ -123,8 +169,15 @@ public static class Brightness
             }
             return done;
         }
-        catch (COMException) { return false; }
-        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException) { return false; }
+        catch (Exception error) when (error is COMException
+                                      or Microsoft.CSharp.RuntimeBinder.RuntimeBinderException
+                                      or InvalidCastException
+                                      or InvalidComObjectException)
+        {
+            if (error is not COMException { HResult: WbemNotSupported })
+                Fault("set", error);
+            return false;
+        }
     }
 
     /// <summary>The objects a WMI query in <c>root\WMI</c> returns.</summary>

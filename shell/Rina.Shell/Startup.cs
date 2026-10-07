@@ -343,6 +343,13 @@ public partial class App
             return;
         }
 
+        if (args.Contains("--check-brightness"))
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = CheckBrightnessAsync();
+            return;
+        }
+
         if (args.Contains("--check-pages"))
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -7136,6 +7143,78 @@ public partial class App
         Environment.ExitCode = fails == 0 ? 0 : 1;
         Shutdown();
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The brightness, driven for real, several times over (<c>4.0b-K04</c>).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Changes the screen, so it is not in the everyday run (`regress.py`
+    /// sets it apart with the other checks that touch the machine). Made
+    /// for a laptop where the first command worked and every one after it
+    /// answered "cannot be driven" (2026-10-08): it does what a person does
+    /// — set, step up, step down, again — and prints what Windows said each
+    /// time, then puts the level back where it was.
+    /// </para>
+    /// </remarks>
+    private async Task CheckBrightnessAsync()
+    {
+        Console.SetOut(new StreamWriter(Console.OpenStandardOutput())
+        {
+            AutoFlush = true,
+        });
+        var fails = 0;
+        void Check(string label, bool ok, string detail = "")
+        {
+            if (!ok) fails++;
+            Console.WriteLine($"  {(ok ? "OK  " : "FAIL")}  {label} {detail}");
+        }
+
+        Console.WriteLine("=== K04: яркость по-настоящему, несколько раз ===");
+        var was = Platform.Brightness.Current();
+        Console.WriteLine($"     сейчас: {(was is null ? "не читается" : was + "%")}"
+                          + (Platform.Brightness.LastFault.Length > 0
+                              ? $" | {Platform.Brightness.LastFault}" : ""));
+        if (was is null)
+        {
+            Console.WriteLine("     экран не отвечает — дальше проверять нечего");
+            Console.WriteLine();
+            Console.WriteLine($"Ошибок: {fails}");
+            Environment.ExitCode = 0;
+            Shutdown();
+            return;
+        }
+
+        var start = was.Value;
+        var low = start > 50 ? start - 20 : start + 20;
+        var steps = new (string Label, Func<(bool Ok, string Detail)> Act)[]
+        {
+            ($"поставить {low}%", () => Platform.Machine.Do("brightness_set", low)),
+            ("ярче", () => Platform.Machine.Do("brightness_up")),
+            ("темнее", () => Platform.Machine.Do("brightness_down")),
+            ($"поставить {start}%", () => Platform.Machine.Do("brightness_set", start)),
+            ("ярче", () => Platform.Machine.Do("brightness_up")),
+            ("темнее", () => Platform.Machine.Do("brightness_down")),
+        };
+        foreach (var (label, act) in steps)
+        {
+            var fault = Platform.Brightness.LastFault;
+            var done = act();
+            // The panel applies a level a moment after it is asked.
+            await Task.Delay(400);
+            var now = Platform.Brightness.Current();
+            var said = Platform.Brightness.LastFault != fault
+                ? $" | {Platform.Brightness.LastFault}" : "";
+            Check(label, done.Ok, $"| ответ {done.Detail}, читается {now?.ToString() ?? "—"}{said}");
+        }
+
+        Platform.Machine.Do("brightness_set", start);
+        Console.WriteLine($"     возвращено: {start}%");
+        Console.WriteLine();
+        Console.WriteLine($"Ошибок: {fails}");
+        Environment.ExitCode = fails == 0 ? 0 : 1;
+        Shutdown();
     }
 
     /// <summary>

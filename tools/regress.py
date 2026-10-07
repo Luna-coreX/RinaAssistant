@@ -143,7 +143,9 @@ TOUCHES_MACHINE = {"--check-voice", "--check-hover", "--check-tray",
                    # and part of what it checks depends on the answer.
                    "--check-media",
                    # Plays through the speakers and listens to the room.
-                   "--check-echolive"}
+                   "--check-echolive",
+                   # Changes the screen's brightness, and puts it back.
+                   "--check-brightness"}
 
 
 #: The interpreter the **core** runs on — and therefore the one its
