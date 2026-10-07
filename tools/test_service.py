@@ -441,6 +441,10 @@ check("ядро объявило возможности команд и исто
       "commands" in work.session.peer_capabilities
       and "history" in work.session.peer_capabilities,
       f"| {work.session.peer_capabilities}")
+# The history is kept only once the person asks for it (the audit's I-2,
+# 2026-10-07); what is checked below is the methods that show and erase it.
+work.ask("settings.set", {"values": {"save_history": True}})
+work.read(1)
 
 work.ask("commands.list")
 items = work.read(1)[0].payload["items"]
