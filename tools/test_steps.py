@@ -26,8 +26,8 @@ sys.path.insert(0, os.path.join(
 from console import use_utf8
 from core import data_transfer
 from voice import user_commands
-from voice.user_commands import (MAX_DEPTH, MAX_REPEAT,
-                                 MAX_WHILE, execute)
+from voice.user_commands import MAX_DEPTH, MAX_REPEAT, MAX_WHILE
+from voice.user_commands import execute as _execute
 
 use_utf8()
 
@@ -42,7 +42,9 @@ def check(label, cond, detail=""):
 
 
 #: Steps are counted through the address opener: it is the one seam a step
-#: reaches for that can be replaced without touching the machine. A "say out
+#: reaches for that can be replaced without touching the machine. Since the
+#: audit of 2026-10-07 (H-2) it is the shell's opener handed to `execute`,
+#: not the `webbrowser` module the step used to call itself. A "say out
 #: loud" step would have been the obvious choice and proves nothing —
 #: `execute` returns such a step's text as its answer and never says it.
 opened = []
@@ -55,12 +57,16 @@ class Opener:
         return True
 
 
+def execute(command, *args, **kwargs):
+    kwargs.setdefault("open_url",
+                      lambda url: (opened.append(url), (True, ""))[1])
+    return _execute(command, *args, **kwargs)
+
+
 def visit(name):
     return {"type": "website", "target": name, "triggers": [], "steps": []}
 
 
-was = user_commands.webbrowser
-user_commands.webbrowser = Opener
 try:
     # --- repeating -----------------------------------------------------
     opened.clear()
@@ -306,7 +312,7 @@ try:
 
 
 finally:
-    user_commands.webbrowser = was
+    pass
 
 
 # --- a trial says which step it is on --------------------------------------
@@ -314,8 +320,6 @@ finally:
 # Only while somebody is watching. A scenario fired by voice has nobody
 # looking at a canvas, and filling the event channel with steps nobody reads
 # would be paying for a picture that is not on a screen.
-was = user_commands.webbrowser
-user_commands.webbrowser = Opener
 try:
     told = []
     opened.clear()
@@ -339,7 +343,7 @@ try:
             emit=lambda name, **p: quiet.append(p), trace=False)
     check("без наблюдателя ничего не сообщается", quiet == [], f"| {quiet}")
 finally:
-    user_commands.webbrowser = was
+    pass
 
 
 # --- these kinds are steps, not commands -----------------------------------

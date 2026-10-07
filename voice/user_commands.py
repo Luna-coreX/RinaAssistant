@@ -22,11 +22,7 @@ OS's standard means.
 
 import os
 import re
-import sys
 import uuid
-import shutil
-import subprocess
-import webbrowser
 
 from core.logging_setup import get_logger, safe
 
@@ -186,15 +182,55 @@ def action_label(action_id):
     return action_id
 
 
-def command_needs_confirm(command):
-    """Is there an irreversible action in the command (or in its steps)."""
-    if command.get("type") == "system":
-        return command.get("target") in DESTRUCTIVE_ACTIONS
-    if command.get("type") == "sequence":
-        return any(step.get("type") == "system"
-                   and step.get("target") in DESTRUCTIVE_ACTIONS
-                   for step in command.get("steps", []))
-    return False
+#: Stands in `destructive_steps` for a call whose target cannot be looked
+#: up from where the question is asked: unknown is treated as dangerous.
+UNKNOWN_CALL = "call"
+
+
+def destructive_steps(command, lookup=None):
+    """
+    The irreversible actions anywhere in a command, in the order met.
+
+    **Anywhere.** The first version looked at the top and at a sequence's
+    own steps, and nowhere else: an "if" branch, the body of a loop, and
+    another command called from this one all shut the computer down
+    without a question, while the editor promised "Rina will ask"
+    (audit 2026-10-07, H-1). A call is followed into the command it calls,
+    once per command, so a ring ends; without `lookup` a call cannot be
+    followed, and an unknown is taken as dangerous rather than as safe.
+    A call whose target no longer exists runs nothing and is not counted.
+    """
+    found = []
+    seen = set()
+    stack = [command]
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, dict):
+            continue
+        kind = node.get("type")
+        if kind == "system" and node.get("target") in DESTRUCTIVE_ACTIONS:
+            if node["target"] not in found:
+                found.append(node["target"])
+        elif kind == "call":
+            wanted = str(node.get("target", "") or "")
+            if wanted and wanted not in seen:
+                seen.add(wanted)
+                if lookup is None:
+                    if UNKNOWN_CALL not in found:
+                        found.append(UNKNOWN_CALL)
+                else:
+                    other = lookup(wanted)
+                    if other is not None:
+                        stack.append(other)
+        # Reversed, so the stack hands them back in the order written.
+        stack.extend(reversed(list(node.get("otherwise") or [])))
+        stack.extend(reversed(list(node.get("steps") or [])))
+    return found
+
+
+def command_needs_confirm(command, lookup=None):
+    """Is there an irreversible action anywhere in the command."""
+    return bool(destructive_steps(command, lookup))
 
 
 def new_command_id():
@@ -371,30 +407,11 @@ def missing_path(target) -> bool:
     return looks_like_path and not os.path.exists(target)
 
 
-def _open_path(path):
-    """Open a file/folder/application in the OS's standard way."""
-    if not path:
-        return False
-    if missing_path(path):
-        return False
-    try:
-        if sys.platform.startswith("win"):
-            os.startfile(path)  # noqa
-        elif sys.platform == "darwin":
-            subprocess.Popen(["open", path])
-        else:
-            # if this is an executable in PATH — we launch it, otherwise xdg-open
-            if shutil.which(path):
-                subprocess.Popen([path])
-            else:
-                subprocess.Popen(["xdg-open", path])
-        return True
-    except Exception:
-        return False
 
 
 def _fresh_state(lookup=None, machine=None, trace=False, say=None,
-                 call_block=None, block_effect=None, windows=None):
+                 call_block=None, block_effect=None, windows=None,
+                 confirmed=False, launch=None, open_url=None, system=None):
     """
     What a scenario carries with it for the length of one run.
 
@@ -418,6 +435,12 @@ def _fresh_state(lookup=None, machine=None, trace=False, say=None,
     return {"vars": {}, "seen": set(), "lookup": lookup, "machine": machine,
             "say": say, "call_block": call_block,
             "block_effect": block_effect, "windows": windows,
+            # The shell's hands (H-2): a command launches, opens and
+            # switches through them, never by itself.
+            "launch": launch, "open_url": open_url, "system": system,
+            # Whether the person confirmed this run (see `_perform`, the
+            # system step). Set by the registry, never by a card.
+            "confirmed": bool(confirmed),
             # Where in the tree we are, as a prefix: "2.steps." while
             # inside the third node's body.
             "at": "",
@@ -810,7 +833,8 @@ def _condition_holds(kind, value, name="", state=None):
 
 def execute(command, host=None, emit=None, depth=0, state=None,
             lookup=None, machine=None, trace=False, say=None,
-            call_block=None, block_effect=None, windows=None):
+            call_block=None, block_effect=None, windows=None,
+            confirmed=False, launch=None, open_url=None, system=None):
     """
     Performs a command. host is an object with methods for system actions
     (minimize/show/quit/mute/unmute) and say(text). Returns (ok,
@@ -826,7 +850,8 @@ def execute(command, host=None, emit=None, depth=0, state=None,
     outermost = state is None
     if outermost:
         state = _fresh_state(lookup, machine, trace, say, call_block,
-                             block_effect, windows)
+                             block_effect, windows, confirmed, launch,
+                             open_url, system)
 
     # The stop signal is caught **here**, at the outermost call, and
     # nowhere else. Caught deeper it would stop a branch rather than the
@@ -860,33 +885,55 @@ def _perform(command, host, emit, depth, state):
     response = command.get("response", "")
 
     ok = True
+    # **The command has no hands of its own** (audit 2026-10-07, H-2).
+    # It used to run `os.startfile` and `webbrowser.open` in the core's
+    # process: a card from somebody else's file, once switched on, ran
+    # `Downloads\setup.exe` past the forbidden folders, past consent to
+    # the unsigned, and past the launch journal — everything the shell
+    # checks for "открой …" said aloud. Now it asks the shell, as the
+    # voice does; with no shell it does nothing.
     if ctype == "app" and command.get("target_kind") == "uwp":
-        # a Store application: launched by identifier, not by path
-        from voice import app_index
-        ok = app_index.launch(
-            app_index.AppEntry(target, target, "uwp", "learned"))
+        ok, response = _by_shell(state, "launch", (target, "uwp"), response)
     elif ctype == "app" or ctype == "folder":
         if missing_path(target):
-            # we name the reason: "it did not work" does not suggest what to do
             ok = False
             response = response or tr(
                 "Не нашла «{target}» — программу удалили или перенесли.",
                 target=os.path.basename(str(target).rstrip("\\/")) or target)
         else:
-            ok = _open_path(target)
+            ok, response = _by_shell(
+                state, "launch",
+                (target, "folder" if os.path.isdir(target) else "file"),
+                response)
     elif ctype == "website":
-        url = target
-        if url and not url.startswith(("http://", "https://")):
+        url = str(target or "").strip()
+        if url and "://" not in url:
             url = "https://" + url
-        try:
-            webbrowser.open(url)
-        except Exception:
-            ok = False
+        ok, response = _by_shell(state, "open_url", (url,), response)
     elif ctype == "speak":
         # for "say the text out loud" the answer is the text itself (target),
         # if no separate response is set
         if not response:
             response = target
+    elif ctype == "system" and target in DESTRUCTIVE_ACTIONS \
+            and not state.get("confirmed"):
+        # **The second lock.** The registry asks before a run that holds an
+        # irreversible step; this is for every path that did not ask — a
+        # trial from the editor, first of all. Nobody tries a command out
+        # in order to have the computer shut down: the step is skipped and
+        # said so, and in a trial the rest goes on (`trace` is a trial).
+        log.warning("Необратимый шаг %s без подтверждения пропущен", target)
+        ok = bool(state.get("trace"))
+        response = tr("«{what}» без подтверждения не выполняю.",
+                      what=action_label(target))
+        # Inside a scenario a step's words are not said unless it speaks;
+        # this one must be heard, or the trial looks like it did the step.
+        say = state.get("say")
+        if depth > 0 and say is not None:
+            try:
+                say(response)
+            except Exception:                           # noqa: BLE001
+                log.exception("Не удалось произнести пропуск шага")
     elif ctype == "system":
         ok = _run_system_action(target, host, emit, state)
     elif ctype == "tool":
@@ -992,6 +1039,36 @@ _ALL_WINDOWS = {"sys_windows_minimize_all": "minimize",
                 "sys_windows_close_all": "close"}
 
 
+def _by_shell(state, hand, args, response):
+    """
+    Ask the shell to do it: (done, what to say).
+
+    The shell's answer is a code; the words stay here. "refused" is the
+    person saying no to something unsigned — an answer, not a failure to
+    explain.
+    """
+    from core.i18n import t as tr
+
+    do = (state or {}).get(hand)
+    if do is None:
+        return False, response or tr(
+            "Запускать и открывать может только оболочка, а связи с ней нет.")
+    try:
+        ok, why = do(*args)
+    except Exception:                                   # noqa: BLE001
+        log.exception("Оболочка не выполнила шаг команды")
+        return False, response
+    if not ok and why == "refused":
+        return False, response or tr("Не стала запускать.")
+    if not ok and why == "forbidden directory":
+        return False, response or tr(
+            "Из этой папки программы не запускаю — например, из «Загрузок».")
+    if not ok and why == "no_shell":
+        return False, response or tr(
+            "Запускать и открывать может только оболочка, а связи с ней нет.")
+    return bool(ok), response
+
+
 def _run_system_action(action, host, emit=None, state=None):
     if action in _ALL_WINDOWS:
         ask = (state or {}).get("windows")
@@ -1004,14 +1081,24 @@ def _run_system_action(action, host, emit=None, state=None):
             return False
         return bool(answer.get("ok"))
 
-    # actions on the computer (volume, media, locking) — they need no host
+    # Actions on the computer — volume, media, locking, a screenshot,
+    # power — by the shell's hands, like the voice's (H-2). They ran in the
+    # core through `system_control`, past the shell's second lock; and the
+    # screenshot did nothing there and reported success (L-6).
     if str(action).startswith("sys_"):
-        from voice import system_control
-        from core.i18n import t as tr
-        message = system_control.run(action[4:])
-        # run() returns text on failure too — so we compare against exactly
-        # that, or a step of a sequence would report "Done" after a failure
-        return bool(message) and message != tr("Не получилось выполнить действие.")
+        do = (state or {}).get("system")
+        if do is None:
+            return False
+        try:
+            if action in DESTRUCTIVE_ACTIONS:
+                ok, _detail = do(action[4:], confirmed=bool(
+                    (state or {}).get("confirmed")))
+            else:
+                ok, _detail = do(action[4:])
+        except Exception:                               # noqa: BLE001
+            log.exception("Оболочка не выполнила системное действие")
+            return False
+        return bool(ok)
 
     # actions on Rina's window touch widgets, and a command may run in a
     # background thread (speech recognition) — we take them into the GUI

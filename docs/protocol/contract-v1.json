@@ -34,6 +34,12 @@
       "methods": [],
       "side": "shell"
     },
+    "browser": {
+      "methods": [
+        "browser.open"
+      ],
+      "side": "shell"
+    },
     "commands": {
       "methods": [
         "commands.builtin",
@@ -543,6 +549,7 @@
     "actuation.session.end": "actuation",
     "apps.index": "apps",
     "apps.launch": "apps",
+    "browser.open": "browser",
     "command.handle": null,
     "command.run_by_id": null,
     "commands.builtin": "commands",

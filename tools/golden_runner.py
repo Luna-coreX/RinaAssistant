@@ -200,7 +200,7 @@ class InProcessDriver(Driver):
         # calls the `system_control.RUNNERS` functions at all. We record the
         # request and answer "it worked": the suite checks that the core
         # **decided** correctly, not that Windows can turn the volume up.
-        def as_shell_do(action, level=None):
+        def as_shell_do(action, level=None, **_extra):
             obs.actions.append(action)
             obs.level = level
             return True, ""

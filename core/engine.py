@@ -1166,6 +1166,10 @@ class RinaEngine:
         """
         for cmd in self._cmd_store.all():
             if cmd.get("id") == command_id:
+                # The button asks like the voice does: "Run" on a command
+                # that shuts the computer down is a yes not yet given.
+                if self._confirm_if_irreversible(cmd):
+                    return
                 self._ensure_command_worker()
                 ctx = contextvars.copy_context()
                 threading.Thread(
@@ -1446,23 +1450,67 @@ class RinaEngine:
         return False
 
     def _dispatch_user_command(self, command):
-        from voice.user_commands import matches, command_needs_confirm
+        from voice.user_commands import matches
 
         try:
             for user_cmd in self._cmd_store.all():
                 if not matches(user_cmd, command):
                     continue
-                if command_needs_confirm(user_cmd):
-                    self._ask(Question.confirm_command(user_cmd.get("id")))
-                    self.say(tr("Команда «{name}» выключит или перезагрузит "
-                                "компьютер. Точно выполнить?",
-                                name=(user_cmd.get("triggers") or ["?"])[0]))
-                else:
+                if not self._confirm_if_irreversible(user_cmd):
                     self._executor.run_user_command(user_cmd)
                 return True
         except Exception:
             log.exception("Сбой при разборе пользовательских команд")
         return False
+
+    def _find_command(self, command_id):
+        for cmd in self._cmd_store.all():
+            if str(cmd.get("id")) == str(command_id):
+                return cmd
+        return None
+
+    def command_confirm_text(self, command_or_id):
+        """
+        What is asked before a command with an irreversible step runs.
+
+        The action is named rather than "shut down or restart": since
+        `4.0b-K08` it may as well be sleep, quitting Rina, or every window
+        closed, and a question about the wrong one is a question answered
+        without reading.
+        """
+        from voice.user_commands import (UNKNOWN_CALL, action_label,
+                                         destructive_steps)
+
+        cmd = (command_or_id if isinstance(command_or_id, dict)
+               else self._find_command(command_or_id))
+        if cmd is None:
+            return tr("Выполнить сохранённую команду?")
+        found = destructive_steps(cmd, self._find_command)
+        what = ", ".join(tr("вызов другой команды") if a == UNKNOWN_CALL
+                         else action_label(a) for a in found)
+        return tr("В команде «{name}» есть необратимое: {what}. Точно "
+                  "выполнить?", name=(cmd.get("triggers") or ["?"])[0],
+                  what=what.lower())
+
+    def _confirm_if_irreversible(self, user_cmd):
+        """
+        Ask before a command with an irreversible step. True if asked.
+
+        The confirmation is issued **for this command** and travels in the
+        question, as for `power_action`: the registry refuses the run
+        without it (H-1), so a path that forgot to ask cannot run it.
+        """
+        from voice.user_commands import command_needs_confirm
+
+        if not command_needs_confirm(user_cmd, self._find_command):
+            return False
+        text = self.command_confirm_text(user_cmd)
+        confirmation = self._tools.request_confirmation(
+            "run_user_command", {"command_id": user_cmd.get("id")},
+            preview=text)
+        self._ask(Question.confirm_command(user_cmd.get("id"), confirmation.id))
+        self.say(text)
+        return True
 
 
     def _ask_llm_async(self, command, source):

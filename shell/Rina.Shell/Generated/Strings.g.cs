@@ -287,10 +287,10 @@ public static partial class Loc
                 {
                     ["English"] = "Grammatical gender",
                 },
-            ["В команде есть необратимое действие — Рина спросит подтверждение."] =
+            ["В команде есть необратимое действие — перед запуском Рина спросит подтверждение, а при пробе пропустит этот шаг."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "The command contains an irreversible action — Rina will ask to confirm.",
+                    ["English"] = "The command contains an irreversible action — Rina will ask to confirm before running it, and will skip that step in a trial.",
                 },
             ["в метаданных нет ни одной части"] =
                 new Dictionary<string, string>

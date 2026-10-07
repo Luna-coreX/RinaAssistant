@@ -38,6 +38,8 @@ public static class Methods
     public const string AppsIndex = "apps.index";
     /// <summary>Возможность: apps.</summary>
     public const string AppsLaunch = "apps.launch";
+    /// <summary>Возможность: browser.</summary>
+    public const string BrowserOpen = "browser.open";
     /// <summary>Базовый метод.</summary>
     public const string CommandHandle = "command.handle";
     /// <summary>Базовый метод.</summary>
@@ -181,6 +183,7 @@ public static class Methods
             ["actuation.session.end"] = "actuation",
             ["apps.index"] = "apps",
             ["apps.launch"] = "apps",
+            ["browser.open"] = "browser",
             ["command.handle"] = null,
             ["command.run_by_id"] = null,
             ["commands.builtin"] = "commands",
@@ -459,6 +462,8 @@ public static class Capabilities
     public const string AudioInput = "audio.input";
     /// <summary>Объявляет shell.</summary>
     public const string AudioOutput = "audio.output";
+    /// <summary>Объявляет shell.</summary>
+    public const string Browser = "browser";
     /// <summary>Объявляет core.</summary>
     public const string Commands = "commands";
     /// <summary>Объявляет core.</summary>
@@ -500,6 +505,7 @@ public static class Capabilities
         "apps",
         "audio.input",
         "audio.output",
+        "browser",
         "permissions",
         "secrets",
         "system",

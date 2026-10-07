@@ -50,8 +50,9 @@ PROVIDER_TITLES = {
     "openrouter": "OpenRouter (облако)",
 }
 
-#: The secret the key to a model's service is kept under (`4.0-H11`) — in
-#: the Windows Credential Manager, never in the settings.
+#: The settings field the key to a model's service is typed into
+#: (`4.0-H11`). The value goes to the Windows Credential Manager, never to
+#: the settings, and under the provider's own name — see `key_name`.
 KEY_NAME = "llm_key"
 
 #: Where secrets are kept; set by the server once the shell is there.
@@ -216,9 +217,22 @@ def dialect():
     return PROVIDERS[provider()][0]
 
 
-def api_key():
+def key_name(name=None):
     """
-    The key to the model's service, from the secret store — or "".
+    The secret a provider's key is kept under: one key per service.
+
+    One key for all of them sent the OpenRouter key to whatever address
+    the LM Studio field held — a server in the local network, over plain
+    http (audit 2026-10-07, M-2). A key belongs to the service it was
+    issued by.
+    """
+    name = name if name in PROVIDERS else provider()
+    return f"{KEY_NAME}.{name}"
+
+
+def api_key(name=None):
+    """
+    This provider's key, from the secret store — or "".
 
     Read when a request goes, not kept here: a key held in the module
     longer than the call that needs it is a key that can leak with it.
@@ -229,9 +243,47 @@ def api_key():
     try:
         from core.secrets import CORE
 
-        return store.get(CORE, KEY_NAME) or ""
+        return store.get(CORE, key_name(name)) or ""
     except Exception:                                   # noqa: BLE001
         return ""
+
+
+def key_may_go(url):
+    """
+    May the key travel to this address.
+
+    OpenRouter's — only to OpenRouter, over https. Anyone else's — over
+    https, or to this computer, where nothing is on the wire. To any other
+    address over plain http the key would cross the network readable, and
+    to a server the field names it would go whether or not that server is
+    who it says it is.
+    """
+    import urllib.parse
+
+    parts = urllib.parse.urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if provider() == "openrouter":
+        return parts.scheme == "https" and host == "openrouter.ai"
+    return parts.scheme == "https" or host in LOCAL_HOSTS
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """
+    A request carrying the key is not followed elsewhere.
+
+    `urllib` carries `Authorization` across a redirect — to another host,
+    and from https down to http. Refused here, the 3xx reaches the caller
+    as an `HTTPError` and is named for what it is.
+    """
+
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+
+def _open(req, timeout):
+    if req.has_header("Authorization"):
+        return urllib.request.build_opener(_NoRedirect).open(req, timeout=timeout)
+    return urllib.request.urlopen(req, timeout=timeout)
 
 
 def is_local_url(url=None):
@@ -251,13 +303,19 @@ def _request(path, payload=None, timeout=8):
     url = base_url() + path
     data = None
     headers = {}
+    withheld = False
     # The key, when one is kept, for the OpenAI-compatible servers: required
     # by OpenRouter, accepted by `llama-server --api-key`. Never to Ollama,
-    # which has no use for it.
+    # which has no use for it — and only where `key_may_go` lets it.
     if dialect() == "openai":
         key = api_key()
-        if key:
+        if key and key_may_go(url):
             headers["Authorization"] = f"Bearer {key}"
+        elif key:
+            withheld = True
+            from core.logging_setup import security_log
+            security_log().warning("Ключ модели не отправлен: адрес %s не https "
+                                   "и не этот компьютер", base_url())
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -268,11 +326,18 @@ def _request(path, payload=None, timeout=8):
                                base_url())
     req = urllib.request.Request(url, data=data, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with _open(req, timeout) as resp:
             # we limit the read: the server at this address may be anything at all
             raw = resp.read(MAX_RESPONSE_BYTES)
             return json.loads(raw.decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as e:
+        if 300 <= e.code < 400 and "Authorization" in headers:
+            raise LLMError(tr("Сервер модели перенаправил запрос, а запрос "
+                              "с ключом перенаправлению не следует."))
+        if e.code in (401, 403) and withheld:
+            raise LLMError(tr("Ключ не отправлен: адрес модели не https и не "
+                              "этот компьютер, и ключ ушёл бы по сети "
+                              "открытым текстом."))
         if e.code in (401, 403):
             # It answered, and said no: a key, not the network. Not a pause
             # either — waiting will not make a wrong key right.

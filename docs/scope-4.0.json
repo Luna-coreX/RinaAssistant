@@ -486,7 +486,7 @@
     "title": "Вызов объявленных инструментов"
   },
   "4.0-H11": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-stable",
     "size": "M",
     "title": "Хранилище секретов для плагинов"
@@ -996,7 +996,7 @@
     "title": "Персона на разных языках и имя собеседника"
   },
   "4.0b-E15": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-stable",
     "size": "M",
     "title": "LM Studio и OpenRouter"

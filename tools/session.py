@@ -290,7 +290,7 @@ def build_engine():
     # The same stub as the golden runner's, for the same reason: what is
     # checked is that the core **decided** correctly, not that Windows can
     # shut itself down.
-    def as_shell_do(action, level=None):
+    def as_shell_do(action, level=None, **_extra):
         box.actions.append(action)
         return True, ""
 

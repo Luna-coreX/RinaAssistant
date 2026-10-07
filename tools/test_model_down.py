@@ -200,7 +200,7 @@ check("у OpenRouter адрес один — ключ не уйдёт по чу�
 chosen["llm_url"] = ""
 
 sent = []
-real_urlopen = llm.urllib.request.urlopen
+real_open = llm._open
 
 
 class Answer:
@@ -229,7 +229,7 @@ def server(request, timeout=None):
 
 keys = Keys()
 llm.secret_store = SecretStore(ask=keys)
-llm.urllib.request.urlopen = server
+llm._open = server
 try:
     chosen["llm_provider"] = "lmstudio"
     check("LM Studio отвечает на диалекте OpenAI", llm.ask("Привет") == "Ответ OpenAI.")
@@ -248,14 +248,14 @@ try:
         check("OpenRouter без ключа — отказ словами, без запроса",
               "Ключ OpenRouter" in str(refusal) and not isinstance(
                   refusal, llm.LLMUnreachable), f"| {refusal}")
-    keys[(CORE, llm.KEY_NAME)] = "sk-or-тайна"
+    keys[(CORE, llm.key_name("openrouter"))] = "sk-or-тайна"
     sent.clear()
     check("с ключом — отвечает", llm.ask("Привет") == "Ответ OpenAI.")
     url, headers, _body = sent[-1]
     check("ключ уходит заголовком, и только на openrouter.ai",
           url.startswith("https://openrouter.ai/api/") and
           headers.get("Authorization") == "Bearer sk-or-тайна", f"| {url}")
-    keys[(CORE, llm.KEY_NAME)] = "wrong"
+    keys[(CORE, llm.key_name("openrouter"))] = "wrong"
     try:
         llm.ask("Привет")
         check("неверный ключ — сказано про ключ, а не про сеть", False)
@@ -269,15 +269,116 @@ try:
           ok and code == "llm.remote_address" and "openrouter.ai" in said)
     chosen["llm_provider"] = "ollama"
     sent.clear()
-    keys[(CORE, llm.KEY_NAME)] = "sk-or-тайна"
+    keys[(CORE, llm.key_name("openrouter"))] = "sk-or-тайна"
     llm._request("/api/tags")
     check("Ollama ключ не получает никогда",
           "Authorization" not in sent[-1][1], f"| {sent[-1][1]}")
+
+    # -- the key belongs to its service (audit 2026-10-07, M-2) -------------
+    # One key for every provider sent OpenRouter's to whatever address the
+    # LM Studio field held.
+    chosen["llm_provider"] = "lmstudio"
+    chosen["llm_url"] = "http://192.168.1.5:1234"
+    sent.clear()
+    llm.ask("Привет")
+    check("ключ OpenRouter не уходит серверу LM Studio",
+          "Authorization" not in sent[-1][1] and "sk-or" not in str(sent[-1][1]),
+          f"| {sent[-1][1]}")
+
+    keys[(CORE, llm.key_name("lmstudio"))] = "lm-своя"
+    sent.clear()
+    try:
+        llm.ask("Привет")
+    except llm.LLMError:
+        pass
+    check("свой ключ LM Studio по http в сеть не уходит",
+          "Authorization" not in sent[-1][1], f"| {sent[-1][1]}")
+    chosen["llm_url"] = "http://evil.example:1234"
+    try:
+        llm.ask("Привет")
+        check("отказ без ключа назван: ключ придержан, а не неверен", False)
+    except llm.LLMError as refusal:
+        check("отказ без ключа назван: ключ придержан, а не неверен",
+              "не отправлен" in str(refusal), f"| {refusal}")
+    chosen["llm_url"] = "https://lm.example.org"
+    sent.clear()
+    llm.ask("Привет")
+    check("по https — уходит", sent[-1][1].get("Authorization") == "Bearer lm-своя",
+          f"| {sent[-1][1]}")
+    chosen["llm_url"] = "http://localhost:1234"
+    sent.clear()
+    llm.ask("Привет")
+    check("и на этот компьютер — уходит",
+          sent[-1][1].get("Authorization") == "Bearer lm-своя")
 finally:
-    llm.urllib.request.urlopen = real_urlopen
+    llm._open = real_open
     llm.secret_store = None
     llm._settings = was[1]
     llm._rest.update(key=None, failures=0, until=0.0)
+
+# ---------------------------------------------------------------------------
+print()
+print("=== запрос с ключом не идёт за перенаправлением ===")
+# On a real connection: `urllib` would carry `Authorization` to wherever a
+# 3xx pointed, another host or plain http included.
+import http.server
+import threading
+
+reached = []
+
+
+class Elsewhere(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        reached.append(self.headers.get("Authorization"))
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b'{"data": []}')
+
+    do_POST = do_GET
+
+    def log_message(self, *_args):
+        pass
+
+
+far = http.server.HTTPServer(("127.0.0.1", 0), Elsewhere)
+threading.Thread(target=far.serve_forever, daemon=True).start()
+
+
+class Sender(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(302)
+        self.send_header("Location",
+                         f"http://127.0.0.1:{far.server_address[1]}/v1/models")
+        self.end_headers()
+
+    do_POST = do_GET
+
+    def log_message(self, *_args):
+        pass
+
+
+near = http.server.HTTPServer(("127.0.0.1", 0), Sender)
+threading.Thread(target=near.serve_forever, daemon=True).start()
+
+keys = Keys()
+keys[(CORE, llm.key_name("llamacpp"))] = "llama-secret"
+llm.secret_store = SecretStore(ask=keys)
+llm._settings = lambda: MemorySettings({
+    "llm_enabled": True, "llm_web": False, "llm_model": "qwen",
+    "llm_timeout": 5, "llm_provider": "llamacpp",
+    "llm_url": f"http://127.0.0.1:{near.server_address[1]}"})
+try:
+    llm._request("/v1/models")
+    check("перенаправление с ключом — отказ", False)
+except llm.LLMError as refusal:
+    check("перенаправление с ключом — отказ, и назван",
+          "перенаправ" in str(refusal), f"| {refusal}")
+check("и до второго сервера ключ не дошёл", reached == [], f"| {reached}")
+llm.secret_store = None
+llm._settings = was[1]
+llm._rest.update(key=None, failures=0, until=0.0)
+near.shutdown()
+far.shutdown()
 
 # ---------------------------------------------------------------------------
 print()

@@ -55,7 +55,7 @@ def make_runner():
         reminders=ReminderStore(settings),
         commands=UserCommandStore(settings),
         emit=lambda name, **data: None,
-        system_out=lambda action: (DONE.append(action), (True, ""))[1],
+        system_out=lambda action, **_extra: (DONE.append(action), (True, ""))[1],
     ))
 
 
@@ -233,7 +233,7 @@ lonely = ToolRunner(ToolContext(
     commands=UserCommandStore(alone),
     emit=lambda name, **data: None,
     apps=lambda: [NOTEPAD],
-    system_out=lambda action: (False, NO_SHELL),
+    system_out=lambda action, **_extra: (False, NO_SHELL),
     launch_app=lambda launch, kind: (False, NO_SHELL),
 ))
 

@@ -179,6 +179,10 @@ class ProtocolServer:
         # A new command silences the answer to the previous one.
         engine.hush_out = self.hush
         engine.launch_out = self.launch_app
+        # A web address — the shell's like the rest of the machine (H-2).
+        # Declared on the engine since 4.0-G and never set: every search
+        # opened the browser from the core.
+        engine.browser_out = self.open_url
         # What is going on outside the command (`4.0b-A09`): which program
         # is in front, whether one is running. The shell has the machine
         # (ADR 0009); the core asks when a condition needs it and keeps
@@ -230,6 +234,21 @@ class ProtocolServer:
 
         self._send_lock = threading.Lock()
         self._running = False
+
+        #: **The thread that reads the channel answers nothing itself.**
+        #: It decodes frames, settles replies to the core's own questions
+        #: and answers `ping`; every request from the shell goes, in order,
+        #: to `_requests`. A handler may need the shell — the secrets store,
+        #: the list of programs, a key read for a list of models — and the
+        #: shell's answer can only be read by the receiving thread. Handled
+        #: on that thread, such a handler waited five seconds for an answer
+        #: it was itself keeping out, and every time gave up: the model's
+        #: key never saved, and "forget everything" left the secrets
+        #: (audit 2026-10-07, H-3). One worker rather than a pool, because
+        #: order is part of the protocol: `settings.set` and the
+        #: `settings.get` after it must not change places.
+        self._receiver: threading.Thread | None = None
+        self._requests: queue.Queue | None = None
         self._on_stop = on_stop
         self.stopped_because = ""
         self._subscribe()
@@ -295,6 +314,18 @@ class ProtocolServer:
         threading.Thread(target=self._report_now_and_then,
                          name="rina-telemetry", daemon=True).start()
 
+        self._receiver = threading.current_thread()
+        worker = None
+        # Standard input is not such a transport: a write from another
+        # thread waits there for the blocked read, and `core.shutdown`
+        # answered by a worker would never wake it. That mode is for
+        # debugging by hand and has no shell to ask anyway — it keeps
+        # answering on the reading thread.
+        if getattr(self.channels.control, "concurrent", False):
+            self._requests = queue.Queue()
+            worker = threading.Thread(target=self._serve_requests,
+                                      name="rina-requests", daemon=True)
+            worker.start()
         try:
             while self._running:
                 try:
@@ -305,10 +336,41 @@ class ProtocolServer:
                     continue            # silence, not the end: see Transport.recv
                 self.liveness.note_traffic()
                 for message in self.decoder.feed(chunk):
-                    self.dispatch(message)
+                    self._route(message)
         finally:
+            # What was asked before the end is answered before the channel
+            # closes: a setting saved just before quitting is still saved.
+            if worker is not None:
+                self._requests.put(None)
+                worker.join(timeout=5.0)
             self.channels.close()
         return self.stopped_because or "остановлено"
+
+    #: Answered by the receiving thread itself: they carry no order and
+    #: wait for nobody, and liveness must not queue behind a slow handler.
+    INLINE = frozenset({"ping", "pong"})
+
+    def _route(self, message: Envelope) -> None:
+        """Settle a reply here, hand a request to the worker."""
+        if ((message.type in ("response", "error") and message.correlation_id)
+                or (message.method or "") in self.INLINE
+                or self._requests is None):
+            self.dispatch(message)
+        else:
+            self._requests.put(message)
+
+    def _serve_requests(self) -> None:
+        """Handle the shell's requests one by one, in the order they came."""
+        while True:
+            message = self._requests.get()
+            if message is None:
+                return
+            try:
+                self.dispatch(message)
+            except TransportClosed:
+                return              # the channel is gone; nobody to answer
+            except Exception as exc:                    # noqa: BLE001
+                self._log_broken(message.method or "", exc)
 
     def _report_now_and_then(self) -> None:
         """
@@ -766,16 +828,32 @@ class ProtocolServer:
                 values[key] = "kept" if self._password_kept(key) else ""
         return {"values": values}
 
+    @staticmethod
+    def _secret_for(key: str, provider: str | None = None) -> str:
+        """
+        The secret a `password` field is kept under.
+
+        The model's key under its provider's name (`llm.key_name`): the field
+        is one, the keys are as many as the services. `provider` — the one
+        arriving in the same parcel, when it does: "OpenRouter, and here is
+        its key" must not file the key under the provider being left.
+        """
+        from core import llm
+
+        return llm.key_name(provider) if key == llm.KEY_NAME else key
+
     def _password_kept(self, key: str) -> bool:
         from core.secrets import CORE
 
         store = self._secrets_here()
         try:
-            return store is not None and store.get(CORE, key) is not None
+            return (store is not None
+                    and store.get(CORE, self._secret_for(key)) is not None)
         except Exception:                               # noqa: BLE001
             return False
 
-    def _keep_password(self, key: str, value) -> tuple[bool, str]:
+    def _keep_password(self, key: str, value,
+                       provider: str | None = None) -> tuple[bool, str]:
         """
         A `password` field's value, into the Credential Manager rather than
         the settings (`4.0-H11`). Empty — forget it. (kept, what to say).
@@ -785,12 +863,13 @@ class ProtocolServer:
         store = self._secrets_here()
         if store is None:
             return False, "Ключ сохранить негде: нет связи с оболочкой."
+        name = self._secret_for(key, provider)
         try:
             if str(value or ""):
-                store.set(CORE, key, str(value))
+                store.set(CORE, name, str(value))
                 return True, ("Ключ сохранён в диспетчере учётных данных "
                               "Windows.")
-            store.delete(CORE, key)
+            store.delete(CORE, name)
             return True, "Ключ забыт."
         except Exception:                               # noqa: BLE001
             return False, "Ключ сохранить не вышло."
@@ -818,7 +897,8 @@ class ProtocolServer:
             if ok and described.get(key, {}).get("format") == "password":
                 # Never written to the settings: the key goes to the
                 # Credential Manager, and the field stays "".
-                kept, text = self._keep_password(key, value)
+                kept, text = self._keep_password(
+                    key, value, values.get("llm_provider"))
                 verdicts[key] = {"accepted": kept,
                                  "code": "" if kept else "settings.invalid_value",
                                  "message": text}
@@ -1840,6 +1920,14 @@ class ProtocolServer:
         blocking it would mean waiting for the answer with the very thread
         that will bring it.
         """
+        # Said aloud rather than discovered as a timeout: from the
+        # receiving thread the answer can never arrive (see `_requests`).
+        if threading.current_thread() is self._receiver:
+            log.error("Вопрос оболочке %s из потока приёма: ответ некому "
+                      "прочитать", method)
+            raise fault("internal", "Вопрос оболочке из потока приёма: "
+                                    "ответ некому прочитать.")
+
         done = threading.Event()
         got: dict = {}
 
@@ -1923,8 +2011,16 @@ class ProtocolServer:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("reason", ""))
 
-    def do_system(self, action: str, level: int | None = None
-                  ) -> tuple[bool, str]:
+    def open_url(self, url: str) -> tuple[bool, str]:
+        """Ask the shell to open a web address (H-2)."""
+        try:
+            answer = self.ask_shell_sync("browser.open", {"url": url})
+        except ProtocolFault as exc:
+            return False, str(exc)
+        return bool(answer.get("ok")), str(answer.get("reason", ""))
+
+    def do_system(self, action: str, level: int | None = None,
+                  confirmed: bool = False) -> tuple[bool, str]:
         """
         Ask the shell to perform a system action.
 
@@ -1937,6 +2033,10 @@ class ProtocolServer:
         # shell that predates it simply never sees one.
         if level is not None:
             payload["level"] = int(level)
+        # The core's word that the person confirmed it: the shell refuses an
+        # irreversible action without it — the second lock (H-1).
+        if confirmed:
+            payload["confirmed"] = True
         try:
             answer = self.ask_shell_sync("system.do", payload)
         except ProtocolFault as exc:
@@ -2015,7 +2115,9 @@ class ProtocolServer:
 
             preview = system_control.confirm_question(action)
         else:
-            preview = "Выполнить сохранённую команду?"
+            describe = getattr(self.engine, "command_confirm_text", None)
+            preview = (describe(command_id) if callable(describe)
+                       else "Выполнить сохранённую команду?")
 
         self.ask_shell("permission.request", {
             "request_id": question.confirmation_id or "",
@@ -2133,6 +2235,16 @@ class ProtocolServer:
     #: How long her voice still hangs in the room after the last sound —
     #: the device's buffer and the room's echo.
     ECHO_TAIL = 0.8
+
+    #: How much of a person's voice over hers stops her at once, before the
+    #: words are known (`4.0b-V10`, 2026-10-07). Whisper gives the words two
+    #: or three seconds after the phrase ends; a short reply is over by
+    #: then, and «замолчи» arrived to find nothing left to stop. Half a
+    #: second of voice is a person talking, not a cough or a click.
+    BARGE_IN = 0.5
+
+    #: Whether this voice-over has already stopped her — once per phrase.
+    _barged = False
 
     #: Whether there is speech of hers in flight right now. Without it
     #: every phrase with her name in it — that is, most of them in
@@ -2263,6 +2375,7 @@ class ProtocolServer:
         self._say_what_is_heard()
 
         phrases = self.segmenter.feed(pcm)
+        self._barge_in()
 
         # **Listening as it goes, when the engine can** (`4.0b-E07`).
         # Handing over a finished phrase costs its whole recognition
@@ -2286,12 +2399,18 @@ class ProtocolServer:
             log.info("Слышу фразу: %.1f с звука", len(phrase) / (16000 * 2))
             # When the phrase began, from its length: the sound arrives as
             # it is recorded, so its end is about now (`4.0b-V10`).
-            began = time.monotonic() - len(phrase) / (speech.RATE
-                                                      * speech.SAMPLE_BYTES)
+            # The speech itself, without the run-up before it and the
+            # silence that ended it: counted from the whole phrase, a
+            # person who started talking as she finished was 0.4 s "inside"
+            # her reply, and lost the phrase (2026-10-07).
+            now = time.monotonic()
+            length = len(phrase) / (speech.RATE * speech.SAMPLE_BYTES)
+            began = now - length + getattr(self.segmenter, "last_head", 0.0)
+            ended = now - getattr(self.segmenter, "last_tail", 0.0)
             # Already fed, piece by piece — so what goes into the queue
             # is the order to finish, not the sound a second time.
             self._queue_phrase(None if self._streaming() else phrase,
-                               over_her=self.voice_heard_at(began))
+                               over_her=self.spoken_over(began, ended))
 
     def _say_what_is_heard(self) -> None:
         """One line per change of what the microphone is doing."""
@@ -2469,7 +2588,12 @@ class ProtocolServer:
             # person pressed the key to speak: then the microphone is
             # open because they asked for it, and what they say is theirs.
             listening_once = getattr(self.engine, "listening_once", None)
-            if (over_her and not (hushed or named)
+            # With her voice taken out of the microphone, what is left over
+            # hers is a person talking over her — about anything, not only
+            # her name or «стоп» (2026-10-07: «нельзя прервать другой
+            # фразой»). The words matching her own were dropped above.
+            barging = over_her and self._echo_cancelled()
+            if (over_her and not (hushed or named or barging)
                     and not (listening_once and listening_once())):
                 log.info("Сказано поверх её речи и без имени — скорее "
                          "всего, это её же голос, не в счёт: %s",
@@ -2485,7 +2609,7 @@ class ProtocolServer:
             # in the shell's queue, and a second of talking over somebody
             # who has just interrupted is the whole of what interrupting
             # is against.
-            if hushed or named:
+            if hushed or named or barging:
                 self.hush()
             if (named or not self.engine.is_always_listen()) and not hushed:
                 self._warm_voice()
@@ -2633,7 +2757,10 @@ class ProtocolServer:
         interrupted hears the difference immediately.
         """
         if not (self._reply_running or self._talking_out
-                or (self._speech_queue and not self._speech_queue.empty())):
+                or (self._speech_queue and not self._speech_queue.empty())
+                # Sent and still playing: the last second of a reply is
+                # in the shell's queue after the core is done with it.
+                or time.monotonic() < self._voice_until):
             return          # there was nothing to interrupt
         self._cut_in = True
         waiting = self._speech_queue
@@ -2952,6 +3079,57 @@ class ProtocolServer:
     def voice_heard_at(self, moment: float) -> bool:
         """Was her voice coming out of the speakers at this moment."""
         return moment < self._voice_until + self.ECHO_TAIL
+
+    def spoken_over(self, began: float, ended: float) -> bool:
+        """
+        Was most of a phrase said while her voice was in the room.
+
+        Most of it, not its start: a person who begins as she ends speaks
+        a word into her last syllable and the rest into silence, and that
+        phrase is theirs. Her own voice coming back starts and ends inside
+        her reply.
+        """
+        until = self._voice_until + self.ECHO_TAIL
+        if ended <= began:
+            return began < until
+        inside = max(0.0, min(ended, until) - began)
+        return inside / (ended - began) >= 0.5
+
+    def _echo_cancelled(self) -> bool:
+        """
+        Whether the shell takes her voice out of the microphone.
+
+        With it on, a voice over hers is a person's: the voice that came
+        back is subtracted before anything is cut into phrases. With it off
+        and speakers in the room, it is very likely her own — the case
+        `4.0b-V10` was opened for.
+        """
+        store = self._settings() or {}
+        return bool(store.get("echo_cancellation", True))
+
+    def _barge_in(self) -> None:
+        """
+        Stop her the moment a person starts talking over her.
+
+        Only where her voice is taken out of the microphone: without that,
+        the voice over hers is mostly her own, and she would stop at the
+        sound of herself. What was said is decided afterwards, when the
+        words come — a person who talked over her about something else is
+        heard as a command.
+        """
+        segmenter = getattr(self, "segmenter", None)
+        if segmenter is None or not getattr(segmenter, "speaking", False):
+            self._barged = False
+            return
+        if self._barged or segmenter.speech_seconds < self.BARGE_IN:
+            return
+        if not (self._talking_out or time.monotonic() < self._voice_until):
+            return
+        if not self._echo_cancelled():
+            return
+        self._barged = True
+        log.info("Перебили голосом — замолкаю, слова разберу следом")
+        self.hush()
 
     # -- the break ---------------------------------------------------------------
 

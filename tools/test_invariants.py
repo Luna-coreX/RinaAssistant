@@ -108,6 +108,20 @@ for path in core_files:
 
 check("ядро не делает побочных эффектов мимо реестра", not offenders,
       f"| {offenders}")
+
+# A person's own command has no hands of its own (audit 2026-10-07, H-2).
+# It sits in `voice/`, outside the directory checked above, and that is
+# how it kept `os.startfile`, `webbrowser.open` and `system_control.run`
+# for the whole port: every launch the voice made went through the shell,
+# and every launch a command made went past it.
+HANDS = {("os", "startfile"), ("webbrowser", "open"), ("subprocess", "Popen"),
+         ("subprocess", "run"), ("system_control", "run"),
+         ("app_index", "launch")}
+own_hands = [f"{owner}.{attr}:{line}" for (owner, attr), line
+             in calls_in(os.path.join("voice", "user_commands.py"))
+             if (owner, attr) in HANDS]
+check("своя команда не запускает и не открывает ничего сама", not own_hands,
+      f"| {own_hands}")
 print(f"     проверено файлов ядра: {len(core_files)}, "
       f"разрешены {ALLOWED}, {LAUNCHER_ONLY} и {PIP_ONLY} — каждый со своей "
       f"оговоркой")
@@ -222,7 +236,7 @@ audit = AuditLog(path=":memory:")
 runner = ToolRunner(ToolContext(
     settings=settings, reminders=ReminderStore(settings),
     commands=UserCommandStore(settings), emit=lambda n, **d: None,
-    system_out=lambda action: (True, "")),
+    system_out=lambda action, **_extra: (True, "")),
     audit=audit)
 
 before = audit.count()

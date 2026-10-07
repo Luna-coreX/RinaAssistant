@@ -58,6 +58,21 @@ public static class Launcher
         }
 
         var path = AppIndex.Canonical(launch);
+
+        // A folder is opened, not run: Explorer shows it. Nothing executes,
+        // so neither the forbidden directories nor consent apply — opening
+        // Downloads to look at it is fine; running a file from it is not.
+        if (kind == "folder")
+        {
+            var there = path.Length > 0 && Directory.Exists(path);
+            var opened = there && Shell(path);
+            Journal.Launch(path.Length > 0 ? path : launch, "folder",
+                           trusted: true, ok: opened,
+                           note: there ? "" : "no folder");
+            return opened ? new Outcome(true)
+                : new Outcome(false, there ? "did not start" : "the folder is gone");
+        }
+
         if (path.Length == 0 || !File.Exists(path))
         {
             Journal.Launch(launch, "file", trusted, ok: false, note: "no file");
