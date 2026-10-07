@@ -741,9 +741,16 @@ public partial class App
                 catch (UnauthorizedAccessException) { }
             };
         }
-        return new Rina.Protocol.CoreLaunch(real.Python,
-            Path.Combine(real.WorkingDirectory, "tools", "_core_sandboxed.py"),
-            real.WorkingDirectory);
+        // An installed copy has no `tools`: the checks are the developer's
+        // and do not ship. There the real core is raised, and whoever runs
+        // the check keeps it off the person's profile (`check_release.py`
+        // gives it a temporary APPDATA). Without this the installed check
+        // tried to start a file that is not there, and failed for that.
+        var sandboxed = Path.Combine(real.WorkingDirectory, "tools",
+                                     "_core_sandboxed.py");
+        if (!File.Exists(sandboxed)) return real;
+        return new Rina.Protocol.CoreLaunch(real.Python, sandboxed,
+                                            real.WorkingDirectory);
     }
 
     private async Task CheckCoreAsync(MainWindow window)
@@ -1093,9 +1100,17 @@ public partial class App
             await Until(() => link.State == Rina.Protocol.CoreState.Ready
                               && link.Connection?.CorePid is { } now
                               && now != dying, 60);
-            var after = Read();
-            var added = after.Length >= before.Length
-                ? after[before.Length..] : after;
+            // The line about the return is written a moment after the state
+            // changes, not with it: waited for as a line, or the check reads
+            // the journal just before it arrives (seen once in the installed
+            // copy's run).
+            string Added()
+            {
+                var now = Read();
+                return now.Length >= before.Length ? now[before.Length..] : now;
+            }
+            await Until(() => Added().Contains("core back"), 5);
+            var added = Added();
             Check("потеря ядра записана в журнал оболочки",
                   added.Contains("core Reconnecting"),
                   $"| {added.Trim().Replace(Environment.NewLine, " ⏎ ")[..Math.Min(200, added.Trim().Length)]}");

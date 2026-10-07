@@ -385,12 +385,23 @@ if "--probe-install" in sys.argv:
             # installed: it raises the installed core and talks to it.
             # "The files are on disk" and "the program works from
             # there" are different claims.
-            alive = subprocess.run([shell, "--check-core"],
-                                   capture_output=True, text=True,
-                                   encoding="utf-8", errors="replace",
-                                   cwd=where, timeout=600)
+            # In a profile of its own: the installed copy raises the real
+            # core, and a check has no business in the person's settings.
+            probe_home = tempfile.mkdtemp(prefix="rina-release-home-")
+            try:
+                alive = subprocess.run([shell, "--check-core"],
+                                       capture_output=True, text=True,
+                                       encoding="utf-8", errors="replace",
+                                       cwd=where, timeout=600,
+                                       env=dict(child_env(),
+                                                APPDATA=probe_home))
+            finally:
+                shutil.rmtree(probe_home, ignore_errors=True)
+            failed = [line.strip() for line in alive.stdout.splitlines()
+                      if "FAIL" in line]
             check("поставленная программа поднимает своё ядро",
-                  alive.returncode == 0, f"| код {alive.returncode}")
+                  alive.returncode == 0,
+                  f"| код {alive.returncode}; " + "; ".join(failed[:3]))
 
         removers = [name for name in os.listdir(where)
                     if name.startswith("unins") and name.endswith(".exe")] \
