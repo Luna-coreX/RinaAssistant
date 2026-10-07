@@ -36,7 +36,9 @@ SOURCES = ["shell", "core", "voice", "plugins", "tools", "server",
            "rina_core.py", "requirements.txt"]
 
 #: What is built or cached there, and is right to be ignored.
-PRODUCED = {"bin", "obj", "__pycache__", "node_modules"}
+PRODUCED = {"bin", "obj", "__pycache__", "node_modules",
+            # Visual Studio's per-machine cache beside the solution.
+            ".vs"}
 
 #: What a deploy tool writes beside the code for one machine, and what must
 #: never reach the repository: Vercel's link to a project (`.vercel/`) and
