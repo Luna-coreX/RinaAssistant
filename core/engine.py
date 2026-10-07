@@ -1239,11 +1239,7 @@ class RinaEngine:
                 # that shuts the computer down is a yes not yet given.
                 if self._confirm_if_irreversible(cmd):
                     return
-                self._ensure_command_worker()
-                ctx = contextvars.copy_context()
-                threading.Thread(
-                    target=ctx.run, args=(self._run_user_command, cmd),
-                    name="rina-run-command", daemon=True).start()
+                self._enqueue(lambda: self._run_user_command(cmd))
                 return
 
     def try_command(self, card):
@@ -1254,11 +1250,7 @@ class RinaEngine:
         sequence with pauses takes seconds, and the press comes from the
         interface thread.
         """
-        self._ensure_command_worker()
-        ctx = contextvars.copy_context()
-        threading.Thread(
-            target=ctx.run, args=(self._executor.try_user_command, card),
-            name="rina-try-command", daemon=True).start()
+        self._enqueue(lambda: self._executor.try_user_command(card))
 
     # ------------------------------------------------------------------
     # the command queue
@@ -1272,12 +1264,34 @@ class RinaEngine:
                     daemon=True)
                 self._command_worker.start()
 
+    def _enqueue(self, job):
+        """
+        Put work into the command queue. Returns the event set when it is done.
+
+        Every source of commands goes through here: a phrase, the "Run"
+        button, the builder's «Проверить». The buttons used to start a
+        thread each, beside the queue (audit 2026-10-07, L-1), and the
+        pipeline's shared state — a clarifying question still open, the
+        last program named — was then touched by two at once, which is
+        exactly what the queue exists to prevent.
+
+        The execution context goes into the queue with the work. The
+        end-to-end trace (4.0-D15) rides in it: the worker thread is
+        long-lived and serves many commands in a row, so it cannot be tied
+        to one of them — the context belongs to the command, not to the
+        thread. The first run of the two processes showed this outright:
+        Rina's answer arrived with a trace that did not match the request's.
+        """
+        self._ensure_command_worker()
+        done = threading.Event()
+        self._commands.put((job, done, contextvars.copy_context()))
+        return done
+
     def _command_loop(self):
         while True:
-            text, require_wake, source, done, ctx = self._commands.get()
+            job, done, ctx = self._commands.get()
             try:
-                ctx.run(self.handle_command, text,
-                        require_wake=require_wake, source=source)
+                ctx.run(job)
             except Exception as e:
                 # without this an exception would carry off the worker, and
                 # every following command would stay in the queue forever
@@ -1301,20 +1315,8 @@ class RinaEngine:
         must not listen further until the previous phrase has been dealt
         with.
         """
-        self._ensure_command_worker()
-        done = threading.Event()
-        # The execution context is put into the queue along with the
-        # command. The end-to-end trace (4.0-D15) rides in it: the worker
-        # thread is long-lived and serves many commands in a row, so it
-        # cannot be tied to one of them — the context belongs to the command,
-        # not to the thread.
-        #
-        # The first run of the two processes showed this outright: Rina's
-        # answer arrived with a trace that did not match the request's, and
-        # there was nothing to tie request to answer with across two
-        # journals.
-        self._commands.put((text, require_wake, source, done,
-                            contextvars.copy_context()))
+        done = self._enqueue(lambda: self.handle_command(
+            text, require_wake=require_wake, source=source))
         if wait:
             done.wait()
         return done

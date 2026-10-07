@@ -220,6 +220,40 @@ try:
 finally:
     pass
 
+# ---------------------------------------------------------------------------
+print()
+print("=== кнопки — в общей очереди команд, а не в своих потоках (L-1) ===")
+# Audit 2026-10-07, L-1: «Проверить» and «Выполнить» each started a thread
+# beside the queue, and the pipeline's shared state — an open clarifying
+# question — was touched by two at once.
+import threading
+
+s = Session()
+ran_on = []
+s.engine._executor.try_user_command = (
+    lambda card: ran_on.append(threading.current_thread().name))
+s.engine._run_user_command = (
+    lambda cmd: ran_on.append(threading.current_thread().name))
+from voice.user_commands import make_command
+
+button = make_command("app", ["блокнот проверка"], "notepad.exe")
+s.engine._cmd_store.add(button)
+gate = threading.Event()
+s.engine._enqueue(gate.wait)            # a phrase still being handled
+s.engine.try_command({"type": "app", "target": "notepad.exe",
+                      "triggers": [], "response": "", "steps": []})
+s.engine.run_command_by_id(button["id"])
+time.sleep(0.3)
+check("пока идёт фраза, кнопки ждут своей очереди", ran_on == [],
+      f"| {ran_on}")
+gate.set()
+for _ in range(50):
+    if len(ran_on) == 2:
+        break
+    time.sleep(0.05)
+check("и выполняются потом, в потоке очереди",
+      ran_on == ["rina-commands", "rina-commands"], f"| {ran_on}")
+
 print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
