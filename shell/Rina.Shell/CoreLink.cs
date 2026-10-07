@@ -745,7 +745,7 @@ public sealed class CoreLink : IAsyncDisposable
             // shell asks, not the core: the shell has the window, and the
             // shell is what sees the signature.
             if (outcome.NeedsTrust)
-                outcome = await AskTrustAsync(launch, kind);
+                outcome = await AskTrustAsync(launch, kind, outcome);
 
             await connection.ReplyAsync(request, new JsonObject
             {
@@ -1015,17 +1015,23 @@ public sealed class CoreLink : IAsyncDisposable
     /// absence of a signature. "Always trust" is remembered and is taken
     /// back in settings (<c>4.0-G10</c>).
     /// </remarks>
-    private async Task<Platform.Launcher.Outcome> AskTrustAsync(string launch,
-                                                                string kind)
+    private async Task<Platform.Launcher.Outcome> AskTrustAsync(
+        string launch, string kind, Platform.Launcher.Outcome needs)
     {
         var path = Platform.AppIndex.Canonical(launch);
+        // About what runs — a shortcut's target, with what it is handed —
+        // and remembered by that (audit 2026-10-07, M-3): a shortcut whose
+        // target is changed afterwards is asked about again.
+        var subject = needs.Subject.Length > 0 ? needs.Subject : path;
+        var arguments = needs.Arguments;
         var answer = await OnUiAsync(() =>
         {
             var source = Platform.AppIndex.Get()
                 .FirstOrDefault(e => string.Equals(
                     e.Launch, path, StringComparison.OrdinalIgnoreCase))
                 ?.Source ?? "";
-            var ask = new Pages.TrustWindow(path, source);
+            var ask = new Pages.TrustWindow(subject, source, arguments,
+                                            via: subject == path ? "" : path);
             ask.ShowDialog();
             return ask.Answer;
         });
@@ -1038,7 +1044,7 @@ public sealed class CoreLink : IAsyncDisposable
             return new Platform.Launcher.Outcome(false, "refused");
 
         if (answer == Pages.TrustWindow.Reply.Always)
-            Platform.Trust.Remember(path);
+            Platform.Trust.Remember(subject, arguments);
 
         return Platform.Launcher.Start(launch, kind, trusted: true);
     }

@@ -32,8 +32,14 @@ public static class Launcher
     /// <param name="Ok">The process started.</param>
     /// <param name="Reason">Why it did not — for the core, not for the person.</param>
     /// <param name="NeedsTrust">Consent for something unsigned is needed.</param>
+    /// <param name="Subject">
+    /// What the consent is about: the file that runs — for a shortcut, its
+    /// target rather than the shortcut (audit 2026-10-07, M-3).
+    /// </param>
+    /// <param name="Arguments">What a shortcut hands its target.</param>
     public sealed record Outcome(bool Ok, string Reason = "",
-                                 bool NeedsTrust = false);
+                                 bool NeedsTrust = false,
+                                 string Subject = "", string Arguments = "");
 
     /// <summary>
     /// Launch what the core named.
@@ -79,26 +85,65 @@ public static class Launcher
             return new Outcome(false, "the file is gone");
         }
 
+        var vetted = Vet(path, trusted);
+        if (!vetted.Ok)
+        {
+            Journal.Launch(vetted.Subject, "file", trusted, ok: false,
+                           note: vetted.Reason);
+            return vetted;
+        }
+
+        // The shortcut itself is started, as Explorer starts it: its
+        // arguments, working folder and window state are part of what the
+        // person installed. What it points at is what was just checked.
+        var subject = vetted.Subject;
+        var ran = Shell(path);
+        Journal.Launch(subject, "file",
+                       trusted || Trust.Allowed(subject, vetted.Arguments),
+                       ran, note: subject == path ? "" : "via shortcut");
+        return ran ? new Outcome(true) : new Outcome(false, "did not start");
+    }
+
+    /// <summary>
+    /// May this file be started: the checks of <see cref="Start"/>, without
+    /// starting anything. <c>Ok</c> means cleared; <c>Subject</c> is what
+    /// was checked.
+    /// </summary>
+    /// <remarks>
+    /// <b>A shortcut is checked by what it starts</b> (audit 2026-10-07,
+    /// M-3). The checks used to look at the shortcut file: it has no
+    /// signature, so every Start-menu program was "unsigned", and it lies
+    /// in the Start menu, so one pointing into Downloads passed. A shortcut
+    /// whose target cannot be read — an installer's "advertised" one — is
+    /// still checked as itself, and so asked about.
+    /// </remarks>
+    public static Outcome Vet(string path, bool trusted)
+    {
+        var subject = path;
+        var arguments = "";
+        if (path.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)
+            && Shortcut.Read(path) is { } target)
+        {
+            var resolved = AppIndex.Canonical(target.Path);
+            if (resolved.Length > 0)
+            {
+                subject = resolved;
+                arguments = target.Arguments;
+            }
+        }
+
         // A prohibition outweighs consent: Downloads does not run, even if
         // the person once said "always trust" to something from there.
-        if (AppIndex.Forbidden(path))
-        {
-            Journal.Launch(path, "file", trusted, ok: false,
-                           note: "forbidden directory");
-            return new Outcome(false, "forbidden directory");
-        }
+        if (AppIndex.Forbidden(path) || AppIndex.Forbidden(subject))
+            return new Outcome(false, "forbidden directory", Subject: subject,
+                               Arguments: arguments);
 
         // Unsigned runs only with consent, and only the first time.
-        if (!trusted && !Trust.Allowed(path))
-        {
-            Journal.Launch(path, "file", trusted: false, ok: false,
-                           note: "consent required");
-            return new Outcome(false, "consent required", NeedsTrust: true);
-        }
+        if (!trusted && !Trust.Allowed(subject, arguments))
+            return new Outcome(false, "consent required", NeedsTrust: true,
+                               Subject: subject, Arguments: arguments);
 
-        var ran = Shell(path);
-        Journal.Launch(path, "file", trusted || Trust.Allowed(path), ran);
-        return ran ? new Outcome(true) : new Outcome(false, "did not start");
+        return new Outcome(true, Subject: subject, Arguments: arguments);
     }
 
     /// <summary>

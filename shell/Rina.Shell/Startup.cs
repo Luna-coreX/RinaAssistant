@@ -6956,6 +6956,76 @@ public partial class App
             try { File.Delete(unsigned); } catch { }
         }
 
+        // --- shortcuts are checked by what they start (audit M-3) ---
+        // In a folder that is not forbidden itself, so what is measured is
+        // the target: the profile's local data, not the temporary folder.
+        var links = Path.Combine(Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData),
+            "RinaAssistant-check-shortcuts");
+        var strayExe = Path.Combine(Path.GetTempPath(), "rina-stray.exe");
+        var ownExe = Path.Combine(links, "own-tool.exe");
+        var otherExe = Path.Combine(links, "other-tool.exe");
+        try
+        {
+            Directory.CreateDirectory(links);
+            File.WriteAllBytes(strayExe, new byte[] { 0x4D, 0x5A, 0, 0 });
+            File.WriteAllBytes(ownExe, new byte[] { 0x4D, 0x5A, 0, 0 });
+            File.WriteAllBytes(otherExe, new byte[] { 0x4D, 0x5A, 0, 1 });
+            var powershell = Path.Combine(Environment.SystemDirectory,
+                "WindowsPowerShell", "v1.0", "powershell.exe");
+
+            var toSigned = Path.Combine(links, "Блокнот.lnk");
+            Platform.Shortcut.Write(toSigned, signed);
+            Check("ярлык читается: цель и аргументы",
+                  string.Equals(Platform.Shortcut.Read(toSigned)?.Path, signed,
+                                StringComparison.OrdinalIgnoreCase),
+                  $"| {Platform.Shortcut.Read(toSigned)?.Path}");
+            Check("ярлык на подписанную программу не спрашивает «без подписи»",
+                  Platform.Launcher.Vet(toSigned, trusted: false) is { Ok: true },
+                  $"| {Platform.Launcher.Vet(toSigned, trusted: false)}");
+
+            var toStray = Path.Combine(links, "Загрузка.lnk");
+            Platform.Shortcut.Write(toStray, strayExe);
+            Check("ярлык в запрещённую папку не запускается, хоть сам и лежит не там",
+                  Platform.Launcher.Vet(toStray, trusted: true)
+                      is { Ok: false, Reason: "forbidden directory" },
+                  $"| {Platform.Launcher.Vet(toStray, trusted: true)}");
+
+            var toCommand = Path.Combine(links, "Команда.lnk");
+            Platform.Shortcut.Write(toCommand, powershell, "-Command Get-Date");
+            var command = Platform.Launcher.Vet(toCommand, trusted: false);
+            Check("подписанный интерпретатор с командой — спрашивает, о команде",
+                  command is { Ok: false, NeedsTrust: true }
+                  && command.Arguments.Contains("Get-Date"),
+                  $"| {command}");
+            var plainShell = Path.Combine(links, "Оболочка.lnk");
+            Platform.Shortcut.Write(plainShell, powershell);
+            Check("тот же интерпретатор без команды — подписан, и всё",
+                  Platform.Launcher.Vet(plainShell, trusted: false) is { Ok: true });
+
+            var toOwn = Path.Combine(links, "Своя.lnk");
+            Platform.Shortcut.Write(toOwn, ownExe);
+            var asked = Platform.Launcher.Vet(toOwn, trusted: false);
+            Check("согласие спрашивается о цели, а не о ярлыке",
+                  asked is { NeedsTrust: true }
+                  && string.Equals(asked.Subject, ownExe,
+                                   StringComparison.OrdinalIgnoreCase),
+                  $"| {asked.Subject}");
+            Platform.Trust.Remember(asked.Subject, asked.Arguments);
+            Check("«всегда» — и тот же ярлык больше не спрашивает",
+                  Platform.Launcher.Vet(toOwn, trusted: false) is { Ok: true });
+            Platform.Shortcut.Write(toOwn, otherExe);
+            Check("цель ярлыка подменили — спрашивает снова",
+                  Platform.Launcher.Vet(toOwn, trusted: false)
+                      is { NeedsTrust: true });
+            Platform.Trust.Forget(ownExe);
+        }
+        finally
+        {
+            try { Directory.Delete(links, recursive: true); } catch { }
+            try { File.Delete(strayExe); } catch { }
+        }
+
         // --- the index (G04) ---
         var index = Platform.AppIndex.Get(refresh: true);
         Check("индекс собрался", index.Count > 0, $"| записей {index.Count}");

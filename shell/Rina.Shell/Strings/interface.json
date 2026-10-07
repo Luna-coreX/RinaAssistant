@@ -1966,5 +1966,14 @@
   },
   "Решение можно поменять в настройках, в разделе «Приватность».": {
     "English": "You can change this later in the settings, under “Privacy”."
+  },
+  "Ярлык запускает команду": {
+    "English": "The shortcut runs a command"
+  },
+  "Программа, которая выполняет любые команды, получит вот эту. Подпись программы ничего не говорит о самой команде.": {
+    "English": "A program that runs any command it is given will get this one. Its signature says nothing about the command itself."
+  },
+  "Через ярлык: {0}": {
+    "English": "Through the shortcut: {0}"
   }
 }

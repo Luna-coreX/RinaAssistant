@@ -2110,6 +2110,11 @@ public static partial class Loc
                 {
                     ["English"] = "{0} applications",
                 },
+            ["Программа, которая выполняет любые команды, получит вот эту. Подпись программы ничего не говорит о самой команде."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "A program that runs any command it is given will get this one. Its signature says nothing about the command itself.",
+                },
             ["Программы"] =
                 new Dictionary<string, string>
                 {
@@ -2998,6 +3003,11 @@ public static partial class Loc
                 {
                     ["English"] = "in an hour",
                 },
+            ["Через ярлык: {0}"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Through the shortcut: {0}",
+                },
             ["число"] =
                 new Dictionary<string, string>
                 {
@@ -3203,6 +3213,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "This screen’s brightness can’t be changed by a program — the brightness step won’t work. On a monitor it can sometimes be switched on in its own menu (DDC/CI).",
+                },
+            ["Ярлык запускает команду"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The shortcut runs a command",
                 },
         };
 }

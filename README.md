@@ -103,7 +103,7 @@ Rina indexes what is actually installed on the machine — Start Menu shortcuts,
 
 - **Type it however you speak it.** "Открой телеграм" finds *Telegram*; Cyrillic input is transliterated and matched fuzzily, so near-misses and mishearings still land.
 - **Ambiguity is asked about, not guessed.** Several matches produce a question, and your answer is remembered as an alias for next time.
-- **Unsigned programs are asked about once.** The question shows everything you could decide by: the name, the full path, where the index found it.
+- **Unsigned programs are asked about once.** The question shows everything you could decide by: the name, the full path, where the index found it. A Start-menu shortcut is judged by what it starts — its target's signature and folder — and a shortcut whose target changes is asked about again.
 
 ### Voice
 

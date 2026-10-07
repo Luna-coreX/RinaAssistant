@@ -222,7 +222,10 @@ public static class AppIndex
                     // We do not ask a shortcut for a signature: what is
                     // signed is not the shortcut but what it points at, and
                     // resolving the target for that is work for launching,
-                    // not for a sweep.
+                    // not for a sweep. Launching does it — the target's
+                    // signature, folder and consent are checked there
+                    // (`Launcher.Vet`, audit 2026-10-07, M-3); this flag is
+                    // only what the index shows.
                     Signed = true,
                 };
             }
