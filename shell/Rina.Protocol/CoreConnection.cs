@@ -148,7 +148,7 @@ public sealed class CoreConnection : IAsyncDisposable
         // writing to it. Besides, 4.0-F12 is obliged to show the state of
         // the link, and the last line of the core's journal is the most
         // intelligible thing to show when it breaks.
-        _core.ErrorDataReceived += (_, e) =>
+        DataReceivedEventHandler keep = (_, e) =>
         {
             if (e.Data is null) return;
             lock (_coreLog)
@@ -157,7 +157,16 @@ public sealed class CoreConnection : IAsyncDisposable
                 while (_coreLog.Count > CoreLogLines) _coreLog.Dequeue();
             }
         };
+        _core.ErrorDataReceived += keep;
         _core.BeginErrorReadLine();
+        // The output stream too, into the same tail (audit 2026-10-07,
+        // M-10). The protocol does not travel on it in `pipe` mode, and it
+        // used to be redirected and never read: a native library — the
+        // speech engines are several — writing more than the pipe holds
+        // would block the core on that write, and from here that looks like
+        // a core that hung.
+        _core.OutputDataReceived += keep;
+        _core.BeginOutputReadLine();
 
         // The core may die without connecting — and then waiting for the
         // pipe until the deadline is pointless. We wait for both outcomes
