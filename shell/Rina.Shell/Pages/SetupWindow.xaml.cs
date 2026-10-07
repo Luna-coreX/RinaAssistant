@@ -71,6 +71,15 @@ public partial class SetupWindow : Window
             S("Что доустановить"),
             S("И слух, и голос работают по пакету и модели — их размер в установщик не помещается."),
             BuildModels));
+        // Whether to keep the conversation (decided 2026-10-07, after the
+        // audit's I-2). It used to be kept by default, without a word: the
+        // most personal thing the program stores, on because nobody said
+        // otherwise. Asked here, unticked, like the telemetry below.
+        HistoryStep = _steps.Count;
+        _steps.Add(new Step(
+            S("Помнить разговор"),
+            S("История — что вы сказали и что ответила Рина. Хранится только на этом компьютере."),
+            BuildHistory, KeepHistory));
         // The beta's telemetry (`4.0b-D05`): asked here because a switch
         // nobody is told about is a switch nobody turns on, and unticked
         // because it is off until a person says otherwise. What leaves and
@@ -170,6 +179,26 @@ public partial class SetupWindow : Window
     private bool _telemetryWas;
     private bool? _telemetryNow;
     private CheckBox? _telemetryBox;
+
+    /// <summary>Which step asks whether to keep the conversation.</summary>
+    public int HistoryStep { get; }
+
+    // What is stored and what was ticked, as for the telemetry.
+    private bool _historyWas;
+    private bool? _historyNow;
+    private CheckBox? _historyBox;
+
+    /// <summary>Is the history box ticked on the step shown — for the check.</summary>
+    public bool? HistoryTicked
+    {
+        get => _historyBox?.IsChecked;
+        set
+        {
+            if (_historyBox is null) return;
+            _historyBox.IsChecked = value;
+            _historyNow = value == true;
+        }
+    }
 
     /// <summary>Is the telemetry box ticked on the step shown — for the check.</summary>
     public bool? TelemetryTicked
@@ -389,6 +418,44 @@ public partial class SetupWindow : Window
         }
     }
 
+    private FrameworkElement BuildHistory()
+    {
+        var stack = new StackPanel();
+        var box = new CheckBox
+        {
+            Style = (Style)FindResource("Toggle"),
+            Content = S("Сохранять историю разговора"),
+            IsChecked = _historyNow ?? _historyWas,
+        };
+        box.Click += (_, _) => _historyNow = box.IsChecked == true;
+        _historyBox = box;
+        stack.Children.Add(box);
+        foreach (var line in new[]
+                 {
+                     S("Сохранённая история видна в разделе «Диалог». Выгрузить её в файл или стереть — целиком или по дням — можно в разделе «Приватность»."),
+                     S("Если не сохранять, сказанное нигде не записывается."),
+                     S("Решение можно поменять в настройках, в разделе «Приватность»."),
+                 })
+            stack.Children.Add(new TextBlock
+            {
+                Text = line,
+                Style = (Style)FindResource("Text.Body"),
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 440,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 12, 0, 0),
+            });
+        return stack;
+    }
+
+    private async Task KeepHistory()
+    {
+        var wanted = _historyNow ?? _historyWas;
+        if (wanted != _historyWas
+            && await _link.SetAsync("save_history", JsonValue.Create(wanted)))
+            _historyWas = wanted;
+    }
+
     private FrameworkElement BuildTelemetry()
     {
         var stack = new StackPanel();
@@ -580,9 +647,11 @@ public partial class SetupWindow : Window
         {
             ["keys"] = new JsonArray((JsonNode)"user_name",
                                      (JsonNode)"address_form",
-                                     (JsonNode)"telemetry"),
+                                     (JsonNode)"telemetry",
+                                     (JsonNode)"save_history"),
         });
         _telemetryWas = stored?["values"]?["telemetry"]?.GetValue<bool>() ?? false;
+        _historyWas = stored?["values"]?["save_history"]?.GetValue<bool>() ?? false;
         _nameWas = stored?["values"]?["user_name"]?.GetValue<string>() ?? "";
         _formWas = stored?["values"]?["address_form"]?.GetValue<string>()
                    ?? "neutral";

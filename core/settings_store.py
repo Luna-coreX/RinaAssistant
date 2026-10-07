@@ -90,7 +90,10 @@ GROUPS = {
         "check_updates": False,
         "hotkey": "Ctrl+Shift+R",
         "action_hotkeys": {},
-        "save_history": True,
+        # Off until the person says otherwise: the first-run wizard asks
+        # (decided 2026-10-07, after the audit's I-2). A profile that already
+        # exists keeps what it has — the store wrote every key.
+        "save_history": False,
         "search_engine": "duckduckgo",
         # Off until asked for (decided 2026-09-29): an unrecognised phrase
         # opened a search engine with that phrase in it, while the product

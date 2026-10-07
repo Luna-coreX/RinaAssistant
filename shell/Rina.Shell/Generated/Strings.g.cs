@@ -721,6 +721,11 @@ public static partial class Loc
                 {
                     ["English"] = "If you don’t answer, nothing happens.",
                 },
+            ["Если не сохранять, сказанное нигде не записывается."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "If it is not kept, what you say is not written down anywhere.",
+                },
             ["Есть новая оболочка {0}."] =
                 new Dictionary<string, string>
                 {
@@ -1042,6 +1047,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Conversation history",
+                },
+            ["История — что вы сказали и что ответила Рина. Хранится только на этом компьютере."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The history is what you said and what Rina answered. It is kept on this computer only.",
                 },
             ["Источник неизвестен"] =
                 new Dictionary<string, string>
@@ -1981,6 +1991,11 @@ public static partial class Loc
                 {
                     ["English"] = "Full copies of your data the program made before updating its storage format. Once forgotten, going back to the earlier format is no longer possible.",
                 },
+            ["Помнить разговор"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Remember the conversation",
+                },
             ["Помочь бете"] =
                 new Dictionary<string, string>
                 {
@@ -2247,6 +2262,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Backups",
+                },
+            ["Решение можно поменять в настройках, в разделе «Приватность»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "You can change this later in the settings, under “Privacy”.",
                 },
             ["Рина"] =
                 new Dictionary<string, string>
@@ -2602,6 +2622,16 @@ public static partial class Loc
                     ["English"] = "Save history",
                     ["Español"] = "Guardar historial",
                     ["Українська"] = "Зберігати історію",
+                },
+            ["Сохранять историю разговора"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Keep the conversation history",
+                },
+            ["Сохранённая история видна в разделе «Диалог». Выгрузить её в файл или стереть — целиком или по дням — можно в разделе «Приватность»."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Kept history is shown in the “Dialogue” section. You can export it to a file or erase it — all of it or by day — in the “Privacy” section.",
                 },
             ["Сохранённые входы"] =
                 new Dictionary<string, string>

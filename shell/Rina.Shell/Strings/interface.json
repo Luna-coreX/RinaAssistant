@@ -1948,5 +1948,23 @@
   },
   "По нему Рина находит программы. Забытый, он соберётся заново из того, что установлено.": {
     "English": "How Rina finds programs. Forgotten, it is built again from what is installed."
+  },
+  "Помнить разговор": {
+    "English": "Remember the conversation"
+  },
+  "История — что вы сказали и что ответила Рина. Хранится только на этом компьютере.": {
+    "English": "The history is what you said and what Rina answered. It is kept on this computer only."
+  },
+  "Сохранять историю разговора": {
+    "English": "Keep the conversation history"
+  },
+  "Сохранённая история видна в разделе «Диалог». Выгрузить её в файл или стереть — целиком или по дням — можно в разделе «Приватность».": {
+    "English": "Kept history is shown in the “Dialogue” section. You can export it to a file or erase it — all of it or by day — in the “Privacy” section."
+  },
+  "Если не сохранять, сказанное нигде не записывается.": {
+    "English": "If it is not kept, what you say is not written down anywhere."
+  },
+  "Решение можно поменять в настройках, в разделе «Приватность».": {
+    "English": "You can change this later in the settings, under “Privacy”."
   }
 }

@@ -1428,6 +1428,11 @@ public partial class App
         // profile happens to hold is whatever earlier checks left in it,
         // and one of them clears the history. A check that reads somebody
         // else's leftovers passes or fails by the order it was run in.
+        //
+        // Kept only once asked for: a fresh profile does not keep the
+        // conversation until the person says so (the audit's I-2), so the
+        // check says so, as the wizard would.
+        await link.SetAsync("save_history", JsonValue.Create(true));
         await link.HandleAsync("посчитай 15 умножить на 12");
 
         string? said = null, answered = null;
@@ -2026,6 +2031,24 @@ public partial class App
         Check("и выбранный род тоже",
               wizard.FormChosen == picked, $"| «{wizard.FormChosen}»");
 
+        // Whether to keep the conversation is asked, not assumed (the
+        // audit's I-2): the box comes unticked on a fresh profile, and the
+        // answer reaches the core either way.
+        wizard.ShowFor(wizard.HistoryStep);
+        Check("история по умолчанию не отмечена",
+              wizard.HistoryTicked == false, $"| {wizard.HistoryTicked}");
+        wizard.HistoryTicked = true;
+        await wizard.KeepForCheck();
+        var historyOn = (await link.GetAsync("save_history"))?["save_history"]
+                        ?.GetValue<bool>();
+        wizard.HistoryTicked = false;
+        await wizard.KeepForCheck();
+        var historyOff = (await link.GetAsync("save_history"))?["save_history"]
+                         ?.GetValue<bool>();
+        Check("ответ про историю доходит до ядра, и отказ тоже",
+              historyOn == true && historyOff == false,
+              $"| отметили — {historyOn}, сняли — {historyOff}");
+
         // `4.0b-D05`. The beta's telemetry is off until a person says
         // otherwise, and the wizard's box is where most will say it: it
         // must come unticked on a fresh profile, and a tick — or taking it
@@ -2083,8 +2106,10 @@ public partial class App
         // something ticked" conflated the two, and went red the day the
         // developer downloaded the very model it was about: on a machine
         // that already has everything, nothing *should* be ticked.
-        Check("каталог что-то предлагает заранее, и немного",
-              wizard.Wanted.Count is > 0 and <= 3,
+        // Nothing, since 2026-10-07 (the audit's I-3): every download of
+        // the first run is the person's choice, the small Vosk included.
+        Check("каталог ничего не отмечает заранее",
+              wizard.Wanted.Count == 0,
               $"| {string.Join(", ", wizard.Wanted)}");
         Check("мастер отметил ровно то, чего ещё нет",
               wizard.TickedIds.OrderBy(x => x)

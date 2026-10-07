@@ -20,7 +20,7 @@ class HistoryStore:
         self._settings = settings
 
     def enabled(self):
-        return bool(self._settings.get("save_history", True))
+        return bool(self._settings.get("save_history", False))
 
     def all(self):
         """
