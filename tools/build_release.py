@@ -273,6 +273,27 @@ def copy_core(out):
     for name in CORE_FILES:
         shutil.copy2(name, os.path.join(out, name))
     say("ядро скопировано", ", ".join(CORE_TREE + CORE_FILES))
+    write_shipped_list(os.path.join(out, "plugins"))
+
+
+def write_shipped_list(folder):
+    """
+    Name the shipped plugins beside them (`plugins/shipped.json`).
+
+    After an update the program's `plugins` holds what this build put
+    there and, from before M-7, what a person installed. The core moves
+    the second kind to the profile on start (`plugins.manager`), and this
+    list is how it tells the two apart: by name, from the build that knows,
+    rather than guessed on the person's machine.
+    """
+    import json
+
+    names = sorted(n for n in os.listdir(folder)
+                   if os.path.isfile(os.path.join(folder, n, "plugin.json")))
+    with io.open(os.path.join(folder, "shipped.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump(names, f, ensure_ascii=False)
+    say("плагины поставки названы", ", ".join(names))
 
 
 def measure(out):

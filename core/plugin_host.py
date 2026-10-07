@@ -385,21 +385,19 @@ class HostedPlugins:
         very start, and the list of plugins would cost as much as running
         them.
         """
-        from plugins.manager import plugins_dir
+        from plugins.manager import plugin_folders
 
-        base = plugins_dir()
         known = set()
         enabled = set()
         if self._settings is not None:
             enabled = set(self._settings.get("enabled_plugins", []) or [])
 
-        for name in sorted(os.listdir(base)):
-            folder = os.path.join(base, name)
-            if not os.path.isdir(folder):
-                continue
-            if not os.path.isfile(os.path.join(folder, "plugin.json")):
-                continue
+        for name, folder in plugin_folders().items():
             known.add(name)
+            # Moved between discoveries — from beside the program into the
+            # profile — it is the same plugin in a new place.
+            if name in self.plugins and self.plugins[name].folder != folder:
+                self.plugins.pop(name).stop()
             if name not in self.plugins:
                 self.plugins[name] = HostedPlugin(folder, self)
                 self._read_manifest(self.plugins[name])

@@ -490,8 +490,10 @@ public partial class AboutPage : UserControl
         {
             (S("Настройки, история, команды"), data),
             (S("Журналы"), System.IO.Path.Combine(data, "logs")),
-            (S("Плагины"), System.IO.Path.Combine(
-                AppContext.BaseDirectory, "..", "..", "..", "..", "plugins")),
+            // The person's plugins, in the profile since the audit of
+            // 2026-10-07 (M-7). The shipped ones beside the program are not
+            // a place a person needs to find.
+            (S("Плагины"), System.IO.Path.Combine(data, "plugins")),
         })
         {
             var row = new Border

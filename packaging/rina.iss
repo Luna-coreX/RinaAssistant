@@ -50,9 +50,19 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
 ; В профиль пользователя, без прав администратора: Рине не нужен доступ
-; к системным папкам.
+; к системным папкам. И без выбора «для всех пользователей» (аудит
+; 2026-10-07, M-7): в Program Files папка программы недоступна для записи,
+; а Рина пишет в неё — пакеты, которые человек ставит потом в runtime,
+; __pycache__ ядра. Установка там проходила, а потом это ломалось с
+; непонятной ошибкой.
 PrivilegesRequired=lowest
-PrivilegesRequiredOverridesAllowed=dialog
+
+; Обновление ставится туда же, где стоит прежняя версия, не спрашивая.
+UsePreviousAppDir=yes
+DisableDirPage=auto
+; В уже существующую папку — с предупреждением, а в непустую чужую — никак
+; (см. [Code]): удаление программы убирает то, что лежит в её папке.
+DirExistsWarning=auto
 
 LicenseFile=..\LICENSE
 UninstallDisplayName={#AppName}
@@ -85,20 +95,138 @@ Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; \
     Flags: nowait postinstall skipifsilent
 
 [UninstallDelete]
-; Рантайм обзаводится __pycache__ и поставленными потом пакетами — того,
-; чего в установке не было. Без этой строки после удаления остаётся папка
-; с чужим мусором, и человек находит её через полгода.
-; Одной этой строки не хватило, и выяснилось это только когда установщик
-; впервые собрали и прогнали от установки до удаления: ядро лежит в
-; {app}\core, {app}\voice, {app}\plugins, и Python пишет __pycache__
-; рядом с ними, а не в runtime. После удаления оставалось 58 файлов.
+; Своё — то, что положила установка, — деинсталлятор убирает сам. Здесь —
+; то, что появилось потом: пакеты, поставленные в runtime, и __pycache__,
+; который Python пишет рядом с модулями ядра. Когда установщик впервые
+; прогнали от установки до удаления, их осталось 58 файлов.
 ;
-; Поэтому не список папок, а вся {app}: точный список устаревает в тот
-; день, когда в раскладке появляется новый пакет, и устаревает молча —
-; ровно так, как устарел этот.
+; Только эти папки, а не {app} целиком (аудит 2026-10-07, M-7). Вся {app}
+; закрывала и новые пакеты раскладки, о которых забыли бы здесь, но
+; удаляла и всё, что лежало в выбранной папке, — человек, поставивший Рину
+; в D:\Tools, лишился бы при удалении всего D:\Tools. Новый пакет
+; раскладки, забытый здесь, ловит `check_release.py --probe-install`:
+; после удаления не должно остаться ни одного файла.
+;
+; {app}\plugins — не здесь, а в [Code]: до M-7 там лежали и плагины,
+; которые ставил человек.
 Type: filesandordirs; Name: "{app}\runtime"
-Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{app}\core"
+Type: filesandordirs; Name: "{app}\voice"
+Type: filesandordirs; Name: "{app}\__pycache__"
+Type: dirifempty; Name: "{app}"
 
-; Настройки, история и команды НЕ удаляются намеренно: они в %APPDATA%, и
-; переустановка не должна стирать годами накопленное. Удалить их — отдельное
-; осознанное действие, как и «сбросить настройки» внутри программы.
+; Настройки, история, команды и плагины человека НЕ удаляются намеренно:
+; они в %APPDATA%, и переустановка не должна стирать годами накопленное.
+; Удалить их — отдельное осознанное действие, как и «сбросить настройки»
+; внутри программы.
+
+[CustomMessages]
+russian.ForeignFolder=В этой папке уже есть файлы, и это не Rina Assistant.%n%nПри удалении программа убирает то, что лежит в её папке, поэтому ставить её сюда нельзя. Выберите пустую или новую папку.
+english.ForeignFolder=This folder already has files in it, and they are not Rina Assistant.%n%nUninstalling removes what is in the program's folder, so it cannot be installed here. Choose an empty or a new folder.
+
+[Code]
+// Rina's own folder: a previous install of it, which an update goes over.
+function IsRinaFolder(const Dir: String): Boolean;
+begin
+  Result := FileExists(AddBackslash(Dir) + '{#AppExe}')
+    or FileExists(AddBackslash(Dir) + 'unins000.exe');
+end;
+
+function IsEmptyFolder(const Dir: String): Boolean;
+var
+  Found: TFindRec;
+begin
+  Result := True;
+  if FindFirst(AddBackslash(Dir) + '*', Found) then
+  try
+    repeat
+      if (Found.Name <> '.') and (Found.Name <> '..') then
+      begin
+        Result := False;
+        Break;
+      end;
+    until not FindNext(Found);
+  finally
+    FindClose(Found);
+  end;
+end;
+
+// A folder with somebody else's files in it (M-7).
+function IsForeignFolder(const Dir: String): Boolean;
+begin
+  Result := DirExists(Dir) and not IsEmptyFolder(Dir) and not IsRinaFolder(Dir);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpSelectDir) and IsForeignFolder(WizardDirValue) then
+  begin
+    MsgBox(CustomMessage('ForeignFolder'), mbError, MB_OK);
+    Result := False;
+  end;
+end;
+
+// Again here, because a silent install with /DIR= never shows the page.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if IsForeignFolder(ExpandConstant('{app}')) then
+    Result := CustomMessage('ForeignFolder');
+end;
+
+// Before M-7 a person's plugins were installed next to the shipped ones.
+// The core moves them to the profile on start; for an update that was
+// uninstalled without ever being started, it is done here. A folder that
+// `shipped.json` (written by the build) does not name is the person's.
+// True when nothing of theirs is left behind.
+function KeepPersonsPlugins(): Boolean;
+var
+  Base, Target: String;
+  Listed: AnsiString;
+  Found: TFindRec;
+begin
+  Result := True;
+  Base := ExpandConstant('{app}\plugins');
+  if not LoadStringFromFile(Base + '\shipped.json', Listed) then
+  begin
+    // No list — nothing can be told apart, so nothing is deleted.
+    Result := not DirExists(Base);
+    Exit;
+  end;
+  Target := ExpandConstant('{userappdata}\RinaAssistant\plugins');
+  if FindFirst(Base + '\*', Found) then
+  try
+    repeat
+      if ((Found.Attributes and FILE_ATTRIBUTE_DIRECTORY) <> 0)
+        and (Found.Name <> '.') and (Found.Name <> '..')
+        and FileExists(Base + '\' + Found.Name + '\plugin.json')
+        and (Pos('"' + Found.Name + '"', String(Listed)) = 0) then
+      begin
+        ForceDirectories(Target);
+        if DirExists(Target + '\' + Found.Name)
+          or not RenameFile(Base + '\' + Found.Name, Target + '\' + Found.Name) then
+          Result := False;
+      end;
+    until not FindNext(Found);
+  finally
+    FindClose(Found);
+  end;
+end;
+
+var
+  NothingOfTheirs: Boolean;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  // Before the files go: `shipped.json` is one of them.
+  if CurUninstallStep = usUninstall then
+    NothingOfTheirs := KeepPersonsPlugins();
+  // The shipped plugins' __pycache__ goes only when nothing of the
+  // person's is among them; otherwise the folder stays, and so does {app}.
+  if (CurUninstallStep = usPostUninstall) and NothingOfTheirs then
+  begin
+    DelTree(ExpandConstant('{app}\plugins'), True, True, True);
+    RemoveDir(ExpandConstant('{app}'));
+  end;
+end;

@@ -30,8 +30,8 @@ from sandbox import isolate_plugins, isolate_storage, neutralise
 use_utf8()
 
 isolate_storage()
-# The examples are not in `plugins/` since `4.0b-K05`; this puts them next
-# to the shipped plugins, in a folder of the check's own.
+# The examples are not in `plugins/` since `4.0b-K05`; this puts them where
+# a person's plugins go, in a folder of the check's own.
 isolate_plugins()
 box = neutralise()
 
@@ -39,7 +39,7 @@ from core.engine import RinaEngine
 from core.events import EventBus
 from core.permissions import PERMISSIONS, PLUGIN_FORBIDDEN, plugin_allowed
 from plugins.api import API_VERSION, MIN_API_VERSION, PluginManifest
-from plugins.manager import PluginManager, plugins_dir
+from plugins.manager import PluginManager, plugins_dir, shipped_dir
 from plugins.page_spec import (CONTAINERS, KINDS, MAX_DEPTH, SCHEMA_VERSION,
                                Card, Group, Note, Row, Title, page_to_dict)
 
@@ -310,7 +310,7 @@ manager.dispatch_action("notes", "clear")
 check("ни один плагин не импортирует интерфейсную библиотеку",
       not [pid for pid in manager.plugins
            if "PySide6" in io.open(
-               os.path.join(plugins_dir(), pid, "main.py"),
+               os.path.join(manager.plugins[pid].manifest.path, "main.py"),
                encoding="utf-8").read()],
       "| это и был прямой блокер разделения процессов")
 
@@ -819,7 +819,7 @@ import importlib.util
 import urllib.request
 
 spec = importlib.util.spec_from_file_location(
-    "rates_main", os.path.join(plugins_dir(), "rates", "main.py"))
+    "rates_main", os.path.join(shipped_dir(), "rates", "main.py"))
 rates = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rates)
 
@@ -970,9 +970,9 @@ try:
               "нет связи" in str(refusal), f"| {refusal}")
 finally:
     urllib.request.urlopen = real_open
-manifest = json.load(io.open(os.path.join(plugins_dir(), "rates", "plugin.json"),
+manifest = json.load(io.open(os.path.join(shipped_dir(), "rates", "plugin.json"),
                              encoding="utf-8"))
-source_text = io.open(os.path.join(plugins_dir(), "rates", "main.py"),
+source_text = io.open(os.path.join(shipped_dir(), "rates", "main.py"),
                       encoding="utf-8").read()
 check("описание плагина больше не называет его примером",
       "пример" not in manifest["description"].lower()

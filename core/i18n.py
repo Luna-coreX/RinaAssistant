@@ -767,6 +767,7 @@ _EN = {
     'Битый plugin.json: ': 'Broken plugin.json: ',
     'В plugin.json не указан id': 'plugin.json has no id',
     'Этот плагин уже установлен': 'This plugin is already installed',
+    'Это имя занято плагином из поставки': 'This name belongs to a plugin that ships with Rina',
     'Чувствительность активации': 'Wake word sensitivity',
     'Насколько похоже должно звучать слово активации. Ниже — срабатывает чаще, но и на лишнее.': 'How closely the wake word must match. Lower reacts more often — including to things you didn’t mean.',
     'Длительность записи': 'Recording length',

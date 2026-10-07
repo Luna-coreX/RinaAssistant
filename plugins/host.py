@@ -187,6 +187,15 @@ class Host:
             self.error = "Нет файла main.py"
             return False
 
+        # A plugin importing its own module as `plugins.<id>.<module>`: the
+        # folder it lives in — beside the program or in the profile — is
+        # searched as part of the package.
+        import plugins
+
+        parent = os.path.dirname(os.path.abspath(self.folder))
+        if parent not in plugins.__path__:
+            plugins.__path__.append(parent)
+
         try:
             spec = importlib.util.spec_from_file_location(
                 f"rina_plugin_{self.manifest.id}", main)

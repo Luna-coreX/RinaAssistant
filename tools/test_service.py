@@ -597,11 +597,11 @@ with tempfile.TemporaryDirectory() as staging:
     io.open(os.path.join(folder, "main.py"), "w",
             encoding="utf-8").write(PLUGIN_SOURCE)
 
-    # We install into the real plugins directory — installation knows no
-    # other — so we clear up both before and after: a check that left a
-    # plugin behind checks replacement instead of installation on the second
-    # run. Which is what happened.
-    installed = os.path.join(ROOT, "plugins", "probe_install")
+    # Into the check's own plugins directory (`isolate_plugins`), where a
+    # person's plugins go; cleared before and after all the same: a check
+    # that left a plugin behind checks replacement instead of installation
+    # on the second run. Which is what happened.
+    installed = os.path.join(os.environ["RINA_PLUGINS_DIR"], "probe_install")
     shutil.rmtree(installed, ignore_errors=True)
 
     work.ask("plugins.install", {"source": folder})
@@ -618,7 +618,7 @@ with tempfile.TemporaryDirectory() as staging:
           any(p.get("plugin_id") == "probe_install" for p in listed),
           f"| {[p.get('plugin_id') for p in listed]}")
 
-shutil.rmtree(os.path.join(ROOT, "plugins", "probe_install"),
+shutil.rmtree(os.path.join(os.environ["RINA_PLUGINS_DIR"], "probe_install"),
               ignore_errors=True)
 
 # Resetting the settings: it returns the defaults and does not touch the commands.
