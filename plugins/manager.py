@@ -40,23 +40,138 @@ HOME_TILE_LIMIT = 4
 ARCHIVE_UNPACKED_LIMIT = 50 * 1024 * 1024
 
 
+#: Written by the build beside the shipped plugins: which of the folders
+#: next to the program are ours (`tools/build_release.py`).
+SHIPPED_LIST = "shipped.json"
+
+
+def shipped_dir() -> str:
+    """The plugins that ship: next to the program, replaced by every update."""
+    return os.path.dirname(os.path.abspath(__file__))
+
+
 def plugins_dir() -> str:
     """
-    The plugins' directory (next to the project).
+    Where a person's plugins go: `plugins` in the data folder.
+
+    **Not next to the program** (audit 2026-10-07, M-7). They used to be
+    installed into the program's own `plugins`, and the uninstaller,
+    which takes the program's folder away, took them along without a word;
+    installed for all users under Program Files, the folder was not
+    writable at all. The profile is the person's, and an update or an
+    uninstall leaves it alone, as it leaves the settings.
 
     `RINA_PLUGINS_DIR` points it elsewhere, and only the checks set it
-    (`tools/sandbox.py::isolate_plugins`). Since `4.0b-K05` the examples
-    live in `examples/plugins/`, outside what ships, and a check that
-    exercises them needs one directory holding them together with the
-    shipped plugins — and a place for its throwaway plugins that is not
-    the repository.
+    (`tools/sandbox.py::isolate_plugins`): the examples of
+    `examples/plugins/` and the checks' throwaway plugins go there.
     """
     path = os.environ.get("RINA_PLUGINS_DIR")
     if not path:
-        here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        path = os.path.join(here, "plugins")
+        from core.settings_store import config_dir
+
+        path = os.path.join(config_dir(), "plugins")
     os.makedirs(path, exist_ok=True)
     return path
+
+
+def _folders_in(base):
+    try:
+        names = sorted(os.listdir(base))
+    except OSError:
+        return []
+    return [name for name in names
+            if os.path.isfile(os.path.join(base, name, "plugin.json"))]
+
+
+def _shipped_list():
+    """The build's list of shipped plugins; `None` when not run from a build."""
+    try:
+        with open(os.path.join(shipped_dir(), SHIPPED_LIST),
+                  encoding="utf-8") as f:
+            listed = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return {str(name) for name in listed} if isinstance(listed, list) else None
+
+
+def shipped_ids():
+    """
+    The names that belong to the shipped plugins.
+
+    From a build — the list it wrote. From the source tree there is none,
+    and every plugin folder there is one of ours: the repository's
+    `plugins/` holds what ships and nothing else (`4.0b-K05`).
+    """
+    listed = _shipped_list()
+    present = set(_folders_in(shipped_dir()))
+    return present if listed is None else present & listed
+
+
+def move_user_plugins():
+    """
+    Move what a person installed out of the program's folder. Returns the names moved.
+
+    Before M-7 a plugin was installed next to the shipped ones, so after
+    an update the program's `plugins` holds both. A folder there that the
+    build's list does not name is somebody's, and it goes to the profile,
+    where the uninstaller cannot reach it. One already in the profile under
+    the same name is not overwritten: that copy is the newer one. Without a
+    build's list nothing can be told apart, and nothing is moved.
+    """
+    import shutil
+
+    listed = _shipped_list()
+    if listed is None:
+        return []
+    moved = []
+    for name in _folders_in(shipped_dir()):
+        if name in listed:
+            continue
+        source = os.path.join(shipped_dir(), name)
+        target = os.path.join(plugins_dir(), name)
+        if os.path.exists(target):
+            log.warning("Плагин «%s» есть и в профиле, и рядом с программой; "
+                        "остаётся тот, что в профиле", name)
+            continue
+        try:
+            shutil.move(source, target)
+        except (OSError, shutil.Error) as exc:
+            log.warning("Плагин «%s» не перенесён в профиль: %s", name, exc)
+            continue
+        security_log().info("Плагин %s перенесён в профиль: %s", name, target)
+        moved.append(name)
+    return moved
+
+
+def plugin_folders():
+    """
+    Every plugin: `{name: folder}`, the shipped ones first, then the person's.
+
+    A person's plugin cannot take a shipped one's name. Its settings, its
+    secrets and its place among the switched-on ones are all keyed by the
+    name, so a folder in the profile called `weather` would quietly become
+    the weather plugin, with its permission to reach the network. The
+    shipped one wins, and the other is named in the log.
+    """
+    move_user_plugins()
+    found = {}
+    shipped = shipped_ids()
+    for name in sorted(shipped):
+        found[name] = os.path.join(shipped_dir(), name)
+    own = plugins_dir()
+    for name in _folders_in(own):
+        if name in found:
+            log.warning("Плагин «%s» в профиле не загружен: имя занято "
+                        "плагином из поставки", name)
+            continue
+        found[name] = os.path.join(own, name)
+    # A plugin importing its own module as `plugins.<name>.<module>` finds
+    # it through the package's search path.
+    import plugins as package
+
+    if own not in package.__path__:
+        package.__path__.append(own)
+    return found
 
 
 class PluginInstallError(Exception):
@@ -148,6 +263,15 @@ def install_plugin(source_path):
             raise PluginInstallError(tr("Битый plugin.json: ") + str(e))
 
         plugin_id = _safe_plugin_id(manifest.get("id") or manifest.get("name"))
+        # Installed under a shipped plugin's name it would never load (see
+        # `plugin_folders`); said now rather than found later as a plugin
+        # that is installed and absent.
+        if plugin_id.lower() in {name.lower() for name in shipped_ids()}:
+            security_log().warning(
+                "Плагин из %s назван как плагин поставки (%s) и не установлен",
+                source_path, plugin_id)
+            raise PluginInstallError(
+                tr("Это имя занято плагином из поставки"))
 
         base = os.path.abspath(plugins_dir())
         target = os.path.abspath(os.path.join(base, plugin_id))
@@ -277,14 +401,10 @@ class PluginManager:
     def discover(self):
         """Scans the plugins directory and reads the manifests (without loading code)."""
         self.plugins.clear()
-        base = plugins_dir()
         enabled_ids = set(settings.get("enabled_plugins", []) or [])
 
-        for name in sorted(os.listdir(base)):
-            folder = os.path.join(base, name)
+        for name, folder in plugin_folders().items():
             manifest_path = os.path.join(folder, "plugin.json")
-            if not os.path.isdir(folder) or not os.path.isfile(manifest_path):
-                continue
             try:
                 with open(manifest_path, "r", encoding="utf-8") as f:
                     data = json.load(f)

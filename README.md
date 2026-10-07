@@ -9,7 +9,7 @@ A desktop voice assistant for Windows — launches your apps, keeps your timers,
 </h3>
 
 <p align="center">
-  <b>Version 4.0.0-port</b> · Windows · Python 3.10+ · .NET 9 · Apache-2.0
+  <b>Version 4.0.0-beta</b> · Windows · Python 3.12 · .NET 9 · Apache-2.0
 </p>
 
 ---
@@ -26,8 +26,9 @@ own: the online voices, the web search and the weather and exchange-rate
 plugins reach the network only once you switch them on, and each says what it
 sends. The beta has telemetry that is off until you switch it on: numbers once
 a day, never what you said, and gone in 4.0.0 Stable. There is a page inside the program
-that lists every single thing it has remembered about you, and a button to make
-it forget any of it.
+that lists everything it keeps about you — including its journals and the
+copies it made before updating its storage — and a button to make it forget
+any of it.
 
 <p align="center">
   <img src="docs/screens/home.png" width="760"><br>
@@ -39,14 +40,18 @@ it forget any of it.
 
 ## Try it in five minutes
 
-Requires **Windows**, **Python 3.10+** and **.NET 9**.
+Requires **Windows**, **Python 3.12** and **.NET 9**.
 
 ```bash
 git clone https://github.com/Luna-coreX/RinaAssistant.git
 cd RinaAssistant
-pip install -r requirements.txt
+python -m venv venv
+venv\Scripts\python -m pip install -r requirements.txt
 dotnet run --project shell/Rina.Shell -c Release
 ```
+
+`requirements.txt` is the core's list, with the same pinned versions the
+installer ships; the shell finds the `venv` by itself.
 
 `-c Release` matters: the living background and the figure are computed on
 the processor, and a Debug build does that three to four times slower —
@@ -98,7 +103,7 @@ Rina indexes what is actually installed on the machine — Start Menu shortcuts,
 
 - **Type it however you speak it.** "Открой телеграм" finds *Telegram*; Cyrillic input is transliterated and matched fuzzily, so near-misses and mishearings still land.
 - **Ambiguity is asked about, not guessed.** Several matches produce a question, and your answer is remembered as an alias for next time.
-- **Unsigned programs are asked about once.** The question shows everything you could decide by: the name, the full path, where the index found it.
+- **Unsigned programs are asked about once.** The question shows everything you could decide by: the name, the full path, where the index found it. A Start-menu shortcut is judged by what it starts — its target's signature and folder — and a shortcut whose target changes is asked about again.
 
 ### Voice
 
@@ -228,9 +233,10 @@ only then whatever is in `PATH`. The voices and the recognition models are
 installed **in the environment**, so a core started with "just python" comes up
 and honestly reports that it has no engines.
 
-Voice engines are optional and listed in `requirements.txt`. The first-run
-wizard installs the ones you pick; you can also install them by hand. Some
-(Vosk, Piper) need a model file, which the wizard downloads.
+`requirements.txt` brings recognition (faster-whisper) and one online voice
+(Edge, off until you choose it). The other engines are optional and not in
+it: the first-run wizard installs the ones you pick. Some (Vosk, Piper) need
+a model file, which the wizard downloads too.
 
 ### Optional: local AI answers
 
@@ -247,7 +253,7 @@ Rina talks to `http://localhost:11434` by default and warns you plainly if you p
 ## Development
 
 ```bash
-python tools/regress.py          # 93 checks, about six minutes
+python tools/regress.py          # 96 checks, about six minutes
 python tools/regress.py --list   # what they are
 ```
 

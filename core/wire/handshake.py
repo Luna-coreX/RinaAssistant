@@ -128,6 +128,11 @@ _CAPABILITY_LIST = (
     # The browser was the one thing on the machine the core still touched
     # itself (audit 2026-10-07, H-2): a search, music, a command's
     # "website" step. Only http and https — the shell refuses the rest.
+    # What the shell keeps about a person, for the privacy page (audit
+    # 2026-10-07, H-4): consent to run the unsigned and the program index.
+    # Its own to tell and to forget — it holds them in memory as well.
+    Capability("kept", Side.SHELL, ("kept.list", "kept.forget"),
+               "что хранит оболочка: согласия на запуск, индекс программ"),
     Capability("browser", Side.SHELL, ("browser.open",),
                "открыть веб-адрес в браузере по умолчанию, только http и https"),
     # --- declared by the core ---

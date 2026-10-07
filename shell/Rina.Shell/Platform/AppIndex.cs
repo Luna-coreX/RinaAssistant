@@ -222,7 +222,10 @@ public static class AppIndex
                     // We do not ask a shortcut for a signature: what is
                     // signed is not the shortcut but what it points at, and
                     // resolving the target for that is work for launching,
-                    // not for a sweep.
+                    // not for a sweep. Launching does it — the target's
+                    // signature, folder and consent are checked there
+                    // (`Launcher.Vet`, audit 2026-10-07, M-3); this flag is
+                    // only what the index shows.
                     Signed = true,
                 };
             }
@@ -240,7 +243,12 @@ public static class AppIndex
             // wrapper for the sake of one call.
             var process = Process.Start(new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                // By its full path (audit 2026-10-07, L-7): named bare, it
+                // is looked for in the current directory first, and a file
+                // dropped there would be run in its place.
+                FileName = Path.Combine(Environment.SystemDirectory,
+                                        "WindowsPowerShell", "v1.0",
+                                        "powershell.exe"),
                 Arguments = "-NoProfile -NonInteractive -Command \"Get-StartApps | Where-Object AppID -like '*!*' | ForEach-Object { $_.Name + '|' + $_.AppID }\"",
                 RedirectStandardOutput = true,
                 UseShellExecute = false,
@@ -424,6 +432,22 @@ public static class AppIndex
     private const int CacheVersion = 3;
 
     private static List<AppEntry>? _memory;
+
+    /// <summary>How many programs the index holds, without building it.</summary>
+    public static int Kept() => _memory?.Count ?? Load()?.Count ?? 0;
+
+    /// <summary>
+    /// Drop the index, in memory and on disk — for the privacy page (H-4).
+    /// How many entries went. It is built again the next time it is asked
+    /// for, from what is installed then.
+    /// </summary>
+    public static int Forget()
+    {
+        var gone = Kept();
+        _memory = null;
+        try { File.Delete(CachePath); } catch { }
+        return gone;
+    }
 
     /// <summary>
     /// The index: from memory, from the file, or built afresh.

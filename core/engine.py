@@ -101,6 +101,10 @@ class RinaEngine:
         #: Called to cut off speech in progress — see `_hush_previous`.
         self.hush_out = None
         self._apps_cache = None
+        self._apps_at = 0.0
+        self._apps_empty_at = None
+        self._apps_refreshing = False
+        self._apps_lock = threading.Lock()
         #: Who opens a page in a browser. The same place as the rest of what
         #: touches the machine; until it is set, the core opens it itself,
         #: as in 3.1.0.
@@ -929,12 +933,77 @@ class RinaEngine:
 
             return app_index.cached_index() or []
 
-        if self._apps_cache is None:
-            from voice.app_index import AppEntry
+        with self._apps_lock:
+            cached, at = self._apps_cache, self._apps_at
+            empty_at = self._apps_empty_at
+        now = time.monotonic()
+        if cached is not None:
+            if now - at > self.APPS_FRESH:
+                self._refresh_apps_later()
+            return cached
+        # Nothing yet, or the last answer was empty — a shell that timed out
+        # building its index, or failed. **Not kept** (audit 2026-10-07,
+        # M-4): kept, an empty list answered "not found" to every program
+        # for the rest of the session. Asked again, but not on every phrase:
+        # a shell still building would make each one wait for it.
+        if empty_at is not None and now - empty_at < self.APPS_RETRY:
+            return []
+        return self._load_apps(refresh=False)
 
-            self._apps_cache = [AppEntry.from_dict(item)
-                                for item in self.apps_source()]
-        return self._apps_cache
+    #: How long the list of programs is taken as it stands. After that it
+    #: is asked for again, rebuilt — a program installed since Rina started
+    #: is found — and in the background: the phrase in hand is answered from
+    #: the list there is, rather than wait seconds for a new one.
+    APPS_FRESH = 600.0
+    #: How soon an empty list is asked for again.
+    APPS_RETRY = 30.0
+
+    def _load_apps(self, refresh):
+        from voice.app_index import AppEntry
+
+        def ask():
+            if refresh:
+                try:
+                    return self.apps_source(refresh=True)
+                except TypeError:
+                    # A source that knows no `refresh` (the checks' stand-ins).
+                    pass
+            return self.apps_source()
+
+        try:
+            raw = ask()
+        except Exception:                               # noqa: BLE001
+            log.warning("Список программ не получен", exc_info=True)
+            raw = []
+        entries = [AppEntry.from_dict(item) for item in raw or []]
+        with self._apps_lock:
+            if entries:
+                self._apps_cache = entries
+                self._apps_at = time.monotonic()
+                self._apps_empty_at = None
+            elif self._apps_cache is None:
+                self._apps_empty_at = time.monotonic()
+            else:
+                # A rebuild that came back empty does not throw away a list
+                # that worked: try again after the usual wait.
+                self._apps_at = time.monotonic()
+        return entries or (self._apps_cache or [])
+
+    def _refresh_apps_later(self):
+        with self._apps_lock:
+            if self._apps_refreshing:
+                return
+            self._apps_refreshing = True
+
+        def rebuild():
+            try:
+                self._load_apps(refresh=True)
+            finally:
+                with self._apps_lock:
+                    self._apps_refreshing = False
+
+        threading.Thread(target=rebuild, name="rina-apps-refresh",
+                         daemon=True).start()
 
     #: The sources that arrive by ear.
     BY_EAR = ("voice", "always")
@@ -1170,11 +1239,7 @@ class RinaEngine:
                 # that shuts the computer down is a yes not yet given.
                 if self._confirm_if_irreversible(cmd):
                     return
-                self._ensure_command_worker()
-                ctx = contextvars.copy_context()
-                threading.Thread(
-                    target=ctx.run, args=(self._run_user_command, cmd),
-                    name="rina-run-command", daemon=True).start()
+                self._enqueue(lambda: self._run_user_command(cmd))
                 return
 
     def try_command(self, card):
@@ -1185,11 +1250,7 @@ class RinaEngine:
         sequence with pauses takes seconds, and the press comes from the
         interface thread.
         """
-        self._ensure_command_worker()
-        ctx = contextvars.copy_context()
-        threading.Thread(
-            target=ctx.run, args=(self._executor.try_user_command, card),
-            name="rina-try-command", daemon=True).start()
+        self._enqueue(lambda: self._executor.try_user_command(card))
 
     # ------------------------------------------------------------------
     # the command queue
@@ -1203,12 +1264,34 @@ class RinaEngine:
                     daemon=True)
                 self._command_worker.start()
 
+    def _enqueue(self, job):
+        """
+        Put work into the command queue. Returns the event set when it is done.
+
+        Every source of commands goes through here: a phrase, the "Run"
+        button, the builder's «Проверить». The buttons used to start a
+        thread each, beside the queue (audit 2026-10-07, L-1), and the
+        pipeline's shared state — a clarifying question still open, the
+        last program named — was then touched by two at once, which is
+        exactly what the queue exists to prevent.
+
+        The execution context goes into the queue with the work. The
+        end-to-end trace (4.0-D15) rides in it: the worker thread is
+        long-lived and serves many commands in a row, so it cannot be tied
+        to one of them — the context belongs to the command, not to the
+        thread. The first run of the two processes showed this outright:
+        Rina's answer arrived with a trace that did not match the request's.
+        """
+        self._ensure_command_worker()
+        done = threading.Event()
+        self._commands.put((job, done, contextvars.copy_context()))
+        return done
+
     def _command_loop(self):
         while True:
-            text, require_wake, source, done, ctx = self._commands.get()
+            job, done, ctx = self._commands.get()
             try:
-                ctx.run(self.handle_command, text,
-                        require_wake=require_wake, source=source)
+                ctx.run(job)
             except Exception as e:
                 # without this an exception would carry off the worker, and
                 # every following command would stay in the queue forever
@@ -1232,20 +1315,8 @@ class RinaEngine:
         must not listen further until the previous phrase has been dealt
         with.
         """
-        self._ensure_command_worker()
-        done = threading.Event()
-        # The execution context is put into the queue along with the
-        # command. The end-to-end trace (4.0-D15) rides in it: the worker
-        # thread is long-lived and serves many commands in a row, so it
-        # cannot be tied to one of them — the context belongs to the command,
-        # not to the thread.
-        #
-        # The first run of the two processes showed this outright: Rina's
-        # answer arrived with a trace that did not match the request's, and
-        # there was nothing to tie request to answer with across two
-        # journals.
-        self._commands.put((text, require_wake, source, done,
-                            contextvars.copy_context()))
+        done = self._enqueue(lambda: self.handle_command(
+            text, require_wake=require_wake, source=source))
         if wait:
             done.wait()
         return done

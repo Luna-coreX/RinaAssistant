@@ -102,6 +102,17 @@ check("плагины сборки — ровно плагины поставк�
       f"| лишние {sorted(built_plugins - meant_plugins)}, "
       f"нет {sorted(meant_plugins - built_plugins)}")
 
+# The list the core tells the shipped plugins by (M-7). One missing from it
+# would be taken for a person's and moved out to the profile on start.
+try:
+    listed = set(json.load(io.open(os.path.join(where, "plugins",
+                                                "shipped.json"),
+                                   encoding="utf-8")))
+except (OSError, ValueError):
+    listed = None
+check("плагины поставки названы в shipped.json",
+      listed == built_plugins, f"| {listed}")
+
 # The shell is published as a separate step: the build can be run without
 # it (`--skip-shell`), so its absence is not a failure but something said
 # out loud.

@@ -6,25 +6,25 @@ using static Rina.Shell.Strings.Loc;
 
 namespace Rina.Shell.Update;
 
-    /// <summary>The check did not go through: network, address, broken metadata.</summary>
+/// <summary>What a check of updates found.</summary>
 public enum Verdict
 {
-    /// <summary>Nothing newer exists.</summary>
+    /// <summary>The check did not go through: network, address, broken metadata.</summary>
     Unknown,
 
-    /// <summary>Only the shell updates.</summary>
+    /// <summary>Nothing newer exists.</summary>
     UpToDate,
 
-    /// <summary>Only the core updates.</summary>
+    /// <summary>Only the shell updates.</summary>
     ShellOnly,
 
-    /// <summary>Both parts update.</summary>
+    /// <summary>Only the core updates.</summary>
     CoreOnly,
 
-    /// <summary>The pair is incompatible: it must not be installed.</summary>
+    /// <summary>Both parts update.</summary>
     Both,
 
-/// <summary>The outcome of a check: what was found and what to do about it.</summary>
+    /// <summary>The pair is incompatible: it must not be installed.</summary>
     Incompatible,
 }
 

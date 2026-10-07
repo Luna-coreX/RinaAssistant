@@ -402,12 +402,18 @@ def models(force=False):
 def status():
     """(is it available, the text to show in the settings)."""
     found = models()
+    # Whoever is chosen, by name (audit 2026-10-07, L-8): "Ollama is
+    # reachable" said of LM Studio or of OpenRouter in the cloud misnames
+    # where the questions go.
+    name = PROVIDER_TITLES[provider()].split(" (", 1)[0]
     if found:
-        return True, tr("Ollama на связи, моделей: {count}", count=len(found))
+        return True, tr("{name} на связи, моделей: {count}", name=name,
+                        count=len(found))
     error = _status_cache.get("error")
     if error:
         return False, error
-    return False, tr("Ollama отвечает, но моделей нет — установите модель")
+    return False, tr("{name} отвечает, но моделей нет — установите модель",
+                     name=name)
 
 
 def cloud_host(model=None):

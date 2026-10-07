@@ -200,3 +200,9 @@ out/
 shell/**/bin/
 shell/**/obj/
 docs/4.0-beta funcs.txt
+
+# Local tools: the IDE's project files, Visual Studio's cache, and Claude Code's
+# session settings (settings.local.json is one machine's, audit 2026-10-07, L-10).
+.idea/
+shell/.vs/
+.claude/

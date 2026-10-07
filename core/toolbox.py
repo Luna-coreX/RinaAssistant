@@ -514,9 +514,10 @@ WEB_SEARCH = Tool(
     params=(
         Param("query", "string", "Что искать."),
         Param("engine", "string", "Поисковая система.", required=False,
-              choices=("google", "yandex", "duckduckgo", "bing"),
+              choices=("duckduckgo", "brave", "startpage", "mojeek", "qwant"),
               # The same names `voice/websearch.py::ENGINES` gives them.
-              labels=("Google", "Яндекс", "DuckDuckGo", "Bing")),
+              labels=("DuckDuckGo", "Brave Search", "Startpage", "Mojeek",
+                      "Qwant")),
     ),
     permissions={"network.external"},
     idempotent=True,            # the same query gives the same page

@@ -23,13 +23,22 @@ TRIGGERS = (
     "search for", "search", "google", "look up",
 )
 
+#: Search engines that do not build a profile of who searches (decided
+#: 2026-10-07, after the audit). Google, Bing and Yandex were offered
+#: before, with Google by default; a privacy-first assistant handing every
+#: unrecognised phrase to an advertising profile by default contradicted
+#: itself. Brave and Mojeek keep indexes of their own; DuckDuckGo, Startpage
+#: and Qwant show others' results without tying them to a person.
 ENGINES = {
-    "google": ("Google", "https://www.google.com/search?q={q}"),
-    "yandex": ("Яндекс", "https://yandex.ru/search/?text={q}"),
     "duckduckgo": ("DuckDuckGo", "https://duckduckgo.com/?q={q}"),
-    "bing": ("Bing", "https://www.bing.com/search?q={q}"),
+    "brave": ("Brave Search", "https://search.brave.com/search?q={q}"),
+    "startpage": ("Startpage", "https://www.startpage.com/sp/search?query={q}"),
+    "mojeek": ("Mojeek", "https://www.mojeek.com/search?q={q}"),
+    "qwant": ("Qwant", "https://www.qwant.com/?q={q}"),
 }
-DEFAULT_ENGINE = "google"
+#: A stored choice that is not among these — one of the retired three —
+#: becomes this on load (`core.settings_store._retire_search_engine`).
+DEFAULT_ENGINE = "duckduckgo"
 
 
 def engine_choices():

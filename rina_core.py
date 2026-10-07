@@ -195,13 +195,13 @@ def main(argv=None):
 
     try:
         channels = open_channels(args.transport, args.session)
-        if args.transport == "stdio":
-            # A stray print() in any module would spoil a frame in the
-            # middle of its length. The transport has already taken the
-            # binary buffer, so sys.stdout itself can be pointed at the
-            # error stream: printing stays visible but does not reach the
-            # wire.
-            sys.stdout = sys.stderr
+        # A stray print() in any module would spoil a frame in the middle of
+        # its length. The transport has already taken the binary buffer, so
+        # sys.stdout itself can be pointed at the error stream: printing
+        # stays visible but does not reach the wire. In `pipe` mode as well
+        # (audit 2026-10-07, M-10): no frames travel there, but one stream
+        # read by the shell is simpler to reason about than two.
+        sys.stdout = sys.stderr
     except (TransportClosed, ValueError) as exc:
         log.error("Канал не открылся: %s", exc)
         print(f"канал не открылся: {exc}", file=sys.stderr)

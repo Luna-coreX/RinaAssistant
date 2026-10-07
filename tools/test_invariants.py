@@ -301,5 +301,40 @@ check("при включённой записи текст виден целик
 real_settings._data["log_texts"] = was_verbatim
 
 print()
+print("=== инвариант: один список зависимостей ядра ===")
+# Audit 2026-10-07, M-5: the README installed the 3.1.0 application's list —
+# Qt and a global keyboard hook, no recognition — while the release was
+# built from another. Now the build reads `requirements.txt`.
+import build_release
+
+with io.open(os.path.join(ROOT, "requirements.txt"), encoding="utf-8") as f:
+    listed = [line.split("#", 1)[0].strip() for line in f]
+listed = [line for line in listed if line]
+check("сборка ставит ровно requirements.txt",
+      build_release.CORE_REQUIREMENTS == listed,
+      f"| {build_release.CORE_REQUIREMENTS}")
+check("версии закреплены", listed and all("==" in line for line in listed),
+      f"| {[line for line in listed if '==' not in line]}")
+foreign = [line for line in listed
+           if line.split("==")[0].lower() in ("pyside6", "pynput", "pyqt5",
+                                               "pyqt6", "speechrecognition")]
+check("ни интерфейса, ни перехвата клавиатуры — ядро без окна", not foreign,
+      f"| {foreign}")
+
+print()
+print("=== инвариант: что меняет дозволенное — в журнале безопасности ===")
+# Audit 2026-10-07, L-3: the cloud provider, the online voices, the
+# work session's watching and the open microphone changed without a line.
+from core import settings_schema
+
+must_watch = {"llm_url", "llm_enabled", "llm_provider", "llm_web",
+              "log_texts", "program_folders", "watch_apps", "session_apps",
+              "session_folders", "save_history", "web_search_fallback",
+              "telemetry", "tts_engine", "check_updates", "always_listen"}
+check("каждая такая настройка в WATCHED",
+      must_watch <= settings_schema.WATCHED,
+      f"| нет: {sorted(must_watch - settings_schema.WATCHED)}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

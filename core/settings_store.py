@@ -90,8 +90,11 @@ GROUPS = {
         "check_updates": False,
         "hotkey": "Ctrl+Shift+R",
         "action_hotkeys": {},
-        "save_history": True,
-        "search_engine": "google",
+        # Off until the person says otherwise: the first-run wizard asks
+        # (decided 2026-10-07, after the audit's I-2). A profile that already
+        # exists keeps what it has — the store wrote every key.
+        "save_history": False,
+        "search_engine": "duckduckgo",
         # Off until asked for (decided 2026-09-29): an unrecognised phrase
         # opened a search engine with that phrase in it, while the product
         # page says every such thing is switched on by the person.
@@ -294,6 +297,7 @@ class SettingsStore:
         # bringing the data's shape up to the current schema version
         migrated = self._migrate_schema() or migrated
         migrated = self._retire_language() or migrated
+        migrated = self._retire_search_engine() or migrated
         migrated = self._adopt_own_persona() or migrated
 
         if migrated:
@@ -490,6 +494,22 @@ class SettingsStore:
         if self._data.get("ui_language") in LANGUAGES:
             return False
         self._data["ui_language"] = "English"
+        return True
+
+    def _retire_search_engine(self):
+        """
+        A search engine no longer offered becomes the default one.
+
+        Google, Bing and Yandex were taken off the list on 2026-10-07; a
+        profile that chose one — or merely kept the old default, Google —
+        moves to DuckDuckGo. The same way as `_retire_language`, and for
+        the same reason: the shell shows the stored value, and one outside
+        the list would be a choice the settings page cannot display.
+        """
+        from voice.websearch import DEFAULT_ENGINE, ENGINES
+        if self._data.get("search_engine") in ENGINES:
+            return False
+        self._data["search_engine"] = DEFAULT_ENGINE
         return True
 
     def _migrate_to_v2(self):

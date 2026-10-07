@@ -21,10 +21,35 @@ also has to show a group it does not recognise, for the same reason the
 settings page shows a key it does not recognise.
 """
 import os
+import shutil
 import time
 
 from core import settings_schema
 from core.i18n import t as tr
+
+
+class Local:
+    """
+    What is kept beside the settings, and who can reach it.
+
+    **The page walked the store and nothing else** (audit 2026-10-07, H-4):
+    the journals, the call journal, the copies made before a migration and
+    what the shell keeps were all on the disk and none of them on the
+    page, and «забыть всё» left a copy of the conversation in `backup-v*`
+    and a year of launched programs in `security.log`. Whatever is not a
+    key of the store reaches the page through this.
+
+    `audit` and `telemetry` are the engine's own objects, not new ones: a
+    second `Telemetry` forgot its own copy while the engine's wrote the old
+    one straight back on the next command (M-1). `shell` asks the shell —
+    `(method, payload) -> dict` — or is `None` when there is none.
+    """
+
+    def __init__(self, folder=None, audit=None, telemetry=None, shell=None):
+        self.folder = folder
+        self.audit = audit
+        self.telemetry = telemetry
+        self.shell = shell
 
 
 def _text(value, limit=300):
@@ -236,7 +261,7 @@ def _folders(settings):
     } for path in (settings.get("program_folders", []) or [])]
 
 
-def _telemetry(settings):
+def _telemetry(settings, telemetry=None):
     """
     The beta's telemetry: what is gathered now, and every report that left.
 
@@ -248,7 +273,9 @@ def _telemetry(settings):
 
     from core.telemetry import Telemetry
 
-    telemetry = Telemetry(settings)
+    # The engine's, when there is one: what is gathered lives in its memory
+    # until it is written, and the file alone showed less (L-2).
+    telemetry = telemetry or Telemetry(settings)
     out = []
     pending = telemetry.report()
     if pending is not None:
@@ -333,6 +360,129 @@ def _changed_settings(settings):
     return out
 
 
+def _size(bytes_):
+    for unit, step in (("ГБ", 1 << 30), ("МБ", 1 << 20), ("КБ", 1 << 10)):
+        if bytes_ >= step:
+            return f"{bytes_ / step:.1f} {unit}"
+    return f"{bytes_} Б"
+
+
+def _tree_size(path):
+    total = 0
+    for top, _dirs, files in os.walk(path):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(top, name))
+            except OSError:
+                pass
+    return total
+
+
+def _journals(local):
+    """
+    The journals: the core's, the security journal, the shell's.
+
+    By file, with size and the last write: what is in them is events — and
+    the security journal holds every program launched, with its path and
+    time, and the settings changed (M-9). Named here so the page stops
+    saying "this is everything" over a year of that.
+    """
+    from core.logging_setup import journals, logs_dir
+
+    folder = logs_dir()
+    items = []
+    for name in journals():
+        path = os.path.join(folder, name)
+        try:
+            items.append({"id": name, "what": name,
+                          "detail": _size(os.path.getsize(path)),
+                          "where": folder, "when": os.path.getmtime(path)})
+        except OSError:
+            continue
+    return items
+
+
+def _calls(local):
+    """The call journal (`core/audit.py`): thirty days of what was done."""
+    if local is None or local.audit is None:
+        return None
+    try:
+        count = local.audit.count()
+    except Exception:                                   # noqa: BLE001
+        return None
+    if not count:
+        return []
+    return [{"id": "all", "what": tr("Вызовов за последние 30 дней: {n}",
+                                     n=count),
+             "detail": "", "where": getattr(local.audit, "path", "") or "",
+             "when": 0.0}]
+
+
+def _backups(local):
+    """
+    Copies the store made of itself before a migration (`backup-v*`) and
+    any other `backup-*` beside it.
+
+    Whole copies of the history, the commands, the reminders as they were
+    then — the one place «забыть всё» left a conversation behind.
+    """
+    if local is None or not local.folder:
+        return None
+    items = []
+    try:
+        names = sorted(os.listdir(local.folder))
+    except OSError:
+        return []
+    for name in names:
+        path = os.path.join(local.folder, name)
+        if not (name.startswith("backup-") and os.path.isdir(path)):
+            continue
+        items.append({"id": name, "what": name,
+                      "detail": _size(_tree_size(path)), "where": path,
+                      "when": os.path.getmtime(path)})
+    return items
+
+
+def _shell_kept(local):
+    """What the shell keeps: consent to run the unsigned, the program index."""
+    if local is None or local.shell is None:
+        return None
+    try:
+        return local.shell("kept.list", {}) or {}
+    except Exception:                                   # noqa: BLE001
+        return None
+
+
+def _consents(kept):
+    if kept is None:
+        return None
+    return [{"id": str(one.get("path", "")),
+             "what": os.path.basename(str(one.get("path", ""))),
+             "detail": "", "where": str(one.get("path", "")),
+             "when": float(one.get("at") or 0.0)}
+            for one in (kept.get("consents") or [])]
+
+
+def _program_index(kept):
+    if kept is None:
+        return None
+    count = int(kept.get("index") or 0)
+    if not count:
+        return []
+    return [{"id": "all", "what": tr("Программ в списке: {n}", n=count),
+             "detail": "", "where": "", "when": 0.0}]
+
+
+def _local_groups(local):
+    """The groups beside the store, in page order. `None` — cannot be known."""
+    kept = _shell_kept(local)
+    return [("journals", _journals(local) if local is not None else None),
+            ("calls", _calls(local)),
+            ("backups", _backups(local)),
+            ("consents", _consents(kept)),
+            ("program_index", _program_index(kept))]
+
+
 def _secrets(store):
     """
     The sign-ins kept for Rina and her plugins (`4.0-H11`) — names, never
@@ -366,7 +516,7 @@ def _secrets(store):
     return items
 
 
-def inventory(settings, secrets=None):
+def inventory(settings, secrets=None, local=None):
     """
     Everything kept about a person, group by group.
 
@@ -378,12 +528,21 @@ def inventory(settings, secrets=None):
     """
     groups = []
     for name, _keys, read in GROUPS:
-        items = read(settings)
+        if name == "telemetry":
+            items = _telemetry(settings, getattr(local, "telemetry", None))
+        else:
+            items = read(settings)
         groups.append({"id": name, "count": len(items), "items": items})
 
     kept = _secrets(secrets)
     if kept is not None:
         groups.append({"id": "secrets", "count": len(kept), "items": kept})
+
+    # Beside the store. A group that cannot be known — no shell to ask —
+    # is left out rather than shown empty: empty would say "nothing kept".
+    for name, items in _local_groups(local):
+        if items is not None:
+            groups.append({"id": name, "count": len(items), "items": items})
 
     changed = _changed_settings(settings)
     groups.append({"id": "settings", "count": len(changed), "items": changed})
@@ -474,13 +633,13 @@ FORGETTABLE = {
 }
 
 
-def _forget_telemetry(settings, wanted):
+def _forget_telemetry(settings, wanted, telemetry=None):
     import io
     import json
 
     from core.telemetry import SENT_FILE, Telemetry
 
-    telemetry = Telemetry(settings)
+    telemetry = telemetry or Telemetry(settings)
     gone = 0
     if wanted is None or "pending" in wanted:
         if telemetry.report() is not None:
@@ -502,7 +661,44 @@ def _forget_telemetry(settings, wanted):
     return gone
 
 
-def forget(settings, group, ids=None, secrets=None):
+def _forget_local(local, group, wanted):
+    """Forget one of the groups beside the store. How many went; None — not one of them."""
+    if group == "journals":
+        # Only when asked through the program, never as a side effect of a
+        # bare call: the folder is wherever `APPDATA` points.
+        if local is None:
+            return 0
+        from core.logging_setup import forget_journals
+
+        return forget_journals(None if wanted is None else sorted(wanted))
+    if group == "calls":
+        if local is None or local.audit is None:
+            return 0
+        count = local.audit.count()
+        local.audit.clear()
+        return count
+    if group == "backups":
+        gone = 0
+        for item in _backups(local) or []:
+            if wanted is not None and item["id"] not in wanted:
+                continue
+            shutil.rmtree(item["where"], ignore_errors=True)
+            gone += 0 if os.path.exists(item["where"]) else 1
+        return gone
+    if group in ("consents", "program_index"):
+        if local is None or local.shell is None:
+            return 0
+        payload = ({"consents": None if wanted is None else sorted(wanted)}
+                   if group == "consents" else {"index": True})
+        try:
+            answer = local.shell("kept.forget", payload) or {}
+        except Exception:                               # noqa: BLE001
+            return 0
+        return int(answer.get("forgotten") or 0)
+    return None
+
+
+def forget(settings, group, ids=None, secrets=None, local=None):
     """
     Forget entries of one group, or the group entire.
 
@@ -522,7 +718,12 @@ def forget(settings, group, ids=None, secrets=None):
         # The records, not the choice: forgetting what was gathered and
         # sent is not the same as switching it off, and a button that did
         # both would decide the second for the person.
-        return _forget_telemetry(settings, wanted)
+        return _forget_telemetry(settings, wanted,
+                                 getattr(local, "telemetry", None))
+
+    gone_beside = _forget_local(local, group, wanted)
+    if gone_beside is not None:
+        return gone_beside
 
     if group == "secrets":
         return _forget_secrets(secrets, wanted)
@@ -605,7 +806,7 @@ def _forget_secrets(store, wanted, owners=False):
     return gone
 
 
-def forget_everything(settings, secrets=None):
+def forget_everything(settings, secrets=None, local=None):
     """
     Everything kept about a person, in one operation.
 
@@ -622,12 +823,17 @@ def forget_everything(settings, secrets=None):
     """
     gone = 0
     for group in [name for name, _keys, _read in GROUPS] + ["settings"]:
-        gone += forget(settings, group, secrets=secrets)
+        gone += forget(settings, group, secrets=secrets, local=local)
     gone += _forget_secrets(secrets, None)
+    # Beside the store (H-4). The journals last: forgetting is itself
+    # written down on the way, and what is erased should include that.
+    for group in ("calls", "backups", "consents", "program_index",
+                  "journals"):
+        gone += forget(settings, group, local=local)
     return gone
 
 
-def export(settings, secrets=None):
+def export(settings, secrets=None, local=None):
     """
     Everything kept about a person, as the contents of a file (`4.0b-B03`).
 
@@ -648,7 +854,7 @@ def export(settings, secrets=None):
     from core import data_transfer
 
     return data_transfer.envelope(data_transfer.KIND_EVERYTHING, {
-        "groups": inventory(settings, secrets),
+        "groups": inventory(settings, secrets, local),
     })
 
 

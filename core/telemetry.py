@@ -286,6 +286,13 @@ class Telemetry:
             return "failed"
         with self._lock:
             self._keep_sent(report)
+            # Switched off while the report was on its way: what left is
+            # recorded — it did leave — but nothing is gathered again. The
+            # `_load` below would otherwise make a fresh state with a fresh
+            # identifier and write it to disk with telemetry off (audit
+            # 2026-10-07, M-1).
+            if not self.enabled:
+                return "sent"
             # What was sent is not counted twice: the counts start again,
             # the identifier stays.
             state = self._load()

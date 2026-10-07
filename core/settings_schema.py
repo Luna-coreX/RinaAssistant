@@ -112,8 +112,8 @@ CONSTRAINTS: dict[str, Constraint] = {
     # with a typo.
     "program_folders": Constraint(format="folder"),
     "piper_model": Constraint(format="file"),
-    "search_engine": Constraint(choices=("google", "yandex", "duckduckgo",
-                                         "bing")),
+    "search_engine": Constraint(choices=("duckduckgo", "brave", "startpage",
+                                         "mojeek", "qwant")),
 
     # The language model: three fields are meaningless while it is off.
     "llm_url": Constraint(depends_on="llm_enabled",
@@ -197,22 +197,34 @@ CONSTRAINTS: dict[str, Constraint] = {
 #: Settings whose change is a security event.
 #:
 #: Not "all of them": the volume and the accent colour in the security
-#: journal would bury the four lines that matter. These four change what
-#: the program is allowed to do or where what it says ends up — where
-#: the language model lives, whether the journal keeps the texts of
-#: replies, which folders may be launched from, and which programs are
-#: watched.
+#: journal would bury the lines that matter. These change what the program
+#: is allowed to do or where what it says ends up — where the language
+#: model lives, whether the journal keeps the texts of replies, which
+#: folders may be launched from, and which programs are watched.
 WATCHED = frozenset({
     "llm_url",
     "llm_enabled",
     "llm_web",
+    # The provider as well as the address (audit 2026-10-07, L-3): choosing
+    # OpenRouter sends the questions to the cloud with the same address
+    # field untouched.
+    "llm_provider",
     "log_texts",
     "program_folders",
     "watch_apps",
+    # The work session's subscriptions to which programs and folders are
+    # open — the same kind of watching as `watch_apps`.
+    "session_apps",
+    "session_folders",
     "save_history",
     "web_search_fallback",
-    # What leaves the machine on its own: the beta's telemetry.
+    # What leaves the machine: the beta's telemetry, the online voices
+    # (the words of a reply go to their service) and the update check.
     "telemetry",
+    "tts_engine",
+    "check_updates",
+    # The microphone open all the time rather than on a key or the name.
+    "always_listen",
 })
 
 
@@ -384,6 +396,12 @@ def options_for(key: str, settings) -> list[dict[str, Any]]:
                   "feminine": tr("В женском роде")}
         return [{"value": form, "title": titles[form], "available": True}
                 for form in ADDRESS]
+    if key == "search_engine":
+        # By the names the engines give themselves: they are not translated.
+        from voice.websearch import ENGINES
+
+        return [{"value": engine, "title": title, "available": True}
+                for engine, (title, _url) in ENGINES.items()]
     if key == "whisper_model":
         # Whisper's list of models is fixed and known without installing
         # anything: these are names, not files that were found.

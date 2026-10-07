@@ -148,7 +148,7 @@ public sealed class CoreConnection : IAsyncDisposable
         // writing to it. Besides, 4.0-F12 is obliged to show the state of
         // the link, and the last line of the core's journal is the most
         // intelligible thing to show when it breaks.
-        _core.ErrorDataReceived += (_, e) =>
+        DataReceivedEventHandler keep = (_, e) =>
         {
             if (e.Data is null) return;
             lock (_coreLog)
@@ -157,7 +157,16 @@ public sealed class CoreConnection : IAsyncDisposable
                 while (_coreLog.Count > CoreLogLines) _coreLog.Dequeue();
             }
         };
+        _core.ErrorDataReceived += keep;
         _core.BeginErrorReadLine();
+        // The output stream too, into the same tail (audit 2026-10-07,
+        // M-10). The protocol does not travel on it in `pipe` mode, and it
+        // used to be redirected and never read: a native library — the
+        // speech engines are several — writing more than the pipe holds
+        // would block the core on that write, and from here that looks like
+        // a core that hung.
+        _core.OutputDataReceived += keep;
+        _core.BeginOutputReadLine();
 
         // The core may die without connecting — and then waiting for the
         // pipe until the deadline is pointless. We wait for both outcomes
@@ -232,13 +241,24 @@ public sealed class CoreConnection : IAsyncDisposable
     /// list.</summary>
     public async Task HandshakeAsync(CancellationToken token = default)
     {
+        // From the build rather than written here (audit 2026-10-07, L-8):
+        // the literals said "4.0.0" and "ru" whatever was running. The
+        // version is the program's (Directory.Build.props), the locale the
+        // system's — the language Rina speaks is the core's own setting.
+        var version = System.Reflection.Assembly.GetEntryAssembly()?
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion ?? "";
+        // `+<commit>` is the SDK's build metadata, not part of the version.
+        version = version.Split('+')[0];
         var hello = new JsonObject
         {
             ["protocol_versions"] = new JsonArray(ProtocolVersion.Current),
-            ["shell_version"] = "4.0.0",
+            ["shell_version"] = version,
             ["capabilities"] = new JsonArray(
                 Capabilities.Shell.Select(c => (JsonNode)c!).ToArray()),
-            ["locale"] = "ru",
+            ["locale"] = System.Globalization.CultureInfo.CurrentUICulture
+                .TwoLetterISOLanguageName,
         };
 
         var answer = await CallAsync(Methods.Hello, hello, token: token)

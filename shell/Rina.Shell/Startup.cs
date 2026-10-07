@@ -1428,6 +1428,11 @@ public partial class App
         // profile happens to hold is whatever earlier checks left in it,
         // and one of them clears the history. A check that reads somebody
         // else's leftovers passes or fails by the order it was run in.
+        //
+        // Kept only once asked for: a fresh profile does not keep the
+        // conversation until the person says so (the audit's I-2), so the
+        // check says so, as the wizard would.
+        await link.SetAsync("save_history", JsonValue.Create(true));
         await link.HandleAsync("посчитай 15 умножить на 12");
 
         string? said = null, answered = null;
@@ -2026,6 +2031,24 @@ public partial class App
         Check("и выбранный род тоже",
               wizard.FormChosen == picked, $"| «{wizard.FormChosen}»");
 
+        // Whether to keep the conversation is asked, not assumed (the
+        // audit's I-2): the box comes unticked on a fresh profile, and the
+        // answer reaches the core either way.
+        wizard.ShowFor(wizard.HistoryStep);
+        Check("история по умолчанию не отмечена",
+              wizard.HistoryTicked == false, $"| {wizard.HistoryTicked}");
+        wizard.HistoryTicked = true;
+        await wizard.KeepForCheck();
+        var historyOn = (await link.GetAsync("save_history"))?["save_history"]
+                        ?.GetValue<bool>();
+        wizard.HistoryTicked = false;
+        await wizard.KeepForCheck();
+        var historyOff = (await link.GetAsync("save_history"))?["save_history"]
+                         ?.GetValue<bool>();
+        Check("ответ про историю доходит до ядра, и отказ тоже",
+              historyOn == true && historyOff == false,
+              $"| отметили — {historyOn}, сняли — {historyOff}");
+
         // `4.0b-D05`. The beta's telemetry is off until a person says
         // otherwise, and the wizard's box is where most will say it: it
         // must come unticked on a fresh profile, and a tick — or taking it
@@ -2083,8 +2106,10 @@ public partial class App
         // something ticked" conflated the two, and went red the day the
         // developer downloaded the very model it was about: on a machine
         // that already has everything, nothing *should* be ticked.
-        Check("каталог что-то предлагает заранее, и немного",
-              wizard.Wanted.Count is > 0 and <= 3,
+        // Nothing, since 2026-10-07 (the audit's I-3): every download of
+        // the first run is the person's choice, the small Vosk included.
+        Check("каталог ничего не отмечает заранее",
+              wizard.Wanted.Count == 0,
               $"| {string.Join(", ", wizard.Wanted)}");
         Check("мастер отметил ровно то, чего ещё нет",
               wizard.TickedIds.OrderBy(x => x)
@@ -6929,6 +6954,76 @@ public partial class App
         finally
         {
             try { File.Delete(unsigned); } catch { }
+        }
+
+        // --- shortcuts are checked by what they start (audit M-3) ---
+        // In a folder that is not forbidden itself, so what is measured is
+        // the target: the profile's local data, not the temporary folder.
+        var links = Path.Combine(Environment.GetFolderPath(
+            Environment.SpecialFolder.LocalApplicationData),
+            "RinaAssistant-check-shortcuts");
+        var strayExe = Path.Combine(Path.GetTempPath(), "rina-stray.exe");
+        var ownExe = Path.Combine(links, "own-tool.exe");
+        var otherExe = Path.Combine(links, "other-tool.exe");
+        try
+        {
+            Directory.CreateDirectory(links);
+            File.WriteAllBytes(strayExe, new byte[] { 0x4D, 0x5A, 0, 0 });
+            File.WriteAllBytes(ownExe, new byte[] { 0x4D, 0x5A, 0, 0 });
+            File.WriteAllBytes(otherExe, new byte[] { 0x4D, 0x5A, 0, 1 });
+            var powershell = Path.Combine(Environment.SystemDirectory,
+                "WindowsPowerShell", "v1.0", "powershell.exe");
+
+            var toSigned = Path.Combine(links, "Блокнот.lnk");
+            Platform.Shortcut.Write(toSigned, signed);
+            Check("ярлык читается: цель и аргументы",
+                  string.Equals(Platform.Shortcut.Read(toSigned)?.Path, signed,
+                                StringComparison.OrdinalIgnoreCase),
+                  $"| {Platform.Shortcut.Read(toSigned)?.Path}");
+            Check("ярлык на подписанную программу не спрашивает «без подписи»",
+                  Platform.Launcher.Vet(toSigned, trusted: false) is { Ok: true },
+                  $"| {Platform.Launcher.Vet(toSigned, trusted: false)}");
+
+            var toStray = Path.Combine(links, "Загрузка.lnk");
+            Platform.Shortcut.Write(toStray, strayExe);
+            Check("ярлык в запрещённую папку не запускается, хоть сам и лежит не там",
+                  Platform.Launcher.Vet(toStray, trusted: true)
+                      is { Ok: false, Reason: "forbidden directory" },
+                  $"| {Platform.Launcher.Vet(toStray, trusted: true)}");
+
+            var toCommand = Path.Combine(links, "Команда.lnk");
+            Platform.Shortcut.Write(toCommand, powershell, "-Command Get-Date");
+            var command = Platform.Launcher.Vet(toCommand, trusted: false);
+            Check("подписанный интерпретатор с командой — спрашивает, о команде",
+                  command is { Ok: false, NeedsTrust: true }
+                  && command.Arguments.Contains("Get-Date"),
+                  $"| {command}");
+            var plainShell = Path.Combine(links, "Оболочка.lnk");
+            Platform.Shortcut.Write(plainShell, powershell);
+            Check("тот же интерпретатор без команды — подписан, и всё",
+                  Platform.Launcher.Vet(plainShell, trusted: false) is { Ok: true });
+
+            var toOwn = Path.Combine(links, "Своя.lnk");
+            Platform.Shortcut.Write(toOwn, ownExe);
+            var asked = Platform.Launcher.Vet(toOwn, trusted: false);
+            Check("согласие спрашивается о цели, а не о ярлыке",
+                  asked is { NeedsTrust: true }
+                  && string.Equals(asked.Subject, ownExe,
+                                   StringComparison.OrdinalIgnoreCase),
+                  $"| {asked.Subject}");
+            Platform.Trust.Remember(asked.Subject, asked.Arguments);
+            Check("«всегда» — и тот же ярлык больше не спрашивает",
+                  Platform.Launcher.Vet(toOwn, trusted: false) is { Ok: true });
+            Platform.Shortcut.Write(toOwn, otherExe);
+            Check("цель ярлыка подменили — спрашивает снова",
+                  Platform.Launcher.Vet(toOwn, trusted: false)
+                      is { NeedsTrust: true });
+            Platform.Trust.Forget(ownExe);
+        }
+        finally
+        {
+            try { Directory.Delete(links, recursive: true); } catch { }
+            try { File.Delete(strayExe); } catch { }
         }
 
         // --- the index (G04) ---

@@ -97,8 +97,13 @@ _plugins = ""
 
 def isolate_plugins():
     """
-    A plugins' directory of the checks' own: the shipped plugins and the
-    examples side by side, in a temporary folder. Returns the path.
+    A person's plugins' directory of the checks' own, in a temporary
+    folder, holding the examples. Returns the path.
+
+    It stands where the profile's `plugins` stands in the program (M-7);
+    the shipped plugins are found where they lie, beside the program, as
+    they are in the program. Copied here as well, they would be a
+    person's plugins under shipped names — which are refused.
 
     Since `4.0b-K05` the examples are not in `plugins/`: that folder is
     what ships, and the examples are for whoever writes a plugin. The
@@ -121,13 +126,12 @@ def isolate_plugins():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     _plugins = tempfile.mkdtemp(prefix="rina-plugins-")
     atexit.register(shutil.rmtree, _plugins, True)
-    for source in (os.path.join(root, "plugins"),
-                   os.path.join(root, "examples", "plugins")):
-        for name in sorted(os.listdir(source)):
-            folder = os.path.join(source, name)
-            if os.path.isfile(os.path.join(folder, "plugin.json")):
-                shutil.copytree(folder, os.path.join(_plugins, name),
-                                ignore=shutil.ignore_patterns("__pycache__"))
+    source = os.path.join(root, "examples", "plugins")
+    for name in sorted(os.listdir(source)):
+        folder = os.path.join(source, name)
+        if os.path.isfile(os.path.join(folder, "plugin.json")):
+            shutil.copytree(folder, os.path.join(_plugins, name),
+                            ignore=shutil.ignore_patterns("__pycache__"))
 
     os.environ["RINA_PLUGINS_DIR"] = _plugins
     # A plugin importing its own module as `plugins.<id>.<module>` finds it

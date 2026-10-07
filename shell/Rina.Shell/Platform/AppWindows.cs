@@ -588,26 +588,9 @@ public static class AppWindows
         if (candidate.Kind != "file") return "";
         var launch = candidate.Launch;
         if (launch.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) return launch;
-        if (!launch.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase) || !File.Exists(launch))
-            return "";
-        try
-        {
-            var type = Type.GetTypeFromProgID("WScript.Shell");
-            if (type is null) return "";
-            dynamic shell = Activator.CreateInstance(type)!;
-            try
-            {
-                dynamic link = shell.CreateShortcut(launch);
-                return (string)(link.TargetPath ?? "");
-            }
-            finally
-            {
-                Marshal.FinalReleaseComObject(shell);
-            }
-        }
-        catch
-        {
-            return "";
-        }
+        if (!launch.EndsWith(".lnk", StringComparison.OrdinalIgnoreCase)) return "";
+        // The same reading the launch checks use (`Shortcut`), rather than a
+        // second one through the scripting host.
+        return Shortcut.Read(launch)?.Path ?? "";
     }
 }

@@ -56,7 +56,9 @@ check("транзакция работает", mem.get("volume") == 42)
 
 
 def make(values):
-    settings = MemorySettings(values)
+    # History is kept only once asked for since 2026-10-07 (the audit's
+    # I-2); what is checked below is that each engine keeps its own.
+    settings = MemorySettings({"save_history": True, **values})
     engine = RinaEngine(event_bus=EventBus(), settings=settings)
     engine._speak_blocking = lambda text: None
     said = []

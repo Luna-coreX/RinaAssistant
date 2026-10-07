@@ -1477,7 +1477,8 @@ class ProtocolServer:
         if settings is None:
             return {"groups": [], "gathered_at": privacy.gathered_at()}
         return {
-            "groups": privacy.inventory(settings, self._secrets_here()),
+            "groups": privacy.inventory(settings, self._secrets_here(),
+                                        self._kept_here(settings)),
             "gathered_at": privacy.gathered_at(),
         }
 
@@ -1502,7 +1503,7 @@ class ProtocolServer:
 
         if message.payload.get("everything"):
             return {"forgotten": privacy.forget_everything(
-                settings, self._secrets_here())}
+                settings, self._secrets_here(), self._kept_here(settings))}
 
         group = str(message.payload.get("group") or "")
         if not group:
@@ -1512,7 +1513,8 @@ class ProtocolServer:
         if ids is not None and not isinstance(ids, list):
             return {"forgotten": 0}
         return {"forgotten": privacy.forget(settings, group, ids,
-                                            self._secrets_here())}
+                                            self._secrets_here(),
+                                            self._kept_here(settings))}
 
     def _privacy_export(self, message: Envelope) -> dict:
         """
@@ -1529,7 +1531,27 @@ class ProtocolServer:
         settings = self._settings()
         if settings is None:
             return {}
-        return privacy.export(settings, self._secrets_here())
+        return privacy.export(settings, self._secrets_here(),
+                              self._kept_here(settings))
+
+    def _kept_here(self, settings):
+        """
+        What lies beside the store, for the privacy page (audit 2026-10-07,
+        H-4): the data folder, the engine's own call journal and telemetry,
+        and the shell for what it keeps — when it declared it can say.
+        """
+        from core.privacy import Local
+
+        runner = getattr(self.engine, "_tools", None)
+        shell = None
+        session = getattr(self, "session", None)
+        if session is not None and session.may_call("kept.list"):
+            shell = (lambda method, payload:
+                     self.ask_shell_sync(method, payload, timeout=10.0))
+        return Local(folder=getattr(settings, "_dir", None),
+                     audit=getattr(runner, "audit", None),
+                     telemetry=getattr(self.engine, "telemetry", None),
+                     shell=shell)
 
     def _secrets_here(self):
         """The secret store, when the shell said it keeps them."""

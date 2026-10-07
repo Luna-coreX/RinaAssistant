@@ -677,6 +677,44 @@ public sealed class CoreLink : IAsyncDisposable
             return;
         }
 
+        // What the shell keeps about a person, for the privacy page (audit
+        // 2026-10-07, H-4): consent to run the unsigned, and the program
+        // index. Told and forgotten here because both live in memory too.
+        if (request.Method == "kept.list")
+        {
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["consents"] = new JsonArray(Platform.Trust.All()
+                    .OrderBy(pair => pair.Value)
+                    .Select(pair => (JsonNode)new JsonObject
+                    {
+                        ["path"] = pair.Key,
+                        ["at"] = new DateTimeOffset(DateTime.SpecifyKind(
+                            pair.Value, DateTimeKind.Utc)).ToUnixTimeSeconds(),
+                    }).ToArray()),
+                ["index"] = Platform.AppIndex.Kept(),
+            });
+            return;
+        }
+
+        if (request.Method == "kept.forget")
+        {
+            var forgotten = 0;
+            if (request.Payload.ContainsKey("consents"))
+                forgotten += Platform.Trust.ForgetMany(
+                    (request.Payload["consents"] as JsonArray)?
+                        .Select(p => p?.GetValue<string>() ?? "")
+                        .Where(p => p.Length > 0).ToList());
+            if (request.Payload["index"] is JsonValue index
+                && index.TryGetValue<bool>(out var dropIndex) && dropIndex)
+                forgotten += Platform.AppIndex.Forget();
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["forgotten"] = forgotten,
+            });
+            return;
+        }
+
         // A web address, for a search, music, or a command's "website"
         // step (audit 2026-10-07, H-2). Only http and https: see Browser.
         if (request.Method == "browser.open")
@@ -707,7 +745,7 @@ public sealed class CoreLink : IAsyncDisposable
             // shell asks, not the core: the shell has the window, and the
             // shell is what sees the signature.
             if (outcome.NeedsTrust)
-                outcome = await AskTrustAsync(launch, kind);
+                outcome = await AskTrustAsync(launch, kind, outcome);
 
             await connection.ReplyAsync(request, new JsonObject
             {
@@ -977,17 +1015,23 @@ public sealed class CoreLink : IAsyncDisposable
     /// absence of a signature. "Always trust" is remembered and is taken
     /// back in settings (<c>4.0-G10</c>).
     /// </remarks>
-    private async Task<Platform.Launcher.Outcome> AskTrustAsync(string launch,
-                                                                string kind)
+    private async Task<Platform.Launcher.Outcome> AskTrustAsync(
+        string launch, string kind, Platform.Launcher.Outcome needs)
     {
         var path = Platform.AppIndex.Canonical(launch);
+        // About what runs — a shortcut's target, with what it is handed —
+        // and remembered by that (audit 2026-10-07, M-3): a shortcut whose
+        // target is changed afterwards is asked about again.
+        var subject = needs.Subject.Length > 0 ? needs.Subject : path;
+        var arguments = needs.Arguments;
         var answer = await OnUiAsync(() =>
         {
             var source = Platform.AppIndex.Get()
                 .FirstOrDefault(e => string.Equals(
                     e.Launch, path, StringComparison.OrdinalIgnoreCase))
                 ?.Source ?? "";
-            var ask = new Pages.TrustWindow(path, source);
+            var ask = new Pages.TrustWindow(subject, source, arguments,
+                                            via: subject == path ? "" : path);
             ask.ShowDialog();
             return ask.Answer;
         });
@@ -1000,7 +1044,7 @@ public sealed class CoreLink : IAsyncDisposable
             return new Platform.Launcher.Outcome(false, "refused");
 
         if (answer == Pages.TrustWindow.Reply.Always)
-            Platform.Trust.Remember(path);
+            Platform.Trust.Remember(subject, arguments);
 
         return Platform.Launcher.Start(launch, kind, trusted: true);
     }
@@ -1025,6 +1069,15 @@ public sealed class CoreLink : IAsyncDisposable
     /// <summary>Where the core lies relative to the shell.</summary>
     public static CoreLaunch FindCore()
     {
+        // An installed copy: the core and the runtime lie beside the shell,
+        // and nothing above the program's folder is looked at (audit
+        // 2026-10-07, L-7) — a `rina_core.py` higher up is not ours.
+        var home = AppContext.BaseDirectory;
+        var shipped = Path.Combine(home, "runtime", "python", "python.exe");
+        if (File.Exists(shipped) && File.Exists(Path.Combine(home, "rina_core.py")))
+            return new CoreLaunch(shipped, Path.Combine(home, "rina_core.py"), home);
+
+        // From the source tree: the shell sits under bin\, the core at the root.
         var dir = AppContext.BaseDirectory;
         while (dir is not null && !File.Exists(Path.Combine(dir, "rina_core.py")))
             dir = Path.GetDirectoryName(dir);

@@ -55,17 +55,34 @@ public partial class TrustWindow : Window
     /// </remarks>
     public Reply Answer { get; private set; } = Reply.Never;
 
-    public TrustWindow(string path, string source = "")
+    /// <param name="path">What runs: for a shortcut, its target.</param>
+    /// <param name="source">Where the index found it.</param>
+    /// <param name="arguments">What a shortcut hands its target.</param>
+    /// <param name="via">The shortcut, when what runs is reached through one.</param>
+    public TrustWindow(string path, string source = "", string arguments = "",
+                       string via = "")
     {
         InitializeComponent();
         // It arrives rather than being simply there (`4.0b-E04`).
         Arrival.Animate(this);
 
+        // A signed host given a command is not "an unsigned program": what
+        // is unvouched for is the command (audit 2026-10-07, M-3). Said as
+        // it is, so the question reads as the one being asked.
+        if (Platform.Trust.RunsCommand(path, arguments))
+        {
+            Headline.Text = S("Ярлык запускает команду");
+            Why.Text = S("Программа, которая выполняет любые команды, получит вот эту. Подпись программы ничего не говорит о самой команде.");
+        }
+
         AppName.Text = Path.GetFileName(path);
-        AppPath.Text = path;
-        AppSource.Text = source.Length > 0
+        AppPath.Text = arguments.Length > 0 ? $"{path} {arguments}" : path;
+        var where = source.Length > 0
             ? S("Источник: {0}", source)
             : S("Источник неизвестен");
+        AppSource.Text = via.Length > 0
+            ? where + "\n" + S("Через ярлык: {0}", via)
+            : where;
     }
 
     private void OnOnce(object sender, RoutedEventArgs e) => Decide(Reply.Once);

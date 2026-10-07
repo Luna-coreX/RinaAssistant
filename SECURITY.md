@@ -35,16 +35,19 @@ then refuse. A plugin can reach the application for exactly two things: saying
 a line, and reading its own setting. Every call has a deadline; a plugin that
 does not answer is treated as broken and stopped, and its neighbours keep
 working. On installation the identifier is checked, the folder it unpacks into
-must land directly inside `plugins/`, names Windows reserves for devices are
-refused, and a replacement is forced back to disabled instead of inheriting
-the old plugin's "enabled".
+must land directly inside the plugins folder in your profile, names Windows
+reserves for devices and names of the plugins that ship with Rina are refused,
+and a replacement is forced back to disabled instead of inheriting the old
+plugin's "enabled".
 
 **What it does not give you, and this is the part that matters.** A separate
 process is not a sandbox. The plugin runs under the same interpreter with the
 same rights as you have, and `subprocess` inside it still works. What was
 taken away is its access to *the application*, not its access to *the
 machine*. A plugin's permissions are honest about our tools and promise
-nothing whatsoever about Python.
+nothing whatsoever about Python. That includes saved secrets: through the
+plugin API a plugin can ask only for its own, but nothing stops its code from
+reading the Windows Credential Manager the way any program you run can.
 
 So installing a plugin remains exactly as consequential as running a
 downloaded program, and should be treated that way. The real boundary is
@@ -60,6 +63,8 @@ A command file can name any program to launch, so importing one is treated as un
 
 Shutdown, restart and sleep are never performed on a single recognised phrase. Speech recognition mishears; a confirmation step means a misheard word cannot power off the machine.
 
+The same holds for your own commands: a command with an irreversible step anywhere in it — inside a branch, a loop, or another command it calls — asks before it runs, whether started by voice or by the «Выполнить» button. «Проверить» skips such a step and says so. The shell refuses the action as well unless the core passes the confirmation along, so the question cannot be lost between the two.
+
 ### Text from outside is never markup
 
 Model replies, recognised speech, plugin output and plugin manifests are rendered as plain text. Otherwise a crafted string could make the interface fetch a remote resource — on Windows, an SMB path is enough to leak an authentication attempt.
@@ -70,22 +75,33 @@ Requests go only to the address in settings, `http://localhost:11434` unless you
 
 ### System programs are launched by absolute path
 
-Windows searches the current directory when a program is named without a path. Every system utility the application invokes is resolved through `%SystemRoot%` first, so a file dropped next to the application cannot take its place.
+Windows searches the current directory when a program is named without a path. Every system utility the application invokes is resolved through `%SystemRoot%` first, so a file dropped next to the application cannot take its place. An installed copy runs its core with the Python it ships, by full path, and looks for nothing above its own folder; only a copy run from the source tree takes the project's `venv`, and failing that, `python` from `PATH`.
 
 ### You can see everything that is kept about you
 
 A page in the application — Privacy → *What Rina knows about me* — lists every
 kind of thing stored locally: the words you taught her, the conversation, your
 reminders, things to do, your own commands, how often each has run, plugins,
-the folders you pointed at, and which settings you changed. Every entry can be
+the folders you pointed at, which settings you changed, saved sign-ins (that
+they exist, never the values), beta telemetry, and what lies beside the
+settings: the journals — the security journal records every program launched,
+with its path and time, and changed settings — the call journal, the copies the
+program made of your data before updating its storage format, the unsigned
+programs you allowed, and the list of installed programs. Every entry can be
 removed one at a time, a group at a time, a day at a time, or all at once; and
 all of it can be written out to a file, either as data or as text you can
 read.
 
-The list is assembled by walking the store rather than from a list somebody
-maintains, so a kind of data added later appears on that page without anybody
-having to remember to add it. If you find something stored that the page does
-not show, that is a defect and worth reporting.
+The settings store is walked rather than listed, so a kind of data added to
+it later appears on that page without anybody having to remember to add it.
+What lies beside the store — the journals, the backups, what the shell keeps —
+is named in code, and a check erases everything and then searches the whole
+data folder for anything you said. If you find something stored that the page
+does not show, that is a defect and worth reporting.
+
+One thing is deliberately not on it: the speech and recognition models you
+downloaded. They are files from their publishers, not anything about you, and
+they are removed by uninstalling or from the model settings.
 
 ### She can tell you why she did something
 
@@ -106,6 +122,12 @@ The application writes a log to `%APPDATA%/RinaAssistant/logs/`, and keeps a
 journal of tool calls next to it. **Neither records what you said** — only how
 long it was — unless you explicitly enable "Log message texts" in
 Settings → Privacy.
+
+They do record what was done. The journals in the same folder list every
+program launched, with its full path and time, and changes to the settings
+that matter for security — the folders Rina searches, the model's address
+and the like — with their new values. All of it is on the privacy page and
+can be erased there.
 
 The rule for the call journal is not a list of exceptions but a property of
 each argument: a value chosen from a fixed set is written down as it stands,

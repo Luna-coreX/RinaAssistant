@@ -74,6 +74,10 @@ public static class Methods
     public const string HistoryList = "history.list";
     /// <summary>Базовый метод.</summary>
     public const string HotkeysActions = "hotkeys.actions";
+    /// <summary>Возможность: kept.</summary>
+    public const string KeptForget = "kept.forget";
+    /// <summary>Возможность: kept.</summary>
+    public const string KeptList = "kept.list";
     /// <summary>Базовый метод.</summary>
     public const string ModelsCatalogue = "models.catalogue";
     /// <summary>Базовый метод.</summary>
@@ -201,6 +205,8 @@ public static class Methods
             ["history.export"] = "history",
             ["history.list"] = "history",
             ["hotkeys.actions"] = null,
+            ["kept.forget"] = "kept",
+            ["kept.list"] = "kept",
             ["models.catalogue"] = null,
             ["models.fetch"] = null,
             ["permission.request"] = "permissions",
@@ -468,6 +474,8 @@ public static class Capabilities
     public const string Commands = "commands";
     /// <summary>Объявляет core.</summary>
     public const string History = "history";
+    /// <summary>Объявляет shell.</summary>
+    public const string Kept = "kept";
     /// <summary>Объявляет core.</summary>
     public const string Llm = "llm";
     /// <summary>Объявляет shell.</summary>
@@ -506,6 +514,7 @@ public static class Capabilities
         "audio.input",
         "audio.output",
         "browser",
+        "kept",
         "permissions",
         "secrets",
         "system",

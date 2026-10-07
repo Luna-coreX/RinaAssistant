@@ -70,11 +70,13 @@ class Model:
         self.note = note
         #: Ticked by default in the setup wizard.
         #:
-        #: Only the small one. The full Russian Vosk is nearly two
-        #: gigabytes, and a box ticked in advance is a box a person does not
-        #: read: they would agree to that download by not noticing it. What
-        #: is offered ready-ticked has to be something nobody minds having
-        #: agreed to.
+        #: Nothing is, since 2026-10-07 (decided after the audit's I-3).
+        #: It used to be the small Vosk and its package — small, so that
+        #: nobody would mind having agreed to it. But a box ticked in advance
+        #: is a box a person does not read, and that download was the one
+        #: network action of the first run nobody chose. The flag stays in
+        #: the catalogue and on the wire; `tools/test_setup.py` holds that it
+        #: is set for nothing.
         self.wanted = wanted
 
     @property
@@ -93,7 +95,6 @@ CATALOGUE = (
           url="https://alphacephei.com/vosk/models/"
               "vosk-model-small-ru-0.22.zip",
           setting="vosk_model",
-          wanted=True,
           note="Быстрый и нетребовательный. Хватает для команд."),
     Model("vosk-ru-full", "Vosk: русский, полный", "vosk",
           size=1938 * 1024 * 1024,
@@ -161,7 +162,6 @@ class Package:
 PACKAGES = (
     Package("pkg-vosk", "Пакет Vosk", "vosk", "vosk", "vosk",
             size=14 * 1024 * 1024,
-            wanted=True,
             note="Нужен, чтобы модель Vosk заработала."),
     Package("pkg-whisper", "Пакет Whisper", "faster-whisper",
             "faster_whisper", "whisper",

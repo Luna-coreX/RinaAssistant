@@ -22,12 +22,11 @@ switched on here, once, at build time — a person who unpacks `embed` by
 hand gets **something different**, and this has to be looked at as part of
 the build rather than as configuring an environment.
 
-**The core's dependencies are not the 3.1.0 application's.** The first line
-of `requirements.txt` is PySide6, and the core does not need it at all:
-`rina_core.py` checks that with `check_headless()`. The list below is put
-together from what the core actually imports, and it is short — the core
-has not one heavy module-level import, and the engines are loaded on
-demand.
+**The core's dependencies are not the 3.1.0 application's.** That one began
+with PySide6, and the core does not need it at all: `rina_core.py` checks
+that with `check_headless()`. `requirements.txt` is put together from what
+the core actually imports, and it is short — the core has not one heavy
+module-level import, and the engines are loaded on demand.
 
 To run:
     python tools/build_release.py                build everything
@@ -63,37 +62,32 @@ PYTHON_ZIP = (f"https://www.python.org/ftp/python/{PYTHON_VERSION}/"
 #: `pip` is not part of `embed`; we take the official installer.
 GET_PIP = "https://bootstrap.pypa.io/get-pip.py"
 
-#: What the **core** needs, not the 3.1.0 application.
-#:
-#: A bare core comes up on the standard library alone: everything heavy is
-#: imported lazily and every import is wrapped in a "no such engine"
-#: refusal. Here is what it works without but noticeably worse: reading
-#: sound files for synthesis, and parsing PCM.
-CORE_REQUIREMENTS = [
-    "numpy>=1.24",
-    "soundfile>=0.12",
-    # Recognition, and it has to be in the build: until it was, every copy
-    # of Rina that anybody assembled was deaf to speech — not only on the
-    # developer's machine. Nothing said so, because nothing checked that a
-    # built runtime can recognise anything (`check_release.py` does now).
-    #
-    # `faster-whisper` and not `openai-whisper`: the latter weighs a
-    # megabyte and pulls in torch, whose wheel is over five hundred and
-    # bundles CUDA. Same models, no torch, and quicker on a processor.
-    "faster-whisper>=1.0",
-    # And a voice, by the same argument as the line above — which was
-    # written about recognition and turned out to be true, word for word,
-    # about speech. Until this line every copy anybody assembled was
-    # **mute**: the runtime carried what decodes sound and nothing that
-    # makes it. Found by a person installing on a second computer.
-    #
-    # `edge-tts` and not Piper: four megabytes against a hundred and
-    # twenty, and no model to fetch. It is not switched on by it being
-    # here — `tts_engine` starts at `silent`, and choosing Edge is
-    # choosing to send the words of a reply to Microsoft. What ships is
-    # the ability, not the decision.
-    "edge-tts>=6.1",
-]
+def core_requirements():
+    """
+    What the **core** needs, not the 3.1.0 application: `requirements.txt`.
+
+    A bare core comes up on the standard library alone: everything heavy is
+    imported lazily and every import is wrapped in a "no such engine"
+    refusal. The file lists what it works without but noticeably worse, and
+    why each is there.
+
+    **Read from the file rather than kept here** (audit 2026-10-07, M-5).
+    There used to be two lists: this one, which the release was built with,
+    and `requirements.txt`, which the README told a developer to install —
+    and that one was still the 3.1.0 application's, Qt and a global
+    keyboard hook included, with no recognition at all. One list cannot
+    disagree with itself.
+    """
+    wanted = []
+    with io.open(os.path.join(ROOT, "requirements.txt"), encoding="utf-8") as f:
+        for line in f:
+            line = line.split("#", 1)[0].strip()
+            if line:
+                wanted.append(line)
+    return wanted
+
+
+CORE_REQUIREMENTS = core_requirements()
 
 #: What travels from the project tree into the release.
 CORE_TREE = ["core", "voice", "plugins"]
@@ -273,6 +267,27 @@ def copy_core(out):
     for name in CORE_FILES:
         shutil.copy2(name, os.path.join(out, name))
     say("ядро скопировано", ", ".join(CORE_TREE + CORE_FILES))
+    write_shipped_list(os.path.join(out, "plugins"))
+
+
+def write_shipped_list(folder):
+    """
+    Name the shipped plugins beside them (`plugins/shipped.json`).
+
+    After an update the program's `plugins` holds what this build put
+    there and, from before M-7, what a person installed. The core moves
+    the second kind to the profile on start (`plugins.manager`), and this
+    list is how it tells the two apart: by name, from the build that knows,
+    rather than guessed on the person's machine.
+    """
+    import json
+
+    names = sorted(n for n in os.listdir(folder)
+                   if os.path.isfile(os.path.join(folder, n, "plugin.json")))
+    with io.open(os.path.join(folder, "shipped.json"), "w",
+                 encoding="utf-8") as f:
+        json.dump(names, f, ensure_ascii=False)
+    say("плагины поставки названы", ", ".join(names))
 
 
 def measure(out):

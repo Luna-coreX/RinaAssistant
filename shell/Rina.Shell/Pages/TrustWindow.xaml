@@ -14,10 +14,10 @@
           BorderBrush="{DynamicResource C.Signal}" BorderThickness="2"
           CornerRadius="{StaticResource Radius.Window}" Padding="24">
     <StackPanel>
-      <TextBlock Text="{loc:S 'Эта программа не подписана'}"
+      <TextBlock x:Name="Headline" Text="{loc:S 'Эта программа не подписана'}"
                  Style="{StaticResource Text.Title}" Margin="0,0,0,12" />
 
-      <TextBlock Text="{loc:S 'Никто не подтвердил, кто её выпустил и что её не подменяли.'}"
+      <TextBlock x:Name="Why" Text="{loc:S 'Никто не подтвердил, кто её выпустил и что её не подменяли.'}"
                  Style="{StaticResource Text.Body}" TextWrapping="Wrap"
                  Margin="0,0,0,16" />
 
