@@ -301,5 +301,26 @@ check("при включённой записи текст виден целик
 real_settings._data["log_texts"] = was_verbatim
 
 print()
+print("=== инвариант: один список зависимостей ядра ===")
+# Audit 2026-10-07, M-5: the README installed the 3.1.0 application's list —
+# Qt and a global keyboard hook, no recognition — while the release was
+# built from another. Now the build reads `requirements.txt`.
+import build_release
+
+with io.open(os.path.join(ROOT, "requirements.txt"), encoding="utf-8") as f:
+    listed = [line.split("#", 1)[0].strip() for line in f]
+listed = [line for line in listed if line]
+check("сборка ставит ровно requirements.txt",
+      build_release.CORE_REQUIREMENTS == listed,
+      f"| {build_release.CORE_REQUIREMENTS}")
+check("версии закреплены", listed and all("==" in line for line in listed),
+      f"| {[line for line in listed if '==' not in line]}")
+foreign = [line for line in listed
+           if line.split("==")[0].lower() in ("pyside6", "pynput", "pyqt5",
+                                               "pyqt6", "speechrecognition")]
+check("ни интерфейса, ни перехвата клавиатуры — ядро без окна", not foreign,
+      f"| {foreign}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)

@@ -40,14 +40,18 @@ any of it.
 
 ## Try it in five minutes
 
-Requires **Windows**, **Python 3.10+** and **.NET 9**.
+Requires **Windows**, **Python 3.12** and **.NET 9**.
 
 ```bash
 git clone https://github.com/Luna-coreX/RinaAssistant.git
 cd RinaAssistant
-pip install -r requirements.txt
+python -m venv venv
+venv\Scripts\python -m pip install -r requirements.txt
 dotnet run --project shell/Rina.Shell -c Release
 ```
+
+`requirements.txt` is the core's list, with the same pinned versions the
+installer ships; the shell finds the `venv` by itself.
 
 `-c Release` matters: the living background and the figure are computed on
 the processor, and a Debug build does that three to four times slower —
@@ -229,9 +233,10 @@ only then whatever is in `PATH`. The voices and the recognition models are
 installed **in the environment**, so a core started with "just python" comes up
 and honestly reports that it has no engines.
 
-Voice engines are optional and listed in `requirements.txt`. The first-run
-wizard installs the ones you pick; you can also install them by hand. Some
-(Vosk, Piper) need a model file, which the wizard downloads.
+`requirements.txt` brings recognition (faster-whisper) and one online voice
+(Edge, off until you choose it). The other engines are optional and not in
+it: the first-run wizard installs the ones you pick. Some (Vosk, Piper) need
+a model file, which the wizard downloads too.
 
 ### Optional: local AI answers
 

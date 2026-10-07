@@ -1,24 +1,29 @@
-PySide6>=6.6
+# What the core needs: the same list the release's runtime is built with
+# (`tools/build_release.py` reads this file). One list, so the environment a
+# developer runs and the one a person gets cannot drift apart.
+#
+# Versions are pinned: "the one we tested against" is a particular number.
+# Raising one is a release decision, checked by `python tools/regress.py`.
+#
+# Not here, on purpose:
+# - the shell (.NET) — it draws the window; the core runs headless, no Qt;
+# - the optional engines — Vosk, Piper, Whisper models: the first-run wizard
+#   installs the ones a person picks;
+# - the 3.1.0 application's list — `archive/3.1.0-app/requirements.txt`.
+#
+# The packages these pull in are not pinned yet; a full lock with hashes is
+# planned for 4.0.0 Stable.
 
-# --- Опционально: глобальная горячая клавиша ---
-pynput>=1.7
+# Reading and writing sound for synthesis; parsing PCM.
+numpy==2.4.6
+soundfile==0.14.0
 
-# --- Аудио-ввод (микрофон) без PyAudio ---
-sounddevice>=0.4
-numpy>=1.24
-soundfile>=0.12        # для воспроизведения аудио (TTS)
+# Recognition. `faster-whisper` and not `openai-whisper`: the same models
+# without torch, whose wheel is over five hundred megabytes and bundles CUDA.
+# Until it was in the build, every copy of Rina anybody assembled was deaf.
+faster-whisper==1.2.1
 
-# ============ TTS (озвучка) — любой на выбор ============
-pyttsx3>=2.98          # офлайн, системный
-edge-tts>=6.1          # онлайн, нейросетевые голоса (рекомендуется)
-# gTTS>=2.5            # онлайн, Google
-# piper-tts            # офлайн нейро (нужна .onnx-модель)
-
-# ============ STT (распознавание) — любой на выбор ============
-SpeechRecognition>=3.10   # для Google и Sphinx
-# vosk>=0.3.45         # офлайн (нужна модель)
-# openai-whisper       # офлайн, точный (скачивает модель сам)
-# pocketsphinx         # офлайн, лёгкий
-
-# --- выбор аудио-устройств и тест микрофона ---
-# (уже покрыто sounddevice + numpy выше)
+# A voice, by the same argument: until this line every built copy was mute.
+# It is not switched on by being here: `tts_engine` starts at `silent`, and
+# choosing Edge is choosing to send the words of a reply to Microsoft.
+edge-tts==7.2.8
