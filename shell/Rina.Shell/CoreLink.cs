@@ -553,7 +553,13 @@ public sealed class CoreLink : IAsyncDisposable
             int? level = request.Payload["level"] is JsonValue given
                          && given.TryGetValue<int>(out var number)
                 ? number : null;
-            var (ok, detail) = Platform.Machine.Do(action, level);
+            // The second lock (audit 2026-10-07, H-1): irreversible only
+            // with the core's word that the person confirmed it.
+            var confirmed = request.Payload["confirmed"] is JsonValue said
+                            && said.TryGetValue<bool>(out var yes) && yes;
+            var refused = Platform.Machine.Gate(action, confirmed);
+            var (ok, detail) = refused is null
+                ? Platform.Machine.Do(action, level) : (false, refused);
             Platform.Journal.Action(action, ok);
             await connection.ReplyAsync(request, new JsonObject
             {
@@ -667,6 +673,20 @@ public sealed class CoreLink : IAsyncDisposable
             await connection.ReplyAsync(request, new JsonObject
             {
                 ["answer"] = answer,
+            });
+            return;
+        }
+
+        // A web address, for a search, music, or a command's "website"
+        // step (audit 2026-10-07, H-2). Only http and https: see Browser.
+        if (request.Method == "browser.open")
+        {
+            var (opened, why) = Platform.Browser.Open(
+                request.Payload["url"]?.GetValue<string>() ?? "");
+            await connection.ReplyAsync(request, new JsonObject
+            {
+                ["ok"] = opened,
+                ["reason"] = why,
             });
             return;
         }

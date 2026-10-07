@@ -214,10 +214,12 @@ class ReferenceCore:
                     return dict(back.payload)
         return {}
 
-    def _ask_shell_do(self, action, level=None):
+    def _ask_shell_do(self, action, level=None, confirmed=False):
         payload = {"action": action}
         if level is not None:
             payload["level"] = level
+        if confirmed:
+            payload["confirmed"] = True
         answer = self._round_trip("system.do", payload)
         return bool(answer.get("ok")), str(answer.get("detail", ""))
 

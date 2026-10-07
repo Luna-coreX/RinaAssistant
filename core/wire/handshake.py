@@ -125,6 +125,11 @@ _CAPABILITY_LIST = (
     Capability("windows", Side.SHELL, ("windows.do",),
                "окна других программ: закрыть, свернуть, развернуть "
                "(4.0b-K08)"),
+    # The browser was the one thing on the machine the core still touched
+    # itself (audit 2026-10-07, H-2): a search, music, a command's
+    # "website" step. Only http and https — the shell refuses the rest.
+    Capability("browser", Side.SHELL, ("browser.open",),
+               "открыть веб-адрес в браузере по умолчанию, только http и https"),
     # --- declared by the core ---
     Capability("stt", Side.CORE,
                ("speech.listen_once", "speech.set_always_listen"),

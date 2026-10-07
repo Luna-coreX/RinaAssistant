@@ -6953,6 +6953,30 @@ public partial class App
         Check("необратимое помечено",
               Platform.Machine.Irreversible.Contains("shutdown")
               && !Platform.Machine.Irreversible.Contains("volume_up"));
+        // Not run — the gate is asked, the machine is not touched.
+        Check("второй замок: необратимое без подтверждения — отказ",
+              Platform.Machine.Gate("shutdown", confirmed: false) is not null
+              && Platform.Machine.Gate("sleep", confirmed: false) is not null);
+        Check("с подтверждением и обычное — пропускается",
+              Platform.Machine.Gate("shutdown", confirmed: true) is null
+              && Platform.Machine.Gate("volume_up", confirmed: false) is null);
+
+        // --- the browser (audit 2026-10-07, H-2) ---
+        Check("браузер открывает только http и https",
+              Platform.Browser.Allowed("https://duckduckgo.com/?q=x") is not null
+              && Platform.Browser.Allowed("http://example.org") is not null
+              && Platform.Browser.Allowed("file:///C:/Windows/System32/calc.exe") is null
+              && Platform.Browser.Allowed("ms-settings:privacy") is null
+              && Platform.Browser.Allowed("javascript:alert(1)") is null
+              && Platform.Browser.Allowed("C:\\Windows\\notepad.exe") is null);
+        Check("адрес с логином внутри — отказ",
+              Platform.Browser.Allowed("https://bank.example@evil.example/") is null);
+
+        // --- a folder is opened, not run ---
+        Check("папки, которой нет, — отказ назван",
+              Platform.Launcher.Start(Path.Combine(Path.GetTempPath(),
+                  "rina-нет-такой-" + Guid.NewGuid().ToString("N")), "folder",
+                  trusted: false) is { Ok: false, Reason: "the folder is gone" });
 
         // --- the brightness (`4.0b-K04`) ---
         //

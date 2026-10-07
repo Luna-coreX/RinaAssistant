@@ -143,6 +143,19 @@ public static class Machine
     public static readonly HashSet<string> Irreversible =
         ["sleep", "shutdown", "restart"];
 
+    /// <summary>
+    /// The second lock: an irreversible action that arrived unconfirmed is
+    /// refused here. Null — may go ahead.
+    /// </summary>
+    /// <remarks>
+    /// The list above said "so the shell can refuse", and nothing refused:
+    /// <c>system.do</c> ran whatever it was named. The core marks an action
+    /// it has a redeemed confirmation for with <c>confirmed</c>; a path
+    /// that forgot to ask arrives without it and stops here.
+    /// </remarks>
+    public static string? Gate(string action, bool confirmed) =>
+        Irreversible.Contains(action) && !confirmed ? "not confirmed" : null;
+
     private static void Tap(byte key)
     {
         keybd_event(key, 0, 0, UIntPtr.Zero);

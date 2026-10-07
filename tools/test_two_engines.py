@@ -61,7 +61,7 @@ def make():
     # is the whole point of the check: a request must not go to the wrong
     # one.
     done = []
-    engine.system_out = lambda action: (done.append(action), (True, ""))[1]
+    engine.system_out = lambda action, **_extra: (done.append(action), (True, ""))[1]
     engine.did = done
     return engine, said, events
 

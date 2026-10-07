@@ -108,10 +108,19 @@ class Core:
             "web_search_fallback": False})
         self.engine = RinaEngine(settings=self.settings, event_bus=EventBus())
         self.engine.voice_out = lambda text, **kw: None
+        # The shell, as it answers `system.do`: what it was asked, and
+        # whether the core said the person confirmed it (the second lock).
+        self.engine.system_out = self._shell
+        self.marked = []
         self.said = []
         self.engine.bus.on(Events.RESPONSE,
                            lambda data: self.said.append(data["text"]))
         box.actions.clear()
+
+    def _shell(self, action, **extra):
+        box.actions.append(action)
+        self.marked.append((action, bool(extra.get("confirmed"))))
+        return True, ""
 
 
 MORNING = {"id": "cmd_morning", "enabled": True, "type": "sequence",
@@ -141,6 +150,8 @@ check("и назвала, что именно", any("выключить комп
 core.engine.handle_command("да", source="typed")
 check("после «да» — выполнено", until(lambda: "shutdown" in box.actions),
       f"| {box.actions}")
+check("и оболочке сказано, что подтверждено — второй замок пропустит",
+      ("shutdown", True) in core.marked, f"| {core.marked}")
 
 box.actions.clear()
 core.engine.handle_command("доброе утро", source="typed")

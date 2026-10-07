@@ -285,7 +285,7 @@ _MEDIA = {"next": "media_next", "previous": "media_prev",
           "play_pause": "media_play_pause"}
 
 
-def _run_system(ctx, action_id):
+def _run_system(ctx, action_id, confirmed=False):
     """
     Perform a system action — by the shell's hands (ADR 0009).
 
@@ -302,7 +302,12 @@ def _run_system(ctx, action_id):
     from voice import system_control
 
     do = getattr(ctx, "system_out", None)
-    ok, detail = do(action_id) if do else (False, NO_SHELL)
+    if do is None:
+        ok, detail = False, NO_SHELL
+    elif confirmed:
+        ok, detail = do(action_id, confirmed=True)
+    else:
+        ok, detail = do(action_id)
 
     # "There is nobody to ask" and "we asked and it did not work" are
     # different things, and a person is told different things. The first
@@ -339,7 +344,9 @@ def _lock_screen(ctx, args):
 
 
 def _power_action(ctx, args):
-    return _run_system(ctx, args["action"])
+    # `power_action` is `confirm_required`: it is reached only with a
+    # redeemed confirmation, and says so to the shell.
+    return _run_system(ctx, args["action"], confirmed=True)
 
 
 def _take_screenshot(ctx, args):
@@ -725,7 +732,12 @@ def _scenario(ctx):
             "say": getattr(ctx, "say", None),
             "call_block": getattr(ctx, "call_block", None),
             "block_effect": getattr(ctx, "block_effect", None),
-            "windows": getattr(ctx, "windows_out", None)}
+            "windows": getattr(ctx, "windows_out", None),
+            # The shell's hands for a command's own steps (H-2): a program,
+            # a folder, a site, a system action.
+            "launch": getattr(ctx, "launch_app", None),
+            "open_url": getattr(ctx, "open_url", None),
+            "system": getattr(ctx, "system_out", None)}
 
 
 def _start_sequence(ctx, command, scenario, silent=None):

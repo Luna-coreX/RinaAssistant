@@ -179,6 +179,10 @@ class ProtocolServer:
         # A new command silences the answer to the previous one.
         engine.hush_out = self.hush
         engine.launch_out = self.launch_app
+        # A web address — the shell's like the rest of the machine (H-2).
+        # Declared on the engine since 4.0-G and never set: every search
+        # opened the browser from the core.
+        engine.browser_out = self.open_url
         # What is going on outside the command (`4.0b-A09`): which program
         # is in front, whether one is running. The shell has the machine
         # (ADR 0009); the core asks when a condition needs it and keeps
@@ -2007,8 +2011,16 @@ class ProtocolServer:
             return False, str(exc)
         return bool(answer.get("ok")), str(answer.get("reason", ""))
 
-    def do_system(self, action: str, level: int | None = None
-                  ) -> tuple[bool, str]:
+    def open_url(self, url: str) -> tuple[bool, str]:
+        """Ask the shell to open a web address (H-2)."""
+        try:
+            answer = self.ask_shell_sync("browser.open", {"url": url})
+        except ProtocolFault as exc:
+            return False, str(exc)
+        return bool(answer.get("ok")), str(answer.get("reason", ""))
+
+    def do_system(self, action: str, level: int | None = None,
+                  confirmed: bool = False) -> tuple[bool, str]:
         """
         Ask the shell to perform a system action.
 
@@ -2021,6 +2033,10 @@ class ProtocolServer:
         # shell that predates it simply never sees one.
         if level is not None:
             payload["level"] = int(level)
+        # The core's word that the person confirmed it: the shell refuses an
+        # irreversible action without it — the second lock (H-1).
+        if confirmed:
+            payload["confirmed"] = True
         try:
             answer = self.ask_shell_sync("system.do", payload)
         except ProtocolFault as exc:

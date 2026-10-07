@@ -83,8 +83,12 @@ class Session:
                            lambda data: self.said.append(data["text"]))
         self.engine.voice_out = lambda text, **kw: None
         self.launched = []
-        self.engine.launch_app = lambda path: (
+        # The shell's hands, where a command's steps go since the audit of
+        # 2026-10-07 (H-2): a launch and a web address.
+        self.engine.launch_out = lambda path, kind="file": (
             self.launched.append(path), (True, ""))[1]
+        self.engine.browser_out = lambda url: (
+            opened.append(url), (True, ""))[1]
 
     def try_card(self, card):
         """Through the executor, synchronously — the thread is the engine's."""
@@ -168,8 +172,6 @@ class Opener:
         return True
 
 
-was = user_commands.webbrowser
-user_commands.webbrowser = Opener
 try:
     s = Session()
     s.try_card({
@@ -216,7 +218,7 @@ try:
     check("карточка из трёхсот шагов усечена до пятидесяти",
           len(opened) == 50, f"| открыто {len(opened)}")
 finally:
-    user_commands.webbrowser = was
+    pass
 
 print()
 print("ИТОГО ошибок:", fails)
