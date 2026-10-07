@@ -322,5 +322,19 @@ check("ни интерфейса, ни перехвата клавиатуры �
       f"| {foreign}")
 
 print()
+print("=== инвариант: что меняет дозволенное — в журнале безопасности ===")
+# Audit 2026-10-07, L-3: the cloud provider, the online voices, the
+# work session's watching and the open microphone changed without a line.
+from core import settings_schema
+
+must_watch = {"llm_url", "llm_enabled", "llm_provider", "llm_web",
+              "log_texts", "program_folders", "watch_apps", "session_apps",
+              "session_folders", "save_history", "web_search_fallback",
+              "telemetry", "tts_engine", "check_updates", "always_listen"}
+check("каждая такая настройка в WATCHED",
+      must_watch <= settings_schema.WATCHED,
+      f"| нет: {sorted(must_watch - settings_schema.WATCHED)}")
+
+print()
 print("ИТОГО ошибок:", fails)
 sys.exit(1 if fails else 0)
