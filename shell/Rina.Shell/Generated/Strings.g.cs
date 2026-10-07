@@ -332,10 +332,10 @@ public static partial class Loc
                 {
                     ["English"] = "version {0}",
                 },
-            ["Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки."] =
+            ["Версия программы и Windows, язык интерфейса, сколько дней идёт подсчёт; выбранные движки распознавания и озвучки, включены ли ответы моделью и постоянное слушание, своя ли у Рины личность; какие команды и инструменты срабатывали и сколько раз, коды ошибок и короткие причины отказов, время распознавания и первого звука; случайный номер установки."] =
                 new Dictionary<string, string>
                 {
-                    ["English"] = "The program and Windows versions, which commands and tools ran and how often, error codes, recognition and first-sound times, a random installation number.",
+                    ["English"] = "The program and Windows versions, the interface language, how many days counting has run; the chosen recognition and speech engines, whether model answers and always-on listening are on, whether Rina has a persona of your own; which commands and tools ran and how often, error codes and short reasons for refusals, recognition and first-sound times; a random installation number.",
                 },
             ["вид"] =
                 new Dictionary<string, string>
@@ -1221,6 +1221,11 @@ public static partial class Loc
                 {
                     ["English"] = "Short signals: heard you, went wrong",
                 },
+            ["Кто видит ваш адрес"] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "Who sees your address",
+                },
             ["Куда сохранить диагностический пакет"] =
                 new Dictionary<string, string>
                 {
@@ -1798,6 +1803,11 @@ public static partial class Loc
                 new Dictionary<string, string>
                 {
                     ["English"] = "Send the beta's anonymous statistics",
+                },
+            ["Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до суток."] =
+                new Dictionary<string, string>
+                {
+                    ["English"] = "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to a day.",
                 },
             ["Очистить"] =
                 new Dictionary<string, string>

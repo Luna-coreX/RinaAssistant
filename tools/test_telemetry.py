@@ -137,6 +137,43 @@ check("в нём ровно оговорённые поля",
       set(report) == {"schema", "install", "app", "os", "language", "days",
                       "engines", "features", "tools", "errors", "reasons",
                       "timings"}, f"| {sorted(report)}")
+
+# What the consent window says leaves, field by field (audit 2026-10-07,
+# L-5): the first edition named half of the report. A field added to the
+# report without a word for it here goes red, and so does a word taken out
+# of the window.
+SAID_AS = {
+    "schema": None,                       # the shape's number, not about you
+    "install": "случайный номер установки",
+    "app": "Версия программы",
+    "os": "Windows",
+    "language": "язык интерфейса",
+    "days": "сколько дней идёт подсчёт",
+    "features": "какие команды",
+    "tools": "инструменты срабатывали",
+    "errors": "коды ошибок",
+    "reasons": "причины отказов",
+    "timings": "время распознавания и первого звука",
+    "engines.stt_engine": "движки распознавания",
+    "engines.tts_engine": "озвучки",
+    "engines.model": "ответы моделью",
+    "engines.always_listen": "постоянное слушание",
+    "engines.personality": "личность",
+}
+with io.open(os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), "shell", "Rina.Shell", "Pages",
+                          "TelemetryConsent.xaml.cs"), encoding="utf-8") as f:
+    consent = f.read()
+fields = ((set(report) - {"engines"})
+          | {f"engines.{k}" for k in report["engines"]})
+check("каждое поле отчёта названо в окне согласия",
+      fields <= set(SAID_AS)
+      and all(word is None or word in consent for word in SAID_AS.values()),
+      f"| без слов: {sorted(fields - set(SAID_AS))}, нет в окне: "
+      f"{[w for w in SAID_AS.values() if w and w not in consent]}")
+check("и окно говорит, что адрес видит платформа",
+      "IP-адрес" in consent and "Vercel" in consent)
+
 check("намерения сосчитаны по каталогу",
       report["features"].get("calc") == 1
       and report["features"].get("app.launch") == 1, f"| {report['features']}")

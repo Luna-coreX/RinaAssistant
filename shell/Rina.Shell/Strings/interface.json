@@ -173,8 +173,14 @@
   "Версии, ссылки, из чего собрана": {
     "English": "Versions, links, what it’s made of"
   },
-  "Версия программы и Windows, какие команды и инструменты срабатывали и сколько раз, коды ошибок, время распознавания и первого звука, случайный номер установки.": {
-    "English": "The program and Windows versions, which commands and tools ran and how often, error codes, recognition and first-sound times, a random installation number."
+  "Версия программы и Windows, язык интерфейса, сколько дней идёт подсчёт; выбранные движки распознавания и озвучки, включены ли ответы моделью и постоянное слушание, своя ли у Рины личность; какие команды и инструменты срабатывали и сколько раз, коды ошибок и короткие причины отказов, время распознавания и первого звука; случайный номер установки.": {
+    "English": "The program and Windows versions, the interface language, how many days counting has run; the chosen recognition and speech engines, whether model answers and always-on listening are on, whether Rina has a persona of your own; which commands and tools ran and how often, error codes and short reasons for refusals, recognition and first-sound times; a random installation number."
+  },
+  "Кто видит ваш адрес": {
+    "English": "Who sees your address"
+  },
+  "Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до суток.": {
+    "English": "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to a day."
   },
   "Включить": {
     "English": "Switch on"
