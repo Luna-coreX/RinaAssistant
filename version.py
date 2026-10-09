@@ -7,7 +7,7 @@
 #: synthesis by sentences and barge-in, and 3.1.0 had none of that.
 #: "About" honestly showed "core 3.1.0" beside a 4.0.0 shell.
 APP_VERSION = "4.0.0-beta"
-BUILD = "2026.09"
+BUILD = "2026.10"
 
 LINKS = {
     "site": "https://www.rina-assistant.com/",
