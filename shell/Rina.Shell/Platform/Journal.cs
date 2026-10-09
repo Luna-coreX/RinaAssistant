@@ -64,6 +64,10 @@ public static class Journal
         => Write($"update stage={stage} {detail}");
 
     /// <summary>A system action: volume, power, screenshot.</summary>
+    /// <summary>A system call that failed, with what Windows said.</summary>
+    public static void Fault(string area, string detail)
+        => Write($"fault area={area} {detail}");
+
     public static void Action(string action, bool ok)
         => Write($"system action={action} result={(ok ? "ok" : "fail")}");
 

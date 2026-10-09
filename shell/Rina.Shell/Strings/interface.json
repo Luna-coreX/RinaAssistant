@@ -179,8 +179,8 @@
   "Кто видит ваш адрес": {
     "English": "Who sees your address"
   },
-  "Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до суток.": {
-    "English": "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to a day."
+  "Отчёт принимает сервер у Vercel. Сборщик IP-адрес не записывает, но сама платформа видит его в своём журнале вызовов и хранит до часа.": {
+    "English": "The report is received by a server on Vercel. The collector does not record your IP address, but the platform itself sees it in its request log and keeps it for up to an hour."
   },
   "Включить": {
     "English": "Switch on"

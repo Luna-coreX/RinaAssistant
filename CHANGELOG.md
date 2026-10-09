@@ -6,6 +6,11 @@ Releases before 3.0.0 are documented on the [releases page](https://github.com/L
 ---
 
 ## Unreleased
+ yet after 4.0.0-beta._
+
+---
+
+## 4.0.0-beta — 2026-10-10
 
 ### Fixed
 

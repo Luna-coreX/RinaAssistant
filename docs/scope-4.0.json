@@ -1020,7 +1020,7 @@
     "title": "Время и дата в ядре"
   },
   "4.0b-K04": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "M",
     "title": "Яркость экрана"
