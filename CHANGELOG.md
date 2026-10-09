@@ -6,27 +6,159 @@ Releases before 3.0.0 are documented on the [releases page](https://github.com/L
 ---
 
 ## Unreleased
- yet after 4.0.0-beta._
+
+_Nothing yet after 4.0.0-beta._
 
 ---
 
 ## 4.0.0-beta — 2026-10-10
 
-### Fixed
+The first open beta of Rina 4.0. The core is now a separate service with its
+own protocol; the window is a native Windows shell; the two talk over
+`docs/protocol/`. 4.0 is a rewrite rather than a port: the behaviour of 3.1.0
+is pinned by recorded utterances and sessions, and everything below is either
+new or changed on purpose.
 
-**"Убавь громкость" made it louder.** System phrases are matched in one pass, longest first, with a fuzzy fallback for misrecognition. "Убавь громкость" scores 0.875 against "прибавь громкость" — above the 0.82 threshold — and the latter is two characters longer, so it was tested first and won. Matching is now two passes: exact containment first, approximate only afterwards. An exact phrase must beat an approximate one whatever its length.
+### Highlights
 
-Found by the new golden-utterance set on its first run, which is precisely what that set exists for. All 53 system phrases now resolve to their own action, and the pair is kept as a regression case.
+- **Programs.** Finds what is installed from Start-menu shortcuts, the
+  registry, Store apps and folders you add. Matches transliterated and
+  misspoken names; when a name is ambiguous, asks, and remembers the answer.
+- **Timers, alarms and reminders** in plain language. They fire with the
+  window closed and survive restarts. Reminders can be tied to a program.
+- **System control.** Nineteen actions, including other programs' windows by
+  name ("закрой Discord", "сверни все окна"). Screen brightness on a laptop
+  panel and on DDC/CI monitors; where the screen cannot be driven, Rina says
+  so instead of pretending. Shutdown, restart, sleep and closing every window
+  always ask first.
+- **Your own commands**, built as a graph of steps: launch, open a folder or
+  a website, say something, run a system action, run a sequence; wait,
+  repeat, conditions, if/else, call another command, remember a value. A
+  visual builder with «Проверить», which runs the graph without saving it.
+  Commands imported from another machine arrive switched off.
+- **Work sessions, focus mode, a to-do list, reminders that depend on
+  context, and learning from corrections.** "Почему?" is answered from the call
+  journal: what was done, at whose request, and why it was refused.
+- **Plugins in their own processes.** A plugin declares its tools, its page
+  and its home tile; its tools get the same permission checks and
+  confirmations as built-in ones. Shipped with the beta: Weather and Exchange
+  rates. Secrets go to the Windows Credential Manager, not to a settings file.
+- **Voice both ways.** Recognition offline with Vosk or Whisper. Speech with
+  Edge, gTTS, Piper or pyttsx3, streamed sentence by sentence. While she
+  speaks, her name or «стоп» cuts her off.
+- **An optional language model** for anything she does not understand: Ollama,
+  LM Studio or llama.cpp on this computer, or OpenRouter with your own key.
+  Off by default; the settings page says plainly when an address is not local.
+- **«Что Рина знает обо мне».** One page lists everything she keeps: learned
+  words, conversation history, reminders, to-dos, commands, plugin data, the
+  journals, the copies made before a storage migration, saved sign-ins (that
+  they exist, never the values), unsigned programs you allowed, the list of
+  installed programs and every telemetry report that left. Each entry can be
+  opened, forgotten one at a time, by group, or all at once, and exported.
+- **Interface.** Three finishes, Russian and English, a floating command bar,
+  tray, global hotkeys, a first-run setup that downloads only what you pick.
+
+### Changed — read before updating from 3.1.0
+
+- **Plugins live in `%APPDATA%\RinaAssistant\plugins`**, not in the program's
+  folder. Plugins that were installed beside the program are moved there on
+  first start. Uninstalling the program leaves them alone.
+- **Search engines.** Google, Bing and Yandex are no longer offered. The
+  default is DuckDuckGo; Brave Search, Startpage, Mojeek and Qwant are added.
+  A stored choice of a removed engine becomes DuckDuckGo.
+- **Conversation history is not kept by default** in a new profile; the
+  first-run setup asks. An existing profile keeps its setting.
+- **The first-run setup downloads nothing unless you tick it.** Vosk is no
+  longer ticked in advance.
+- **«Забыть всё» removes more.** It also removes the journals and every
+  `backup-*` folder, including the copies made before a storage migration.
+  After it, going back to the previous storage format is no longer possible.
+- **Irreversible steps need confirmation wherever they sit** — inside a
+  branch, a loop, or a command called from another. «Проверить» skips such a
+  step and says so.
+- **Start-menu shortcuts are judged by what they start.** Unsigned targets
+  ask once, and a shortcut that hands a command to a signed interpreter asks
+  about the command, not about the interpreter.
+- **Installer.** Installs per user, with no administrator rights and no
+  changes to `PATH`. Updating goes into the same folder. Installing into a
+  non-empty folder that is not Rina's is refused. Uninstalling removes only
+  the program's own folders.
+
+### Security and privacy
+
+- The core launches nothing and touches no system setting itself. Programs,
+  system actions and web pages go through the shell, which checks them and
+  keeps the record; the shell refuses an irreversible action unless the core
+  passes on a confirmation.
+- Keys for language-model providers are kept per provider and sent only over
+  `https` or to this computer. A request carrying a key is never followed to
+  another address.
+- The security journal records every program launched, with its path and
+  time, and changes to settings that matter for security. The text of what
+  you said is not written unless you switch that on.
+- Beta telemetry is off until you switch it on. What leaves is numbers and
+  fixed words only; every report that left is shown in full on the privacy
+  page. It is removed in 4.0.0 Stable.
+- Threat model: `docs/security/THREAT-MODEL.md`.
+
+### Fixed before release
+
+- «Убавь громкость» made the volume go up: an exact phrase now always beats
+  an approximate one, whatever its length.
+- Every Start-menu program was reported as unsigned on its first launch, and
+  a shortcut into Downloads passed the folder check. Both are fixed by checking
+  the target.
+- An empty program list was kept for the whole session after a slow first
+  index, so every program answered «не нашла». Now it is asked again.
+- Telemetry switched off on the privacy page came back on the next command.
+- Irreversible steps inside a nested branch or a called command ran without a
+  question, and «Проверить» ran them as well.
+- Uninstalling removed the whole installation folder, including anything else
+  that was in it.
+- After the first brightness change on a laptop, every further step reported
+  that the screen cannot be driven. Found on a laptop and fixed.
+- The core's output stream was redirected and never read. A native library
+  writing a lot to it could block the core.
+- The consent window for telemetry did not name every field of the report.
+
+### Known limitations
+
+- **Not code-signed yet.** Windows SmartScreen warns about an unknown
+  publisher; «Подробнее → Выполнить в любом случае» runs it. Signing is planned
+  for 4.0.0 Stable.
+- **Speakers without headphones.** Echo cancellation is on. Once, in use, she
+  heard her own words; the situation has not been reproduced yet. Please
+  report what she was saying when it happens.
+- **The beta speaks with the voice you choose in the setup.** Rina's own voice
+  comes in 4.0.0 Stable.
+- **Piper** reads English program names with Russian phonetics.
+
+### Development
+
+- Python 3.12 is the development interpreter (it was 3.10+). `requirements.txt`
+  now lists the core's dependencies with pinned versions, and the release
+  build reads the same file. The old list of 3.1.0 is in `archive/3.1.0-app/`.
+- The release checks run against a temporary profile and never touch the
+  user's real settings.
 
 ### Licence
 
-**The project moved from MIT to the Apache License 2.0.** The reasoning is in [ADR 0001](docs/adr/0001-license-and-contributions.md); in short, Apache-2.0 gives everything MIT gave and adds two things this project needs — an explicit patent grant, and protection of the name, so a fork inherits the code but not the right to call itself Rina.
+**The project moved from MIT to the Apache License 2.0.** The reasoning is in
+[ADR 0001](docs/adr/0001-license-and-contributions.md); in short, Apache-2.0
+gives everything MIT gave and adds an explicit patent grant and protection of
+the name, so a fork inherits the code but not the right to call itself Rina.
 
-The change was made now because it could be: every commit so far is by one author, who could therefore relicense unilaterally. That stops being true the moment outside code is merged.
+The change was made now because it could be: every commit so far is by one
+author, who could therefore relicense unilaterally. That stops being true the
+moment outside code is merged.
 
-**This is not retroactive.** Releases up to and including 3.1.0 went out under MIT, and copies obtained under those terms keep them.
+**This is not retroactive.** Releases up to and including 3.1.0 went out under
+MIT, and copies obtained under those terms keep them.
 
-**Contributions need no agreement to sign.** Apache-2.0 section 5 licenses a submitted contribution under the same terms by default, which is the job a CLA would otherwise do. Added `CONTRIBUTING.md` describing this, `NOTICE` for attribution, and `docs/adr/` for decision records.
+**Contributions need no agreement to sign.** Apache-2.0 section 5 licenses a
+submitted contribution under the same terms by default, which is the job a CLA
+would otherwise do. See `CONTRIBUTING.md`, `NOTICE` for attribution, and
+`docs/adr/` for decision records.
 
 ---
 

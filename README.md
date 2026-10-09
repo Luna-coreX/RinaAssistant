@@ -40,7 +40,16 @@ any of it.
 
 ## Try it in five minutes
 
-Requires **Windows**, **Python 3.12** and **.NET 9**.
+**The installer** — Windows 10 (2004 or newer) or 11, 64-bit. Download
+`RinaAssistant-4.0.0-beta-setup.exe` from the
+[latest release](https://github.com/Luna-coreX/RinaAssistant/releases/latest)
+and run it. It installs into your user profile: no administrator rights, no
+changes to `PATH`, no service, no autostart unless you switch it on. The beta
+is not code-signed yet, so Windows warns about an unknown publisher: choose
+**More info → Run anyway**. The SHA-256 is on the release page.
+
+**From source** — for developers. Requires **Windows**, **Python 3.12** and
+**.NET 9**.
 
 ```bash
 git clone https://github.com/Luna-coreX/RinaAssistant.git
