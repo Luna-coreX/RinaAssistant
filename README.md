@@ -326,6 +326,9 @@ The sweep that walks that document rather than a list somebody maintains is
 
 Reporting a vulnerability: [`SECURITY.md`](SECURITY.md).
 
+Privacy: what stays on your computer and what leaves it, and by whose choice —
+[`PRIVACY.md`](PRIVACY.md) (English), [`PRIVACY.ru.md`](PRIVACY.ru.md) (русский).
+
 ---
 
 ## Contributing and feedback
