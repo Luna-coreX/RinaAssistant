@@ -539,6 +539,66 @@
     "size": "M",
     "title": "Документация архитектуры и дизайна"
   },
+  "4.0-P01": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Форма продавца и приём платежей"
+  },
+  "4.0-P02": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Учётная запись"
+  },
+  "4.0-P03": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Лицензия и активация устройства"
+  },
+  "4.0-P04": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "ProFeatures"
+  },
+  "4.0-P05": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Подписка и оплата"
+  },
+  "4.0-P06": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Доставка закрытых модулей"
+  },
+  "4.0-P07": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Синхронизация между устройствами"
+  },
+  "4.0-P08": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Наборы сценариев"
+  },
+  "4.0-P09": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "M",
+    "title": "Первый коннектор"
+  },
+  "4.0-P10": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "L",
+    "title": "Сервер учётных записей и лицензий"
+  },
   "4.0-R01": {
     "done": true,
     "milestone": "4.0-port",
