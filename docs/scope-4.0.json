@@ -629,6 +629,18 @@
     "size": "S",
     "title": "Телеметрия беты уходит из Stable"
   },
+  "4.0-S05": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Согласие на обработку персональных данных"
+  },
+  "4.0-S06": {
+    "done": false,
+    "milestone": "4.0-stable",
+    "size": "S",
+    "title": "Публичная оферта"
+  },
   "4.0-U01": {
     "done": true,
     "milestone": "4.0-port",
@@ -894,7 +906,7 @@
     "title": "Статьи"
   },
   "4.0b-D04": {
-    "done": false,
+    "done": true,
     "milestone": "4.0-beta",
     "size": "S",
     "title": "Вопросы к пользователям"
