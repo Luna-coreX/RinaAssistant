@@ -329,6 +329,10 @@ Reporting a vulnerability: [`SECURITY.md`](SECURITY.md).
 Privacy: what stays on your computer and what leaves it, and by whose choice —
 [`PRIVACY.md`](PRIVACY.md) (English), [`PRIVACY.ru.md`](PRIVACY.ru.md) (русский).
 
+Licence agreement for using the program, on top of Apache-2.0 and never
+narrower than it — [`EULA.md`](EULA.md) (English), [`EULA.ru.md`](EULA.ru.md)
+(русский, prevails).
+
 ---
 
 ## Contributing and feedback

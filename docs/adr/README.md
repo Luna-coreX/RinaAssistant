@@ -18,6 +18,7 @@ A decision belongs here when undoing it would mean rewriting rather than editing
 | [0010](0010-plugin-api.md) | Plugin API — a plugin declares tools, page and permissions; it does not act on its own | accepted | `4.0-H03` |
 | [0011](0011-python-runtime.md) | Python runtime — an embedded distribution ships with the installer | accepted | `4.0-I01` |
 | [0012](0012-voice-design.md) | How her own voice is made — designed from a description, stored as audio | **proposed** | `V-03` |
+| [0013](0013-paid-plans.md) | Paid plans — accounts and Pro arrive with Stable; paid code is closed and separate | accepted | `4.0-P01` |
 
 ## Decided but not yet written up
 

@@ -33,13 +33,15 @@ from typing import Protocol, runtime_checkable
 #: The list is not a promise but a dictionary of names: it exists so that a
 #: capability's name is written the same way in the core, in the shell and
 #: in a future licence server. Not one of them is limited today.
+#:
+#: GitHub is not here: its plugin (4.0-H14) is a base plugin and stays free
+#: (ADR 0013).
 FEATURES = {
     "rag":            "Поиск по локальным документам",
     "agents":         "Многошаговые сценарии с подтверждением",
     "sessions":       "Расширенная память рабочих сессий",
     "computer_use":   "Управление компьютером с предпросмотром",
     "sync":           "Зашифрованная синхронизация между устройствами",
-    "connector.github": "Интеграция с GitHub",
     "connector.notion": "Интеграция с Notion",
     "vrm":            "Компаньон на рабочем столе",
     "workflow_packs": "Готовые наборы сценариев",
